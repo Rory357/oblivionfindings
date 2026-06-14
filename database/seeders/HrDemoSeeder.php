@@ -6,13 +6,23 @@ use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrApprovalChain;
+use App\Domain\Hr\Models\HrBenefitEnrollment;
+use App\Domain\Hr\Models\HrBenefitPlan;
+use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Hr\Models\HrSalaryBand;
+use App\Domain\Hr\Models\HrSavedReport;
+use App\Models\StaffBackgroundCheck;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
@@ -21,6 +31,7 @@ use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrSurvey;
 use App\Domain\Hr\Models\HrSurveyQuestion;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\FeedService;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -50,6 +61,296 @@ class HrDemoSeeder extends Seeder
         $this->seedAssets($tenantId, $manager, $profiles);
         $this->seedTraining($tenantId, $profiles);
         $this->seedAnnouncementsAndSurveys($tenantId, $admin);
+        $this->seedRecognitionFeed($tenantId, $admin, $manager, $profiles);
+        $this->seedCompensationAndBenefits($tenantId, $admin, $manager, $profiles);
+        $this->seedComplianceExtras($tenantId, $admin, $manager, $profiles);
+    }
+
+    /**
+     * Seed the remaining hubs that were empty in demo: driver eligibility,
+     * vetting/background checks, approval chains, and saved reports.
+     * Idempotent via updateOrCreate on natural keys.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedComplianceExtras(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if ($profiles->isEmpty()) {
+            return;
+        }
+
+        // Driver eligibility register (user_id is unique per row).
+        $drivers = [
+            ['profile' => 0, 'number' => 'DL-DEMO-001', 'class' => 'Class 1', 'status' => 'eligible', 'canDrive' => true],
+            ['profile' => 1, 'number' => 'DL-DEMO-002', 'class' => 'Class 1', 'status' => 'pending_review', 'canDrive' => false],
+        ];
+
+        foreach ($drivers as $driver) {
+            HrDriverEligibility::updateOrCreate(
+                ['user_id' => $profiles[$driver['profile']]->user_id],
+                [
+                    'tenant_id' => $tenantId,
+                    'licence_number' => $driver['number'],
+                    'licence_class' => $driver['class'],
+                    'licence_endorsements' => ['P'],
+                    'licence_expires_at' => '2028-03-31',
+                    'incident_free_since' => '2024-01-01',
+                    'status' => $driver['status'],
+                    'can_drive_clients' => $driver['canDrive'],
+                    'can_drive_clients_approved_by' => $driver['canDrive'] ? $manager->id : null,
+                    'can_drive_clients_approved_at' => $driver['canDrive'] ? Carbon::parse('2026-04-02 09:00:00') : null,
+                    'next_review_at' => '2027-04-02',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Vetting / background checks (keyed by user + check type).
+        $checks = [
+            ['profile' => 0, 'type' => 'police_check', 'ref' => 'PV-DEMO-001'],
+            ['profile' => 1, 'type' => 'right_to_work', 'ref' => 'RTW-DEMO-002'],
+        ];
+
+        foreach ($checks as $check) {
+            StaffBackgroundCheck::updateOrCreate(
+                ['user_id' => $profiles[$check['profile']]->user_id, 'check_type' => $check['type']],
+                [
+                    'status' => 'clear',
+                    'reference_number' => $check['ref'],
+                    'provider' => 'Demo Vetting Service',
+                    'check_date' => '2026-01-20',
+                    'issue_date' => '2026-02-01',
+                    'expires_at' => '2029-02-01',
+                    'disclosures_present' => false,
+                    'updated_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Approval chains (configuration only; instances are created by business
+        // flows, which is a separate design decision).
+        $chains = [
+            ['name' => 'Leave Approval', 'process_type' => 'leave'],
+            ['name' => 'Expense Approval', 'process_type' => 'expense'],
+        ];
+
+        foreach ($chains as $chainData) {
+            $chain = HrApprovalChain::updateOrCreate(
+                ['tenant_id' => $tenantId, 'name' => $chainData['name']],
+                [
+                    'process_type' => $chainData['process_type'],
+                    'is_active' => true,
+                    'created_by' => $admin->id,
+                ],
+            );
+
+            $chain->steps()->updateOrCreate(
+                ['step_order' => 1],
+                [
+                    'approver_type' => 'manager',
+                    'auto_approve_after_days' => 7,
+                    'created_at' => now(),
+                ],
+            );
+        }
+
+        // Saved reports (tenant_id null to match the controller's current scope).
+        $reports = [
+            ['name' => 'Active Staff', 'type' => 'employee', 'fields' => ['employee_number', 'name', 'position_title', 'department']],
+            ['name' => 'Leave Register', 'type' => 'leave', 'fields' => ['employee_name', 'leave_type', 'start_date', 'end_date', 'status']],
+        ];
+
+        foreach ($reports as $report) {
+            HrSavedReport::updateOrCreate(
+                ['tenant_id' => null, 'name' => $report['name']],
+                [
+                    'report_type' => $report['type'],
+                    'fields' => $report['fields'],
+                    'sort_direction' => 'asc',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+    }
+
+    /**
+     * Seed the Compensation & Benefits hubs (salary bands, a comp review, bonus
+     * payments, benefit plans + enrollments) so they aren't empty in demo.
+     * Idempotent via updateOrCreate on natural keys.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedCompensationAndBenefits(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if ($profiles->isEmpty()) {
+            return;
+        }
+
+        // Salary bands by role.
+        $bands = [
+            ['role' => 'support_worker', 'name' => 'Support Worker', 'min' => 50000, 'mid' => 58000, 'max' => 66000, 'minH' => 24.0, 'maxH' => 32.0],
+            ['role' => 'team_lead', 'name' => 'Team Lead', 'min' => 66000, 'mid' => 74000, 'max' => 82000, 'minH' => 32.0, 'maxH' => 40.0],
+            ['role' => 'provider_manager', 'name' => 'Manager', 'min' => 90000, 'mid' => 105000, 'max' => 120000, 'minH' => 43.0, 'maxH' => 58.0],
+        ];
+
+        foreach ($bands as $band) {
+            HrSalaryBand::updateOrCreate(
+                ['tenant_id' => $tenantId, 'position_role' => $band['role'], 'band_name' => $band['name']],
+                [
+                    'min_salary' => $band['min'],
+                    'mid_salary' => $band['mid'],
+                    'max_salary' => $band['max'],
+                    'min_hourly' => $band['minH'],
+                    'max_hourly' => $band['maxH'],
+                    'currency' => 'NZD',
+                    'effective_from' => '2026-04-01',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // An annual compensation review cycle.
+        HrCompensationReview::updateOrCreate(
+            ['tenant_id' => $tenantId, 'title' => 'FY2026 Annual Review'],
+            [
+                'review_cycle' => 'annual',
+                'effective_date' => '2026-07-01',
+                'status' => 'planning',
+                'budget_amount' => 25000,
+                'notes' => 'Seeded annual compensation review for HR demo.',
+                'created_by' => $admin->id,
+            ],
+        );
+
+        // A couple of bonus payments.
+        $bonuses = [
+            ['profile' => 0, 'type' => 'spot', 'amount' => 500, 'date' => '2026-05-20', 'status' => 'approved', 'reason' => 'Outstanding shift cover'],
+            ['profile' => 1, 'type' => 'performance', 'amount' => 1200, 'date' => '2026-06-01', 'status' => 'pending', 'reason' => 'Annual performance bonus'],
+        ];
+
+        foreach ($bonuses as $bonus) {
+            HrBonusPayment::updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'employee_profile_id' => $profiles[$bonus['profile']]->id,
+                    'bonus_type' => $bonus['type'],
+                    'payment_date' => $bonus['date'],
+                ],
+                [
+                    'amount' => $bonus['amount'],
+                    'currency' => 'NZD',
+                    'reason' => $bonus['reason'],
+                    'status' => $bonus['status'],
+                    'approved_by' => $bonus['status'] === 'approved' ? $manager->id : null,
+                    'approved_at' => $bonus['status'] === 'approved' ? Carbon::parse($bonus['date'].' 09:00:00') : null,
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Benefit plans + enrollments.
+        $kiwiSaver = HrBenefitPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'KiwiSaver (Employer 3%)'],
+            [
+                'type' => 'kiwisaver',
+                'provider' => 'Default KiwiSaver Scheme',
+                'description' => 'Standard KiwiSaver with 3% employer contribution.',
+                'employer_contribution_rate' => 3,
+                'is_active' => true,
+            ],
+        );
+
+        $health = HrBenefitPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'Southern Cross Health'],
+            [
+                'type' => 'health_insurance',
+                'provider' => 'Southern Cross',
+                'description' => 'Subsidised health insurance.',
+                'employer_contribution_rate' => 50,
+                'is_active' => true,
+            ],
+        );
+
+        foreach ([0, 1] as $i) {
+            HrBenefitEnrollment::updateOrCreate(
+                ['tenant_id' => $tenantId, 'employee_profile_id' => $profiles[$i]->id, 'benefit_plan_id' => $kiwiSaver->id],
+                [
+                    'enrollment_date' => '2026-01-15',
+                    'status' => 'active',
+                    'employee_contribution_rate' => 3,
+                    'employer_contribution_rate' => 3,
+                ],
+            );
+        }
+
+        HrBenefitEnrollment::updateOrCreate(
+            ['tenant_id' => $tenantId, 'employee_profile_id' => $profiles[0]->id, 'benefit_plan_id' => $health->id],
+            [
+                'enrollment_date' => '2026-02-01',
+                'status' => 'active',
+                'employee_contribution_rate' => 0,
+                'employer_contribution_rate' => 50,
+            ],
+        );
+    }
+
+    /**
+     * Seed the community feed: a couple of posts + a handful of peer kudos so
+     * the recognition feed isn't empty in demo. Idempotent — skips if the feed
+     * already has posts for this tenant.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedRecognitionFeed(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if (HrFeedPost::query()->where('tenant_id', $tenantId)->exists()) {
+            return;
+        }
+
+        $workers = $profiles->map(fn (HrEmployeeProfile $p) => $p->user)->filter()->values();
+        if ($workers->count() < 1) {
+            return;
+        }
+
+        // A couple of general feed posts.
+        HrFeedPost::create([
+            'tenant_id' => $tenantId,
+            'user_id' => $admin->id,
+            'post_type' => 'announcement',
+            'content' => 'Welcome to the community feed — share wins and recognise your teammates here!',
+            'is_pinned' => true,
+        ]);
+        HrFeedPost::create([
+            'tenant_id' => $tenantId,
+            'user_id' => $manager->id,
+            'post_type' => 'update',
+            'content' => 'Great effort covering the weekend roster, everyone. The new intake settled in smoothly.',
+            'is_pinned' => false,
+        ]);
+
+        // A handful of peer kudos (each also creates a kudos feed post).
+        $feed = app(FeedService::class);
+        $givers = collect([$manager, $admin])->merge($workers)->values();
+        $kudos = [
+            ['category' => 'teamwork', 'message' => 'Stepped in to cover a short-notice sleepover — huge help to the team.'],
+            ['category' => 'going_above', 'message' => 'Stayed back to support a client through a tough evening. Above and beyond.'],
+            ['category' => 'customer_focus', 'message' => 'The family specifically called out how supported they felt this week.'],
+            ['category' => 'innovation', 'message' => 'Reworked the handover checklist and it has saved everyone time.'],
+            ['category' => 'leadership', 'message' => 'Calmly led the team through a busy shift and kept everyone on track.'],
+        ];
+
+        foreach ($kudos as $index => $entry) {
+            $from = $givers[$index % $givers->count()];
+            $to = $workers[$index % $workers->count()];
+            if ($from->id === $to->id) {
+                $to = $workers[($index + 1) % $workers->count()];
+            }
+            if ($from->id === $to->id) {
+                continue; // not enough distinct users
+            }
+
+            $feed->sendKudos($from, $to->id, $entry['category'], $entry['message'], $tenantId);
+        }
     }
 
     private function resolveTenantId(): int

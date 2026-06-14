@@ -251,6 +251,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                                                     type="button"
                                                     variant="outline"
                                                     size="icon"
+                                                    aria-label="Edit salary band"
                                                     onClick={() =>
                                                         openEdit(band)
                                                     }

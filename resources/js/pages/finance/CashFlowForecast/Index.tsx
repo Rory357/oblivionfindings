@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,6 +99,7 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
                                 </Button>
                             </Link>
                         }
+                        footer={<ReportsTabsFooter active="cash-flow-forecast" />}
                     />
                 }
             >

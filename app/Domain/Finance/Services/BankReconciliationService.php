@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankReconciliation;
 use App\Domain\Finance\Models\FinBankReconciliationLine;
@@ -13,6 +14,10 @@ use Illuminate\Support\Str;
 
 class BankReconciliationService
 {
+    public function __construct(
+        private readonly JournalPostingService $journalPostingService,
+    ) {}
+
     /**
      * Parse CSV file and create FinBankTransaction records.
      * CSV format: Date,Amount,Description,Reference (first row headers).
@@ -39,6 +44,7 @@ class BankReconciliationService
             while (($row = fgetcsv($handle)) !== false) {
                 if (count($row) < 3) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -49,6 +55,7 @@ class BankReconciliationService
 
                 if ($date === null) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -117,7 +124,7 @@ class BankReconciliationService
             ->whereHas('journal', function ($q) {
                 $q->where('status', 'posted');
             })
-            ->when(!empty($matchedJournalLineIds), function ($q) use ($matchedJournalLineIds) {
+            ->when(! empty($matchedJournalLineIds), function ($q) use ($matchedJournalLineIds) {
                 $q->whereNotIn('id', $matchedJournalLineIds);
             })
             ->with('journal:id,journal_number,journal_date,description')
@@ -185,24 +192,78 @@ class BankReconciliationService
     /**
      * Create a reconciliation line matching a bank transaction to an optional journal line.
      */
-    public function matchTransaction(int $reconciliationId, int $bankTransactionId, ?int $journalLineId): FinBankReconciliationLine
+    public function matchTransaction(int $reconciliationId, int $bankTransactionId, ?int $journalLineId, ?int $adjustmentAccountId = null): FinBankReconciliationLine
     {
         $transaction = FinBankTransaction::findOrFail($bankTransactionId);
 
-        $line = FinBankReconciliationLine::create([
-            'reconciliation_id' => $reconciliationId,
-            'bank_transaction_id' => $bankTransactionId,
-            'journal_line_id' => $journalLineId,
-            'is_matched' => true,
-        ]);
+        return DB::transaction(function () use ($reconciliationId, $bankTransactionId, $journalLineId, $adjustmentAccountId, $transaction) {
+            // A statement line with no existing journal (bank fee, interest, etc.)
+            // can be matched "as an adjustment": post a balanced journal against the
+            // chosen account so the GL reflects it, then match the new bank-side line.
+            if ($journalLineId === null && $adjustmentAccountId !== null) {
+                $journalLineId = $this->postAdjustmentJournal($transaction, $adjustmentAccountId);
+            }
 
-        $transaction->update([
-            'status' => 'matched',
-            'reconciliation_id' => $reconciliationId,
-            'matched_journal_line_id' => $journalLineId,
-        ]);
+            $line = FinBankReconciliationLine::create([
+                'reconciliation_id' => $reconciliationId,
+                'bank_transaction_id' => $bankTransactionId,
+                'journal_line_id' => $journalLineId,
+                'is_matched' => true,
+            ]);
 
-        return $line;
+            $transaction->update([
+                'status' => 'matched',
+                'reconciliation_id' => $reconciliationId,
+                'matched_journal_line_id' => $journalLineId,
+            ]);
+
+            return $line;
+        });
+    }
+
+    /**
+     * Post a balanced adjustment journal for an unmatched statement line and return
+     * the bank-side journal line id (the GL movement the reconciliation matches).
+     * Outflow (fee): DR adjustment account / CR bank. Inflow (interest): DR bank /
+     * CR adjustment account. The bank GL is the account's gl_account_id, else 1000.
+     */
+    private function postAdjustmentJournal(FinBankTransaction $transaction, int $adjustmentAccountId): int
+    {
+        $bankAccount = FinBankAccount::findOrFail($transaction->bank_account_id);
+        $orgId = $bankAccount->organization_id;
+
+        $bankGlId = $bankAccount->gl_account_id
+            ?: FinAccount::forOrganization($orgId)->where('code', '1000')->where('is_active', true)->value('id');
+
+        if (! $bankGlId) {
+            throw new \InvalidArgumentException('No bank GL account is configured for this bank account.');
+        }
+
+        $amount = number_format(abs((float) $transaction->amount), 2, '.', '');
+        $isOutflow = (float) $transaction->amount < 0;
+
+        $adjustmentLine = ['account_id' => $adjustmentAccountId, 'description' => $transaction->description ?: 'Bank adjustment'];
+        $bankLine = ['account_id' => $bankGlId, 'description' => $transaction->description ?: 'Bank adjustment'];
+
+        if ($isOutflow) {
+            $adjustmentLine += ['debit' => $amount, 'credit' => 0];
+            $bankLine += ['debit' => 0, 'credit' => $amount];
+        } else {
+            $bankLine += ['debit' => $amount, 'credit' => 0];
+            $adjustmentLine += ['debit' => 0, 'credit' => $amount];
+        }
+
+        $journal = $this->journalPostingService->createAndPost($orgId, [
+            'journal_date' => $transaction->transaction_date->toDateString(),
+            'type' => 'standard',
+            'reference' => $transaction->reference ?: "REC-{$transaction->id}",
+            'description' => 'Bank reconciliation adjustment: '.($transaction->description ?: "transaction #{$transaction->id}"),
+            'source_type' => FinBankTransaction::class,
+            'source_id' => $transaction->id,
+            'lines' => [$adjustmentLine, $bankLine],
+        ])->load('lines');
+
+        return $journal->lines->firstWhere('account_id', $bankGlId)->id;
     }
 
     /**
@@ -305,7 +366,7 @@ class BankReconciliationService
             $amountMatches = true;
         }
 
-        if (!$amountMatches) {
+        if (! $amountMatches) {
             return null;
         }
 
@@ -320,8 +381,8 @@ class BankReconciliationService
 
         // Reference/description partial match
         $hasTextMatch = $this->hasPartialTextMatch(
-            $transaction->reference . ' ' . $transaction->description,
-            $journalLine->description . ' ' . ($journalLine->journal->reference ?? '')
+            $transaction->reference.' '.$transaction->description,
+            $journalLine->description.' '.($journalLine->journal->reference ?? '')
         );
 
         // Determine confidence
@@ -346,8 +407,8 @@ class BankReconciliationService
         }
 
         // Extract meaningful words (3+ chars)
-        $words1 = array_filter(preg_split('/\s+/', $text1), fn($w) => strlen($w) >= 3);
-        $words2 = array_filter(preg_split('/\s+/', $text2), fn($w) => strlen($w) >= 3);
+        $words1 = array_filter(preg_split('/\s+/', $text1), fn ($w) => strlen($w) >= 3);
+        $words2 = array_filter(preg_split('/\s+/', $text2), fn ($w) => strlen($w) >= 3);
 
         foreach ($words1 as $word) {
             foreach ($words2 as $other) {

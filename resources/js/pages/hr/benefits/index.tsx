@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Heart, Plus, ShieldCheck } from 'lucide-react';
+import { Heart, Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface BenefitPlan {
@@ -68,9 +68,16 @@ interface Summary {
     };
 }
 
+interface Employee {
+    id: number;
+    user: { id: number; name: string } | null;
+    position_title: string | null;
+}
+
 interface Props {
     enrollments: { data: Enrollment[]; links: any[] };
     plans: BenefitPlan[];
+    employees: Employee[];
     summary: Summary;
     filters: { status: string | null; plan_id: string | null };
     can: { manage: boolean };
@@ -119,9 +126,17 @@ const emptyEnrollForm = {
     notes: '',
 };
 
+const emptyEditForm = {
+    status: 'active',
+    employee_contribution_rate: '',
+    employer_contribution_rate: '',
+    notes: '',
+};
+
 export default function BenefitsIndex({
     enrollments,
     plans,
+    employees,
     summary,
     filters,
     can,
@@ -129,11 +144,35 @@ export default function BenefitsIndex({
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyEnrollForm);
+    const [editId, setEditId] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState(emptyEditForm);
 
     const fieldError = (field: string) =>
         errors?.[field] ? (
             <p className="mt-1 text-xs text-status-critical">{errors[field]}</p>
         ) : null;
+
+    const openEdit = (enrollment: Enrollment) => {
+        setEditId(enrollment.id);
+        setEditForm({
+            status: enrollment.status,
+            employee_contribution_rate: enrollment.employee_contribution_rate ?? '',
+            employer_contribution_rate: enrollment.employer_contribution_rate ?? '',
+            notes: enrollment.notes ?? '',
+        });
+    };
+
+    const setEdit = (key: string, value: string) =>
+        setEditForm((prev) => ({ ...prev, [key]: value }));
+
+    const submitEdit = (e: FormEvent) => {
+        e.preventDefault();
+        if (editId === null) return;
+        router.put(`/hr/benefits/enrollments/${editId}`, editForm, {
+            preserveScroll: true,
+            onSuccess: () => setEditId(null),
+        });
+    };
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -299,6 +338,11 @@ export default function BenefitsIndex({
                                     <TableHead>Employer Rate</TableHead>
                                     <TableHead>Enrolled</TableHead>
                                     <TableHead>Status</TableHead>
+                                    {can.manage && (
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -348,12 +392,26 @@ export default function BenefitsIndex({
                                                 )}
                                             </span>
                                         </TableCell>
+                                        {can.manage && (
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openEdit(enrollment)
+                                                    }
+                                                >
+                                                    <Pencil className="mr-1 h-3 w-3" />
+                                                    Edit
+                                                </Button>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))}
                                 {!enrollments.data.length && (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={7}
+                                            colSpan={can.manage ? 8 : 7}
                                             className="py-12 text-center"
                                         >
                                             <div className="flex flex-col items-center gap-2">
@@ -406,18 +464,31 @@ export default function BenefitsIndex({
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         <div>
-                            <Label htmlFor="employee_profile_id">
-                                Employee Profile ID
-                            </Label>
-                            <Input
-                                id="employee_profile_id"
-                                type="number"
+                            <Label htmlFor="employee_profile_id">Employee</Label>
+                            <Select
                                 value={form.employee_profile_id}
-                                onChange={(e) =>
-                                    set('employee_profile_id', e.target.value)
+                                onValueChange={(val) =>
+                                    set('employee_profile_id', val)
                                 }
-                                required
-                            />
+                            >
+                                <SelectTrigger id="employee_profile_id">
+                                    <SelectValue placeholder="Select an employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map((emp) => (
+                                        <SelectItem
+                                            key={emp.id}
+                                            value={String(emp.id)}
+                                        >
+                                            {emp.user?.name ??
+                                                `Profile #${emp.id}`}
+                                            {emp.position_title
+                                                ? ` — ${emp.position_title}`
+                                                : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             {fieldError('employee_profile_id')}
                         </div>
                         <div>
@@ -520,6 +591,103 @@ export default function BenefitsIndex({
                                 Cancel
                             </Button>
                             <Button type="submit">Enroll</Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Enrollment Dialog */}
+            <Dialog
+                open={editId !== null}
+                onOpenChange={(o) => !o && setEditId(null)}
+            >
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Update Enrollment</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submitEdit} className="space-y-4">
+                        <div>
+                            <Label htmlFor="edit_status">Status</Label>
+                            <Select
+                                value={editForm.status}
+                                onValueChange={(val) => setEdit('status', val)}
+                            >
+                                <SelectTrigger id="edit_status">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="opted_out">
+                                        Opted Out
+                                    </SelectItem>
+                                    <SelectItem value="suspended">
+                                        Suspended
+                                    </SelectItem>
+                                    <SelectItem value="terminated">
+                                        Terminated
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {fieldError('status')}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label htmlFor="edit_employee_rate">
+                                    Employee Rate (%)
+                                </Label>
+                                <Input
+                                    id="edit_employee_rate"
+                                    type="number"
+                                    step="0.01"
+                                    value={editForm.employee_contribution_rate}
+                                    onChange={(e) =>
+                                        setEdit(
+                                            'employee_contribution_rate',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                {fieldError('employee_contribution_rate')}
+                            </div>
+                            <div>
+                                <Label htmlFor="edit_employer_rate">
+                                    Employer Rate (%)
+                                </Label>
+                                <Input
+                                    id="edit_employer_rate"
+                                    type="number"
+                                    step="0.01"
+                                    value={editForm.employer_contribution_rate}
+                                    onChange={(e) =>
+                                        setEdit(
+                                            'employer_contribution_rate',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                {fieldError('employer_contribution_rate')}
+                            </div>
+                        </div>
+                        <div>
+                            <Label htmlFor="edit_notes">Notes</Label>
+                            <Textarea
+                                id="edit_notes"
+                                value={editForm.notes}
+                                onChange={(e) => setEdit('notes', e.target.value)}
+                            />
+                            {fieldError('notes')}
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setEditId(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit">Save</Button>
                         </div>
                     </form>
                 </DialogContent>

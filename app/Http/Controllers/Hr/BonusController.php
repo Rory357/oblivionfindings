@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BonusController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List bonus payments with filters.
      */
@@ -83,7 +85,7 @@ class BonusController extends Controller
         ]);
 
         HrBonusPayment::create([
-            'tenant_id' => null,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'employee_profile_id' => $data['employee_profile_id'],
             'bonus_type' => $data['bonus_type'],
             'amount' => $data['amount'],
@@ -116,36 +118,5 @@ class BonusController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Bonus payment approved.');
-    }
-
-    /**
-     * Show bonus detail.
-     */
-    public function show(Request $request, HrBonusPayment $bonus)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-
-        $bonus->load([
-            'employeeProfile.user:id,name,email',
-            'approver:id,name',
-            'creator:id,name',
-        ]);
-
-        return Inertia::render('hr/compensation/bonuses', [
-            'bonus' => [
-                'id' => $bonus->id,
-                'employee_name' => $bonus->employeeProfile?->user?->name ?? 'Unknown',
-                'bonus_type' => $bonus->bonus_type,
-                'amount' => $bonus->amount,
-                'currency' => $bonus->currency,
-                'reason' => $bonus->reason,
-                'payment_date' => $bonus->payment_date?->toDateString(),
-                'status' => $bonus->status,
-                'approved_by' => $bonus->approver?->name,
-                'approved_at' => $bonus->approved_at?->toDateTimeString(),
-                'created_by' => $bonus->creator?->name,
-            ],
-        ]);
     }
 }

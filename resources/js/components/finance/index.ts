@@ -4,17 +4,23 @@
 // WizardShell kit (wizard), StatusBadge (hr) — are reused, not duplicated, so
 // Finance tabs/modals/badges are visually identical to HR + Rostering. Only the
 // finance-specific pieces (hero category, money field, posting preview) are new.
+export * from './banking-hub';
 export * from './finance-hero';
 export * from './finance-tabs';
 export * from './ledger-hub';
 export * from './money';
 export * from './new-account-dialog';
+export * from './new-bill-dialog';
 export * from './new-invoice-dialog';
 export * from './new-journal-dialog';
+export * from './new-po-dialog';
+export * from './new-vendor-dialog';
 export * from './payables-hub';
 export * from './posting-preview';
 export * from './receivables-hub';
 export * from './record-receipt-dialog';
+export * from './reports-hub';
+export * from './tax-hub';
 export * from './wizard';
 
 // Reuse HR's legible StatusBadge (already covers paid/posted/overdue/approved/…)

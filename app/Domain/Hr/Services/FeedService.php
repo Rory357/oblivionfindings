@@ -32,11 +32,11 @@ class FeedService
     /**
      * Create a new feed post.
      */
-    public function createPost(User $user, array $data): HrFeedPost
+    public function createPost(User $user, array $data, ?int $tenantId = null): HrFeedPost
     {
-        return DB::transaction(function () use ($user, $data) {
+        return DB::transaction(function () use ($user, $data, $tenantId) {
             return HrFeedPost::create([
-                'tenant_id' => $user->tenant_id,
+                'tenant_id' => $tenantId ?? $user->tenant_id,
                 'user_id' => $user->id,
                 'post_type' => $data['post_type'] ?? 'update',
                 'content' => $data['content'],
@@ -48,14 +48,15 @@ class FeedService
     /**
      * Send kudos to another user. Also creates a corresponding feed post.
      */
-    public function sendKudos(User $from, int $toUserId, string $category, string $message): HrKudos
+    public function sendKudos(User $from, int $toUserId, string $category, string $message, ?int $tenantId = null): HrKudos
     {
-        return DB::transaction(function () use ($from, $toUserId, $category, $message) {
-            $toUser = User::findOrFail($toUserId);
+        return DB::transaction(function () use ($from, $toUserId, $category, $message, $tenantId) {
+            User::findOrFail($toUserId);
+            $resolvedTenantId = $tenantId ?? $from->tenant_id;
 
             // Create a feed post for the kudos
             $feedPost = HrFeedPost::create([
-                'tenant_id' => $from->tenant_id,
+                'tenant_id' => $resolvedTenantId,
                 'user_id' => $from->id,
                 'post_type' => 'kudos',
                 'content' => $message,
@@ -63,7 +64,7 @@ class FeedService
             ]);
 
             return HrKudos::create([
-                'tenant_id' => $from->tenant_id,
+                'tenant_id' => $resolvedTenantId,
                 'from_user_id' => $from->id,
                 'to_user_id' => $toUserId,
                 'category' => $category,

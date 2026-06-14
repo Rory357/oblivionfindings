@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -405,6 +406,7 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
                             { label: 'Failed', value: errorCount },
                         ]}
                         actions={<CreateIntegrationDialog />}
+                        footer={<SettingsTabsFooter active="integrations" />}
                     />
                 }
             >

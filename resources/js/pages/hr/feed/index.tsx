@@ -1,15 +1,8 @@
+import { RecognitionDialog } from '@/components/hr/recognition-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -120,12 +113,6 @@ export default function FeedIndex({
         post_type: 'update',
     });
 
-    const kudosForm = useForm({
-        to_user_id: '',
-        category: '',
-        message: '',
-    });
-
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
             '/hr/feed',
@@ -142,22 +129,10 @@ export default function FeedIndex({
         });
     };
 
-    const submitKudos = (e: React.FormEvent) => {
-        e.preventDefault();
-        kudosForm.post('/hr/feed/kudos', {
-            preserveScroll: true,
-            onSuccess: () => {
-                kudosForm.reset();
-                setKudosOpen(false);
-            },
-        });
-    };
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Community Feed" />
-            <Dialog open={kudosOpen} onOpenChange={setKudosOpen}>
-                <PageLayout
+            <PageLayout
                     hero={
                         <PageHero category="hr"
                             icon={Rss}
@@ -170,123 +145,18 @@ export default function FeedIndex({
                                 { label: 'New hires', value: milestones.new_hires.length },
                             ]}
                             actions={
-                                <DialogTrigger asChild>
-                                    <Button size="sm">
-                                        <Heart className="mr-1.5 h-4 w-4" />
-                                        Send Kudos
-                                    </Button>
-                                </DialogTrigger>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setKudosOpen(true)}
+                                >
+                                    <Heart className="mr-1.5 h-4 w-4" />
+                                    Send Kudos
+                                </Button>
                             }
                         />
                     }
                 >
-                    <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Send Kudos</DialogTitle>
-                                <DialogDescription>
-                                    Recognize a colleague for their great work
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={submitKudos} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="to_user_id">
-                                        Recipient
-                                    </Label>
-                                    <Select
-                                        value={kudosForm.data.to_user_id}
-                                        onValueChange={(v) =>
-                                            kudosForm.setData('to_user_id', v)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a colleague" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {employees.map((emp) => (
-                                                <SelectItem
-                                                    key={emp.id}
-                                                    value={String(emp.id)}
-                                                >
-                                                    {emp.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {kudosForm.errors.to_user_id && (
-                                        <p className="text-sm text-destructive">
-                                            {kudosForm.errors.to_user_id}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="category">Category</Label>
-                                    <Select
-                                        value={kudosForm.data.category}
-                                        onValueChange={(v) =>
-                                            kudosForm.setData('category', v)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.entries(
-                                                kudosCategories,
-                                            ).map(([key, label]) => (
-                                                <SelectItem
-                                                    key={key}
-                                                    value={key}
-                                                >
-                                                    {label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {kudosForm.errors.category && (
-                                        <p className="text-sm text-destructive">
-                                            {kudosForm.errors.category}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="message">Message</Label>
-                                    <Textarea
-                                        id="message"
-                                        value={kudosForm.data.message}
-                                        onChange={(e) =>
-                                            kudosForm.setData(
-                                                'message',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="What did they do that was awesome?"
-                                        rows={3}
-                                    />
-                                    {kudosForm.errors.message && (
-                                        <p className="text-sm text-destructive">
-                                            {kudosForm.errors.message}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setKudosOpen(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={kudosForm.processing}
-                                    >
-                                        Send Kudos
-                                    </Button>
-                                </div>
-                            </form>
-                        </DialogContent>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     {/* Left Sidebar — Milestones */}
                     <div className="space-y-4 lg:col-span-1">
                         <Card>
@@ -602,8 +472,14 @@ export default function FeedIndex({
                         </Card>
                     </div>
                 </div>
+
+                <RecognitionDialog
+                    open={kudosOpen}
+                    onClose={() => setKudosOpen(false)}
+                    employees={employees}
+                    kudosCategories={kudosCategories}
+                />
                 </PageLayout>
-            </Dialog>
         </AppLayout>
     );
 }

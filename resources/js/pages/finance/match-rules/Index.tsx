@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { BankingTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -327,6 +328,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                             { label: 'Active', value: activeCount },
                         ]}
                         actions={<CreateRuleDialog />}
+                        footer={<BankingTabsFooter active="match-rules" />}
                     />
                 }
             >

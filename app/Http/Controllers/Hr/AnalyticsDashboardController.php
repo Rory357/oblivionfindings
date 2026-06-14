@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Services\WorkforceAnalyticsService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AnalyticsDashboardController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly WorkforceAnalyticsService $analyticsService,
     ) {}
@@ -22,7 +25,7 @@ class AnalyticsDashboardController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.analytics.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $headcountTrend = $this->analyticsService->getHeadcountTrend($tenantId, 12);
         $turnoverRate = $this->analyticsService->getTurnoverRate($tenantId, 'year');

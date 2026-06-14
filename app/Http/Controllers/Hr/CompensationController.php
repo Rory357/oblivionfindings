@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -14,6 +15,8 @@ use Inertia\Inertia;
 
 class CompensationController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         protected CompensationService $compensationService,
     ) {}
@@ -68,7 +71,7 @@ class CompensationController extends Controller
         ]);
 
         HrSalaryBand::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'created_by' => $user->id,
             ...$data,
         ]);
@@ -203,12 +206,12 @@ class CompensationController extends Controller
         ]);
 
         $this->compensationService->createCompensationReview([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'created_by' => $user->id,
             ...$data,
         ]);
 
-        return redirect()->route('hr.compensation.reviews.index')->with('success', 'Compensation review created.');
+        return redirect()->route('hr.compensation.reviews')->with('success', 'Compensation review created.');
     }
 
     /**
@@ -244,6 +247,23 @@ class CompensationController extends Controller
     }
 
     /**
+     * Approve a compensation review (planning/in_progress → approved) so it can be applied.
+     */
+    public function approveReview(Request $request, HrCompensationReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+
+        try {
+            $this->compensationService->approveCompensationReview($review, $user->id);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Compensation review approved. You can now apply it to update employee salaries.');
+    }
+
+    /**
      * Apply an approved compensation review (bulk update).
      */
     public function applyReview(Request $request, HrCompensationReview $review)
@@ -251,7 +271,11 @@ class CompensationController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
 
-        $this->compensationService->applyCompensationReview($review);
+        try {
+            $this->compensationService->applyCompensationReview($review);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Compensation review applied successfully. Employee profiles have been updated.');
     }

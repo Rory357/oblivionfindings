@@ -29,8 +29,7 @@ type PolicyVersion = {
     version_number: string;
     document_path?: string | null;
     effective_from: string;
-    content: string;
-    change_summary: string | null;
+    content_summary: string | null;
     created_at: string;
 };
 
@@ -49,7 +48,7 @@ type Policy = {
     is_active: boolean;
     requires_attestation: boolean;
     description: string | null;
-    currentVersion: PolicyVersion | null;
+    current_version: PolicyVersion | null;
     versions: PolicyVersion[];
     attestations: Attestation[];
 };
@@ -172,17 +171,17 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                         Attestation Required
                                     </Badge>
                                 )}
-                                {policy.currentVersion && (
+                                {policy.current_version && (
                                     <Badge variant="outline">
                                         v
-                                        {policy.currentVersion.version_number}
+                                        {policy.current_version.version_number}
                                     </Badge>
                                 )}
                             </span>
                         }
                         actions={
                             <>
-                                {policy.currentVersion?.document_path && (
+                                {policy.current_version?.document_path && (
                                     <>
                                         <Link
                                             href={`/hr/policies/${policy.id}/download`}
@@ -279,28 +278,27 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                     </div>
                 )}
 
-                {policy.currentVersion && (
+                {policy.current_version?.content_summary && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <FileText className="h-5 w-5 text-status-info" />
                                 Current Version (v
-                                {policy.currentVersion.version_number})
+                                {policy.current_version.version_number})
                             </CardTitle>
                             <div className="text-xs text-muted-foreground">
                                 Effective from{' '}
                                 {formatDate(
-                                    policy.currentVersion.effective_from,
+                                    policy.current_version.effective_from,
                                 )}
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div
-                                className="prose prose-sm max-w-none text-foreground"
-                                dangerouslySetInnerHTML={{
-                                    __html: policy.currentVersion.content,
-                                }}
-                            />
+                            {/* Plain-text summary — rendered as text (not HTML) to
+                                avoid XSS; the authoritative policy is the PDF. */}
+                            <p className="whitespace-pre-wrap text-sm text-foreground">
+                                {policy.current_version.content_summary}
+                            </p>
                         </CardContent>
                     </Card>
                 )}
@@ -327,7 +325,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                     <TableRow key={version.id}>
                                         <TableCell className="font-medium">
                                             v{version.version_number}
-                                            {policy.currentVersion?.id ===
+                                            {policy.current_version?.id ===
                                                 version.id && (
                                                 <Badge className="ml-2 border-status-success/30 bg-status-success-bg text-status-success">
                                                     Current
@@ -338,7 +336,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                             {formatDate(version.effective_from)}
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                                            {version.change_summary ||
+                                            {version.content_summary ||
                                                 'No summary provided'}
                                         </TableCell>
                                         <TableCell>

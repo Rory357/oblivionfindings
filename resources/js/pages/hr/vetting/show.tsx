@@ -2,6 +2,15 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -12,8 +21,10 @@ import {
     Edit,
     FileText,
     Shield,
+    ShieldCheck,
     User,
 } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -111,6 +122,27 @@ export default function VettingShow({ check, can }: Props) {
         typeof check.notes === 'string' &&
         check.notes.includes('[Consent recorded');
     const canViewDisclosures = Boolean(can.viewDisclosures ?? can.manage);
+
+    const [consentOpen, setConsentOpen] = useState(false);
+    const [consentGiven, setConsentGiven] = useState(false);
+    const [consentNotes, setConsentNotes] = useState('');
+
+    const submitConsent = (e: FormEvent) => {
+        e.preventDefault();
+        if (!consentGiven) return;
+        router.post(
+            `/hr/compliance/vetting/${check.id}/consent`,
+            { consent_given: true, consent_notes: consentNotes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setConsentOpen(false);
+                    setConsentGiven(false);
+                    setConsentNotes('');
+                },
+            },
+        );
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -435,6 +467,20 @@ export default function VettingShow({ check, can }: Props) {
                             <CardTitle className="text-base">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    setConsentGiven(false);
+                                    setConsentNotes('');
+                                    setConsentOpen(true);
+                                }}
+                            >
+                                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                                {consentRecorded
+                                    ? 'Update Consent'
+                                    : 'Record Consent'}
+                            </Button>
                             {expired && (
                                 <Button
                                     size="sm"
@@ -476,6 +522,60 @@ export default function VettingShow({ check, can }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            {/* Record Consent Dialog */}
+            <Dialog open={consentOpen} onOpenChange={setConsentOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Record Consent</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submitConsent} className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Confirm the staff member has given consent for this
+                            background check. This is recorded against the
+                            check's history.
+                        </p>
+                        <label className="flex items-start gap-2 text-sm">
+                            <Checkbox
+                                checked={consentGiven}
+                                onCheckedChange={(c) =>
+                                    setConsentGiven(c === true)
+                                }
+                                className="mt-0.5"
+                            />
+                            <span>
+                                The staff member has given informed consent for
+                                this vetting check.
+                            </span>
+                        </label>
+                        <div>
+                            <Label htmlFor="consent_notes">
+                                Notes (optional)
+                            </Label>
+                            <Textarea
+                                id="consent_notes"
+                                value={consentNotes}
+                                onChange={(e) =>
+                                    setConsentNotes(e.target.value)
+                                }
+                                placeholder="e.g. consent form signed and filed"
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setConsentOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={!consentGiven}>
+                                Record Consent
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

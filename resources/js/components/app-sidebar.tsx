@@ -1633,6 +1633,15 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         icon: LayoutDashboard,
     });
 
+    if (can?.finance?.dashboard) {
+        // Obligation calendar — invoice/bill due dates, payment runs, GST deadlines.
+        overview.push({
+            title: 'Calendar',
+            href: '/finance/calendar',
+            icon: CalendarDays,
+        });
+    }
+
     if (
         can?.finance?.ledger?.view ||
         can?.finance?.ledger?.manage ||
@@ -1667,53 +1676,36 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
 
     const banking: NavItem[] = [];
-    if (can?.finance?.bank?.view) {
+    if (
+        can?.finance?.bank?.view ||
+        can?.finance?.bank?.manage ||
+        can?.finance?.pettyCash?.view
+    ) {
+        // Banking & Cash hub — accounts, transactions, reconciliation, matching,
+        // feeds, EFTPOS, petty cash and match rules are now tabs here.
         banking.push({
-            title: 'Bank Accounts',
-            href: '/finance/bank-accounts',
+            title: 'Banking',
+            href: '/finance/banking',
             icon: Landmark,
-        });
-        banking.push({
-            title: 'Reconciliation',
-            href: '/finance/bank-reconciliation',
-            icon: CheckCircle2,
-        });
-        banking.push({
-            title: 'Payment Matching',
-            href: '/finance/payment-matching',
-            icon: ArrowLeftRight,
-        });
-        banking.push({
-            title: 'Bank Feeds',
-            href: '/finance/bank-feeds',
-            icon: Radio,
-        });
-        banking.push({
-            title: 'EFTPOS',
-            href: '/finance/eftpos/terminals',
-            icon: CreditCard,
         });
     }
 
     const other: NavItem[] = [];
-    if (can?.finance?.tax?.view)
+    // Tax & Compliance hub — GST returns, IRD filings, audit exports and
+    // consolidation are now tabs here.
+    if (
+        can?.finance?.tax?.view ||
+        can?.finance?.tax?.manage ||
+        can?.finance?.reports?.view ||
+        can?.finance?.admin
+    ) {
         other.push({
-            title: 'GST Returns',
-            href: '/finance/gst-returns',
+            title: 'Tax & Compliance',
+            href: '/finance/tax',
             icon: Receipt,
         });
-    if (can?.finance?.tax?.manage)
-        other.push({
-            title: 'IRD E-Filing',
-            href: '/finance/ird-filings',
-            icon: Send,
-        });
-    if (can?.finance?.pettyCash?.view)
-        other.push({
-            title: 'Petty Cash',
-            href: '/finance/petty-cash',
-            icon: Banknote,
-        });
+    }
+    // Petty Cash is now a tab in the Banking & Cash hub (see `banking` above).
     if (can?.finance?.reports?.view)
         other.push({
             title: 'Donor Funds',
@@ -1723,53 +1715,24 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     const reports: NavItem[] = [];
     if (can?.finance?.reports?.view) {
+        // Reports & Planning hub — P&L, balance sheet, trial balance, cash flow,
+        // aged AR/AP, funding summary, budget vs actuals and cash-flow forecast
+        // are now tabs here.
         reports.push({
-            title: 'Trial Balance',
-            href: '/finance/reports/trial-balance',
+            title: 'Reports',
+            href: '/finance/reports',
             icon: BarChart3,
-        });
-        reports.push({
-            title: 'Profit & Loss',
-            href: '/finance/reports/profit-loss',
-            icon: BarChart3,
-        });
-        reports.push({
-            title: 'Balance Sheet',
-            href: '/finance/reports/balance-sheet',
-            icon: BarChart3,
-        });
-        reports.push({
-            title: 'Budget vs Actuals',
-            href: '/finance/reports/budget-vs-actuals',
-            icon: Target,
-        });
-        reports.push({
-            title: 'Cash Flow Forecast',
-            href: '/finance/cash-flow-forecast',
-            icon: TrendingUp,
-        });
-        reports.push({
-            title: 'Audit Exports',
-            href: '/finance/audit-exports',
-            icon: Download,
         });
     }
 
     if (can?.finance?.admin) {
+        // Settings hub — accounting integrations (Xero/MYOB) and funding streams
+        // are now tabs here. (Fiscal periods, cost centres, currencies live in the
+        // Ledger hub; match rules in the Banking hub — not duplicated here.)
         other.push({
-            title: 'Funding Streams',
-            href: '/finance/funding-streams',
-            icon: GitBranch,
-        });
-        other.push({
-            title: 'Consolidation',
-            href: '/finance/consolidation',
-            icon: Building2,
-        });
-        other.push({
-            title: 'Integrations',
-            href: '/finance/integrations',
-            icon: Link2,
+            title: 'Settings',
+            href: '/finance/settings',
+            icon: Settings,
         });
     }
 
@@ -2273,13 +2236,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: MessageSquareText,
         });
     }
-    if (can?.hr?.surveys?.view) {
-        engagement.items.push({
-            title: 'Surveys',
-            href: '/hr/surveys',
-            icon: ClipboardList,
-        });
-    }
     if (can?.hr?.announcements?.view) {
         engagement.items.push({
             title: 'Announcements',
@@ -2287,9 +2243,15 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: MessageSquareText,
         });
     }
-    if (can?.hr?.analytics?.view) {
+    // Surveys & Wellbeing unified on the richer engagement-survey system
+    // (the standalone /hr/surveys system was retired and redirects here).
+    if (
+        can?.hr?.wellbeing?.view ||
+        can?.hr?.analytics?.view ||
+        can?.hr?.surveys?.view
+    ) {
         engagement.items.push({
-            title: 'Wellbeing',
+            title: 'Surveys & Wellbeing',
             href: '/hr/wellbeing',
             icon: Target,
         });

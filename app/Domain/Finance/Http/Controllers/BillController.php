@@ -29,7 +29,11 @@ class BillController extends Controller
         $orgId = $request->user()->organization_id;
 
         $query = FinBill::forOrganization($orgId)
-            ->with('vendor:id,name')
+            ->with([
+                'vendor:id,name',
+                // Lines power the in-place Edit modal's prefill for draft bills.
+                'lines:id,bill_id,description,quantity,unit_price,gst_rate,account_id',
+            ])
             ->orderBy('bill_date', 'desc');
 
         if ($request->filled('status')) {
@@ -70,11 +74,22 @@ class BillController extends Controller
             'due_this_week' => $allBills->whereIn('status', ['approved', 'partially_paid'])->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7))->sum(fn ($b) => $b->total_amount - $b->amount_paid),
         ];
 
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/bills/Index', [
             'bills' => $bills,
             'vendors' => $vendors,
             'filters' => $request->only(['status', 'vendor_id', 'search', 'date_from', 'date_to']),
             'summary' => $summary,
+            'canManage' => $canManage,
+            // Expense/asset accounts for the New Bill modal (each line needs one).
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)
+                    ->active()
+                    ->whereIn('type', ['expense', 'asset'])
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

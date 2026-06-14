@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     BookOpen,
@@ -46,6 +46,7 @@ interface ComplianceStatus {
 
 interface Props {
     complianceStatuses: ComplianceStatus[];
+    can: { viewCatalog: boolean };
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,7 +113,7 @@ function formatCategory(cat: string): string {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MyTraining({ complianceStatuses }: Props) {
+export default function MyTraining({ complianceStatuses, can }: Props) {
     const [activeFilter, setActiveFilter] = useState<StatusKey | 'all'>('all');
 
     const summary = useMemo(() => {
@@ -163,6 +164,16 @@ export default function MyTraining({ complianceStatuses }: Props) {
                             { label: 'Expired', value: summary.expired },
                             { label: 'Compliance rate', value: `${complianceRate}%` },
                         ]}
+                        actions={
+                            can.viewCatalog ? (
+                                <Button asChild variant="outline">
+                                    <Link href="/hr/training/catalog">
+                                        <BookOpen className="mr-1.5 h-4 w-4" />
+                                        Browse training courses
+                                    </Link>
+                                </Button>
+                            ) : undefined
+                        }
                     />
                 }
             >
@@ -414,6 +425,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                         type="button"
                                         variant="ghost"
                                         size="icon"
+                                        aria-label="Clear filter"
                                         onClick={() => setActiveFilter('all')}
                                         className="ml-1.5 h-4 w-4 p-0"
                                     >

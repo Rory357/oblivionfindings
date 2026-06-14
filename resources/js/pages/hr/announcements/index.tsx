@@ -2,6 +2,14 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -11,9 +19,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,
@@ -23,6 +32,7 @@ import {
     Pin,
     Plus,
 } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -42,9 +52,16 @@ interface Announcement {
     created_at: string;
 }
 
+interface Option {
+    value: string;
+    label: string;
+}
+
 interface Props {
     announcements: { data: Announcement[]; links: any[] };
     acknowledgedIds: number[];
+    priorities: Option[];
+    audiences: Option[];
     filters: { priority: string | null };
     can: { manage: boolean };
 }
@@ -98,10 +115,24 @@ const formatDate = (value?: string | null) => {
 export default function AnnouncementsIndex({
     announcements,
     acknowledgedIds,
+    priorities,
+    audiences,
     filters,
     can,
 }: Props) {
     const NONE = '__none__';
+    const [open, setOpen] = useState(false);
+    const form = useForm({
+        title: '',
+        content: '',
+        priority: 'normal',
+        target_audience: 'all',
+        target_value: '',
+        published_at: '',
+        expires_at: '',
+        is_pinned: false,
+        requires_acknowledgement: false,
+    });
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -109,6 +140,17 @@ export default function AnnouncementsIndex({
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
+    };
+
+    const submitCreate = (e: FormEvent) => {
+        e.preventDefault();
+        form.post('/hr/announcements', {
+            preserveScroll: true,
+            onSuccess: () => {
+                setOpen(false);
+                form.reset();
+            },
+        });
     };
 
     function handleAcknowledge(id: number) {
@@ -145,12 +187,10 @@ export default function AnnouncementsIndex({
                     ]}
                     actions={
                         can.manage && (
-                            <Link href="/hr/announcements/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Announcement
-                                </Button>
-                            </Link>
+                            <Button size="sm" onClick={() => setOpen(true)}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New Announcement
+                            </Button>
                         )
                     }
                 />
@@ -328,6 +368,187 @@ export default function AnnouncementsIndex({
                     className="mt-4"
                 />
             </PageShell>
+
+            {/* New Announcement Dialog */}
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>New Announcement</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submitCreate} className="space-y-4">
+                        <div>
+                            <Label htmlFor="title">Title</Label>
+                            <Input
+                                id="title"
+                                value={form.data.title}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
+                                placeholder="Announcement title"
+                            />
+                            {form.errors.title && (
+                                <p className="mt-1 text-xs text-status-critical">
+                                    {form.errors.title}
+                                </p>
+                            )}
+                        </div>
+                        <div>
+                            <Label htmlFor="content">Content</Label>
+                            <Textarea
+                                id="content"
+                                value={form.data.content}
+                                onChange={(e) =>
+                                    form.setData('content', e.target.value)
+                                }
+                                rows={5}
+                                placeholder="Write your announcement..."
+                            />
+                            {form.errors.content && (
+                                <p className="mt-1 text-xs text-status-critical">
+                                    {form.errors.content}
+                                </p>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <Label>Priority</Label>
+                                <Select
+                                    value={form.data.priority}
+                                    onValueChange={(v) =>
+                                        form.setData('priority', v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {priorities.map((p) => (
+                                            <SelectItem
+                                                key={p.value}
+                                                value={p.value}
+                                            >
+                                                {p.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Target Audience</Label>
+                                <Select
+                                    value={form.data.target_audience}
+                                    onValueChange={(v) =>
+                                        form.setData('target_audience', v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {audiences.map((a) => (
+                                            <SelectItem
+                                                key={a.value}
+                                                value={a.value}
+                                            >
+                                                {a.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        {form.data.target_audience !== 'all' && (
+                            <div>
+                                <Label htmlFor="target_value">
+                                    Target Value
+                                </Label>
+                                <Input
+                                    id="target_value"
+                                    value={form.data.target_value}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'target_value',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder={`Enter ${form.data.target_audience} name or ID`}
+                                />
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <Label htmlFor="published_at">Publish At</Label>
+                                <Input
+                                    id="published_at"
+                                    type="datetime-local"
+                                    value={form.data.published_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'published_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Leave blank to publish immediately.
+                                </p>
+                            </div>
+                            <div>
+                                <Label htmlFor="expires_at">Expires At</Label>
+                                <Input
+                                    id="expires_at"
+                                    type="datetime-local"
+                                    value={form.data.expires_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'expires_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Leave blank for no expiry.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={form.data.is_pinned}
+                                    onCheckedChange={(c) =>
+                                        form.setData('is_pinned', c === true)
+                                    }
+                                />
+                                Pin this announcement
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={form.data.requires_acknowledgement}
+                                    onCheckedChange={(c) =>
+                                        form.setData(
+                                            'requires_acknowledgement',
+                                            c === true,
+                                        )
+                                    }
+                                />
+                                Require staff acknowledgement
+                            </label>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={form.processing}>
+                                Publish Announcement
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

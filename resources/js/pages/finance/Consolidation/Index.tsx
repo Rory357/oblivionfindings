@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -134,14 +135,22 @@ export default function ConsolidationIndex({ groups }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Consolidation Groups" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Consolidation Groups</h1>
-                        <p className="text-muted-foreground">Manage inter-company consolidation groups and entities</p>
-                    </div>
-                    <CreateGroupDialog />
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero category="finance"
+                        icon={Building2}
+                        title="Consolidation Groups"
+                        description="Manage inter-company consolidation groups and entities"
+                        stats={[
+                            { label: 'Active groups', value: activeGroups.length },
+                            { label: 'Total entities', value: totalEntities },
+                        ]}
+                        actions={<CreateGroupDialog />}
+                        footer={<TaxTabsFooter active="consolidation" />}
+                    />
+                }
+            >
+                <div className="flex flex-col gap-6">
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -237,7 +246,8 @@ export default function ConsolidationIndex({ groups }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

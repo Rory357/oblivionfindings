@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Services\FeedService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -10,6 +11,8 @@ use Inertia\Inertia;
 
 class FeedController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly FeedService $feedService,
     ) {}
@@ -23,7 +26,7 @@ class FeedController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $type = $request->query('type');
 
         $posts = $this->feedService->getFeed($tenantId, $type);
@@ -86,7 +89,7 @@ class FeedController extends Controller
         ]);
 
         try {
-            $this->feedService->createPost($user, $validated);
+            $this->feedService->createPost($user, $validated, $this->resolveHrTenantIdForUser($user));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -115,6 +118,7 @@ class FeedController extends Controller
                 $validated['to_user_id'],
                 $validated['category'],
                 $validated['message'],
+                $this->resolveHrTenantIdForUser($user),
             );
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

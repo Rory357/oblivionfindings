@@ -3,6 +3,7 @@ import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { BankingTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +60,7 @@ export default function PettyCashIndex({ funds }: Props) {
                                 </Link>
                             </Button>
                         }
+                        footer={<BankingTabsFooter active="petty-cash" />}
                     />
                 }
             >

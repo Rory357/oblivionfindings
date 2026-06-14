@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Services\ExpenseService;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class ExpenseController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly ExpenseService $expenseService,
     ) {}
@@ -24,7 +27,7 @@ class ExpenseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
         $canManage = $user->canDo('hr.expenses.manage');
@@ -126,6 +129,8 @@ class ExpenseController extends Controller
                 'approved_by' => $expenseClaim->approver?->name,
                 'approved_at' => $expenseClaim->approved_at?->toDateTimeString(),
                 'paid_at' => $expenseClaim->paid_at?->toDateTimeString(),
+                'journal_id' => $expenseClaim->journal_id,
+                'gl_posted_at' => $expenseClaim->gl_posted_at?->toDateTimeString(),
                 'items' => $expenseClaim->items->map(fn ($item) => [
                     'id' => $item->id,
                     'description' => $item->description,
@@ -138,8 +143,13 @@ class ExpenseController extends Controller
                 ]),
             ],
             'can' => [
-                'approve' => $user->canDo('hr.expenses.manage') && $expenseClaim->status === 'submitted',
+                'approve' => $user->canDo('hr.expenses.approve') && $expenseClaim->status === 'submitted',
                 'manage' => $user->canDo('hr.expenses.manage'),
+                // Pay only once approved AND posted to the GL (mirrors the payroll
+                // pay-net gate: a claim must hit the ledger before it is disbursed).
+                'pay' => $user->canDo('hr.expenses.approve')
+                    && $expenseClaim->status === 'approved'
+                    && $expenseClaim->gl_posted_at !== null,
             ],
         ]);
     }
@@ -169,7 +179,7 @@ class ExpenseController extends Controller
     public function approve(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
 
         try {
             $this->expenseService->approveClaim($expenseClaim, $user);
@@ -187,7 +197,7 @@ class ExpenseController extends Controller
     public function reject(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:2000'],
@@ -200,5 +210,29 @@ class ExpenseController extends Controller
         }
 
         return redirect()->back()->with('success', 'Expense claim rejected.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Mark paid                                                          */
+    /* ------------------------------------------------------------------ */
+
+    public function pay(Request $request, HrExpenseClaim $expenseClaim)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+
+        // Only disburse a claim that has been posted to the GL (the approve flow
+        // dispatches PostExpenseJournalJob; markPaid itself guards status).
+        if ($expenseClaim->gl_posted_at === null) {
+            return redirect()->back()->with('error', 'Expense claim must be posted to the general ledger before it can be marked paid.');
+        }
+
+        try {
+            $this->expenseService->markPaid($expenseClaim);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Expense claim marked as paid.');
     }
 }

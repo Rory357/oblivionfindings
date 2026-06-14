@@ -88,6 +88,10 @@ class SeedHrPermissionsSeeder extends Seeder
 
             // Wellbeing
             'hr.wellbeing.view' => 'View wellbeing dashboard',
+
+            // Recognition / Community feed (peer kudos)
+            'hr.recognition.view' => 'View the recognition feed',
+            'hr.recognition.give' => 'Give kudos and post to the recognition feed',
         ];
 
         Permission::query()
@@ -148,6 +152,13 @@ class SeedHrPermissionsSeeder extends Seeder
             'hr.leave.viewAny',
             'hr.leave.approve',
         ]);
+
+        // Peer recognition is for everyone — grant view + give to all staff roles
+        // (hr + admin already get it above). Auditor is view-only.
+        foreach (['support_worker', 'team_lead', 'coordinator', 'provider_manager', 'clinical_lead', 'finance'] as $staffRole) {
+            $this->attachPermissions($staffRole, ['hr.recognition.view', 'hr.recognition.give']);
+        }
+        $this->attachPermissions('auditor', ['hr.recognition.view']);
 
         $this->command->info('Seeded '.count($permissions).' HR permissions.');
     }

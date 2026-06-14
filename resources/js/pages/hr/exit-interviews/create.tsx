@@ -252,6 +252,7 @@ export default function ExitInterviewCreate({
                                             type="button"
                                             variant="ghost"
                                             size="icon"
+                                            aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
                                             onClick={() =>
                                                 form.setData(
                                                     'overall_satisfaction',

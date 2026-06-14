@@ -38,6 +38,7 @@ class PaymentMatchingService
                     'matchable_id' => $candidate->id,
                     'confidence_score' => $score['total'],
                     'match_reasons' => $score['reasons'],
+                    'dimensions' => $score['dimensions'],
                 ]);
             }
         }
@@ -52,15 +53,20 @@ class PaymentMatchingService
     {
         $score = 0;
         $reasons = [];
+        // The FinMatchRule rule_type dimensions this candidate satisfied — the
+        // match-rule engine governs the auto-confirm threshold off these.
+        $dimensions = [];
 
         // 1. Exact amount match (40 points)
         $candidateAmountDue = $this->amountDueFor($candidate);
         if (bccomp((string) abs((float) $txn->amount), (string) $candidateAmountDue, 2) === 0) {
             $score += 40;
             $reasons[] = 'Exact amount match';
+            $dimensions[] = 'exact_amount';
         } elseif (abs(abs((float) $txn->amount) - (float) $candidateAmountDue) < 0.50) {
             $score += 25;
             $reasons[] = 'Amount within $0.50 tolerance';
+            $dimensions[] = 'amount_tolerance';
         }
 
         // 2. Reference/invoice number match (30 points)
@@ -71,6 +77,7 @@ class PaymentMatchingService
         )) {
             $score += 30;
             $reasons[] = 'Reference number found in transaction';
+            $dimensions[] = 'reference_match';
         }
 
         // 3. Vendor/client name match (15 points) - fuzzy match
@@ -78,6 +85,7 @@ class PaymentMatchingService
         if ($vendorName && $this->fuzzyMatch($txn->description, $vendorName)) {
             $score += 15;
             $reasons[] = 'Vendor/client name matched in description';
+            $dimensions[] = 'vendor_pattern';
         }
 
         // 4. Date proximity (10 points)
@@ -103,9 +111,10 @@ class PaymentMatchingService
         if ($historicalMatch) {
             $score += 5;
             $reasons[] = 'Similar transaction matched before';
+            $dimensions[] = 'recurring_pattern';
         }
 
-        return ['total' => min($score, 100), 'reasons' => $reasons];
+        return ['total' => min($score, 100), 'reasons' => $reasons, 'dimensions' => $dimensions];
     }
 
     /**
@@ -168,12 +177,18 @@ class PaymentMatchingService
 
         $results = ['matched' => 0, 'auto_confirmed' => 0, 'suggested' => 0];
         $rules = FinMatchRule::forOrganization($orgId)->active()->byPriority()->get();
+        $defaultThreshold = 95;
 
         foreach ($unmatched as $txn) {
             $matches = $this->findMatches($orgId, $txn);
 
             foreach ($matches as $match) {
-                $autoThreshold = $rules->max('auto_confirm_threshold') ?? 95;
+                // The governing rule is the highest-priority active rule whose
+                // rule_type the candidate actually satisfied (+ whose conditions
+                // hold). It sets the auto-confirm threshold; without one we fall
+                // back to the conservative default.
+                $rule = $this->governingRule($rules, $txn, $match['dimensions']);
+                $autoThreshold = $rule ? (float) $rule->auto_confirm_threshold : $defaultThreshold;
 
                 $pm = FinPaymentMatch::create([
                     'organization_id' => $orgId,
@@ -187,6 +202,8 @@ class PaymentMatchingService
 
                 if ($pm->status === 'auto_confirmed') {
                     $this->confirmAndPost($pm, null, 'auto_confirmed');
+                    // Credit the rule that drove the auto-confirm.
+                    $rule?->increment('match_count');
                     $results['auto_confirmed']++;
                 } else {
                     $results['suggested']++;
@@ -197,6 +214,46 @@ class PaymentMatchingService
         }
 
         return $results;
+    }
+
+    /**
+     * The highest-priority active rule that governs this match: its rule_type must
+     * be one of the dimensions the candidate satisfied, and its (optional) JSON
+     * conditions must hold for the transaction. Rules are pre-sorted by priority
+     * desc, so the first qualifying rule wins.
+     */
+    private function governingRule(Collection $rules, FinBankTransaction $txn, array $dimensions): ?FinMatchRule
+    {
+        return $rules->first(
+            fn (FinMatchRule $rule) => in_array($rule->rule_type, $dimensions, true)
+                && $this->ruleConditionsMet($rule, $txn)
+        );
+    }
+
+    /**
+     * Evaluate a rule's optional JSON conditions against the transaction. Supported
+     * keys (all optional): min_amount, max_amount, description_contains. An empty
+     * conditions set always passes.
+     */
+    private function ruleConditionsMet(FinMatchRule $rule, FinBankTransaction $txn): bool
+    {
+        $conditions = $rule->conditions ?? [];
+        $amount = abs((float) $txn->amount);
+
+        if (isset($conditions['min_amount']) && $amount < (float) $conditions['min_amount']) {
+            return false;
+        }
+
+        if (isset($conditions['max_amount']) && $amount > (float) $conditions['max_amount']) {
+            return false;
+        }
+
+        if (! empty($conditions['description_contains'])
+            && ! str_contains(strtolower((string) $txn->description), strtolower((string) $conditions['description_contains']))) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

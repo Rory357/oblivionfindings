@@ -268,7 +268,18 @@ total_gross == GL wage expense. **M5-2 (net-pay payment run) is the remaining pi
   payday-filing feed from payroll. *Fix:* surface a payday-filing export/record from the posted run on the
   IRD filings screen. *Acceptance:* a posted run yields a payday-filing artefact visible under IRD filings.
 
-### M6 — Performance hub — 🟡 IN PROGRESS (ReviewWizardDialog shipped main c1b072b5, 2026-06-14)
+### M6 — Performance hub — ✅ DONE (main c1b072b5→15b818b2, 2026-06-14)
+
+**Shipped (6 green sub-commits, ~22 Pest tests):** ReviewWizardDialog (c1b072b5) · SupervisionDialog (86c41f33,
++topics_discussed NOT-NULL fix) · GoalDialog (de2e2a9a, wired dead goals.update) · ProbationDialog (3031c971,
+wired dead probation.*) · SuccessionCandidateDialog (6f5855fe, wired dead candidates.* + blank-name fix) ·
+Competency edit (15b818b2, wired dead competencies.update + fixed a 500ing create path: created_by column didn't
+exist). Every page-based create/edit form → WizardShell modal with old routes redirected; all four flagged dead
+backends now wired. **DEFERRED to M10:** the Performance hub-tabs shell (performance/index.tsx → PageHero+HrTabs
+consolidation of Overview·Reviews·Supervision·Competencies·PIPs·Succession·Feedback) — alongside the other hub
+consolidations (leave HrTabs migration, my-calendar wrapper de-dup, time-off grid). HrGoal vs HrDevelopmentGoal
+confirmed NOT duplicates (kept separate).
+
 
 **Audit CORRECTION:** HrGoal (OKRs: user_id, key-results, progress_percentage) and HrDevelopmentGoal (competency
 growth: employee_user_id/manager_user_id, target_level/progress_percent) are **NOT duplicates** — distinct
@@ -308,7 +319,15 @@ goals.update, succession.candidates.store/update, competencies.update.
   self-assessment though `employee_comments` is validated. *Fix:* a review-cycle object + bulk launch +
   employee self-assessment step. *Acceptance:* a cycle launches reviews in bulk; employee can self-assess.
 
-### M7 — Peer Recognition (explicit deliverable)
+### M7 — Peer Recognition (explicit deliverable) — ✅ DONE (main 6a8cc7af→e08c55c5, 2026-06-14)
+
+**Shipped (3 green sub-commits, 7 Pest tests):** M7-S1 (6a8cc7af) — SECURITY: the /hr/feed routes were
+permission-ungated (any auth user could post/kudos); gated feed.index→hr.recognition.view, feed.store+feed.kudos→
+hr.recognition.give (new keys in SeedHrPermissionsSeeder, granted to all staff roles, reseed-on-deploy). Same commit
+fixed a latent bug that made the feed WHOLLY non-functional: FeedController used $user->tenant_id (always null) vs a
+NOT-NULL column → empty reads + every insert silently failed; routed via ResolvesHrTenant. M7-R2 (7aa86d9e) —
+Give-recognition WizardShell modal (recipient PeoplePicker → category TilePicker → message → review) replacing the
+flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (idempotent). NO reactions (no backend).
 
 **Key finding:** partially built — `HrKudos` model + `FeedService::sendKudos` + `FeedController::sendKudos`
 + 2 flat dialogs + profile stats + leaderboard. This is "finish/upgrade", not "build".
@@ -340,15 +359,55 @@ goals.update, succession.candidates.store/update, competencies.update.
   (no doc preview, `ESignatureController:55`). *Fix:* add driver add/approve/suspend UI; "Send for
   signature" + "Generate from template" modals; consent capture; document preview in `sign.tsx`.
   *Acceptance:* each backend reachable; signer sees the document.
+  - ✅ **DONE — drivers (829cfb6b):** drivers/index.tsx was fully read-only (didn't even consume `can`); wired
+    Add-Driver dialog (staff dropdown + licence fields, endorsements comma→array) + per-row Approve + Suspend
+    dialog (required reason) on the existing store/approve/suspend endpoints; controller index() ships an
+    `employees` prop; fixed invisible status badges. 5 tests (DriverEligibilityTest). NOTE: hr.driver.view/manage
+    are granted to provider_manager (RbacSeeder), NOT the hr role. Audit verified all 4 compliance controllers
+    correctly use ResolvesHrTenant (no null-tenant bug). REMAINING M8-2: signatures.request "Send for signature"
+    modal (+ doc preview in sign.tsx — currently signs blind); documents.generate "Generate from template" modal
+    (index "Generate from Template" link is a dead-end to the templates list); vetting.captureConsent "Record
+    Consent" button on vetting/show.tsx (page already renders the consent badge/card, just nothing writes it).
+  - ✅ **DONE — vetting consent (cf77f871):** added a "Record Consent" button + dialog (affirmative-consent
+    checkbox matching the `accepted` rule + optional notes) to vetting/show.tsx Actions card → POSTs the existing
+    captureConsent endpoint (appends to notes; non-tenant-aware table; no migration). 3 tests (VettingConsentTest,
+    acting as provider_manager).
+  - ✅ **DONE — e-signature (6bebb4b8):** signatures.request was UI-less → added a "Send for Signature" dialog
+    (per-row on documents/index.tsx, checkbox list of staff by name → POST signatures.request; index ships
+    employees.user_id). Fixed BLIND signing: sign.tsx now has a "View document" link backed by a NEW signer-scoped
+    download route hr.signatures.document (authorises on signer_user_id, not hr.documents.view). 4 tests
+    (ESignatureRequestTest).
+  - ✅ **DONE — documents.generate (11b99d68) → M8-2 COMPLETE:** documents/index "Generate from Template" hero
+    button was a dead-end Link to the templates LIST → now opens a "Generate from Template" dialog (template Select +
+    employee Select + optional title → POST documents.generate; HrDocumentMergeService writes an HTML doc to the
+    private disk). HrDocumentController@index ships an active `templates` prop; "Manage templates" link retained.
+    3 tests (DocumentGenerateTest, Storage::fake private). **All 4 dead compliance backends now reachable.**
 - **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
   never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
   fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
+  - ✅ **DONE (b4dfe753):** root cause was deeper — show.tsx read `policy.currentVersion` (camelCase) but the
+    relation serialises `current_version` (snake_case, as index.tsx reads), so the WHOLE current-version section
+    (version badge, View/Download doc, summary) was dead. Plus the field is `content_summary` (not content/
+    change_summary), and it was piped through `dangerouslySetInnerHTML` (XSS on a plain-text textarea field).
+    Fixed all three: current_version + content_summary throughout; render summary as plain text (no HTML); card
+    shown only when a summary exists. Pure frontend (data was always persisted). 3 tests (PolicyShowContentTest:
+    payload ships content_summary, non-view 403, source guard that show.tsx has no dangerouslySetInnerHTML).
+    PolicyController already tenant-correct (ResolvesHrTenant). Stats deferred (low value).
 - **M8-4 Compensation hub + finish flows.** *Problem:* 5 disconnected comp pages, 1 nav entry; bonus create
   unreachable + `tenant_id=null`; `storeReview` redirects to a non-existent route name → exception; comp
   review approval flow missing (applyReview no-op). *Fix:* Compensation hub (`TabStrip`: Bands · Reviews ·
   Bonuses); bonus create modal + tenant scope; fix the route-name; add review-item approve + status
   transition. *Acceptance:* bonus created from UI (tenant-scoped); review create works; review can be
   approved + applied.
+  - ✅ **DONE (41a26edc):** `storeReview`/`storeBand` null-tenant fixed (was dead on MySQL — `tenant_id`
+    NOT NULL) via `ResolvesHrTenant`; `storeReview` dead redirect (`hr.compensation.reviews.index` →
+    `hr.compensation.reviews`) fixed. 3 tests (CompensationReviewCreationTest).
+  - ✅ **DONE (551ee277):** bonus create UI — `bonuses.tsx` ignored the `employees` prop + had no create
+    control (the live `bonuses.store` was UI-unreachable); added a "Record Bonus" dialog (employee dropdown
+    by name, type/amount/date/reason). `BonusController::store` wrote `tenant_id=null` (nullable col but
+    escapes `scopeForTenant` + the `['tenant_id','status']` index) → `ResolvesHrTenant`; dropped orphaned
+    `show()`; fixed invisible status badges (`bg-status-*` → `bg-status-*-bg`). 3 tests (BonusCreationTest).
+    REMAINING: Compensation hub TabStrip; review-item approve + status transition.
 - **M8-5 Benefits + Assets + Expenses.** *Problem:* benefits enrol uses raw profile-ID input; no plan
   edit/lifecycle; assets create standalone + no retire/maintenance; expenses "Mark Paid" 404
   (`markPaid` unrouted), no receipt upload, **expense→Finance bridge orphaned** (`PostExpenseJournalJob`
@@ -356,11 +415,41 @@ goals.update, succession.candidates.store/update, competencies.update.
   enrol + plan lifecycle; asset modals + retire/maintenance; route+wire `markPaid`; receipt upload;
   dispatch `PostExpenseJournalJob` on approve. *Acceptance:* benefits enrol via picker; asset lifecycle;
   expense paid + posts to Finance GL.
+  - ✅ **DONE (6e8e52c9):** expense→Finance GL bridge wired — `ExpenseService::approveClaim` now dispatches
+    `PostExpenseJournalJob` (idempotent via `journal_id` guard); `HrExpenseClaim` `gl_posted_at` made
+    fillable+cast (was silently dropped); `ExpenseController` approve/reject/show permission keys aligned to
+    `hr.expenses.approve`. 3 tests (ExpenseJournalPostingTest — balanced journal DR 6100/7010 CR 2000=300,
+    double-post guard, non-approver 403).
+  - ✅ **DONE (a1efcc75):** Benefits enrollment edit UI — `benefits/index.tsx` table was read-only; added a
+    per-row Edit dialog (status/contribution rates/notes → PUT `enrollments.update`) + replaced the raw
+    "Employee Profile ID" input with an employee name dropdown. Fixed 3 null-tenant bugs (all `$user->tenant_id`):
+    index/plans/summary used `forTenant(null)`→`whereNull` so real enrollments NEVER showed (list always empty);
+    `storePlan` wrote `tenant_id=null` into a NOT-NULL col (plan create dead on MySQL); added cross-tenant guard
+    on update. Routed via `ResolvesHrTenant` + ships `employees` prop. 4 tests (BenefitsEnrollmentTest).
+  - ✅ **DONE (aff27454):** Expenses finishing — wired `markPaid` (was unrouted; show.tsx Mark-Paid button POSTed
+    to a nonexistent `/mark-paid` = dead button) → new route `hr.expenses.pay` + `ExpenseController::pay` (guards
+    `gl_posted_at` set, mirrors payroll pay-net gate) + server `can.pay` flag. Added "Posted to GL" badge (show
+    payload now ships `journal_id`/`gl_posted_at`). Fixed the always-empty index (`forTenant(null)`→`whereNull`)
+    via `ResolvesHrTenant`. Fixed invisible status badges. 5 tests (ExpensePaymentTest). REMAINING: expenses
+    create page→modal + receipt upload; benefits plan edit/lifecycle; asset modals/retire.
 - **M8-6 Engagement consolidation.** *Problem:* two survey systems (`HrSurvey` vs `HrEngagementSurvey`),
   two announcement paths (`HrAnnouncement` vs feed post_type), `HrCheckIn` orphan model. *Fix:* consolidate
   on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
   announcements create → modal; wire or drop `HrCheckIn`. *Acceptance:* one survey system; one announcement
   path; no orphan model.
+  - AUDIT (agent a1edcf43, re-derived): canonical survey system = HrEngagementSurvey (/hr/wellbeing) — richer
+    (anonymity, per-response scoring, eNPS, action plans + SLA reminder job SendEngagementActionPlanRemindersJob,
+    5 tests); HrSurvey (/hr/surveys) is the thin dup (+cross-tenant bug). Announcements (HrAnnouncement) vs feed
+    are COMPLEMENTARY, not dups (acknowledge fully wired, no null-tenant bug) — only gap = create.tsx is a page not
+    a modal. HrCheckIn = TRUE ORPHAN (referenced nowhere but model/migration; drop = M10, needs migration).
+  - ✅ **DONE — retire HrSurvey (a22ddb85):** SurveyController index/create/show/respond → redirect to
+    hr.wellbeing.index (routes+names preserved; store/submitResponse left gated-but-unreachable for M10 removal);
+    sidebar dropped "Surveys", renamed "Wellbeing"→"Surveys & Wellbeing" + broadened gate (wellbeing||analytics||
+    surveys .view; old item was mis-gated analytics.view only). 4 tests (SurveySystemRetiredTest).
+  - ✅ **DONE — announcements create→modal (36197574) → M8-6 COMPLETE:** "New Announcement" hero button now opens an
+    in-page dialog on announcements/index (title/content/priority/audience/target-value/publish+expiry/pin/ack);
+    AnnouncementController@index ships PRIORITIES/AUDIENCES consts; @create redirects to index (route preserved);
+    deleted dead create.tsx. 4 tests (AnnouncementCreateModalTest). HrCheckIn orphan drop → M10.
 
 ### M9 — Reports/Analytics; unified Approvals inbox; My-HR self-service
 
@@ -369,6 +458,17 @@ goals.update, succession.candidates.store/update, competencies.update.
   to `.xlsx` (corrupt); analytics/headcount cross-tenant (`tenantId=null`). *Fix:* align props/shape; fix
   the run/export routes; real XLSX (or honest CSV); tenant-scope. *Acceptance:* headcount loads; saved
   reports run/export; XLSX opens; metrics tenant-scoped.
+  - ✅ **DONE — headcount crash + tenant (37f2233b):** controller shipped prop `currentHeadcount` but page reads
+    `current` → Object.entries(undefined) crash; +2 shape mismatches (page read `total_fte` [service ships
+    `fte_total`] + treated `by_department` [array of {department,count}] as a Record). Fixed: controller render key
+    → `current` + ResolvesHrTenant (was `$tenantId=null`); page type aligned to service shape, maps the array, reads
+    fte_total. 2 tests (HeadcountDashboardTest).
+  - ✅ **DONE — saved-report 404s + corrupt xlsx (e8496951):** reports/saved.tsx hit /hr/reports/{id}/run|export +
+    deleted /hr/reports/{id}, but routes are /hr/reports/**saved**/{id}/... → run/export/delete all 404'd (export also
+    POSTed a GET route). Fixed all three page paths (run POST, export GET, delete DELETE). exportToExcel wrote CSV
+    bytes into a .xlsx (no xlsx-writer dep) → corrupt; made export emit an honest .csv (text/csv), removed the
+    misleading "Excel" button + the dead exportToExcel service method. 4 tests (SavedReportActionsTest).
+    REMAINING M9-1: AnalyticsDashboardController `$tenantId=null` cross-tenant (same null-tenant pattern → ResolvesHrTenant).
 - **M9-2 Reports hub + consolidate webhooks/scheduling.** *Problem:* 4 fragmented report pages; **three**
   webhook systems (`HrWebhookController`/`reports/webhooks` vs `WebhookController`/`settings/webhooks` vs
   automation actions); two scheduling systems (`HrReportSubscription` vs `HrSavedReport.is_scheduled`).
@@ -381,24 +481,128 @@ goals.update, succession.candidates.store/update, competencies.update.
   expense/timesheet/offer/pay-run submit; scope `pending()` to `getCurrentApprover()`; add process-type
   tabs + chain edit/toggle; offers + pay-run sign-off as process types. *Acceptance:* one inbox shows the
   user's real pending items across types; chains manageable.
+  - ✅ **PARTIAL — tenant-correctness (fc64fa59):** ApprovalController chains/storeChain/pending used $user->tenant_id
+    (null) → ResolvesHrTenant + a cross-tenant guard on action(); 3 tests (ApprovalChainTenantTest). The inbox now
+    loads honestly (empty) + chains are tenant-scoped/usable.
+  - ⚠️ **DEFERRED to M10 (design decision, NOT a safe loop wire):** initiateApproval has ZERO callers; the generic
+    approval-chain engine is a PARALLEL system to each feature's own approve flow (leave/expense/etc. approve
+    directly). Wiring initiateApproval into those flows would create a duplicate, competing approval state — a product
+    call on which mechanism is authoritative (adopt the generic engine everywhere vs remove it as speculative). Not
+    done here to avoid dual-approval bugs. pending()-scope-to-approver + process-type tabs also depend on that call.
 - **M9-4 My-HR self-service hub.** *Problem:* `/hr/my` is 11 separate full pages; my/training shows only
   compliance (no LMS); my/policies un-attestable without a current version. *Fix:* one ESS hub (`TabStrip`:
   Overview · Profile · Leave · Time · Pay · Expenses · Documents · Training · Policies · Reviews · Goals ·
   Surveys); fix my/training to include enrolments; fix attest. *Acceptance:* one tabbed ESS hub; training
   shows courses; policies attestable.
+  - ✅ **DONE (audit + 341533bd) → M9 CLOSED.** Audit (agent a5a327c8) verified the ESS hub is essentially sound:
+    all 12 my/* pages + 23 /hr/my routes resolve to real controller methods, self-scoped by user_id (no null-tenant
+    bug); policies-attest (uses currentVersion, post-M8-3) + payslip-list flows confirmed working; the stale plan
+    claims were false. ONE real dead item fixed: /hr/my/payslips "View/Download" buttons hit hr.payslips.view-gated
+    routes → 403 for staff; added ungated owner-authorised self-service routes (my.payslips.show/download) +
+    PayslipController@show owner-allowance. 3 tests (MyPayslipsSelfServiceTest). NOTE: the 11-page→TabStrip ESS-hub
+    consolidation + my/training LMS link + a my/leave cancel button (backend works) are UX-shell/feature gaps →
+    DEFERRED to M10 (consistent with the other hub-shell deferrals).
 
 ### M10 — De-dup sweep, demo seeders, a11y + responsive, final parity
 
 - **M10-1 De-dup sweep close-out.** Verify every merge in M1–M9 kept old routes alive via redirect; extract
   any remaining near-identical hero/table/card code into shared HR primitives. *Acceptance:* no duplicate
   concept pages remain; all old routes 301/redirect; dup map in this doc updated.
+  - ✅ **DONE — redirects verified (2720731d):** RetiredRoutesRedirectTest asserts all 8 retired routes still
+    redirect (no 404): /hr/{directory,positions,orgchart,departments}→/hr/people; /hr/job-postings→/hr/recruitment/jobs
+    (hr.jobs.index); /hr/surveys + /hr/surveys/create→/hr/wellbeing; /hr/announcements/create→/hr/announcements.
+    16 assertions. Shared-primitive extraction not needed (hubs already reuse components/hr spine + wizard kit).
+  - ✅ **DONE — ESS my/leave cancel button (cefa24a2):** wired the existing cancelLeave (owner-only, pending/
+    approved, restores balance) — my/leave.tsx now has a per-row Cancel control. 3 tests (MyLeaveCancelTest).
+  - ✅ **DONE — drop orphan HrCheckIn (d93766f1):** reversible drop migration + deleted the never-referenced model.
+    2 tests (HrCheckInDroppedTest).
+  - ✅ **DONE — my/training LMS catalog link (203dd983):** permission-gated "Browse training courses" action on
+    my/training.tsx (can.viewCatalog = hr.training.view||training.viewAny). 2 tests (MyTrainingCatalogLinkTest).
+  - ✅ **DONE — HrSurvey controller/service/pages removal (S25):** the standalone HrSurvey system was retired in
+    S11 (GET methods already redirected to /hr/wellbeing). Finished the cleanup: the `surveys.` route group now
+    uses `Route::redirect('/hr/surveys{,/create,/{survey}/respond,/{survey}}', '/hr/wellbeing')` (route NAMES
+    preserved: hr.surveys.index/create/respond/show; permission middleware dropped so bookmarks redirect even
+    without the perm). Deleted `SurveyController` + `SurveyService` (used ONLY by that controller) + the 4
+    `pages/hr/surveys/*.tsx`. Dropped the unreferenced POST routes (hr.surveys.store/respond.store — grep found
+    zero route()/UI refs; only `hr.wellbeing.surveys.show` exists, a different namespace). KEPT: HrSurvey* models
+    (orphaned now — dropping their tables is a separate migration like HrCheckIn, future tick) and the
+    `hr.surveys.view` permission exposure in HandleInertiaRequests (the sidebar still reads `can.hr.surveys.view`
+    as one OR-branch to show the "Surveys & Wellbeing" → /hr/wellbeing nav item). Wayfinder regenerated (pruned the
+    SurveyController action TS; generated TS is gitignored). Gates: types + build + RetiredRoutesRedirectTest +
+    SurveySystemRetiredTest (5 tests, incl. route-names-still-resolve) green.
 - **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
   so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
   *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
+  - Already seeded (pre-M10): leave, recruitment, cases, time, expenses, payroll, documents, performance, assets,
+    training, announcements+surveys, recognition feed.
+  - ✅ **DONE — Comp & Benefits (5dea5418):** seedCompensationAndBenefits — 3 salary bands + FY2026 review + 2 bonuses
+    + 2 benefit plans + 3 enrollments (idempotent). 1 test (CompensationBenefitsDemoSeederTest).
+  - ✅ **DONE — drivers/vetting/approvals/reports (ed9b1036) → M10-2 COMPLETE:** seedComplianceExtras — 2 driver
+    records + 2 background checks + 2 approval chains (w/ steps) + 2 saved reports (idempotent). Every HR hub now
+    renders populated under migrate:fresh --seed. Tests in CompensationBenefitsDemoSeederTest (2 tests, run seeder
+    twice). NOTE: saved reports seeded tenant_id=null to match ReportBuilderController's current whereNull scope.
+- **M10-6 Payslip true PDF (finish half-built feature).** *Problem:* `PayslipService::generatePayslipPdf`
+  rendered the `hr.payslip-pdf` Blade view to disk as raw HTML named `.html` and `PayslipController@download`
+  served it `text/html` — an honest stub, not a payslip document. *Fix:*
+  - ✅ **DONE — render via dompdf (S24, a23b31e1):** `barryvdh/laravel-dompdf ^3.1` is already installed (same
+    lib Finance's `InvoicePdfService` uses), so route the view through `Pdf::loadView(...)->setPaper('a4')->output()`,
+    store a `.pdf`, persist `pdf_path`. download() serves `application/pdf` and regenerates when the artefact is
+    missing OR a stale pre-PDF `.html` path (existing rows self-upgrade on next download). dompdf has no
+    flexbox/grid → converted the flex header to a 2-col table + dropped the unused `.info-grid` grid CSS.
+    3 tests (PayslipPdfTest: %PDF magic bytes under `.pdf`, download Content-Type `application/pdf`, `.html`→PDF
+    upgrade). Self-service download test still green.
 - **M10-3 Swallowed-fatal sweep.** Fix the silent catches listed in cross-cutting (notifications, webhooks,
   automation, EmployeeProfileController, frontend). *Acceptance:* failures log/surface; no silent `return []`.
 - **M10-4 a11y + responsive + empty/loading/error states.** Axe pass (no criticals) + mobile pass on every
   HR hub; consistent empty/loading/error states. *Acceptance:* axe clean; responsive; states present.
+  - ✅ **DONE — icon-only buttons get accessible names (S26):** static a11y sweep of pages/hr + components/hr.
+    Token/contrast side already clean (no same-token `bg-status-X text-status-X` killers — the `-bg`-suffixed
+    pairings are correct; `status-badge.tsx` + `hr-primitives.test.tsx` already guard the bug; no inline hex /
+    inline styles). HIGH-SIGNAL cluster = 12 icon-only `<Button size="icon">` with no accessible name across 11
+    files → added `aria-label`: time-off prev/next month, compensation/bands edit, recruitment/index clear-filter,
+    recruitment/scorecard + feedback/respond + exit-interviews/create star ratings (dynamic `Rate N star(s)`),
+    my/training clear-filter, documents/{create,edit}-template remove-merge-field, job-postings/create remove-email
+    (dynamic), org-chart-pane expand/collapse (dynamic). Already-labelled (skipped): employees/documents (4×
+    aria-label), succession/show (aria-label), compliance/matrix + directory-pane (title attr); skills/matrix has
+    visible proficiency-code text. Gates: types + eslint(touched) + build green. NOTE: live axe/mobile pass is
+    browser-blocked → deferred to USER. Remaining a11y static candidates: skills/matrix cell label, fill-amber-400
+    raw-palette star fills (non-token, cosmetic).
+- **M10-7 Finish-half-built: compensation review APPROVE (no dead button).** *Problem (verified by a parallel
+  audit + adversarial check, S27):* a comp review is created `planning` with items `pending`, but `applyReview`/
+  `applyCompensationReview` require status `approved` (items `approved`) and the review-detail "Apply Review"
+  button only shows when `status==='approved'` — yet NO route/method/UI ever transitioned planning→approved. So
+  the Apply button was permanently unreachable and the whole apply pipeline was dead code (mirror that DID exist:
+  `BonusController::approve`).
+  - ✅ **DONE — wire approve end-to-end (S27):** `CompensationService::approveCompensationReview($review,$approverId)`
+    (guards status ∈ planning/in_progress; marks each pending item `approved` + `approved_by` via the model so it's
+    audited; flips review→`approved`). `CompensationController@approveReview` (perm `hr.compensation.manage`,
+    LogicException→flash error) + POST `reviews.approve`. review-detail.tsx: "Approve Review" button when
+    planning/in_progress, then the existing "Apply Review" appears. Also hardened `applyReview` to catch the
+    LogicException (was an uncaught 500). ⚠️ `hr_compensation_reviews` has NO approved_by column (only the ITEMS +
+    history tables do) — approver attribution lives on the items; the review tracks status only. 4 tests
+    (CompensationReviewApprovalTest: approve flips review+items, approve→apply updates salary + writes history,
+    apply-without-approve flashes error not 500, perm gate). Gates: types + eslint + build + sibling comp suite green.
+- **M10 REMAINING-WORK MAP (from the S27 parallel audit + adversarial verify — ranked, all safeHeadless unless noted):**
+  - *Standardised-tabs shells (the big DoD item; structure is headless-verifiable via route-redirect tests + types +
+    build, only visual parity is browser-blocked):* only People + Recruitment have the canonical TabStrip; Leave uses
+    in-page Radix tabs (OK). LACKING tabs, ranked by cluster size: **Performance** (~8 surfaces/20+ pages — largest),
+    **My-HR/ESS** (12 pages), **Compliance** (~7 surfaces), **Reports** (5), **Compensation** (3, no index),
+    **Documents** (3), **Settings** (3, low). One hub/tick.
+  - *Half-built backends (finish or hide):* **Asset retire/maintenance** — index filter + status colours offer
+    maintenance/retired but AssetService only assign/return + no route/UI can set them (medium; either wire or hide
+    the filter options). **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
+    exist, but create form has no file input, request has no rule, no upload route (medium). **Benefit plan
+    deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
+  - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
+    self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
+    HrDemoSeederTest + SurveySystemRetiredTest, so dropping requires editing all of those too). **HrDashboardConfig**
+    (fully standalone leaf — cleanest drop, zero test fallout). HrEmployeeProfileVersion/HrEmployeeStatusChange +
+    HrCompensationReviewItem are dead *relationships on LIVE parents* (lower priority / future scope — leave).
+  - *Static a11y/token (build+eslint-verifiable):* **same-token contrast killers** — ~15 page files pair `bg-status-X`
+    with `text-status-X` (NO `-bg` suffix) → invisible text (the exact bug status-badge.tsx guards; S26 grep MISSED
+    these because the order is `text-…` before `bg-…`). Fix = swap `bg-status-X`→`bg-status-X-bg`. Plus raw-palette
+    `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls
+    (leave select checkboxes ×2, goals chevron toggle).
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
   hero/tabs/modals visually match; no dead buttons; DoD met.
 

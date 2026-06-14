@@ -2,13 +2,14 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -18,9 +19,19 @@ interface Vendor {
     name: string;
 }
 
+interface BillLine {
+    id: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    gst_rate: string;
+    account_id: number | null;
+}
+
 interface Bill {
     id: number;
     bill_number: string;
+    vendor_id: number;
     vendor_reference: string | null;
     vendor: Vendor | null;
     bill_date: string;
@@ -28,6 +39,8 @@ interface Bill {
     total_amount: string;
     amount_paid: string;
     status: string;
+    notes: string | null;
+    lines: BillLine[];
 }
 
 interface PaginatedBills {
@@ -56,6 +69,8 @@ interface Props extends PageProps {
     vendors: Vendor[];
     filters: Filters;
     summary: Summary;
+    canManage: boolean;
+    accounts: AccountOption[];
 }
 
 const formatCurrency = (amount: string | number) =>
@@ -78,12 +93,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Bills', href: '/finance/bills' },
 ];
 
-export default function BillsIndex({ auth, bills, vendors, filters, summary }: Props) {
+export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const [newBillOpen, setNewBillOpen] = useState(false);
+    const [editBill, setEditBill] = useState<Bill | null>(null);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -126,12 +143,12 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                             { label: 'Due this week', value: formatCurrency(summary.due_this_week) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/bills/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewBillOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Bill
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<PayablesTabsFooter active="bills" />}
                     />
@@ -139,45 +156,9 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info-bg p-2">
-                                    <DollarSign className="h-5 w-5 text-status-info dark:text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Unpaid</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_unpaid)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-critical-bg p-2">
-                                    <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Overdue</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_overdue)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning-bg p-2">
-                                    <CalendarClock className="h-5 w-5 text-status-warning dark:text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Due This Week</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.due_this_week)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatCurrency(summary.total_unpaid)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatCurrency(summary.due_this_week)} />
                 </div>
 
                 {/* Filters */}
@@ -256,12 +237,13 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                 <TableHead className="text-right">Total</TableHead>
                                 <TableHead className="text-right">Paid</TableHead>
                                 <TableHead>Status</TableHead>
+                                {canManage && <TableHead className="text-right">Actions</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground py-8">
                                         No bills found.
                                     </TableCell>
                                 </TableRow>
@@ -298,6 +280,22 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                                 {statusConfig[bill.status]?.label ?? bill.status}
                                             </Badge>
                                         </TableCell>
+                                        {canManage && (
+                                            <TableCell className="text-right">
+                                                {bill.status === 'draft' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditBill(bill);
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                )}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))
                             )}
@@ -321,6 +319,26 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     )}
                 </Card>
             </PageLayout>
+
+            {canManage && (
+                <NewBillDialog
+                    open={newBillOpen}
+                    onClose={() => setNewBillOpen(false)}
+                    vendors={vendors}
+                    accounts={accounts}
+                />
+            )}
+
+            {canManage && editBill && (
+                <NewBillDialog
+                    key={editBill.id}
+                    open
+                    bill={editBill}
+                    onClose={() => setEditBill(null)}
+                    vendors={vendors}
+                    accounts={accounts}
+                />
+            )}
         </AppLayout>
     );
 }

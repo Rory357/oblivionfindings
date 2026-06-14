@@ -47,6 +47,8 @@ class PurchaseOrderController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/purchase-orders/Index', [
             'purchaseOrders' => $purchaseOrders,
             'vendors' => $vendors,
@@ -55,6 +57,12 @@ class PurchaseOrderController extends Controller
                 'vendor_id' => $request->input('vendor_id', ''),
                 'search' => $request->input('search', ''),
             ],
+            'canManage' => $canManage,
+            // Expense accounts for the New PO modal's optional per-line account.
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->ofType('expense')
+                    ->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

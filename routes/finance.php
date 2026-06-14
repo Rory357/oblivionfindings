@@ -5,6 +5,7 @@ use App\Domain\Finance\Http\Controllers\AccountsReceivableController;
 use App\Domain\Finance\Http\Controllers\AuditExportController;
 use App\Domain\Finance\Http\Controllers\BankAccountController;
 use App\Domain\Finance\Http\Controllers\BankFeedController;
+use App\Domain\Finance\Http\Controllers\BankingController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
@@ -21,6 +22,7 @@ use App\Domain\Finance\Http\Controllers\CurrencyController;
 use App\Domain\Finance\Http\Controllers\DonorFundController;
 use App\Domain\Finance\Http\Controllers\EftposController;
 use App\Domain\Finance\Http\Controllers\ExecutiveFinancialDashboardController;
+use App\Domain\Finance\Http\Controllers\FinanceCalendarController;
 use App\Domain\Finance\Http\Controllers\FinanceDashboardController;
 use App\Domain\Finance\Http\Controllers\FinancialInsightsApiController;
 use App\Domain\Finance\Http\Controllers\FinancialReportController;
@@ -44,8 +46,11 @@ use App\Domain\Finance\Http\Controllers\PriceBookController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
 use App\Domain\Finance\Http\Controllers\QuoteController;
 use App\Domain\Finance\Http\Controllers\RecurringChargeController;
+use App\Domain\Finance\Http\Controllers\ReportsController;
+use App\Domain\Finance\Http\Controllers\SettingsController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
+use App\Domain\Finance\Http\Controllers\TaxController;
 use App\Domain\Finance\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +67,15 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Executive Financial Dashboard
     Route::get('/executive-dashboard', [ExecutiveFinancialDashboardController::class, 'index'])
         ->name('executive-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Finance obligation calendar — page shell + JSON event feed (invoice/bill
+    // due dates, payment runs, GST deadlines).
+    Route::get('/calendar', [FinanceCalendarController::class, 'index'])
+        ->name('calendar.index')
+        ->middleware('permission:finance.dashboard');
+    Route::get('/calendar/events', [FinanceCalendarController::class, 'events'])
+        ->name('calendar.events')
         ->middleware('permission:finance.dashboard');
 
     // All-Sites Financial Overview
@@ -346,6 +360,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::delete('/recurring-charges/{charge}', [RecurringChargeController::class, 'destroy'])->name('recurring_charges.destroy');
     });
 
+    // ── Banking & Cash hub ──────────────────────────────────────────────
+    // /finance/banking is the hub entry point; it redirects to the first banking
+    // tab the user can open (accounts · transactions · reconciliation · matching ·
+    // feeds · EFTPOS · petty cash · match rules). The tabs are the routes below.
+    Route::get('/banking', [BankingController::class, 'index'])->name('banking.index');
+
     // ── Bank Accounts ───────────────────────────────────────────────────
     Route::get('/bank-accounts', [BankAccountController::class, 'index'])
         ->name('bank-accounts.index')
@@ -440,6 +460,15 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->name('bank-reconciliation.complete')
         ->middleware('permission:finance.bank.manage');
 
+    // ── Tax & Compliance hub ────────────────────────────────────────────
+    // /finance/tax is the hub entry point; it redirects to the first tax tab the
+    // user can open (GST returns · IRD filings · audit exports · consolidation).
+    Route::get('/tax', [TaxController::class, 'index'])->name('tax.index');
+
+    // Settings hub entry — redirects to the first openable admin tab
+    // (integrations · funding streams). Mirrors the tax hub.
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+
     // ── GST Returns ─────────────────────────────────────────────────────
     Route::get('/gst-returns', [GstReturnController::class, 'index'])
         ->name('gst-returns.index')
@@ -519,6 +548,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::get('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'mapping'])->name('integrations.mapping');
         Route::put('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'updateMapping'])->name('integrations.mapping.update');
     });
+
+    // ── Reports & Planning hub ──────────────────────────────────────────
+    // /finance/reports is the hub entry point; it redirects to the first report tab
+    // (P&L). The report routes themselves are the tabs below.
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
 
     // ── Financial Reports ───────────────────────────────────────────────
     Route::middleware('permission:finance.reports.view')->group(function () {

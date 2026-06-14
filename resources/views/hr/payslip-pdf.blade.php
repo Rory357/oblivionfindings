@@ -6,7 +6,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #333; padding: 20px; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+        .header td { padding: 0; vertical-align: top; }
         .header h1 { font-size: 20px; }
         .header .period { font-size: 11px; color: #666; }
         .section { margin-bottom: 15px; }
@@ -14,9 +15,6 @@
         table { width: 100%; border-collapse: collapse; }
         td, th { padding: 4px 10px; text-align: left; }
         .right { text-align: right; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .info-grid .label { color: #666; font-size: 10px; text-transform: uppercase; }
-        .info-grid .value { font-weight: bold; }
         .totals-row { border-top: 2px solid #333; font-weight: bold; font-size: 14px; }
         .totals-row td { padding-top: 8px; }
         .deduction { color: #c00; }
@@ -24,20 +22,22 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
-            <h1>Payslip</h1>
-            <div class="period">
-                Period: {{ $payslip->pay_period_start->format('d M Y') }} &ndash; {{ $payslip->pay_period_end->format('d M Y') }}
-            </div>
-        </div>
-        <div style="text-align: right;">
-            <div><strong>Status:</strong> {{ ucfirst($payslip->status) }}</div>
-            @if($payslip->payment_date)
-                <div><strong>Payment Date:</strong> {{ $payslip->payment_date->format('d M Y') }}</div>
-            @endif
-        </div>
-    </div>
+    <table class="header">
+        <tr>
+            <td style="width: 50%;">
+                <h1>Payslip</h1>
+                <div class="period">
+                    Period: {{ $payslip->pay_period_start->format('d M Y') }} &ndash; {{ $payslip->pay_period_end->format('d M Y') }}
+                </div>
+            </td>
+            <td style="width: 50%; text-align: right;">
+                <div><strong>Status:</strong> {{ ucfirst($payslip->status) }}</div>
+                @if($payslip->payment_date)
+                    <div><strong>Payment Date:</strong> {{ $payslip->payment_date->format('d M Y') }}</div>
+                @endif
+            </td>
+        </tr>
+    </table>
 
     {{-- Employee Details --}}
     <div class="section">

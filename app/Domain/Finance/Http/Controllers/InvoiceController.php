@@ -31,6 +31,8 @@ class InvoiceController extends Controller
         $orgId = $request->user()->organization_id;
 
         $query = FinInvoice::forOrganization($orgId)
+            // Lines power the in-place Edit modal's prefill for draft invoices.
+            ->with('lines:id,invoice_id,description,quantity,unit_price,tax_rate_id,account_id')
             ->orderBy('invoice_date', 'desc');
 
         if ($request->filled('status')) {
@@ -340,7 +342,20 @@ class InvoiceController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($invoice, $validated) {
+        $orgId = $request->user()->organization_id;
+        // Resolve the client (when client-billed) exactly as store() does, so the
+        // edit modal can switch between client- and funder-billed and the
+        // denormalised name/email/address stay consistent.
+        $client = ! empty($validated['client_id'])
+            ? Client::query()
+                ->when(
+                    $orgId && Schema::hasColumn('clients', 'organization_id'),
+                    fn ($query) => $query->where('organization_id', $orgId),
+                )
+                ->findOrFail($validated['client_id'])
+            : null;
+
+        DB::transaction(function () use ($invoice, $validated, $client) {
             $lines = [];
             $subtotal = '0';
             $taxTotal = '0';
@@ -382,9 +397,11 @@ class InvoiceController extends Controller
             $invoice->update([
                 'invoice_date' => $validated['invoice_date'],
                 'due_date' => $validated['due_date'],
-                'client_name' => $validated['client_name'],
-                'client_email' => $validated['client_email'] ?? null,
-                'client_address' => $validated['client_address'] ?? null,
+                'client_id' => $client?->id,
+                'client_name' => $validated['client_name'] ?? $client?->full_name ?? ($validated['funding_body'] ?? null),
+                'client_email' => $validated['client_email'] ?? $client?->email,
+                'client_address' => $validated['client_address'] ?? $this->formatClientAddress($client),
+                'funding_body' => $validated['funding_body'] ?? null,
                 'bill_id' => $validated['bill_id'] ?? null,
                 'currency_code' => $validated['currency_code'] ?? 'NZD',
                 'subtotal' => $subtotal,

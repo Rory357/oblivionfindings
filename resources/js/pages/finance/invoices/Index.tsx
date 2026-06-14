@@ -9,17 +9,29 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+
+interface InvoiceLine {
+    id: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    tax_rate_id: number | null;
+}
 
 interface Invoice {
     id: number;
     invoice_number: string;
     invoice_date: string;
     due_date: string;
+    client_id: number | null;
     client_name: string;
     client_email: string | null;
+    funding_body: string | null;
+    notes: string | null;
     total_amount: string;
     currency_code: string;
     status: string;
@@ -27,6 +39,7 @@ interface Invoice {
     paid_at: string | null;
     amount_due?: number;
     amount_paid?: number;
+    lines: InvoiceLine[];
 }
 
 interface PaginatedInvoices {
@@ -86,6 +99,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
     const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
+    const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
 
     const canReceipt = (invoice: Invoice) =>
         canManage &&
@@ -145,58 +159,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info-bg p-2">
-                                    <DollarSign className="h-5 w-5 text-status-info dark:text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Outstanding</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_outstanding)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-critical-bg p-2">
-                                    <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Overdue</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_overdue)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-muted p-2 dark:bg-muted">
-                                    <FileText className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Drafts</p>
-                                    <p className="text-xl font-bold text-foreground">{summary.draft_count}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success-bg p-2">
-                                    <CheckCircle className="h-5 w-5 text-status-success dark:text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Paid This Month</p>
-                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.paid_this_month)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatCurrency(summary.total_outstanding)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={FileText} tone="muted" label="Drafts" value={summary.draft_count} />
+                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatCurrency(summary.paid_this_month)} />
                 </div>
 
                 {/* Filters */}
@@ -319,6 +285,18 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
+                                            {canManage && invoice.status === 'draft' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditInvoice(invoice);
+                                                    }}
+                                                >
+                                                    Edit
+                                                </Button>
+                                            )}
                                             {canReceipt(invoice) && (
                                                 <Button
                                                     size="sm"
@@ -377,6 +355,17 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                 <NewInvoiceDialog
                     open={newInvoiceOpen}
                     onClose={() => setNewInvoiceOpen(false)}
+                    clients={clients}
+                    taxRates={taxRates}
+                />
+            )}
+
+            {canManage && editInvoice && (
+                <NewInvoiceDialog
+                    key={editInvoice.id}
+                    open
+                    invoice={editInvoice}
+                    onClose={() => setEditInvoice(null)}
                     clients={clients}
                     taxRates={taxRates}
                 />

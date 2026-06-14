@@ -68,6 +68,7 @@ class DatabaseSeeder extends Seeder
         // Additional demo/debug seeders kept in main seeding flow for full dataset coverage.
         $this->call(DemoSeeder::class);
         $this->call(HrDemoSeeder::class);
+        $this->call(FinanceDemoSeeder::class);
         $this->call(DebugMedicalData::class);
         $this->call(FamilyPortalDemoSeeder::class);
         $this->call(RosteringProductionDemoSeeder::class);

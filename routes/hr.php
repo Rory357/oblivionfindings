@@ -59,7 +59,6 @@ use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
-use App\Http\Controllers\Hr\SurveyController;
 use App\Http\Controllers\Hr\TimeOffCalendarController;
 use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
@@ -648,6 +647,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/reviews/create', [CompensationController::class, 'createReview'])->name('reviews.create');
             Route::post('/reviews', [CompensationController::class, 'storeReview'])->name('reviews.store');
             Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
+            Route::post('/reviews/{review}/approve', [CompensationController::class, 'approveReview'])->name('reviews.approve');
             Route::post('/reviews/{review}/apply', [CompensationController::class, 'applyReview'])->name('reviews.apply');
             Route::post('/bonuses', [BonusController::class, 'store'])->name('bonuses.store');
             Route::post('/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('bonuses.approve');
@@ -687,6 +687,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.expenses.approve')->group(function () {
             Route::post('/{expenseClaim}/approve', [ExpenseController::class, 'approve'])->name('approve');
             Route::post('/{expenseClaim}/reject', [ExpenseController::class, 'reject'])->name('reject');
+            Route::post('/{expenseClaim}/pay', [ExpenseController::class, 'pay'])->name('pay');
         });
 
         Route::get('/{expenseClaim}', [ExpenseController::class, 'show'])->name('show');
@@ -800,27 +801,30 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('feed')->name('feed.')->group(function () {
-        Route::get('/', [FeedController::class, 'index'])->name('index');
-        Route::post('/', [FeedController::class, 'store'])->name('store');
-        Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+        Route::get('/', [FeedController::class, 'index'])
+            ->middleware('permission:hr.recognition.view')->name('index');
+
+        // Mutations require the give permission (was previously ungated).
+        Route::middleware('permission:hr.recognition.give')->group(function () {
+            Route::post('/', [FeedController::class, 'store'])->name('store');
+            Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+        });
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Surveys
+    | Surveys (RETIRED — superseded by the Wellbeing engagement-survey system)
     |--------------------------------------------------------------------------
+    | The standalone HrSurvey module was retired (S11): the Wellbeing system
+    | covers anonymity, scoring, eNPS, action plans + SLA reminders. The routes
+    | are kept alive as redirects so bookmarks + route() helpers still resolve;
+    | route names are preserved.
     */
-    Route::middleware('permission:hr.surveys.view')->prefix('surveys')->name('surveys.')->group(function () {
-        Route::get('/', [SurveyController::class, 'index'])->name('index');
-
-        Route::middleware('permission:hr.surveys.manage')->group(function () {
-            Route::get('/create', [SurveyController::class, 'create'])->name('create');
-            Route::post('/', [SurveyController::class, 'store'])->name('store');
-        });
-
-        Route::get('/{survey}/respond', [SurveyController::class, 'respond'])->name('respond');
-        Route::post('/{survey}/respond', [SurveyController::class, 'submitResponse'])->name('respond.store');
-        Route::get('/{survey}', [SurveyController::class, 'show'])->name('show');
+    Route::prefix('surveys')->name('surveys.')->group(function () {
+        Route::redirect('/', '/hr/wellbeing')->name('index');
+        Route::redirect('/create', '/hr/wellbeing')->name('create');
+        Route::redirect('/{survey}/respond', '/hr/wellbeing')->name('respond');
+        Route::redirect('/{survey}', '/hr/wellbeing')->name('show');
     });
 
     /*
@@ -917,6 +921,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::prefix('signatures')->name('signatures.')->group(function () {
         Route::get('/pending', [ESignatureController::class, 'pending'])->name('pending');
+        Route::get('/{signature}/document', [ESignatureController::class, 'downloadDocument'])->name('document');
         Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
         Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
         Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
@@ -940,8 +945,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         });
     });
 
-    // My Payslips (self-service)
+    // My Payslips (self-service) — owner-authorised in the controller, so these
+    // are NOT behind hr.payslips.view (which only HR/admin hold).
     Route::get('/my/payslips', [PayslipController::class, 'myPayslips'])->name('my.payslips');
+    Route::get('/my/payslips/{payslip}', [PayslipController::class, 'show'])->name('my.payslips.show');
+    Route::get('/my/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('my.payslips.download');
 
     /*
     |--------------------------------------------------------------------------

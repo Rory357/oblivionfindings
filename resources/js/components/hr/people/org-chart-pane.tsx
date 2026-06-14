@@ -239,6 +239,7 @@ function OrgNodeCard({
                         type="button"
                         variant="outline"
                         size="icon"
+                        aria-label={collapsed ? 'Expand subordinates' : 'Collapse subordinates'}
                         onClick={() => setCollapsed((c) => !c)}
                         className="absolute -bottom-3 left-1/2 z-10 h-6 w-6 -translate-x-1/2 rounded-full text-muted-foreground shadow-sm"
                     >

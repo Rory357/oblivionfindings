@@ -860,7 +860,7 @@ export default function MyPayslips({ payslips }: Props) {
                                                             asChild
                                                         >
                                                             <Link
-                                                                href={`/hr/payroll/payslips/${p.id}`}
+                                                                href={`/hr/my/payslips/${p.id}`}
                                                             >
                                                                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                                                                 View Full
@@ -873,7 +873,7 @@ export default function MyPayslips({ payslips }: Props) {
                                                             asChild
                                                         >
                                                             <Link
-                                                                href={`/hr/payroll/payslips/${p.id}/download`}
+                                                                href={`/hr/my/payslips/${p.id}/download`}
                                                             >
                                                                 <Download className="mr-1.5 h-3.5 w-3.5" />
                                                                 Download PDF

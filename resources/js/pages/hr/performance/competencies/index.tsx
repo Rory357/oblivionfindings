@@ -48,6 +48,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Competencies', href: '/hr/performance/competencies' },
 ];
 
+const DEFAULT_LEVELS = 'Beginner\nDeveloping\nCompetent\nAdvanced\nExpert';
+const fromLines = (v: string) =>
+    v
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s !== '');
+
 export default function CompetencyIndex({
     competencies,
     grouped,
@@ -55,28 +62,55 @@ export default function CompetencyIndex({
     can,
 }: Props) {
     const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
     const form = useForm({
         name: '',
         description: '',
         category: '',
-        proficiency_levels: [
-            'Beginner',
-            'Developing',
-            'Competent',
-            'Advanced',
-            'Expert',
-        ],
+        proficiency_text: DEFAULT_LEVELS,
     });
+
+    const openCreate = () => {
+        setEditingId(null);
+        form.reset();
+        form.clearErrors();
+        setShowForm(true);
+    };
+
+    const openEdit = (comp: Competency) => {
+        setEditingId(comp.id);
+        form.clearErrors();
+        form.setData({
+            name: comp.name,
+            description: comp.description ?? '',
+            category: comp.category,
+            proficiency_text: (comp.proficiency_levels ?? []).join('\n'),
+        });
+        setShowForm(true);
+    };
+
+    const closeForm = () => {
+        setShowForm(false);
+        setEditingId(null);
+        form.reset();
+        form.clearErrors();
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post('/hr/performance/competencies', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowForm(false);
-                form.reset();
-            },
-        });
+        form.transform((data) => ({
+            name: data.name,
+            description: data.description,
+            category: data.category,
+            proficiency_levels: fromLines(data.proficiency_text),
+        }));
+
+        const opts = { preserveScroll: true, onSuccess: closeForm };
+        if (editingId !== null) {
+            form.put(`/hr/performance/competencies/${editingId}`, opts);
+        } else {
+            form.post('/hr/performance/competencies', opts);
+        }
     };
 
     const categories = Object.keys(grouped);
@@ -111,10 +145,7 @@ export default function CompetencyIndex({
                                                 Assess
                                             </Link>
                                         </Button>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setShowForm(!showForm)}
-                                        >
+                                        <Button size="sm" onClick={openCreate}>
                                             <Plus className="mr-1.5 h-4 w-4" />
                                             Add Competency
                                         </Button>
@@ -129,7 +160,9 @@ export default function CompetencyIndex({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">
-                                New Competency
+                                {editingId !== null
+                                    ? 'Edit Competency'
+                                    : 'New Competency'}
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -184,17 +217,37 @@ export default function CompetencyIndex({
                                         rows={2}
                                     />
                                 </div>
+                                <div>
+                                    <Label>
+                                        Proficiency levels{' '}
+                                        <span className="text-xs text-muted-foreground">
+                                            (one per line)
+                                        </span>
+                                    </Label>
+                                    <Textarea
+                                        value={form.data.proficiency_text}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'proficiency_text',
+                                                e.target.value,
+                                            )
+                                        }
+                                        rows={5}
+                                    />
+                                </div>
                                 <div className="flex gap-2">
                                     <Button
                                         type="submit"
                                         disabled={form.processing}
                                     >
-                                        Save
+                                        {editingId !== null
+                                            ? 'Save Changes'
+                                            : 'Save'}
                                     </Button>
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => setShowForm(false)}
+                                        onClick={closeForm}
                                     >
                                         Cancel
                                     </Button>
@@ -229,6 +282,9 @@ export default function CompetencyIndex({
                                             <TableHead>Competency</TableHead>
                                             <TableHead>Description</TableHead>
                                             <TableHead>Levels</TableHead>
+                                            {can.manage && (
+                                                <TableHead className="w-16"></TableHead>
+                                            )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -255,6 +311,19 @@ export default function CompetencyIndex({
                                                         )}
                                                     </div>
                                                 </TableCell>
+                                                {can.manage && (
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                openEdit(comp)
+                                                            }
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         ))}
                                     </TableBody>

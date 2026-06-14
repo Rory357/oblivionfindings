@@ -22,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Play, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Play, X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -220,6 +220,17 @@ export default function CompensationReviewDetail({
     const submitCreate = (e: FormEvent) => {
         e.preventDefault();
         router.post('/hr/compensation/reviews', form);
+    };
+
+    const approveReview = () => {
+        if (
+            review &&
+            confirm(
+                'Approve this compensation review? This marks all pending line-items approved and unlocks applying it.',
+            )
+        ) {
+            router.post(`/hr/compensation/reviews/${review.id}/approve`);
+        }
     };
 
     const applyReview = () => {
@@ -488,6 +499,14 @@ export default function CompensationReviewDetail({
                                 <Badge className={getStatusColor(review.status)}>
                                     {review.status.replace(/_/g, ' ')}
                                 </Badge>
+                                {can.manage &&
+                                    (review.status === 'planning' ||
+                                        review.status === 'in_progress') && (
+                                        <Button size="sm" onClick={approveReview}>
+                                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                                            Approve Review
+                                        </Button>
+                                    )}
                                 {can.manage && review.status === 'approved' && (
                                     <Button size="sm" onClick={applyReview}>
                                         <Play className="mr-1 h-4 w-4" />

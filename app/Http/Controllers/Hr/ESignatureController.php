@@ -6,8 +6,8 @@ use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Services\ESignatureService;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ESignatureController extends Controller
@@ -59,6 +59,9 @@ class ESignatureController extends Controller
                 'document_title' => $signature->document?->title ?? 'Unknown Document',
                 'document_category' => $signature->document?->category,
                 'document_original_name' => $signature->document?->original_name,
+                'document_download_url' => $signature->document
+                    ? route('hr.signatures.document', $signature)
+                    : null,
                 'requested_by' => $signature->requestedBy?->name ?? 'Unknown',
                 'requested_at' => $signature->requested_at?->toDateTimeString(),
                 'signed_at' => $signature->signed_at?->toDateTimeString(),
@@ -68,6 +71,31 @@ class ESignatureController extends Controller
                 'sign' => $signature->status === 'pending',
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Download document — signer-scoped (so the signer can review it)    */
+    /* ------------------------------------------------------------------ */
+
+    public function downloadDocument(Request $request, HrDocumentSignature $signature)
+    {
+        $user = $request->user();
+        // The signer is authorised to view the document they were asked to sign,
+        // regardless of whether they hold hr.documents.view.
+        abort_unless($user && $signature->signer_user_id === $user->id, 403);
+
+        $document = $signature->document;
+        abort_unless($document, 404, 'Document not found.');
+
+        abort_unless(
+            Storage::disk($document->storage_disk)->exists($document->storage_path),
+            404,
+            'Document file is missing from storage.',
+        );
+
+        $filename = $document->original_name ?: basename($document->storage_path);
+
+        return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
     }
 
     /* ------------------------------------------------------------------ */

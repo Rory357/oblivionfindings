@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import { NewPoDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, ShoppingCart } from 'lucide-react';
+import { useState } from 'react';
 
 type Vendor = { id: number; name: string };
 
@@ -48,10 +49,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function PurchaseOrderIndex() {
-    const { purchaseOrders, vendors, filters } = usePage().props as any;
+    const { purchaseOrders, vendors, filters, canManage, accounts } = usePage().props as any;
+    const [newPoOpen, setNewPoOpen] = useState(false);
 
     const rows: PurchaseOrder[] = purchaseOrders?.data ?? [];
     const vendorList: Vendor[] = vendors ?? [];
+    const accountList: AccountOption[] = accounts ?? [];
 
     const current = {
         status: filters?.status ?? '',
@@ -76,12 +79,12 @@ export default function PurchaseOrderIndex() {
                             { label: 'Total', value: purchaseOrders?.total ?? rows.length },
                         ]}
                         actions={
-                            <Link href="/finance/purchase-orders/create">
-                                <Button size="sm">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewPoOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Purchase Order
                                 </Button>
-                            </Link>
+                            )
                         }
                         footer={<PayablesTabsFooter active="purchase-orders" />}
                     />
@@ -205,6 +208,15 @@ export default function PurchaseOrderIndex() {
                     </div>
                 ) : null}
             </PageLayout>
+
+            {canManage && (
+                <NewPoDialog
+                    open={newPoOpen}
+                    onClose={() => setNewPoOpen(false)}
+                    vendors={vendorList}
+                    accounts={accountList}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { CalendarDays, ChevronDown, Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -349,6 +349,9 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
                                     <th className="px-4 py-3 text-left font-medium">
                                         Submitted
                                     </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -385,13 +388,41 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {request.created_at}
                                             </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {(request.status ===
+                                                    'pending' ||
+                                                    request.status ===
+                                                        'approved') && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            if (
+                                                                confirm(
+                                                                    'Cancel this leave request?',
+                                                                )
+                                                            ) {
+                                                                router.delete(
+                                                                    `/hr/my/leave/${request.id}`,
+                                                                    {
+                                                                        preserveScroll:
+                                                                            true,
+                                                                    },
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })}
                                 {requests.data.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={5}
+                                            colSpan={6}
                                             className="px-4 py-8 text-center text-muted-foreground"
                                         >
                                             No leave requests found.

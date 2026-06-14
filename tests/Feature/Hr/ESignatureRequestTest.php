@@ -1,0 +1,115 @@
+<?php
+
+use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDocumentSignature;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    $this->seed(RbacSeeder::class);
+    $this->seed(SeedHrPermissionsSeeder::class);
+
+    // hr.documents.manage (request perm accepts it) is granted to provider_manager.
+    $this->manager = User::factory()->create([
+        'organization_id' => 1,
+        'role' => 'provider_manager',
+        'approved_at' => now(),
+    ]);
+    $this->manager->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'provider_manager')->first()->id,
+    ]);
+
+    $this->worker = User::factory()->create([
+        'organization_id' => 1,
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    $this->profile = HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $this->worker->id,
+        'employee_number' => 'EMP-'.$this->worker->id,
+        'work_email' => $this->worker->email,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    $this->document = HrDocument::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $this->profile->id,
+        'title' => 'Code of Conduct',
+        'category' => 'policy',
+        'storage_disk' => 'local',
+        'storage_path' => 'hr/documents/code.pdf',
+        'original_name' => 'code-of-conduct.pdf',
+        'created_by' => $this->manager->id,
+    ]);
+});
+
+test('a manager can send a document for signature', function () {
+    $this->actingAs($this->manager)
+        ->post('/hr/signatures/request', [
+            'document_id' => $this->document->id,
+            'user_ids' => [$this->worker->id],
+        ])
+        ->assertSessionHas('success');
+
+    $this->assertDatabaseHas('hr_document_signatures', [
+        'document_id' => $this->document->id,
+        'signer_user_id' => $this->worker->id,
+        'status' => 'pending',
+        'requested_by' => $this->manager->id,
+    ]);
+});
+
+test('the documents index ships employees with user_id for the signer picker', function () {
+    $response = $this->actingAs($this->manager)->get('/hr/documents');
+    $response->assertOk();
+
+    $employees = collect($response->inertiaProps('employees'));
+    expect($employees->pluck('user_id')->all())->toContain($this->worker->id);
+});
+
+test('a user without signature/document manage cannot send for signature', function () {
+    $this->actingAs($this->worker)
+        ->post('/hr/signatures/request', [
+            'document_id' => $this->document->id,
+            'user_ids' => [$this->worker->id],
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('hr_document_signatures', [
+        'document_id' => $this->document->id,
+    ]);
+});
+
+test('the signer can download the document they were asked to sign', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('hr/documents/code.pdf', 'PDF BYTES');
+
+    $signature = HrDocumentSignature::query()->create([
+        'tenant_id' => 1,
+        'document_id' => $this->document->id,
+        'signer_user_id' => $this->worker->id,
+        'status' => 'pending',
+        'requested_by' => $this->manager->id,
+        'requested_at' => now(),
+    ]);
+
+    $this->actingAs($this->worker)
+        ->get("/hr/signatures/{$signature->id}/document")
+        ->assertOk();
+
+    // A different (non-signer) user cannot download it.
+    $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $this->actingAs($other)
+        ->get("/hr/signatures/{$signature->id}/document")
+        ->assertForbidden();
+});

@@ -210,28 +210,29 @@ class IrdFilingService
         Log::info('IRD filing submission initiated', [
             'filing_id' => $filing->id,
             'type' => $filing->filing_type,
-            'ird_number' => '***' . substr($filing->ird_number, -3),
+            'ird_number' => '***'.substr($filing->ird_number, -3),
         ]);
 
-        // Check if API credentials are configured
-        if (! config('services.ird.api_key')) {
+        // No live IRD Gateway Services integration is wired yet (it requires a
+        // SOAP request signed with WS-Security / X.509 to
+        // https://services.ird.govt.nz/gateway/gws/returns/). Rather than fake a
+        // successful filing, refuse unless an explicit simulation is enabled — so
+        // a user is never misled into thinking a return was transmitted to IRD.
+        if (! config('services.ird.simulation_enabled', false)) {
             throw new \RuntimeException(
-                'IRD Gateway Services API credentials not configured. ' .
-                'Set IRD_API_KEY and IRD_API_SECRET in your environment.'
+                'Live IRD Gateway Services submission is not yet available. '.
+                'File this return directly via myIR, or enable IRD simulation mode '.
+                '(IRD_SIMULATION_ENABLED=true) for testing.'
             );
         }
 
-        // In production, this would:
-        // 1. Build SOAP/REST request to IRD Gateway Services
-        // 2. Sign with WS-Security (X.509 certificate)
-        // 3. POST to https://services.ird.govt.nz/gateway/gws/returns/
-        // 4. Parse the response and extract reference number
-
+        // Explicit, clearly-labelled simulation — NOT transmitted to IRD.
         return [
-            'reference' => 'IRD-' . strtoupper(Str::random(8)),
-            'status' => 'received',
+            'reference' => 'SIM-'.strtoupper(Str::random(8)),
+            'status' => 'simulated',
+            'simulated' => true,
             'timestamp' => now()->toIso8601String(),
-            'message' => 'Filing received and queued for processing.',
+            'message' => 'SIMULATED submission — NOT transmitted to IRD. File via myIR for a real submission.',
         ];
     }
 
@@ -242,7 +243,7 @@ class IrdFilingService
     {
         // Pad to 9 digits if 8 digits
         if (strlen($irdNum) === 8) {
-            $irdNum = '0' . $irdNum;
+            $irdNum = '0'.$irdNum;
         }
 
         if (strlen($irdNum) !== 9) {

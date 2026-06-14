@@ -2,10 +2,27 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PageHero } from '@/components/page';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { Banknote, CheckCircle2, DollarSign } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Banknote, CheckCircle2, DollarSign, Plus } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type Bonus = {
     id: number;
@@ -17,6 +34,11 @@ type Bonus = {
     payment_date: string;
     status: string;
 };
+type Employee = {
+    id: number;
+    user: { id: number; name: string } | null;
+    position_title: string | null;
+};
 type Props = {
     bonuses: {
         data: Bonus[];
@@ -25,6 +47,7 @@ type Props = {
         total: number;
         links: any[];
     };
+    employees: Employee[];
     can: { manage?: boolean };
 };
 
@@ -35,17 +58,15 @@ const breadcrumbs = [
 ];
 const statusConfig: Record<string, { className: string; label: string }> = {
     pending: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+        className: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
         label: 'Pending',
     },
     approved: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 bg-status-info-bg text-status-info',
         label: 'Approved',
     },
     paid: {
-        className:
-            'border-status-success/30 text-status-success bg-status-success',
+        className: 'border-status-success/30 bg-status-success-bg text-status-success',
         label: 'Paid',
     },
     cancelled: {
@@ -54,7 +75,54 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
 };
 
-export default function BonusIndex({ bonuses, can }: Props) {
+const BONUS_TYPES = [
+    { value: 'performance', label: 'Performance' },
+    { value: 'signing', label: 'Signing' },
+    { value: 'retention', label: 'Retention' },
+    { value: 'spot', label: 'Spot' },
+    { value: 'holiday', label: 'Holiday' },
+    { value: 'other', label: 'Other' },
+];
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+const emptyForm = {
+    employee_profile_id: '',
+    bonus_type: 'performance',
+    amount: '',
+    payment_date: todayIso(),
+    reason: '',
+};
+
+export default function BonusIndex({ bonuses, employees, can }: Props) {
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
+    const [open, setOpen] = useState(false);
+    const [form, setForm] = useState(emptyForm);
+
+    const set = (key: string, value: string) =>
+        setForm((prev) => ({ ...prev, [key]: value }));
+
+    const fieldError = (field: string) =>
+        errors?.[field] ? (
+            <p className="mt-1 text-xs text-status-critical">{errors[field]}</p>
+        ) : null;
+
+    const openCreate = () => {
+        setForm(emptyForm);
+        setOpen(true);
+    };
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        router.post('/hr/compensation/bonuses', form, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setOpen(false);
+                setForm(emptyForm);
+            },
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bonus Payments" />
@@ -74,6 +142,14 @@ export default function BonusIndex({ bonuses, can }: Props) {
                             value: bonuses.data.filter((b) => b.status === 'paid').length,
                         },
                     ]}
+                    actions={
+                        can.manage ? (
+                            <Button size="sm" onClick={openCreate}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Record Bonus
+                            </Button>
+                        ) : null
+                    }
                 />
                 <Card>
                     <CardHeader>
@@ -84,6 +160,17 @@ export default function BonusIndex({ bonuses, can }: Props) {
                             <div className="py-12 text-center text-muted-foreground">
                                 <DollarSign className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                 <p>No bonus payments recorded.</p>
+                                {can.manage && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-4"
+                                        onClick={openCreate}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Record Bonus
+                                    </Button>
+                                )}
                             </div>
                         ) : (
                             <table className="w-full text-sm">
@@ -134,7 +221,7 @@ export default function BonusIndex({ bonuses, can }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-medium">
-                                                    ${b.amount.toFixed(2)}
+                                                    ${Number(b.amount).toFixed(2)}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {b.payment_date}
@@ -178,6 +265,119 @@ export default function BonusIndex({ bonuses, can }: Props) {
                     </CardContent>
                 </Card>
             </PageShell>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Record Bonus Payment</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submit} className="space-y-4">
+                        <div>
+                            <Label htmlFor="employee_profile_id">Employee</Label>
+                            <Select
+                                value={form.employee_profile_id}
+                                onValueChange={(val) =>
+                                    set('employee_profile_id', val)
+                                }
+                            >
+                                <SelectTrigger id="employee_profile_id">
+                                    <SelectValue placeholder="Select an employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map((emp) => (
+                                        <SelectItem
+                                            key={emp.id}
+                                            value={String(emp.id)}
+                                        >
+                                            {emp.user?.name ?? `Profile #${emp.id}`}
+                                            {emp.position_title
+                                                ? ` — ${emp.position_title}`
+                                                : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {fieldError('employee_profile_id')}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label htmlFor="bonus_type">Type</Label>
+                                <Select
+                                    value={form.bonus_type}
+                                    onValueChange={(val) =>
+                                        set('bonus_type', val)
+                                    }
+                                >
+                                    <SelectTrigger id="bonus_type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {BONUS_TYPES.map((t) => (
+                                            <SelectItem
+                                                key={t.value}
+                                                value={t.value}
+                                            >
+                                                {t.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {fieldError('bonus_type')}
+                            </div>
+                            <div>
+                                <Label htmlFor="amount">Amount (NZD)</Label>
+                                <Input
+                                    id="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={form.amount}
+                                    onChange={(e) =>
+                                        set('amount', e.target.value)
+                                    }
+                                    required
+                                />
+                                {fieldError('amount')}
+                            </div>
+                        </div>
+                        <div>
+                            <Label htmlFor="payment_date">Payment Date</Label>
+                            <Input
+                                id="payment_date"
+                                type="date"
+                                value={form.payment_date}
+                                onChange={(e) =>
+                                    set('payment_date', e.target.value)
+                                }
+                                required
+                            />
+                            {fieldError('payment_date')}
+                        </div>
+                        <div>
+                            <Label htmlFor="reason">Reason</Label>
+                            <Textarea
+                                id="reason"
+                                value={form.reason}
+                                onChange={(e) => set('reason', e.target.value)}
+                                placeholder="Optional context for this bonus"
+                            />
+                            {fieldError('reason')}
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={!form.employee_profile_id}>
+                                Record Bonus
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
