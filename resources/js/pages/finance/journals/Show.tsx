@@ -163,7 +163,7 @@ export default function JournalsShow({ auth, journal }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/journals"
                         title={

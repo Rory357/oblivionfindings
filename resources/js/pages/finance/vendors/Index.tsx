@@ -99,7 +99,7 @@ export default function VendorsIndex({ vendors, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Building2}
                         title="Vendors"
                         description="Manage your suppliers, contractors and service providers"

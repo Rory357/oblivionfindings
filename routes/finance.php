@@ -33,6 +33,7 @@ use App\Domain\Finance\Http\Controllers\IntercompanyController;
 use App\Domain\Finance\Http\Controllers\InvoiceController;
 use App\Domain\Finance\Http\Controllers\IrdFilingController;
 use App\Domain\Finance\Http\Controllers\JournalController;
+use App\Domain\Finance\Http\Controllers\LedgerController;
 use App\Domain\Finance\Http\Controllers\MatchRuleController;
 use App\Domain\Finance\Http\Controllers\PaymentAllocationController;
 use App\Domain\Finance\Http\Controllers\PaymentMatchController;
@@ -76,6 +77,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/clients/{client}/financials', [ClientFinancialsController::class, 'show'])
         ->name('clients.financials')
         ->middleware('permission:finance.dashboard');
+
+    // ── General Ledger hub ──────────────────────────────────────────────
+    // /finance/ledger is the hub entry point; it redirects to the first ledger
+    // tab the user can open. The tabs themselves are the routes below.
+    Route::get('/ledger', [LedgerController::class, 'index'])->name('ledger.index');
 
     // ── Chart of Accounts ───────────────────────────────────────────────
     Route::get('/accounts', [ChartOfAccountsController::class, 'index'])

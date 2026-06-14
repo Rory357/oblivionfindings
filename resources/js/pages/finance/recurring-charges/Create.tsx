@@ -35,7 +35,7 @@ export default function RecurringChargeCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Recurring Charge" />
-            <PageHero variant="compact" title="Create Recurring Charge" description="Set up a new recurring billing charge for a client." backHref="/finance/recurring-charges" />
+            <PageHero category="finance" variant="compact" title="Create Recurring Charge" description="Set up a new recurring billing charge for a client." backHref="/finance/recurring-charges" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

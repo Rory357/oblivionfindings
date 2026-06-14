@@ -125,7 +125,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/credit-notes"
                         title="New Credit Note"

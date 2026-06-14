@@ -128,7 +128,7 @@ export default function CashFlow({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Activity}
                         title="Cash Flow Statement"
                         description="Cash inflows and outflows across operating, investing, and financing activities."

@@ -41,7 +41,7 @@ export default function PettyCashIndex({ funds }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Coins}
                         title="Petty Cash Funds"
                         description="Manage petty cash floats and transactions"

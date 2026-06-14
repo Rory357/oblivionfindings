@@ -214,7 +214,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/gst-returns"
                         title={

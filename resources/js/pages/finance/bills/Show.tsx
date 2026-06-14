@@ -102,7 +102,7 @@ export default function BillShow({ auth, bill }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bills"
                         title={

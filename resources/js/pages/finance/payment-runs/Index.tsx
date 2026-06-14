@@ -69,7 +69,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Send}
                         title="Payment Runs"
                         description="Manage batch payments to vendors"

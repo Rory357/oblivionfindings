@@ -87,7 +87,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Smartphone}
                         title="EFTPOS Terminals"
                         description="Configure and manage EFTPOS terminal devices."

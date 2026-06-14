@@ -105,3 +105,31 @@ test('finance chart verification fails when config references a soft deleted acc
         ->expectsOutputToContain('6200')
         ->assertExitCode(1);
 });
+
+test('finance chart verification fails when an account name contradicts its configured intent', function () {
+    $this->seed(FinanceSeeder::class);
+
+    // Reproduce the 5020-class bug: the Leave Expense account seeded under the
+    // wrong (ACC Employer Levy) name. Existence/active still pass; name parity must not.
+    DB::table('fin_accounts')
+        ->where('organization_id', 0)
+        ->where('code', '5050')
+        ->update(['name' => 'ACC Employer Levy']);
+
+    $this->artisan('finance:verify-chart')
+        ->expectsOutputToContain('names contradict their configured intent')
+        ->expectsOutputToContain('5050')
+        ->assertExitCode(1);
+});
+
+test('the seeded leave-expense account is distinct from the ACC employer levy account', function () {
+    $this->seed(FinanceSeeder::class);
+
+    $leave = DB::table('fin_accounts')->where('organization_id', 0)->where('code', '5050')->first();
+    $acc = DB::table('fin_accounts')->where('organization_id', 0)->where('code', '5020')->first();
+
+    expect($leave)->not->toBeNull()
+        ->and($leave->name)->toContain('Leave Expense')
+        ->and($acc->name)->toContain('ACC Employer Levy')
+        ->and(config('finance.event_accounts.leave_provision.debit'))->toBe('5050');
+});

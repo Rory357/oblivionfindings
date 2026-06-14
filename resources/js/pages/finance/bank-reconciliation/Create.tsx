@@ -47,7 +47,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bank-reconciliation"
                         title="New Bank Reconciliation"

@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { LedgerTabsFooter, NewJournalDialog } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,9 +51,19 @@ interface Filters {
     search?: string;
 }
 
+interface RefItem {
+    id: number;
+    code: string;
+    name: string;
+}
+
 interface Props extends PageProps {
     journals: PaginatedJournals;
     filters: Filters;
+    canManage?: boolean;
+    accounts?: RefItem[];
+    costCentres?: RefItem[];
+    fundingStreams?: RefItem[];
 }
 
 const formatNZD = (amount: string | number) =>
@@ -76,7 +87,16 @@ const typeBadge = (type: string) => {
     return map[type] ?? 'bg-muted text-foreground';
 };
 
-export default function JournalsIndex({ auth, journals, filters }: Props) {
+export default function JournalsIndex({
+    auth,
+    journals,
+    filters,
+    canManage = false,
+    accounts = [],
+    costCentres = [],
+    fundingStreams = [],
+}: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [type, setType] = useState(filters.type ?? '');
@@ -117,7 +137,8 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="journals" />}
                         icon={BookOpen}
                         title="Journals"
                         description="General ledger journal entries"
@@ -127,12 +148,12 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                             { label: 'Drafts (this page)', value: draftCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/journals/create">
+                            canManage ? (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Journal
-                                </Link>
-                            </Button>
+                                </Button>
+                            ) : undefined
                         }
                     />
                 }
@@ -270,6 +291,16 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                             ))}
                         </div>
                     </div>
+                )}
+
+                {canManage && (
+                    <NewJournalDialog
+                        open={createOpen}
+                        onClose={() => setCreateOpen(false)}
+                        accounts={accounts}
+                        costCentres={costCentres}
+                        fundingStreams={fundingStreams}
+                    />
                 )}
             </PageLayout>
         </AppLayout>

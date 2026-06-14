@@ -63,7 +63,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Banknote}
                         title="Bank Accounts"
                         description="Manage your organisation's bank accounts and balances"

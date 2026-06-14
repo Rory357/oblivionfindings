@@ -77,7 +77,7 @@ export default function PriceBookShow({ price_book }: Props) {
     return (
         <AppLayout>
             <Head title={price_book.name} />
-            <PageHero variant="compact" title={price_book.name} description={price_book.description ?? ''} backHref="/finance/price-books" />
+            <PageHero category="finance" variant="compact" title={price_book.name} description={price_book.description ?? ''} backHref="/finance/price-books" />
             <PageShell>
                 {/* Header info */}
                 <div className="flex flex-wrap items-center gap-2">

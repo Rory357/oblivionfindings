@@ -137,7 +137,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/journals"
                         title="New Journal Entry"

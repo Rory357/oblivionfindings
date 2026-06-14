@@ -154,7 +154,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
             <Head title="Receivables" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowUpFromLine}
                         title="Receivables"
                         description="Accounts receivable dashboard for outstanding invoices and payments."

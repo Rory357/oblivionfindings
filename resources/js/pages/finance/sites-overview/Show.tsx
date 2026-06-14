@@ -208,7 +208,7 @@ export default function SitesFinancialOverview({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/dashboard"
                         title="All-Sites Comparison"

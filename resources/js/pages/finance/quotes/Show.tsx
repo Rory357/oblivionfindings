@@ -71,7 +71,7 @@ export default function QuoteShow({ quote }: Props) {
     return (
         <AppLayout>
             <Head title={quote.title} />
-            <PageHero variant="compact" title={quote.title} description={clientDisplay} backHref="/finance/quotes" />
+            <PageHero category="finance" variant="compact" title={quote.title} description={clientDisplay} backHref="/finance/quotes" />
             <PageShell>
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-2">

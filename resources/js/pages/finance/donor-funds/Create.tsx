@@ -63,7 +63,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/donor-funds"
                         title="New Donor Fund"

@@ -159,7 +159,7 @@ export default function BankFeedsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Rss}
                         title="Bank Feeds"
                         description="Automated bank transaction imports from NZ banks"

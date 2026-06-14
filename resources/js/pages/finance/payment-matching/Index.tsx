@@ -149,7 +149,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowLeftRight}
                         title="Payment Matching"
                         description="Automatically match bank transactions to bills and invoices"

@@ -115,7 +115,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowDownToLine}
                         title="Bills"
                         description="Manage accounts payable"

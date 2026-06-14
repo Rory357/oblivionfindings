@@ -98,7 +98,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Calculator}
                         title="GST Returns"
                         description="Manage and file GST returns with IRD"

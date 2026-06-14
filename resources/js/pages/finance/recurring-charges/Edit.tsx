@@ -45,7 +45,7 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
     return (
         <AppLayout>
             <Head title="Edit Recurring Charge" />
-            <PageHero variant="compact" title="Edit Recurring Charge" description="Update an existing recurring billing charge." backHref="/finance/recurring-charges" />
+            <PageHero category="finance" variant="compact" title="Edit Recurring Charge" description="Update an existing recurring billing charge." backHref="/finance/recurring-charges" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

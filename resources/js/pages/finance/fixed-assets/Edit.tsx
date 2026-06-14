@@ -119,7 +119,7 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/fixed-assets/${asset.id}`}
                         title="Edit Fixed Asset"

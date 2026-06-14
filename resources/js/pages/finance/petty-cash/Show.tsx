@@ -93,7 +93,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/petty-cash"
                         title={

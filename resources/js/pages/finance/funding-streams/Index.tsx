@@ -355,7 +355,7 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts }:
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Sprout}
                         title="Funding Streams"
                         description="Manage funding sources and revenue allocations"

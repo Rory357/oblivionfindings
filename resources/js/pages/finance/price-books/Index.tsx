@@ -61,7 +61,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
     return (
         <AppLayout>
             <Head title="Price Books" />
-            <PageHero
+            <PageHero category="finance"
                 icon={BookOpen}
                 title="Price Books"
                 description="Manage pricing structures and rate schedules for services."

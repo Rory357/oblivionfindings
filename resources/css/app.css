@@ -115,6 +115,8 @@
     --color-category-sites-bg: var(--category-sites-bg);
     --color-category-fleet: var(--category-fleet);
     --color-category-fleet-bg: var(--category-fleet-bg);
+    --color-category-finance: var(--category-finance);
+    --color-category-finance-bg: var(--category-finance-bg);
 
     /* Sites / Meal Planner green accent (bare utilities: bg-sites, text-sites-deep, …) */
     --color-sites: var(--sites);
@@ -219,6 +221,9 @@
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 12%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
+    /* Finance — teal/green "money" hue (+170), distinct from sites +210 / fleet +45 */
+    --category-finance: oklch(from var(--primary) l c calc(h + 170));
+    --category-finance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 170)) 12%, transparent);
 
     /* Meal Planner accent — brand-derived. Was the Sites green; now follows --primary
        so the planner matches the brand colour from Settings → Branding (parity with the
@@ -339,6 +344,8 @@
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
+    --category-finance: oklch(from var(--primary) l c calc(h + 170));
+    --category-finance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 170)) 20%, transparent);
 
     /* Meal Planner accent — brand-derived (dark) */
     --sites: var(--primary);

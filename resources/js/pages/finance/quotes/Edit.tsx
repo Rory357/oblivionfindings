@@ -134,7 +134,7 @@ export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit: ${quote.title}`} />
-            <PageHero variant="compact" title={`Edit: ${quote.title}`} backHref={`/finance/quotes/${quote.id}`} />
+            <PageHero category="finance" variant="compact" title={`Edit: ${quote.title}`} backHref={`/finance/quotes/${quote.id}`} />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     {/* Client Details */}

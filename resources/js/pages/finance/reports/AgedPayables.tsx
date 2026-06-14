@@ -92,7 +92,7 @@ export default function AgedPayables({ report }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowDownToLine}
                         title="Aged Payables"
                         description="Outstanding payables by vendor and aging period."

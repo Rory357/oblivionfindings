@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -319,7 +320,8 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="currencies" />}
                         icon={Coins}
                         title="Currencies"
                         description="Manage currencies and exchange rates for multi-currency transactions"

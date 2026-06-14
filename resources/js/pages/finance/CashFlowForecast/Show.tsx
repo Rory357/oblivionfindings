@@ -169,7 +169,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/cash-flow-forecast"
                         title={

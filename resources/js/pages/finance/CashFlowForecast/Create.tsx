@@ -37,7 +37,7 @@ export default function CashFlowForecastCreate() {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/cash-flow-forecast"
                         title="New Cash Flow Forecast"
