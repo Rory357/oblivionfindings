@@ -51,8 +51,13 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   readout, remounts map on release via mapKey) + breach-type Segmented (enter/exit/both, default both)
   + active Switch; empty-state when no coords. onShapeChange syncs circle centre/radius back to the
   form; circle-only per guardrail (polygon stays a post-create concern). Gate: tsc/lint/build green.
-  Commit `<s5>`.
-- [ ] **S6 — Property & finance + Review & safety steps.** Finance step + review summary/risk/notes +
-  Save & add another + success pane.
+  Commit `87e346b3`.
+- [x] **S6 — Property & finance + Review & safety steps.** `StepFinance`: rent amount + frequency
+  select, lease start/end (client-side end≥start), landlord name/contact, weekly food budget.
+  `StepReview`: two risk toggle-tiles (high-risk critical tone / high-needs warning tone) revealing
+  risk notes + review date when on; emergency plan location; site notes; per-section ReviewCard/
+  ReviewRow summary (Basics·Location·Spaces·Rostering·Contacts & equipment·Property & finance) each
+  with an Edit jump (`goToStep`). Footer Save&add-another + Create + WizardSuccessPane already wired in
+  S3. Modal now feature-complete (all 9 steps). Gate: tsc/lint/build green. Commit `<s6>`.
 - [ ] **S7 — Full audit, tests, cutover.** E2E + visual parity + full gate + deprecate /sites/create +
   final summary.

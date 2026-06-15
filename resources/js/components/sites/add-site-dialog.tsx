@@ -649,9 +649,9 @@ function StepBody({ stepKey, ctx }: { stepKey: StepKey; ctx: SiteStepCtx }) {
         case 'documents':
             return <StepDocuments ctx={ctx} />;
         case 'finance':
-            return <StepFinancePlaceholder />;
+            return <StepFinance ctx={ctx} />;
         case 'review':
-            return <StepReviewPlaceholder />;
+            return <StepReview ctx={ctx} />;
         default:
             return null;
     }
@@ -2118,22 +2118,306 @@ function CoverageCard({
         </div>
     );
 }
-function StepFinancePlaceholder() {
+const RENT_FREQUENCIES = [
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'fortnightly', label: 'Fortnightly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'annually', label: 'Annually' },
+];
+
+function StepFinance({ ctx }: { ctx: SiteStepCtx }) {
+    const { data, set, err } = ctx;
     return (
-        <StepHead
-            icon={Wallet}
-            title="Property & finance"
-            blurb="Tenancy, lease, landlord and the weekly food budget."
-        />
+        <div>
+            <StepHead
+                icon={Wallet}
+                title="Property & finance"
+                blurb="Tenancy, lease and budget — all optional, captured here so nothing's missed."
+            />
+            <div className="grid gap-4">
+                <SubHead icon={Wallet}>Tenancy</SubHead>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Rent amount" hint="$">
+                        <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={data.rent_amount}
+                            onChange={(e) => set('rent_amount', e.target.value)}
+                            placeholder="0.00"
+                        />
+                    </Field>
+                    <Field label="Rent frequency">
+                        <SelectInput
+                            value={data.rent_frequency}
+                            onChange={(v) =>
+                                set('rent_frequency', v as SiteWizardForm['rent_frequency'])
+                            }
+                            placeholder="Frequency"
+                            options={RENT_FREQUENCIES}
+                        />
+                    </Field>
+                    <Field label="Lease start">
+                        <Input
+                            type="date"
+                            value={data.lease_start_date}
+                            onChange={(e) => set('lease_start_date', e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Lease end" error={err('lease_end_date')}>
+                        <Input
+                            type="date"
+                            value={data.lease_end_date}
+                            onChange={(e) => set('lease_end_date', e.target.value)}
+                            aria-invalid={!!err('lease_end_date')}
+                        />
+                    </Field>
+                    <Field label="Landlord name">
+                        <Input
+                            value={data.landlord_name}
+                            onChange={(e) => set('landlord_name', e.target.value)}
+                            placeholder="e.g. Acme Property"
+                        />
+                    </Field>
+                    <Field label="Landlord contact">
+                        <Input
+                            value={data.landlord_contact}
+                            onChange={(e) => set('landlord_contact', e.target.value)}
+                            placeholder="Phone or email"
+                        />
+                    </Field>
+                </div>
+
+                <SubHead icon={Wallet}>Budgets</SubHead>
+                <Field label="Weekly food budget" hint="$ per week" span>
+                    <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={data.weekly_food_budget}
+                        onChange={(e) => set('weekly_food_budget', e.target.value)}
+                        placeholder="0.00"
+                        className="max-w-[200px]"
+                    />
+                </Field>
+            </div>
+        </div>
     );
 }
-function StepReviewPlaceholder() {
+
+function RiskTile({
+    on,
+    onToggle,
+    tone,
+    title,
+    desc,
+}: {
+    on: boolean;
+    onToggle: () => void;
+    tone: 'critical' | 'warning';
+    title: string;
+    desc: string;
+}) {
+    const toneCls = on
+        ? tone === 'critical'
+            ? 'border-status-critical bg-status-critical-bg'
+            : 'border-status-warning bg-status-warning-bg'
+        : 'border-border bg-card/50 hover:border-primary/40';
+    const iconCls =
+        tone === 'critical' ? 'text-status-critical' : 'text-status-warning';
     return (
-        <StepHead
-            icon={CheckCircle2}
-            title="Review & safety"
-            blurb="Risk flags, emergency plan, notes — then create the site."
-        />
+        <button
+            type="button"
+            aria-pressed={on}
+            onClick={onToggle}
+            className={cn(
+                'flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors',
+                toneCls,
+            )}
+        >
+            <span className={cn('mt-0.5 shrink-0', on ? iconCls : 'text-muted-foreground')}>
+                {on ? <Check className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+            </span>
+            <span className="min-w-0">
+                <span className="block text-sm font-semibold">{title}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    {desc}
+                </span>
+            </span>
+        </button>
+    );
+}
+
+function StepReview({ ctx }: { ctx: SiteStepCtx }) {
+    const { data, set, ref, goToStep } = ctx;
+    const showRisk = data.is_high_risk || data.is_high_needs;
+    const leadName =
+        ref.users.find((u) => String(u.id) === data.primary_contact_user_id)?.name ?? null;
+    const typeLabel =
+        SITE_TYPES.find((t) => t.value === data.type)?.label ?? data.type;
+    const spaceCount = data.rooms.length + data.resources.length + data.zones.length;
+    const addr = [data.address_line_1, data.suburb, data.city, data.postcode]
+        .filter(Boolean)
+        .join(', ');
+    const money = (v: string) =>
+        v ? `$${Number(v).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}` : null;
+
+    return (
+        <div>
+            <StepHead
+                icon={CheckCircle2}
+                title="Review & safety"
+                blurb="Flag risk, note the emergency plan, then create the site."
+            />
+            <div className="grid gap-4">
+                {/* Risk flags */}
+                <div className="grid gap-2 sm:grid-cols-2">
+                    <RiskTile
+                        on={data.is_high_risk}
+                        onToggle={() => set('is_high_risk', !data.is_high_risk)}
+                        tone="critical"
+                        title="High-risk site"
+                        desc="Elevated safety risk — flags across the app."
+                    />
+                    <RiskTile
+                        on={data.is_high_needs}
+                        onToggle={() => set('is_high_needs', !data.is_high_needs)}
+                        tone="warning"
+                        title="High-needs site"
+                        desc="Complex support needs — extra attention."
+                    />
+                </div>
+                {showRisk ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Risk notes" span>
+                            <Textarea
+                                rows={2}
+                                value={data.risk_notes}
+                                onChange={(e) => set('risk_notes', e.target.value)}
+                                placeholder="What's the risk, and how is it managed?"
+                            />
+                        </Field>
+                        <Field label="Risk review date">
+                            <Input
+                                type="date"
+                                value={data.risk_review_date}
+                                onChange={(e) => set('risk_review_date', e.target.value)}
+                            />
+                        </Field>
+                    </div>
+                ) : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Emergency / evacuation plan location" span>
+                        <Input
+                            value={data.emergency_plan_location}
+                            onChange={(e) => set('emergency_plan_location', e.target.value)}
+                            placeholder="e.g. Reception noticeboard"
+                        />
+                    </Field>
+                    <Field label="Site notes" span>
+                        <Textarea
+                            rows={2}
+                            value={data.notes}
+                            onChange={(e) => set('notes', e.target.value)}
+                            placeholder="Anything else the team should know."
+                        />
+                    </Field>
+                </div>
+
+                {/* Summary */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <ReviewCard icon={Building2} title="Basics" onEdit={() => goToStep('basics')}>
+                        <ReviewRow label="Type" value={typeLabel} />
+                        <ReviewRow label="Name" value={data.name} />
+                        <ReviewRow label="Lead" value={leadName} />
+                        <ReviewRow
+                            label="Status"
+                            value={data.is_active ? 'Active' : 'Inactive'}
+                        />
+                    </ReviewCard>
+                    <ReviewCard icon={MapPin} title="Location" onEdit={() => goToStep('location')}>
+                        <ReviewRow label="Address" value={addr} />
+                        <ReviewRow label="Region" value={data.region} />
+                        <ReviewRow
+                            label="Geofence"
+                            value={
+                                data.latitude && data.longitude
+                                    ? `${data.geofence.radius_m} m · ${data.geofence.breach_type}`
+                                    : null
+                            }
+                        />
+                    </ReviewCard>
+                    <ReviewCard icon={Package} title="Spaces" onEdit={() => goToStep('spaces')}>
+                        <ReviewRow
+                            label="Rooms / resources / zones"
+                            value={spaceCount > 0 ? String(spaceCount) : null}
+                        />
+                        <ReviewRow label="Total capacity" value={data.total_capacity} />
+                    </ReviewCard>
+                    <ReviewCard
+                        icon={CalendarClock}
+                        title="Rostering"
+                        onEdit={() => goToStep('rostering')}
+                    >
+                        <ReviewRow
+                            label="Coverage rules"
+                            value={data.coverage.length > 0 ? String(data.coverage.length) : null}
+                        />
+                        <ReviewRow
+                            label="Credentials"
+                            value={
+                                data.credentials.length > 0
+                                    ? `${data.credentials.length} required`
+                                    : null
+                            }
+                        />
+                        <ReviewRow
+                            label="Shift templates"
+                            value={
+                                data.shift_templates.length > 0
+                                    ? String(data.shift_templates.length)
+                                    : null
+                            }
+                        />
+                    </ReviewCard>
+                    <ReviewCard
+                        icon={Users}
+                        title="Contacts & equipment"
+                        onEdit={() => goToStep('contacts')}
+                    >
+                        <ReviewRow
+                            label="Contacts"
+                            value={data.contacts.length > 0 ? String(data.contacts.length) : null}
+                        />
+                        <ReviewRow
+                            label="Assets linked"
+                            value={data.assets.length > 0 ? String(data.assets.length) : null}
+                        />
+                        <ReviewRow
+                            label="Medication storage"
+                            value={data.medication_storage_location}
+                        />
+                    </ReviewCard>
+                    <ReviewCard
+                        icon={Wallet}
+                        title="Property & finance"
+                        onEdit={() => goToStep('finance')}
+                    >
+                        <ReviewRow
+                            label="Rent"
+                            value={
+                                money(data.rent_amount)
+                                    ? `${money(data.rent_amount)} / ${data.rent_frequency}`
+                                    : null
+                            }
+                        />
+                        <ReviewRow label="Lease" value={data.lease_start_date} />
+                        <ReviewRow label="Weekly food budget" value={money(data.weekly_food_budget)} />
+                    </ReviewCard>
+                </div>
+            </div>
+        </div>
     );
 }
 
