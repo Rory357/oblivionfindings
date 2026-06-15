@@ -791,6 +791,20 @@ Timekeeping (sidebar `time.view` vs route `timesheets.viewAny`), Community Feed 
 `exit-interviews.*`). The Payslips + Onboarding-Emails divergences ARE fixed (via per-tab hub gating). The rest are
 benign (over-show, never under-show) and left for a separate gate-audit pass.
 
+**Shipped — M10-B close-out (2026-06-15, ✅ DONE + DEPLOYED + LIVE-VERIFIED on oblivionfindings.com):**
+all 6 ticks merged to main and auto-deployed; the HR sidebar flyout was read live via a `javascript_tool`
+DOM extraction of the `div.fixed.z-50.w-64` panel (screenshots froze the renderer on first interaction — a
+later screenshot succeeded once it settled). **Final IA confirmed live — every HR nav group is now ≤ 5 items:**
+My HR(1) · People(3) · Time & Leave(4) · Pay & Benefits(3) · Performance(1) · Engagement(3) ·
+Compliance & Records(5) · Employee Lifecycle(4) · Payroll & Admin(4). Folds verified to open from their hub
+tab strips: Payroll (Runs·Payslips, per-tab gated), Reports (+Analytics·Headcount, per-tab gated), Onboarding
+(Checklists·Emails), Compliance (+Catalog), Documents (+Signatures). The dead "Expiring Docs" 404 link is gone.
+No role lost access (RBAC re-verified: all non-admin holders are the `hr` role, which holds every gate). Commits:
+plan `5df3fbc0` · Payroll fold `649d75b3` · Onboarding fold `891cb47f` · Catalog/Analytics+Headcount/Signatures
+folds `d71c81e8` · re-group `2c6d3f01`. Gates each tick: types + eslint + build + `HrHubTabsRenderTest` (46 pass,
++8 folded routes). New shared share: `auth.can.hr.payslips.{view,generate}` added to `HandleInertiaRequests`.
+**M10-B is the IA close-out for the HR module — the sidebar is now navigable with no group a user can get lost in.**
+
 ---
 
 ## Verification gates (every milestone, before merge to main)
