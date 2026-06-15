@@ -673,7 +673,7 @@ function StepBasics({ ctx }: { ctx: SiteStepCtx }) {
                 title="What kind of site is this?"
                 blurb="Pick the site type, name it, and choose who leads it."
             />
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
                 <Field label="Site type" required error={err('type')} span>
                     <TilePicker
                         value={data.type}
@@ -979,7 +979,7 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                 title="Spaces"
                 blurb="Set up the rooms, resources or zones this site has."
             />
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
                 {showCapacity ? (
                     <Field
                         label="Total capacity / beds"
@@ -1278,7 +1278,7 @@ function StepEquipment({ ctx }: { ctx: SiteStepCtx }) {
                 title="Medication storage"
                 blurb="Where medication is kept on site — this feeds eMAR and site readiness."
             />
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
                 <Field label="Medication storage location" span>
                     <Input
                         value={data.medication_storage_location}
@@ -1759,7 +1759,7 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                 title="Rostering & coverage"
                 blurb="Define who needs to be on site, when — plus the credentials staff must hold."
             />
-            <div className="grid gap-6">
+            <div className="flex flex-col gap-6">
                 {/* Copy a pattern */}
                 {ref.copyableSites.length > 0 ? (
                     <Field
@@ -2122,7 +2122,7 @@ function StepFinance({ ctx }: { ctx: SiteStepCtx }) {
                 title="Property & finance"
                 blurb="Tenancy, lease and budget — all optional, captured here so nothing's missed."
             />
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
                 <SubHead icon={Wallet}>Tenancy</SubHead>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Rent amount" hint="$">
