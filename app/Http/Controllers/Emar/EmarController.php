@@ -1837,33 +1837,64 @@ class EmarController extends Controller
         $date = $request->input('date', today()->toDateString());
         $siteFilter = $request->integer('site_id') ?: null;
 
+        $svc = app(GuidedRoundService::class);
+        $residents = [];
+
+        // The board/timeline derive counts from the round's stored counters, but
+        // the Chart matrix and the per-round audit timeline need the live, ordered
+        // doses ("cells"). cells() reuses the one GuidedRoundService pipeline, so
+        // there's no second schedule/administration code path here.
         $rounds = MedicationRound::query()
             ->forDate($date)
             ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
-            ->with(['assignedTo:id,name', 'startedBy:id,name', 'completedBy:id,name'])
+            ->with(['assignedTo:id,name', 'startedBy:id,name', 'completedBy:id,name', 'template:id,name', 'site:id,name'])
             ->orderBy('scheduled_time')
             ->get()
-            ->map(fn (MedicationRound $r) => [
-                'id' => $r->id,
-                'name' => $r->name,
-                'scheduled_time' => substr((string) $r->scheduled_time, 0, 5),
-                'window_minutes' => (int) ($r->window_minutes ?? 60),
-                'status' => $r->status,
-                'round_date' => $r->round_date?->toDateString(),
-                'total_medications' => (int) $r->total_medications,
-                'given' => (int) $r->administered_count,
-                'refused' => (int) $r->refused_count,
-                'withheld' => (int) $r->withheld_count,
-                'missed' => (int) $r->missed_count,
-                'assignee' => $r->assignedTo?->name,
-                'assigned_to' => $r->assigned_to,
-                'started_at' => $r->started_at?->toIso8601String(),
-                'completed_at' => $r->completed_at?->toIso8601String(),
-            ])
+            ->map(function (MedicationRound $r) use ($svc, &$residents) {
+                $cells = $svc->cells($r);
+                foreach ($cells as $cell) {
+                    if ($cell['resident_id'] && ! isset($residents[$cell['resident_id']])) {
+                        $residents[$cell['resident_id']] = [
+                            'id' => $cell['resident_id'],
+                            'name' => $cell['resident_name'],
+                            'site_id' => $cell['site_id'],
+                            'site_name' => $cell['site_name'],
+                        ];
+                    }
+                }
+
+                return [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'scheduled_time' => substr((string) $r->scheduled_time, 0, 5),
+                    'window_minutes' => (int) ($r->window_minutes ?? 60),
+                    'status' => $r->status,
+                    'round_date' => $r->round_date?->toDateString(),
+                    'site_id' => $r->site_id,
+                    'site_name' => $r->site?->name,
+                    'template_name' => $r->template?->name,
+                    'total_medications' => (int) $r->total_medications,
+                    'given' => (int) $r->administered_count,
+                    'refused' => (int) $r->refused_count,
+                    'withheld' => (int) $r->withheld_count,
+                    'missed' => (int) $r->missed_count,
+                    'assignee' => $r->assignedTo?->name,
+                    'assigned_to' => $r->assigned_to,
+                    'created_at' => $r->created_at?->toIso8601String(),
+                    'started_at' => $r->started_at?->toIso8601String(),
+                    'started_by' => $r->startedBy?->name,
+                    'completed_at' => $r->completed_at?->toIso8601String(),
+                    'completed_by' => $r->completedBy?->name,
+                    'cells' => $cells,
+                ];
+            })
             ->all();
 
+        usort($residents, fn ($a, $b) => strcmp((string) $a['name'], (string) $b['name']));
+        $residents = array_values($residents);
+
         $templates = MedicationRoundTemplate::query()
-            ->with('defaultAssignedTo:id,name')
+            ->with(['defaultAssignedTo:id,name', 'site:id,name'])
             ->orderBy('scheduled_time')
             ->get()
             ->map(fn (MedicationRoundTemplate $t) => [
@@ -1874,6 +1905,7 @@ class EmarController extends Controller
                 'days_of_week' => $t->days_of_week ?? [],
                 'active' => (bool) $t->active,
                 'site_id' => $t->site_id,
+                'site_name' => $t->site?->name,
                 'service_context_id' => $t->service_context_id,
                 'default_assigned_to' => $t->default_assigned_to,
                 'default_staff' => $t->defaultAssignedTo?->name,
@@ -1889,16 +1921,16 @@ class EmarController extends Controller
         // competent viewer (mirrors the retired guided page).
         $guidedRound = null;
         if ($request->filled('guided')) {
-            $round = MedicationRound::find($request->integer('guided'));
+            $round = MedicationRound::with(['template:id,name', 'assignedTo:id,name', 'startedBy:id,name', 'completedBy:id,name'])
+                ->find($request->integer('guided'));
             if ($round) {
-                $svc = app(GuidedRoundService::class);
                 if ($round->status === 'pending' && $user?->canDo('medications.administer.record')) {
                     $round->forceFill([
                         'status' => 'in_progress',
                         'started_by' => $user->id,
                         'started_at' => now(),
                     ])->save();
-                    $round->refresh();
+                    $round->refresh()->load('startedBy:id,name');
                 }
                 $items = $svc->items($round);
                 $guidedRound = [
@@ -1909,6 +1941,13 @@ class EmarController extends Controller
                         'scheduled_time' => substr((string) $round->scheduled_time, 0, 5),
                         'window_minutes' => (int) ($round->window_minutes ?? 60),
                         'round_date' => $round->round_date?->toDateString(),
+                        'template_name' => $round->template?->name,
+                        'assignee' => $round->assignedTo?->name,
+                        'created_at' => $round->created_at?->toIso8601String(),
+                        'started_at' => $round->started_at?->toIso8601String(),
+                        'started_by' => $round->startedBy?->name,
+                        'completed_at' => $round->completed_at?->toIso8601String(),
+                        'completed_by' => $round->completedBy?->name,
                     ],
                     'items' => $items,
                     'progress' => $svc->summarise($items),
@@ -1938,14 +1977,18 @@ class EmarController extends Controller
             'templates' => $templates,
             'staff' => $this->getStaffList(),
             'date' => $date,
+            'now_label' => now()->setTimezone(config('app.worker_timezone', config('app.timezone')))->format('g:i a'),
             'lastGenerated' => $lastGenerated?->toIso8601String(),
             'guidedRound' => $guidedRound,
             'activity' => $activity,
+            'residents' => $residents,
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'site_brand_colour' => $siteFilter ? Site::whereKey($siteFilter)->value('brand_colour') : null,
             'witnesses' => $this->boardPayload->witnesses($user),
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'board_user' => $this->boardPayload->boardUser($user),
+            'can_manage' => (bool) $user?->canDo('medications.orders.manage'),
+            'can_export' => (bool) ($user?->canDo('medications.reports.export') || $user?->canDo('reports.viewAny')),
         ]);
     }
 
