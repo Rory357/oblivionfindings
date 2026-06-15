@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -345,6 +346,8 @@ export default function MySurveys({ surveys }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="surveys" />
+
                 {surveys.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">

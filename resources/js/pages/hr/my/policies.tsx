@@ -9,6 +9,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -80,6 +81,8 @@ export default function MyPolicies({ policies }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="policies" />
+
                 {/* Policies List */}
                 <Card>
                     <CardHeader>

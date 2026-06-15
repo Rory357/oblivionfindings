@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BreakGlassFlagDismissal;
+use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientIncident;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class EmergencyAccessController extends Controller
 {
@@ -28,6 +32,8 @@ class EmergencyAccessController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
+
+        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
 
         $q = trim((string) $request->get('q', ''));
 
@@ -88,7 +94,7 @@ class EmergencyAccessController extends Controller
         $auditLog = ClientBreakGlassAccess::withTrashed()
             ->tap($orgScope)
             ->tap($bySite)
-            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name'])
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name', 'accessEvents'])
             ->orderByDesc('created_at')
             ->limit(150)
             ->get()
@@ -107,33 +113,54 @@ class EmergencyAccessController extends Controller
                 'revoked_by' => $a->revokedBy?->name,
                 'review_outcome' => $a->review_outcome,
                 'reviewed_by' => $a->reviewedBy?->name,
+                'incident_report_id' => $a->incident_report_id,
+                'events' => $a->accessEvents->sortBy('created_at')->values()->map(fn ($e) => [
+                    'action' => $e->action,
+                    'detail' => $e->detail,
+                    'at' => $e->created_at?->toIso8601String(),
+                ])->all(),
             ])
             ->values();
 
-        // Flagged: repeat break-glass — the same user activating ≥4 times in 7 days.
-        $weekAgo = now()->subDays(7);
-        $recent = ClientBreakGlassAccess::withTrashed()->tap($orgScope)->where('created_at', '>=', $weekAgo)->with('user:id,name')->get();
+        // Acknowledged signals are suppressed until newer activity appears (re-surface).
+        $dismissals = BreakGlassFlagDismissal::query()
+            ->where('organization_id', $user->organization_id)
+            ->get()
+            ->keyBy(fn ($d) => $d->signal_type.':'.$d->signal_key);
+        $isDismissed = function (string $type, string $key, ?Carbon $freshAt) use ($dismissals): bool {
+            $d = $dismissals->get($type.':'.$key);
+
+            return $d && $d->dismissed_through && $freshAt && $d->dismissed_through->gte($freshAt);
+        };
+
+        // Flagged: repeat break-glass — one user activating ≥ the policy threshold within its window.
+        $windowStart = now()->subDays($policy->repeat_window_days);
+        $recent = ClientBreakGlassAccess::withTrashed()->tap($orgScope)->where('created_at', '>=', $windowStart)->with('user:id,name')->get();
         $flaggedSignals = $recent->groupBy('user_id')
-            ->filter(fn ($g) => $g->count() >= 4)
+            ->filter(fn ($g) => $g->count() >= $policy->repeat_threshold_count)
+            ->reject(fn ($g) => $isDismissed('repeat', (string) $g->first()->user_id, $g->max('created_at')))
             ->map(fn ($g) => [
                 'type' => 'repeat',
+                'key' => (string) $g->first()->user_id,
                 'severity' => 'critical',
                 'title' => 'Repeat break-glass — same user',
-                'detail' => ($g->first()->user?->name ?? 'A staff member').' activated break-glass '.$g->count().' times in the last 7 days.',
+                'detail' => ($g->first()->user?->name ?? 'A staff member').' activated break-glass '.$g->count().' times in the last '.$policy->repeat_window_days.' days.',
             ])
             ->values();
 
         // Oversight gap: activations that have ended (expired) without a post-event review.
-        $awaitingReview = ClientBreakGlassAccess::query()
+        $awaitingBase = ClientBreakGlassAccess::query()
             ->tap($orgScope)
             ->tap($bySite)
             ->whereNotNull('expires_at')->where('expires_at', '<', now())
-            ->whereNull('review_outcome')
-            ->count();
+            ->whereNull('review_outcome');
+        $awaitingReview = (clone $awaitingBase)->count();
+        $awaitingFresh = $awaitingReview > 0 ? Carbon::parse((clone $awaitingBase)->max('expires_at')) : null;
 
-        if ($awaitingReview > 0) {
+        if ($awaitingReview > 0 && ! $isDismissed('awaiting_review', 'awaiting_review', $awaitingFresh)) {
             $flaggedSignals->push([
                 'type' => 'awaiting_review',
+                'key' => 'awaiting_review',
                 'severity' => 'warning',
                 'title' => 'Activations awaiting review',
                 'detail' => $awaitingReview.' expired break-glass activation'.($awaitingReview === 1 ? ' has' : 's have').' not had a post-event review.',
@@ -153,6 +180,35 @@ class EmergencyAccessController extends Controller
 
         $activeSite = $siteId ? Site::find($siteId) : null;
 
+        // Deep-link from the MAR interstitial: pre-open the request wizard for this client.
+        $requestClientId = $request->integer('request_client') ?: null;
+        $requestClient = null;
+        if ($requestClientId) {
+            $rc = Client::query()->with('site:id,name')->find($requestClientId);
+            if ($rc) {
+                $requestClient = [
+                    'id' => $rc->id,
+                    'first_name' => $rc->first_name,
+                    'last_name' => $rc->last_name,
+                    'date_of_birth' => optional($rc->date_of_birth)->format('Y-m-d'),
+                    'status' => $rc->status,
+                    'site' => $rc->site?->only(['id', 'name']),
+                ];
+            }
+        }
+
+        // Incidents for the audit-log clients, for the review modal's link picker.
+        $incidentsByClient = ClientIncident::query()
+            ->whereIn('client_id', $auditLog->pluck('client_id')->unique()->values())
+            ->orderByDesc('occurred_at')
+            ->get(['id', 'client_id', 'type', 'title', 'occurred_at'])
+            ->groupBy('client_id')
+            ->map(fn ($g) => $g->map(fn ($i) => [
+                'id' => $i->id,
+                'label' => $i->title ?: ucfirst((string) $i->type),
+                'date' => $i->occurred_at?->toDateString(),
+            ])->values());
+
         return inertia('emergency/access', [
             'query' => $q,
             'results' => $results,
@@ -162,11 +218,15 @@ class EmergencyAccessController extends Controller
             'approvers' => $approvers,
             'can_review' => $user->hasRole('admin', 'provider_manager') || $user->canDo('medications.audit.view'),
             'policy' => [
-                'default_minutes' => ClientBreakGlassAccess::DEFAULT_MINUTES,
-                'max_minutes' => ClientBreakGlassAccess::MAX_MINUTES,
+                'default_minutes' => $policy->default_minutes,
+                'max_minutes' => $policy->max_minutes,
+                'extend_minutes' => $policy->extend_minutes,
                 'auto_revoke' => true,
-                'reason_required' => true,
+                'reason_required' => $policy->reason_required,
+                'repeat_threshold_count' => $policy->repeat_threshold_count,
+                'repeat_window_days' => $policy->repeat_window_days,
             ],
+            'can_edit_policy' => $user->hasRole('admin', 'provider_manager'),
             'stats' => [
                 'active' => $activeAccesses->count(),
                 'granted_week' => $recent->count(),
@@ -176,6 +236,8 @@ class EmergencyAccessController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+            'request_client' => $requestClient,
+            'incidents_by_client' => $incidentsByClient,
         ]);
     }
 }

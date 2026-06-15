@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -178,6 +179,8 @@ export default function MyExpenses({ claims, categories }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="expenses" />
+
                 {/* Submit Expense Form */}
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
                     <Card>

@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero, PageLayout } from '@/components/page';
+import { ComplianceTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -207,6 +208,8 @@ export default function ComplianceMatrix({
                     />
                 }
             >
+                <ComplianceTabs active="matrix" />
+
                 {/* Add Requirement Form */}
                 {showAddForm && can.manage && (
                     <Card>

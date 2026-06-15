@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -67,6 +68,8 @@ export default function MyProfile({ profile }: Props) {
                         />
                     }
                 >
+                <MyHrTabs active="profile" />
+
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             <p>

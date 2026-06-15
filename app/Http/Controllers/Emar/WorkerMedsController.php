@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -239,6 +240,9 @@ class WorkerMedsController extends Controller
             }
 
             $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+
+            // Access-scope log: record a dose given under an active break-glass grant.
+            BreakGlassAccessEvent::recordFor($user, $medication->client, 'recorded_dose', $medication->name.' · '.$data['status']);
 
             // The sidebar overdue badge caches for 60s — recording a dose is
             // the one action that should drop it immediately.

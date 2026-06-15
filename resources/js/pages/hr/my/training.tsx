@@ -1,5 +1,6 @@
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -177,6 +178,8 @@ export default function MyTraining({ complianceStatuses, can }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="training" />
+
                 {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
                     <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">

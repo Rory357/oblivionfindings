@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BreakGlassFlagDismissal;
+use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
@@ -9,6 +11,7 @@ use App\Services\NotificationService;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BreakGlassController extends Controller
 {
@@ -25,10 +28,12 @@ class BreakGlassController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
 
+        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
+
         $data = $request->validate([
-            'reason' => ['required', 'string', 'max:255'],
+            'reason' => [$policy->reason_required ? 'required' : 'nullable', 'string', 'max:255'],
             'reason_category' => ['nullable', 'string', 'max:100'],
-            'minutes' => ['nullable', 'integer', 'min:5', 'max:'.ClientBreakGlassAccess::MAX_MINUTES],
+            'minutes' => ['nullable', 'integer', 'min:5', 'max:'.$policy->max_minutes],
             'authorization_mode' => ['nullable', Rule::in(['self', 'co_sign'])],
             // Dual authorisation must be a *different* person.
             'co_signed_by' => ['nullable', 'integer', Rule::exists('users', 'id'), Rule::notIn([$user->id]), 'required_if:authorization_mode,co_sign'],
@@ -36,15 +41,15 @@ class BreakGlassController extends Controller
             'acknowledged_incident_report' => ['nullable', 'boolean'],
         ]);
 
-        // Default: expire after the policy default unless explicitly set, capped at the policy max.
-        $minutes = ! empty($data['minutes']) ? (int) $data['minutes'] : ClientBreakGlassAccess::DEFAULT_MINUTES;
-        $minutes = min($minutes, ClientBreakGlassAccess::MAX_MINUTES);
+        // Default to the org policy duration unless explicitly set, capped at the policy max.
+        $minutes = ! empty($data['minutes']) ? (int) $data['minutes'] : $policy->default_minutes;
+        $minutes = min($minutes, $policy->max_minutes);
         $mode = $data['authorization_mode'] ?? 'self';
 
         $access = ClientBreakGlassAccess::create([
             'client_id' => $client->id,
             'user_id' => $user->id,
-            'reason' => $data['reason'],
+            'reason' => $data['reason'] ?? $data['reason_category'] ?? '',
             'reason_category' => $data['reason_category'] ?? null,
             'authorization_mode' => $mode,
             'co_signed_by' => $mode === 'co_sign' ? ($data['co_signed_by'] ?? null) : null,
@@ -73,13 +78,14 @@ class BreakGlassController extends Controller
             return back()->with('error', 'This grant has already ended and cannot be extended.');
         }
 
-        // Cap the total window (grant → new expiry) at the policy maximum.
-        $hardCap = $access->created_at?->copy()->addMinutes(ClientBreakGlassAccess::MAX_MINUTES);
-        $proposed = $access->expires_at->copy()->addMinutes(ClientBreakGlassAccess::EXTEND_MINUTES);
+        // Cap the total window (grant → new expiry) at the org policy maximum.
+        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
+        $hardCap = $access->created_at?->copy()->addMinutes($policy->max_minutes);
+        $proposed = $access->expires_at->copy()->addMinutes($policy->extend_minutes);
         $newExpiry = $hardCap && $proposed->greaterThan($hardCap) ? $hardCap : $proposed;
 
         if ($newExpiry->lessThanOrEqualTo($access->expires_at)) {
-            return back()->with('error', 'Already at the maximum '.(ClientBreakGlassAccess::MAX_MINUTES / 60).'-hour duration.');
+            return back()->with('error', 'Already at the maximum '.round($policy->max_minutes / 60, 1).'-hour duration.');
         }
 
         $access->forceFill(['expires_at' => $newExpiry])->save();
@@ -102,7 +108,8 @@ class BreakGlassController extends Controller
         $data = $request->validate([
             'review_outcome' => ['required', Rule::in(['justified', 'not_justified'])],
             'review_notes' => ['nullable', 'string', 'max:2000'],
-            'incident_report_linked' => ['nullable', 'boolean'],
+            // The linked incident must belong to this access's client.
+            'incident_report_id' => ['nullable', 'integer', Rule::exists('client_incidents', 'id')->where('client_id', $record->client_id)],
         ]);
 
         $record->forceFill([
@@ -110,10 +117,64 @@ class BreakGlassController extends Controller
             'reviewed_by' => $user->id,
             'review_outcome' => $data['review_outcome'],
             'review_notes' => $data['review_notes'] ?? null,
-            'incident_report_linked' => (bool) ($data['incident_report_linked'] ?? false),
+            'incident_report_id' => $data['incident_report_id'] ?? null,
+            'incident_report_linked' => ! empty($data['incident_report_id']),
         ])->save();
 
         return back()->with('success', 'Break-glass review saved.');
+    }
+
+    public function updatePolicy(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $this->canEditPolicy($user), 403);
+        abort_unless($user->organization_id, 422);
+
+        $data = $request->validate([
+            'default_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+            'max_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+            'extend_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+            'reason_required' => ['required', 'boolean'],
+            'repeat_threshold_count' => ['required', 'integer', 'min:1', 'max:100'],
+            'repeat_window_days' => ['required', 'integer', 'min:1', 'max:90'],
+        ]);
+
+        if ($data['default_minutes'] > $data['max_minutes']) {
+            throw ValidationException::withMessages([
+                'default_minutes' => 'Default duration cannot exceed the maximum.',
+            ]);
+        }
+
+        BreakGlassPolicy::updateOrCreate(['organization_id' => $user->organization_id], $data);
+
+        return back()->with('success', 'Break-glass policy updated.');
+    }
+
+    /** Only organisation admins / provider managers may change the policy. */
+    private function canEditPolicy(User $user): bool
+    {
+        return $user->hasRole('admin', 'provider_manager');
+    }
+
+    public function dismissFlag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('medications.audit.view'), 403);
+
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['repeat', 'awaiting_review'])],
+            'key' => ['required', 'string', 'max:100'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // One acknowledgement per (org, type, key); dismissed_through advances on re-ack
+        // so the signal re-surfaces only when newer activity appears.
+        BreakGlassFlagDismissal::updateOrCreate(
+            ['organization_id' => $user->organization_id, 'signal_type' => $data['type'], 'signal_key' => $data['key']],
+            ['dismissed_by' => $user->id, 'reason' => $data['reason'] ?? null, 'dismissed_through' => now()],
+        );
+
+        return back()->with('success', 'Signal acknowledged.');
     }
 
     public function destroy(Request $request, Client $client, ClientBreakGlassAccess $access)

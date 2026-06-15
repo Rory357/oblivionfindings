@@ -10,11 +10,14 @@ import { ReviewDialog, type ReviewRecord } from '@/pages/emergency/_review-dialo
 import { Head, router } from '@inertiajs/react';
 import { Ban, Building2, Clock, Download, FileText, Fingerprint, History, MapPin, Pill, Plus, ShieldAlert, ShieldCheck, SlidersHorizontal, TriangleAlert, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 type ActiveAccess = { id: number; client_id: number; client_name: string; site_name: string | null; reason: string; reason_category: string | null; cosign_label: string | null; granted_by: string | null; created_at: string | null; expires_at: string | null; can_revoke: boolean };
-type AuditRow = { id: number; client_id: number; staff: string; client_name: string; site_name: string | null; reason: string; reason_category: string | null; minutes: number | null; created_at: string | null; expires_at: string | null; status: string; revoked_by: string | null; review_outcome: string | null; reviewed_by: string | null };
-type Flagged = { type: string; severity: string; title: string; detail: string };
-type Policy = { default_minutes: number; max_minutes: number; auto_revoke: boolean; reason_required: boolean };
+type AuditRow = { id: number; client_id: number; staff: string; client_name: string; site_name: string | null; reason: string; reason_category: string | null; minutes: number | null; created_at: string | null; expires_at: string | null; status: string; revoked_by: string | null; review_outcome: string | null; reviewed_by: string | null; incident_report_id: number | null; events: { action: string; detail: string | null; at: string | null }[] };
+type Flagged = { type: string; key: string; severity: string; title: string; detail: string };
+type Policy = { default_minutes: number; max_minutes: number; extend_minutes: number; auto_revoke: boolean; reason_required: boolean; repeat_threshold_count: number; repeat_window_days: number };
 type Stats = { active: number; granted_week: number; awaiting_review: number; flagged: number };
 
 type Props = {
@@ -30,6 +33,9 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    request_client: ClientLite | null;
+    can_edit_policy: boolean;
+    incidents_by_client: Record<number, { id: number; label: string; date: string | null }[]>;
 };
 
 const fmtLeft = (ms: number) => {
@@ -51,11 +57,15 @@ function exportCsv(rows: AuditRow[]) {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `break-glass-audit-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
-export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour, request_client: requestClient, can_edit_policy: canEditPolicy, incidents_by_client: incidentsByClient }: Props) {
     const [tab, setTab] = useState('active');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
-    const [wizardOpen, setWizardOpen] = useState(false);
+    // Auto-open the wizard when deep-linked for a client that has no live grant yet.
+    const alreadyGrantedForRequest = requestClient ? activeAccesses.some((a) => a.client_id === requestClient.id) : false;
+    const [wizardOpen, setWizardOpen] = useState(() => !!requestClient && !alreadyGrantedForRequest);
     const [reviewRecord, setReviewRecord] = useState<ReviewRecord | null>(null);
+    const [dismissTarget, setDismissTarget] = useState<Flagged | null>(null);
+    const [dismissReason, setDismissReason] = useState('');
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -64,6 +74,14 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
     const onSearch = (q: string) => router.get('/emar/emergency-access', { q, ...(siteFilter ? { site_id: siteFilter } : {}) }, { only: ['results', 'query'], preserveState: true, preserveScroll: true });
     const revoke = (a: ActiveAccess) => { if (confirm(`Revoke ${a.client_name}'s break-glass access?`)) router.delete(`/emar/clients/${a.client_id}/break-glass/${a.id}`, { preserveScroll: true }); };
     const extend = (a: ActiveAccess) => router.post(`/emar/clients/${a.client_id}/break-glass/${a.id}/extend`, {}, { preserveScroll: true });
+    const submitDismiss = () => {
+        if (!dismissTarget) return;
+        router.post('/emar/break-glass-flags/dismiss', { type: dismissTarget.type, key: dismissTarget.key, reason: dismissReason || null }, {
+            preserveScroll: true,
+            onSuccess: () => { toast.success('Signal acknowledged'); setDismissTarget(null); setDismissReason(''); },
+            onError: () => toast.error('Could not acknowledge signal'),
+        });
+    };
 
     const TABS: RosterTabItem[] = [
         { id: 'active', label: 'Active access', icon: ShieldAlert, tone: 'primary', badge: activeAccesses.length || undefined },
@@ -73,7 +91,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
     ];
     const heroStats: PageHeroStat[] = [
         { label: 'Active now', value: stats.active, tone: stats.active > 0 ? 'warning' : 'neutral' },
-        { label: 'Granted · 7d', value: stats.granted_week },
+        { label: `Granted · ${policy.repeat_window_days}d`, value: stats.granted_week },
         { label: 'Awaiting review', value: stats.awaiting_review, tone: stats.awaiting_review > 0 ? 'warning' : 'neutral' },
         { label: 'Flagged', value: stats.flagged, tone: stats.flagged > 0 ? 'critical' : 'neutral' },
     ];
@@ -150,7 +168,9 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                     const leftMs = expires - now;
                                     const pct = Math.max(0, Math.min(1, leftMs / total));
                                     const urgent = leftMs <= 600000 ? 'var(--status-critical)' : leftMs <= 1800000 ? 'var(--status-warning)' : 'var(--primary)';
-                                    const detailLine = a.reason && a.reason !== a.reason_category ? a.reason : null;
+                                    // Free-text detail when present; otherwise the eyebrow already names the category, so
+                                    // fall back to the raw reason only for legacy rows that have no category.
+                                    const reasonBody = a.reason && a.reason !== a.reason_category ? a.reason : a.reason_category ? null : a.reason;
                                     return (
                                         <div key={a.id} className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${leftMs <= 600000 ? 'border-status-critical/50' : ''}`}>
                                             <div className="h-1" style={{ background: urgent }} />
@@ -166,7 +186,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                                     <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{a.site_name ?? '—'} · granted {fmtDateTime(a.created_at)}</div>
                                                     <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-1.5">
                                                         {a.reason_category && <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{a.reason_category}</div>}
-                                                        <div className="text-xs">{detailLine ?? a.reason}</div>
+                                                        {reasonBody && <div className="text-xs">{reasonBody}</div>}
                                                     </div>
                                                     <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground"><Fingerprint className="h-3 w-3" />{a.cosign_label ? `${a.cosign_label} · ` : ''}by {a.granted_by ?? 'Unknown'}</div>
                                                 </div>
@@ -231,7 +251,10 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${crit ? 'bg-status-critical-bg text-status-critical' : 'bg-status-warning-bg text-status-warning'}`}>{f.severity}</span>
                                             </div>
                                             <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
-                                            <div className="mt-3"><Button size="sm" variant="outline" onClick={() => setTab('audit')}>Review in audit log</Button></div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => setTab('audit')}>Review in audit log</Button>
+                                                {canReview && <Button size="sm" variant="ghost" onClick={() => setDismissTarget(f)}>Acknowledge</Button>}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -240,27 +263,32 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                     )
                 )}
 
-                {tab === 'policy' && (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <PolicyCard icon={Clock} title="Access duration">
-                            <PolicyRow label="Default duration" value={`${policy.default_minutes} minutes`} />
-                            <PolicyRow label="Maximum duration" value={`${Math.round(policy.max_minutes / 60)} hours (incl. extensions)`} />
-                            <PolicyRow label="Auto-revoke on expiry" value={policy.auto_revoke ? 'On' : 'Off'} on={policy.auto_revoke} />
-                        </PolicyCard>
-                        <PolicyCard icon={ShieldCheck} title="Authorisation & oversight">
-                            <PolicyRow label="Reason required" value={policy.reason_required ? 'Yes' : 'No'} on={policy.reason_required} />
-                            <PolicyRow label="Co-sign / self-authorise recorded" value="Yes" on />
-                            <PolicyRow label="Post-event review" value="Justified / not justified" on />
-                            <PolicyRow label="Append-only audit" value="Yes — retained" on />
-                            <PolicyRow label="Repeat-misuse flagging" value="≥ 4 activations / 7 days" on />
-                        </PolicyCard>
-                        <div className="rounded-2xl border bg-muted/30 p-4 text-xs text-muted-foreground lg:col-span-2">Policy is enforced server-side (duration cap, auto-expiry, append-only audit, structured reason &amp; authorisation, post-event review). Editable policy controls, co-sign PIN verification and misuse auto-blocking are a planned governance follow-up.</div>
-                    </div>
-                )}
+                {tab === 'policy' && <PolicyEditor policy={policy} canEdit={canEditPolicy} />}
             </div>
 
-            {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
-            {reviewRecord && <ReviewDialog record={reviewRecord} onClose={() => setReviewRecord(null)} />}
+            {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} prefillClient={requestClient} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
+            {reviewRecord && <ReviewDialog record={reviewRecord} incidents={incidentsByClient[reviewRecord.client_id] ?? []} onClose={() => setReviewRecord(null)} />}
+            <Dialog open={!!dismissTarget} onOpenChange={(o) => { if (!o) { setDismissTarget(null); setDismissReason(''); } }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Acknowledge signal</DialogTitle>
+                        <DialogDescription>{dismissTarget?.detail}</DialogDescription>
+                    </DialogHeader>
+                    <textarea
+                        aria-label="Reason for acknowledging this signal"
+                        value={dismissReason}
+                        onChange={(e) => setDismissReason(e.target.value)}
+                        rows={3}
+                        placeholder="Why is this acceptable? (optional — recorded against the acknowledgement)"
+                        className="w-full rounded-lg border border-input bg-background p-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <p className="text-xs text-muted-foreground">This hides the signal until newer break-glass activity appears.</p>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => { setDismissTarget(null); setDismissReason(''); }}>Cancel</Button>
+                        <Button onClick={submitDismiss}>Acknowledge &amp; resolve</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
@@ -283,4 +311,85 @@ function PolicyCard({ icon: Icon, title, children }: { icon: typeof Clock; title
 }
 function PolicyRow({ label, value, on }: { label: string; value: string; on?: boolean }) {
     return <div className="flex items-center justify-between border-b py-2 text-sm last:border-b-0"><span className="text-muted-foreground">{label}</span><span className={`font-medium ${on ? 'text-status-success' : ''}`}>{value}</span></div>;
+}
+function NumberField({ label, hint, value, onChange, disabled, suffix }: { label: string; hint?: string; value: number; onChange: (v: number) => void; disabled?: boolean; suffix?: string }) {
+    return (
+        <label className="flex items-center justify-between gap-3 border-b py-2.5 text-sm last:border-b-0">
+            <span className="min-w-0">
+                <span className="font-medium">{label}</span>
+                {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+                <Input type="number" aria-label={label} min={1} value={value} disabled={disabled} onChange={(e) => onChange(Math.max(0, Math.round(Number(e.target.value) || 0)))} className="h-8 w-20 text-right tabular-nums" />
+                {suffix && <span className="w-9 text-xs text-muted-foreground">{suffix}</span>}
+            </span>
+        </label>
+    );
+}
+function TogglePill({ label, on, onChange, disabled }: { label: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+    return (
+        <div className="flex items-center justify-between border-b py-2.5 text-sm last:border-b-0">
+            <span className="font-medium">{label}</span>
+            <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} className={`relative h-6 w-[42px] shrink-0 rounded-full transition-colors ${on ? 'bg-status-success' : 'bg-muted-foreground/30'} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+            </button>
+        </div>
+    );
+}
+function PolicyEditor({ policy, canEdit }: { policy: Policy; canEdit: boolean }) {
+    const [form, setForm] = useState(policy);
+    const [saving, setSaving] = useState(false);
+    const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(policy), [form, policy]);
+    const defaultExceedsMax = form.default_minutes > form.max_minutes;
+    const set = (patch: Partial<Policy>) => setForm((f) => ({ ...f, ...patch }));
+
+    const save = () => {
+        setSaving(true);
+        router.put(
+            '/emar/break-glass-policy',
+            {
+                default_minutes: form.default_minutes,
+                max_minutes: form.max_minutes,
+                extend_minutes: form.extend_minutes,
+                reason_required: form.reason_required,
+                repeat_threshold_count: form.repeat_threshold_count,
+                repeat_window_days: form.repeat_window_days,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Break-glass policy updated'),
+                onError: (e) => toast.error((Object.values(e)[0] as string) || 'Could not save policy'),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    return (
+        <div className="grid gap-4 lg:grid-cols-2">
+            <PolicyCard icon={Clock} title="Access duration">
+                <NumberField label="Default duration" hint="Pre-filled when access is requested." value={form.default_minutes} suffix="min" disabled={!canEdit} onChange={(v) => set({ default_minutes: v })} />
+                <NumberField label="Maximum duration" hint="Hard cap, including extensions." value={form.max_minutes} suffix="min" disabled={!canEdit} onChange={(v) => set({ max_minutes: v })} />
+                <NumberField label="Per-extension" hint="Added each time a grant is extended." value={form.extend_minutes} suffix="min" disabled={!canEdit} onChange={(v) => set({ extend_minutes: v })} />
+                {defaultExceedsMax && <p className="pt-2 text-xs font-medium text-status-critical">Default duration cannot exceed the maximum.</p>}
+            </PolicyCard>
+            <PolicyCard icon={ShieldCheck} title="Oversight & flagging">
+                <TogglePill label="Reason required" on={form.reason_required} disabled={!canEdit} onChange={(v) => set({ reason_required: v })} />
+                <NumberField label="Flag repeat use after" hint="Activations by one staff member…" value={form.repeat_threshold_count} suffix="times" disabled={!canEdit} onChange={(v) => set({ repeat_threshold_count: v })} />
+                <NumberField label="…within" value={form.repeat_window_days} suffix="days" disabled={!canEdit} onChange={(v) => set({ repeat_window_days: v })} />
+            </PolicyCard>
+            <PolicyCard icon={ShieldCheck} title="Always enforced">
+                <PolicyRow label="Auto-revoke on expiry" value="On" on />
+                <PolicyRow label="Append-only audit" value="Yes — retained" on />
+                <PolicyRow label="Post-event review" value="Justified / not justified" on />
+            </PolicyCard>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-muted/30 p-4 lg:col-span-2">
+                <p className="text-xs text-muted-foreground">{canEdit ? 'Changes apply org-wide and take effect on the next grant, extension and flag check.' : 'Only administrators can change the break-glass policy.'}</p>
+                {canEdit && (
+                    <Button onClick={save} disabled={!dirty || saving || defaultExceedsMax}>
+                        {saving ? 'Saving…' : 'Save policy'}
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
 }
