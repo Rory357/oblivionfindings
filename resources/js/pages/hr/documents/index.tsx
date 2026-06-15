@@ -189,7 +189,7 @@ export default function DocumentsIndex({
                     />
                 }
             >
-                <DocumentsTabs active="library" canManage={can.manage} />
+                <DocumentsTabs active="library" />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">

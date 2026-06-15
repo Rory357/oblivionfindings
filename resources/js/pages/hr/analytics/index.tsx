@@ -1,3 +1,4 @@
+import { ReportsTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -129,6 +130,7 @@ export default function AnalyticsDashboard({
                     />
                 }
             >
+                <ReportsTabs active="analytics" />
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>

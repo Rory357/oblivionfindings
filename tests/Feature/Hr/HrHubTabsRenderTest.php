@@ -65,6 +65,13 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     // Onboarding hub
     '/hr/onboarding',
     '/hr/onboarding/emails',
+    // Reports hub — folded Analytics + Headcount dashboards
+    '/hr/analytics',
+    '/hr/headcount',
+    // Compliance hub — folded Course Catalog
+    '/hr/training/catalog',
+    // Documents hub — folded Signatures
+    '/hr/signatures/pending',
     // Performance hub
     '/hr/performance',
     '/hr/performance/reviews',

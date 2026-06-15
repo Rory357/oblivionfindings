@@ -2206,13 +2206,7 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     }
-    if (can?.hr?.training?.view) {
-        admin.items.push({
-            title: 'Course Catalog',
-            href: '/hr/training/catalog',
-            icon: BookOpen,
-        });
-    }
+    // Course Catalog (/hr/training/catalog) is now a tab of the Compliance hub.
     if (can?.hr?.assets?.view) {
         admin.items.push({
             title: 'Assets',
@@ -2223,18 +2217,8 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.hr?.skills?.view) {
         admin.items.push({ title: 'Skills', href: '/hr/skills', icon: Target });
     }
-    if (can?.hr?.analytics?.view) {
-        admin.items.push({
-            title: 'Analytics',
-            href: '/hr/analytics',
-            icon: LayoutGrid,
-        });
-        admin.items.push({
-            title: 'Headcount',
-            href: '/hr/headcount',
-            icon: Users,
-        });
-    }
+    // Analytics (/hr/analytics) and Headcount (/hr/headcount) are now tabs of
+    // the Reports hub.
     if (can?.hr?.calendar?.view) {
         admin.items.push({
             title: 'Calendar',
@@ -2251,16 +2235,14 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: ClipboardCheck,
         });
     }
+    // Documents hub — Signatures (/hr/signatures/pending) is now a tab here.
+    // (The old "Expiring Docs" link pointed at a non-existent route and was
+    // removed.)
     if (can?.hr?.documents?.view) {
         admin.items.push({
             title: 'Documents',
             href: '/hr/documents',
             icon: FileText,
-        });
-        admin.items.push({
-            title: 'Expiring Docs',
-            href: '/hr/documents/expiring',
-            icon: ShieldAlert,
         });
     }
     if (can?.hr?.approvals?.view || can?.hr?.approvals?.manage) {
@@ -2268,13 +2250,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Approvals',
             href: '/hr/approvals/pending',
             icon: ClipboardCheck,
-        });
-    }
-    if (can?.hr?.documents?.view || can?.hr?.documents?.manage) {
-        admin.items.push({
-            title: 'Signatures',
-            href: '/hr/signatures/pending',
-            icon: FileText,
         });
     }
     if (can?.hr?.cases?.view) {

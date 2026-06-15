@@ -1,6 +1,7 @@
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ReportsTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
@@ -81,6 +82,7 @@ export default function HeadcountIndex({
                         { label: 'Attrition risk', value: attritionRisk.length },
                     ]}
                 />
+                <ReportsTabs active="headcount" />
                 <div className="grid gap-4 md:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-2">
