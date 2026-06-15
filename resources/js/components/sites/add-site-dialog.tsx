@@ -70,6 +70,7 @@ import {
     Sparkles,
     Star,
     Trash2,
+    UploadCloud,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -1306,11 +1307,20 @@ const DOCUMENT_CATEGORIES = [
     { value: 'other', label: 'Other' },
 ];
 
+function formatFileSize(bytes: number): string {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
     const { data, set } = ctx;
     const inputRef = useRef<HTMLInputElement>(null);
+    const [dragging, setDragging] = useState(false);
+
     const addFiles = (files: FileList | null) => {
-        if (!files) return;
+        if (!files || files.length === 0) return;
         const drafts: SiteDocumentDraft[] = Array.from(files).map((file) => ({
             file,
             title: file.name.replace(/\.[^.]+$/, ''),
@@ -1325,26 +1335,79 @@ function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
             'documents',
             data.documents.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
         );
+    const remove = (i: number) =>
+        set('documents', data.documents.filter((_, idx) => idx !== i));
 
     return (
         <div>
             <StepHead
                 icon={FileText}
                 title="Documents"
-                blurb="Attach site certificates, the lease, evacuation plans and more."
+                blurb="Drag in site certificates, the lease, evacuation plans and more."
             />
             <div className="grid gap-3">
-                <button
-                    type="button"
+                {/* Drag & drop zone */}
+                <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => inputRef.current?.click()}
-                    className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-muted/50"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            inputRef.current?.click();
+                        }
+                    }}
+                    onDragEnter={(e) => {
+                        e.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragLeave={(e) => {
+                        e.preventDefault();
+                        if (!e.currentTarget.contains(e.relatedTarget as Node))
+                            setDragging(false);
+                    }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        setDragging(false);
+                        addFiles(e.dataTransfer.files);
+                    }}
+                    className={cn(
+                        'flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                        dragging
+                            ? 'border-primary bg-primary/10 ring-4 ring-primary/15'
+                            : 'border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/40',
+                    )}
                 >
-                    <FileText className="h-6 w-6 text-muted-foreground" />
-                    <span className="text-[13px] font-semibold">Click to upload files</span>
-                    <span className="text-[11px] text-muted-foreground">
-                        PDF, Word, images — up to 50&nbsp;MB each
+                    <span
+                        className={cn(
+                            'grid h-14 w-14 place-items-center rounded-2xl transition-colors',
+                            dragging
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary',
+                        )}
+                    >
+                        <UploadCloud className="h-7 w-7" />
                     </span>
-                </button>
+                    <div>
+                        <div className="text-sm font-semibold">
+                            {dragging ? 'Drop files to upload' : 'Drag & drop files here'}
+                        </div>
+                        <div className="mt-0.5 text-[13px] text-muted-foreground">
+                            or{' '}
+                            <span className="font-semibold text-primary">
+                                browse
+                            </span>{' '}
+                            from your computer
+                        </div>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                        PDF, Word, images — up to 50&nbsp;MB each
+                    </div>
+                </div>
                 <input
                     ref={inputRef}
                     type="file"
@@ -1353,39 +1416,59 @@ function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
                     onChange={(e) => addFiles(e.target.files)}
                 />
 
-                {data.documents.map((d, i) => (
-                    <div
-                        key={i}
-                        className="grid gap-2 rounded-lg border border-border bg-card/70 p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
-                    >
-                        <Input
-                            value={d.title}
-                            onChange={(e) => update(i, { title: e.target.value })}
-                            placeholder="Title"
-                        />
-                        <SelectInput
-                            value={d.category}
-                            onChange={(v) => update(i, { category: v })}
-                            placeholder="Category"
-                            options={DOCUMENT_CATEGORIES}
-                        />
-                        <Input
-                            type="date"
-                            value={d.expiry_date}
-                            onChange={(e) => update(i, { expiry_date: e.target.value })}
-                        />
-                        <button
-                            type="button"
-                            aria-label="Remove document"
-                            onClick={() =>
-                                set('documents', data.documents.filter((_, idx) => idx !== i))
-                            }
-                            className="self-center text-muted-foreground hover:text-status-critical"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </button>
+                {/* Staged files */}
+                {data.documents.length > 0 ? (
+                    <div className="grid gap-2">
+                        {data.documents.map((d, i) => (
+                            <div
+                                key={i}
+                                className="rounded-xl border border-border bg-card/70 p-3 transition-colors hover:border-primary/40"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                                        <FileText className="h-5 w-5" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="truncate text-[13px] font-semibold">
+                                            {d.file.name}
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                            {formatFileSize(d.file.size)}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        aria-label="Remove document"
+                                        onClick={() => remove(i)}
+                                        className="shrink-0 text-muted-foreground hover:text-status-critical"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <div className="mt-2.5 grid gap-2 sm:grid-cols-[1.4fr_1fr_1fr]">
+                                    <Input
+                                        value={d.title}
+                                        onChange={(e) => update(i, { title: e.target.value })}
+                                        placeholder="Title"
+                                        className="h-8"
+                                    />
+                                    <SelectInput
+                                        value={d.category}
+                                        onChange={(v) => update(i, { category: v })}
+                                        placeholder="Category"
+                                        options={DOCUMENT_CATEGORIES}
+                                    />
+                                    <Input
+                                        type="date"
+                                        value={d.expiry_date}
+                                        onChange={(e) => update(i, { expiry_date: e.target.value })}
+                                        className="h-8"
+                                    />
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                ) : null}
             </div>
         </div>
     );
