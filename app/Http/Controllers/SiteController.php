@@ -1627,8 +1627,6 @@ class SiteController extends Controller
 
         return [
             'users' => User::select(['id', 'name'])->orderBy('name')->get(),
-            'checklistTemplates' => $this->checklistTemplatesPayload(),
-            'availableAssets' => $this->availableAssetsPayload(null),
             'regionOptions' => NzRegions::REGIONS,
             'serviceContexts' => $serviceContexts,
             'copyableSites' => $copyableSites,
@@ -1644,8 +1642,6 @@ class SiteController extends Controller
     {
         return [
             'users' => [],
-            'checklistTemplates' => [],
-            'availableAssets' => [],
             'regionOptions' => [],
             'serviceContexts' => [],
             'copyableSites' => [],
@@ -1766,6 +1762,11 @@ class SiteController extends Controller
                 'notes' => $room['notes'] ?? null,
                 'is_active' => true,
             ];
+            // Room type = assignable bedroom vs communal/shared space. The
+            // full-page wizard omits this, so default to a bedroom (assignable).
+            if (array_key_exists('is_assignable', $room)) {
+                $payload['is_assignable'] = (bool) $room['is_assignable'];
+            }
 
             if (! empty($room['id'])) {
                 $existing = SiteHouseRoom::where('id', $room['id'])

@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\RosterTemplate;
 use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -254,6 +255,24 @@ class AddSiteModalStoreTest extends TestCase
                         && count($s['credentials']) === 1
                 ))
             );
+    }
+
+    public function test_store_persists_room_type_via_is_assignable(): void
+    {
+        $payload = $this->basePayload([
+            'rooms' => [
+                ['name' => 'Bedroom 1', 'notes' => '', 'is_assignable' => true],
+                ['name' => 'Lounge', 'notes' => 'Shared space', 'is_assignable' => false],
+            ],
+        ]);
+
+        $this->actingAs($this->admin)->post('/sites', $payload)->assertRedirect();
+        $site = Site::where('name', 'Modal House')->firstOrFail();
+
+        $bedroom = SiteHouseRoom::where('site_id', $site->id)->where('name', 'Bedroom 1')->firstOrFail();
+        $communal = SiteHouseRoom::where('site_id', $site->id)->where('name', 'Lounge')->firstOrFail();
+        $this->assertTrue((bool) $bedroom->is_assignable);   // bedroom
+        $this->assertFalse((bool) $communal->is_assignable); // communal / shared
     }
 
     public function test_update_persists_food_budget_cents_and_drops_unhandled_rostering(): void
