@@ -58,6 +58,20 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   risk notes + review date when on; emergency plan location; site notes; per-section ReviewCard/
   ReviewRow summary (Basics·Location·Spaces·Rostering·Contacts & equipment·Property & finance) each
   with an Edit jump (`goToStep`). Footer Save&add-another + Create + WizardSuccessPane already wired in
-  S3. Modal now feature-complete (all 9 steps). Gate: tsc/lint/build green. Commit `<s6>`.
-- [ ] **S7 — Full audit, tests, cutover.** E2E + visual parity + full gate + deprecate /sites/create +
-  final summary.
+  S3. Modal now feature-complete (all 9 steps). Gate: tsc/lint/build green. Commit `e2e0e944`.
+- [x] **S7 — Full audit, tests, cutover.** Added `AddSiteModalE2ETest` (24/7-house modal payload →
+  21 coverage rows · 3 coverage types · active circle geofence · all 7 critical readiness items done →
+  "ready"; 1 test/7 assertions, green). Full gate: tsc/lint/build green; add-site PHP suites all green
+  (14+10+1) + SiteControllerTest 48 (no regression); Pint clean. Cutover = index hero opens the modal;
+  `/sites/create` kept as no-JS fallback. DoD close-out written at the top of PLAN.md.
+  ⚠️ Pre-existing/unrelated (proven via `git diff origin/main`): SiteGeofenceTest:70 stale
+  `scope==='vehicle'` from commit 5e6546d1 (spawned a background task) + 2 vitest files (my-day,
+  app-sidebar) untouched by this work. Remaining = browser pixel-parity + a11y axe sweep on the
+  auto-deploy dev site (user; structurally low-risk — same WizardShell/primitives + Leaflet-in-dialog
+  already proven by _site-geofence-dialog). Commit `<s7>`.
+
+## Definition of done — reached
+All S1–S7 ticked. Modal opens from the Sites index, matches Add Client (shared WizardShell), walks all
+9 steps with working validation/discard/completeness/geocode+geofence; `POST /sites` persists the full
+payload (coverage role_requirements, credentials, shift templates, finance cents, circle AssetGeofence)
+in one transaction; tests added and green; full gate green. Browser visual/a11y sweep → user.

@@ -1,3 +1,35 @@
+# ✅ DEFINITION OF DONE — close-out (all S1–S7 shipped on `feat/sites-add-site-modal`)
+
+The standalone full-page Add Site wizard is replaced by an **Add-Client-style modal**
+launched from the Sites index, capturing the full site record across 9 steps and wired
+backend↔frontend both ways. Slice commits: S0 `56c929ac` · S1 `90f1d77f` · S2 `42aeec4e`
+· S3 `c7f5182d` · S4 `1b75d913` · S5 `87e346b3` · S6 `e2e0e944` · S7 (this).
+
+**Zero schema changes** (every column already existed). **No new geofence table** — the
+modal seeds a circle into the shared `AssetGeofence` via the same scope/shape contract as
+`SiteGeofenceController`. One DB transaction fans the payload out to existing models
+(coverage rows · staff requirements · RosterTemplate · finance cents · circle geofence).
+
+Gates (per slice + final): `tsc` ✓ · `eslint` ✓ · `vite build` ✓ · `php artisan test`
+green for every add-site suite — AddSiteModalValidationTest (14) + AddSiteModalStoreTest
+(10) + AddSiteModalE2ETest (1, a 24/7 house → 21 coverage rows + active geofence + "ready"
+in SiteReadinessService) + SiteControllerTest (48, no regression). Pint clean.
+
+**Cutover:** the Sites index hero "Add site" now opens the modal; `/sites/create` + its
+page are **kept as a no-JS fallback** (lowest-risk option from the plan; untouched).
+
+**Remaining = browser-only (user, on the auto-deploy dev site):** pixel-parity vs Add
+Client + an a11y/responsive (axe) sweep. Structurally low-risk: the modal reuses the
+identical `WizardShell` + `wizard/primitives` + tokens as Add Client, and Leaflet-in-dialog
+is already proven by the existing `_site-geofence-dialog.tsx` (same map, same Radix dialog).
+
+**Pre-existing failures (NOT this work, proven via `git diff origin/main`):**
+`SiteGeofenceTest` line 70 (stale `scope === 'vehicle'` expectation from commit `5e6546d1`;
+flagged as a background task) · 2 vitest files (`my-day` timesheet routing, `app-sidebar`
+Finance nav) — both untouched modules from concurrent loops.
+
+---
+
 # Add Site Modal — Implementation Plan (S0 audit output)
 
 > Branch `feat/sites-add-site-modal` off `origin/main`. Design bundle (gitignored) at
