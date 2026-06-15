@@ -26,7 +26,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     FieldErr,
-    InfoCard,
     SelectInput,
     Segmented,
     StepHead,
@@ -764,11 +763,6 @@ function StepBasics({ ctx }: { ctx: SiteStepCtx }) {
                         </div>
                     </div>
                 </div>
-
-                <InfoCard icon={Shield}>
-                    Brand colour is set per-site in{' '}
-                    <strong>Settings → Branding</strong>, not here.
-                </InfoCard>
             </div>
         </div>
     );
