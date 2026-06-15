@@ -6,8 +6,9 @@ import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rosteri
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { BalanceCheckDialog, CdPill, LossActionDialog, RecordCdEntryDialog, RecordDestructionDialog, ReportLossDialog, ResolveDiscrepancyDialog } from '@/pages/emar/_cd-dialogs';
+import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertTriangle, ClipboardCheck, FileWarning, Lock, Package, Plus, ShieldCheck, Trash2, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, FileWarning, Lock, Package, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type CdDestructionRow = { id: number; client_name: string; medication_name: string | null; quantity: number | string | null; unit: string | null; reason: string | null; destroyed_at: string | null; destroyed_by_name: string | null; witness_name: string | null };
@@ -23,6 +24,12 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    date: string;
+    today: string;
+    is_today: boolean;
+    date_label: string;
+    client_id: number | null;
+    q: string | null;
 };
 
 type Modal =
@@ -32,31 +39,58 @@ type Modal =
     | { type: 'lossAction'; report: CdLossReport; action: 'investigate' | 'resolve' }
     | null;
 
-function daysSince(iso: string | null): number | null {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-    return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+/** Case-insensitive match of a query against a row's text fields. */
+function matchq(q: string, ...parts: (string | null | undefined)[]): boolean {
+    return !q || parts.filter(Boolean).join(' ').toLowerCase().includes(q);
 }
 
 export default function ControlledDrugs(props: Props) {
-    const { medications, recentEntries, discrepancies, destructions, lossReports, staff, sites, active_site: activeSite, site_brand_colour: brandColour } = props;
+    const { medications, recentEntries, discrepancies, destructions, lossReports, staff, clients, sites, active_site: activeSite, site_brand_colour: brandColour, date, today, is_today: isToday } = props;
 
     const [activeTab, setActiveTab] = useState('register');
+    const [search, setSearch] = useState(props.q ?? '');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(props.client_id ?? null);
     const [modal, setModal] = useState<Modal>(null);
 
-    // Last balance check per medication (from the append-only register).
-    const reconciliation = useMemo(() => {
-        return medications.map((m) => {
-            const last = recentEntries.find((e) => e.entry_type === 'balance_check' && e.medication_name === m.name && e.client_id === m.client_id);
-            const days = daysSince(last?.recorded_at ?? null);
-            return { med: m, lastAt: last?.recorded_at ?? null, days, overdue: days === null || days >= 7 };
-        });
-    }, [medications, recentEntries]);
+    // Calendar + Site + Client round-trip to the server (the movement lists are
+    // server-windowed to the selected day); the text search stays client-side over
+    // the loaded rows so it filters every tab — including the always-current Register
+    // and Reconciliation surfaces — without a reload. `over` keys set to undefined
+    // are dropped from the query.
+    const reload = (over: Record<string, string | number | undefined>) => {
+        const params: Record<string, string | number | undefined> = {
+            ...(siteFilter ? { site_id: siteFilter } : {}),
+            ...(clientFilter ? { client_id: clientFilter } : {}),
+            ...(date !== today ? { date } : {}),
+            ...(search ? { q: search } : {}),
+            ...over,
+        };
+        Object.keys(params).forEach((k) => params[k] === undefined && delete params[k]);
+        router.get('/emar/controlled', params, { preserveState: true, preserveScroll: true });
+    };
+    const goDate = (ymd: string) => reload({ date: ymd === today ? undefined : ymd });
+    const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id ?? undefined }); };
+    const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id ?? undefined }); };
+    const stepLabel = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
+
+    // Client-side text filter shared by every tab (client or controlled-drug name).
+    const q = search.trim().toLowerCase();
+    const medsF = useMemo(() => medications.filter((m) => matchq(q, m.name, m.client_name)), [medications, q]);
+    const entriesF = useMemo(() => recentEntries.filter((e) => matchq(q, e.medication_name, e.client_name)), [recentEntries, q]);
+    const discF = useMemo(() => discrepancies.filter((d) => matchq(q, d.medication?.name, d.client ? `${d.client.first_name} ${d.client.last_name}` : '')), [discrepancies, q]);
+    const destF = useMemo(() => destructions.filter((d) => matchq(q, d.medication_name, d.client_name)), [destructions, q]);
+    const lossF = useMemo(() => lossReports.filter((l) => matchq(q, l.medication_name, l.client ? `${l.client.first_name} ${l.client.last_name}` : '')), [lossReports, q]);
+
+    // Reconciliation derives from the always-current per-med balance-check state the
+    // server computes (decoupled from the day-scoped movement list).
+    const reconciliation = useMemo(
+        () => medsF.map((m) => ({ med: m, lastAt: m.last_balance_check_at ?? null, days: m.days_since_check ?? null, overdue: !!m.overdue_check })),
+        [medsF],
+    );
 
     const openLosses = lossReports.filter((l) => ['reported', 'investigating'].includes(l.investigation_status));
-    const overdueChecks = reconciliation.filter((r) => r.overdue).length;
+    const overdueChecks = medications.filter((m) => m.overdue_check).length;
 
     const TABS: RosterTabItem[] = [
         { id: 'register', label: 'Register', icon: Lock, tone: 'primary', badge: medications.length || undefined },
@@ -118,11 +152,72 @@ export default function ControlledDrugs(props: Props) {
                         </>
                     }
                     footer={
-                        sites.length > 0 ? (
-                            <div className="flex items-center justify-end py-3">
-                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={(id) => { setSiteFilter(id); router.get('/emar/controlled', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); }} onDark />
+                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {/* eslint-disable no-restricted-syntax -- segmented day-stepper on the dark hero; not a shadcn Button (rostering idiom). */}
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goDate(addDays(date, -1))}
+                                >
+                                    <ChevronLeft className="h-3.5 w-3.5" />
+                                    {stepLabel(addDays(date, -1))}
+                                </button>
+                                <DayPickerChip date={date} isToday={isToday} onPick={goDate} caption="Register & movements are for the selected day; stock & CD balance checks always show today." />
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goDate(addDays(date, 1))}
+                                >
+                                    {stepLabel(addDays(date, 1))}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                                {!isToday ? (
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
+                                        onClick={() => goDate(today)}
+                                    >
+                                        Back to today
+                                    </button>
+                                ) : null}
                             </div>
-                        ) : undefined
+                            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
+                                <div className="relative w-full max-w-xs md:w-[260px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per the design handoff. */}
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search client or controlled drug…"
+                                        aria-label="Search controlled drug register"
+                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                    />
+                                    {search ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
+                                        <button
+                                            type="button"
+                                            aria-label="Clear search"
+                                            onClick={() => setSearch('')}
+                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
+                                </div>
+                                {sites.length > 0 ? (
+                                    <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />
+                                ) : null}
+                                <EntityFilter
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))}
+                                    value={clientFilter}
+                                    onChange={onClient}
+                                    onDark
+                                />
+                            </div>
+                        </div>
                     }
                 />
 
@@ -139,8 +234,8 @@ export default function ControlledDrugs(props: Props) {
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Controlled drug views" />
 
                 {activeTab === 'register' && (
-                    <TableCard head={['Client', 'Medication', 'On hand', 'Last checked', '']} empty={medications.length === 0 ? 'No active controlled drugs.' : null}>
-                        {medications.map((m) => {
+                    <TableCard head={['Client', 'Medication', 'On hand', 'Last checked', '']} empty={medsF.length === 0 ? (medications.length === 0 ? 'No active controlled drugs.' : 'No controlled drugs match your search.') : null}>
+                        {medsF.map((m) => {
                             const rec = reconciliation.find((r) => r.med.id === m.id);
                             return (
                                 <tr key={m.id} className="border-b last:border-b-0">
@@ -156,8 +251,8 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'recent' && (
-                    <TableCard head={['Date', 'Client', 'Medication', 'Type', 'Qty', 'Balance', 'Recorded by', 'Witness']} empty={recentEntries.length === 0 ? 'No register entries yet.' : null}>
-                        {recentEntries.map((e) => (
+                    <TableCard head={['Date', 'Client', 'Medication', 'Type', 'Qty', 'Balance', 'Recorded by', 'Witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No register movements on ${props.date_label}.` : 'No movements match your search.') : null}>
+                        {entriesF.map((e) => (
                             <tr key={e.id} className="border-b last:border-b-0">
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-3">{e.client_name}</td>
@@ -173,7 +268,7 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'reconciliation' && (
-                    <TableCard head={['Client', 'Medication', 'On hand', 'Last balance check', 'Status']} empty={reconciliation.length === 0 ? 'No controlled drugs to reconcile.' : null}>
+                    <TableCard head={['Client', 'Medication', 'On hand', 'Last balance check', 'Status']} empty={reconciliation.length === 0 ? (medications.length === 0 ? 'No controlled drugs to reconcile.' : 'No controlled drugs match your search.') : null}>
                         {reconciliation.map((r) => (
                             <tr key={r.med.id} className="border-b last:border-b-0">
                                 <td className="px-4 py-3">{r.med.client_name}</td>
@@ -187,9 +282,9 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'discrepancies' && (
-                    discrepancies.length === 0 ? <EmptyCard text="No open discrepancies." /> : (
+                    discF.length === 0 ? <EmptyCard text={discrepancies.length === 0 ? 'No open discrepancies.' : 'No discrepancies match your search.'} /> : (
                         <div className="flex flex-col gap-3">
-                            {discrepancies.map((d) => (
+                            {discF.map((d) => (
                                 <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
                                     <div>
                                         <div className="font-medium">{d.medication?.name ?? 'CD'} <span className="text-sm text-muted-foreground">· {d.client ? `${d.client.first_name} ${d.client.last_name}` : ''}</span></div>
@@ -210,8 +305,8 @@ export default function ControlledDrugs(props: Props) {
                         <div className="flex justify-end">
                             <Button size="sm" onClick={() => setModal({ type: 'destruction' })}><Trash2 className="h-4 w-4" />Record destruction</Button>
                         </div>
-                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} empty={destructions.length === 0 ? 'No CD destructions recorded.' : null}>
-                            {destructions.map((d) => (
+                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
+                            {destF.map((d) => (
                                 <tr key={d.id} className="border-b last:border-b-0">
                                     <td className="px-4 py-3 text-muted-foreground">{d.destroyed_at ? new Date(d.destroyed_at).toLocaleDateString('en-NZ') : '—'}</td>
                                     <td className="px-4 py-3">{d.client_name}</td>
@@ -227,9 +322,9 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'loss' && (
-                    lossReports.length === 0 ? <EmptyCard text="No loss reports." /> : (
+                    lossF.length === 0 ? <EmptyCard text={lossReports.length === 0 ? 'No loss reports.' : 'No loss reports match your search.'} /> : (
                         <div className="flex flex-col gap-3">
-                            {lossReports.map((l) => (
+                            {lossF.map((l) => (
                                 <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
                                     <div>
                                         <div className="font-medium">{l.medication_name} <span className="text-sm text-muted-foreground">· {l.quantity_lost} {l.unit} lost</span></div>
@@ -247,8 +342,8 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'audit' && (
-                    <TableCard head={['When', 'Medication', 'Movement', 'Balance', 'By · witness']} empty={recentEntries.length === 0 ? 'No audit entries.' : null}>
-                        {recentEntries.map((e) => (
+                    <TableCard head={['When', 'Medication', 'Movement', 'Balance', 'By · witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No audit entries on ${props.date_label}.` : 'No audit entries match your search.') : null}>
+                        {entriesF.map((e) => (
                             <tr key={e.id} className="border-b last:border-b-0">
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-3 font-medium">{e.medication_name}</td>

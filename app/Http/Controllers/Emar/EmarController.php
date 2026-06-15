@@ -1391,12 +1391,32 @@ class EmarController extends Controller
     public function controlled(Request $request)
     {
         $siteFilter = $request->integer('site_id') ?: null;
+        $clientFilter = $request->integer('client_id') ?: null;
+        $search = trim((string) $request->string('q')) ?: null;
         $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+        $byClient = fn ($q) => $q->where('client_id', $clientFilter);
+
+        // Date anchor (mirrors the meds/today + PRN hero day-stepper). The register
+        // (stock on-hand) and reconciliation always show today; movements — Recent
+        // Entries, Destructions and the Audit trail — are scoped to the selected day.
+        $timezone = app(MarScheduleService::class)->workerTimezone();
+        $now = Carbon::now($timezone);
+        $today = $now->copy()->startOfDay();
+        $anchorYmd = $request->string('date')->toString();
+        try {
+            $anchor = $anchorYmd !== '' ? Carbon::parse($anchorYmd, $timezone)->startOfDay() : $today->copy();
+        } catch (\Throwable) {
+            $anchor = $today->copy();
+        }
+        $isToday = $anchor->isSameDay($today);
+        $dayStart = $anchor->copy()->startOfDay()->utc();
+        $dayEnd = $anchor->copy()->endOfDay()->utc();
 
         $controlledMedications = ClientMedication::query()
             ->active()
             ->controlled()
             ->when($siteFilter, $bySite)
+            ->when($clientFilter, $byClient)
             ->with([
                 'client:id,first_name,last_name',
                 'stock',
@@ -1404,16 +1424,29 @@ class EmarController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Last balance check per controlled drug — computed server-side over the
+        // full register (NOT the day-scoped recentEntries) so Reconciliation and the
+        // overdue-check alert stay current regardless of the selected day (BK-recon).
+        $lastChecks = ClientControlledDrugEntry::query()
+            ->where('entry_type', 'balance_check')
+            ->whereIn('client_medication_id', $controlledMedications->pluck('id')->all())
+            ->selectRaw('client_medication_id, MAX(recorded_at) as last_at')
+            ->groupBy('client_medication_id')
+            ->pluck('last_at', 'client_medication_id');
+
         $recentEntries = ClientControlledDrugEntry::query()
             ->when($siteFilter, $bySite)
-            ->with(['client:id,first_name,last_name', 'medication:id,name', 'recordedBy:id,name', 'witnessedBy:id,name'])
+            ->when($clientFilter, $byClient)
+            ->whereBetween('recorded_at', [$dayStart, $dayEnd])
+            ->with(['client:id,first_name,last_name', 'medication:id,name,controlled_drug', 'recordedBy:id,name', 'witnessedBy:id,name'])
             ->latest('recorded_at')
-            ->limit(50)
+            ->limit(100)
             ->get();
 
         $discrepancies = ClientControlledDrugDiscrepancy::query()
             ->whereIn('status', ['open', 'under_review'])
             ->when($siteFilter, $bySite)
+            ->when($clientFilter, $byClient)
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,name',
@@ -1425,13 +1458,16 @@ class EmarController extends Controller
         $destructions = MedicationDestruction::query()
             ->controlled()
             ->when($siteFilter, $bySite)
+            ->when($clientFilter, $byClient)
+            ->whereBetween('destroyed_at', [$dayStart, $dayEnd])
             ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name', 'witness1:id,name'])
             ->latest('destroyed_at')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         $lossReports = ControlledDrugLossReport::query()
             ->when($siteFilter, $bySite)
+            ->when($clientFilter, $byClient)
             ->with([
                 'client:id,first_name,last_name',
                 'discoveredBy:id,name',
@@ -1443,29 +1479,51 @@ class EmarController extends Controller
         $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/ControlledDrugs', [
-            'medications' => $controlledMedications->map(fn (ClientMedication $m) => [
-                'id' => $m->id,
-                'name' => $m->name,
-                'controlled_drug' => (bool) $m->controlled_drug,
-                'client_id' => $m->client_id,
-                'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
-                'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
-                    'unit' => $m->stock->unit,
-                    'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
-                ] : null,
-            ])->values(),
+            'medications' => $controlledMedications->map(function (ClientMedication $m) use ($lastChecks, $now) {
+                $lastCheckRaw = $lastChecks[$m->id] ?? null;
+                $lastCheck = $lastCheckRaw ? Carbon::parse($lastCheckRaw) : null;
+                $daysSince = $lastCheck ? (int) floor($lastCheck->copy()->diffInDays($now)) : null;
+
+                return [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'form' => $m->dose_unit ?? $m->route,
+                    'strength' => $m->dosage,
+                    'controlled_drug' => (bool) $m->controlled_drug,
+                    'client_id' => $m->client_id,
+                    'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
+                    // Always-current reconciliation state (decoupled from the day-scoped
+                    // movements list) so the Reconciliation tab + overdue alert are correct
+                    // whatever day is selected. Overdue = never checked or ≥ 7 days ago.
+                    'last_balance_check_at' => $lastCheck?->toIso8601String(),
+                    'days_since_check' => $daysSince,
+                    'overdue_check' => $daysSince === null || $daysSince >= 7,
+                    'stock' => $m->stock ? [
+                        'on_hand' => $m->stock->on_hand,
+                        'unit' => $m->stock->unit,
+                        'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
+                        'expiry_date' => $m->stock->expiry_date instanceof \DateTimeInterface ? $m->stock->expiry_date->toDateString() : ($m->stock->expiry_date ?: null),
+                        'batch_number' => $m->stock->batch_number,
+                        'reorder_level' => $m->stock->reorder_level,
+                    ] : null,
+                    // TODO(G-F): no Schedule (2/3/4) column on client_medications — chip omitted
+                    // until a `cd_schedule` field exists. See docs/CONTROLLED_GAP_ANALYSIS.md (BK-schedule).
+                    'schedule' => null,
+                ];
+            })->values(),
             'recentEntries' => $recentEntries->map(fn (ClientControlledDrugEntry $e) => [
                 'id' => $e->id,
                 'client_id' => $e->client_id,
                 'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : 'Unknown',
                 'medication_name' => $e->medication?->name,
+                'controlled_drug' => (bool) ($e->medication?->controlled_drug ?? true),
                 'entry_type' => $e->entry_type,
                 'quantity' => $e->quantity,
                 'unit' => $e->unit,
                 'on_hand_before' => $e->on_hand_before,
                 'on_hand_after' => $e->on_hand_after,
                 'batch_number' => $e->batch_number,
+                'expiry_date' => $e->expiry_date instanceof \DateTimeInterface ? $e->expiry_date->toDateString() : ($e->expiry_date ?: null),
                 'notes' => $e->notes,
                 'recorded_at' => $e->recorded_at instanceof \DateTimeInterface ? $e->recorded_at->toIso8601String() : null,
                 'recorded_by_name' => $e->recordedBy?->name,
@@ -1540,6 +1598,12 @@ class EmarController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+            'date' => $anchor->toDateString(),
+            'today' => $today->toDateString(),
+            'is_today' => $isToday,
+            'date_label' => $anchor->isoFormat('ddd D MMM'),
+            'client_id' => $clientFilter,
+            'q' => $search,
             'can' => [
                 'manage_evidence' => (bool) $request->user() && (
                     $request->user()->canDo('medications.controlled.record')
