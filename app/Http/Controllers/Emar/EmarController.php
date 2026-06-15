@@ -1427,6 +1427,10 @@ class EmarController extends Controller
         // Last balance check per controlled drug — computed server-side over the
         // full register (NOT the day-scoped recentEntries) so Reconciliation and the
         // overdue-check alert stay current regardless of the selected day (BK-recon).
+        // TODO(Gx): a scheduled job to *escalate* CDs with no balance check in N days
+        // (a MedicationDashboardAlert via MedicationAlertService) does not exist yet —
+        // the page derives the overdue count live from overdue_check below, which covers
+        // the UI; only the background escalation remains. See docs/CONTROLLED_GAP_ANALYSIS.md.
         $lastChecks = ClientControlledDrugEntry::query()
             ->where('entry_type', 'balance_check')
             ->whereIn('client_medication_id', $controlledMedications->pluck('id')->all())

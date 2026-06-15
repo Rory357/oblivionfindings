@@ -1,5 +1,33 @@
 # Controlled Drugs (`/emar/controlled`) — Gap Analysis & Fix Loop
 
+## ✅ DEFINITION OF DONE — LOOP COMPLETE (2026-06-16)
+
+**Every checklist box below is `[x]`.** `/emar/controlled` is at feature-complete, standardised
+parity with `/emar/prn` and `/meds/today`. Shipped across 7 reviewable commits
+(`0a58f39e` → final): hero footer day-picker + search + Site + Client filter driving all 7 tabs;
+stacked dismissible alert strip + truthful offline sync eyebrow; read-only `CdDetailDialog` +
+right-click `ShiftContextMenu` + click/keyboard row interactions + "View client" on every tab;
+per-tab create affordances + empty-state CTAs; self-witness blocked in every CD wizard +
+batch/expiry-on-receipt + last-checked hint + denaturing confirmation; CD lock glyph + inline
+expiry; cross-tab consistency + 3 new feature tests.
+
+**Gates (final):** `npm run types` ✓ · `npx eslint` ✓ · `npm run build` ✓ · `./vendor/bin/pint` ✓ ·
+`ControlledDrugsTest` 6/6 ✓. All CD recording/balance/destruction/loss/discrepancy actions happen
+in-page via modals with Inertia partial reloads.
+
+**Remaining `TODO(Gx)` (need schema/design or are browser-only — out of the headless loop's scope):**
+- **Schedule (2/3/4) chip** — no `cd_schedule` column on `client_medications`; not invented.
+- **Overdue-reconciliation escalation job** — UI count is live from `overdue_check`; a background
+  `MedicationDashboardAlert` generator for CDs unchecked in N days is unbuilt (code comment in `controlled()`).
+- **CD-mutation offline queue convergence** — CD wizards post via Inertia, not the shared offline
+  queue (IndexedDB); the eyebrow reflects device state, not a CD-specific pending count.
+- **Linked incident_id/discrepancy_id on the detail modal** — no FK column (link lives in
+  `MedicationIncidentIntegrationService`); not surfaced.
+- **CD Accountable Officer / regulator-notified on loss reports** — no column (only police/pharmacy exist).
+- **Live pixel/axe/responsive verify on oblivionfindings.com** — browser-only → USER.
+
+---
+
 Single source of truth for the `/loop` bringing `/emar/controlled` to feature-complete,
 standardised parity with `/emar/prn` (`PrnRecords.tsx`) and `/meds/today`.
 
@@ -49,11 +77,11 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 ## F. Schedule / expiry visibility on Register & Reconciliation (priority 6)
 
-- [ ] **F13** Schedule (2/3/4) chip + CD lock glyph on the drug cell (Register/Reconciliation/Recent); expiry column/inline where stock carries it. Semantic tokens only. *Schedule column does NOT exist → chip = `TODO(G-F)`; CD lock + expiry are wireable now.*
+- [x] **F13** `DrugCell` adds a CD lock glyph (`Lock`) + "CD" badge to the drug cell on Register/Reconciliation/Recent (gated on `controlled_drug`); `ExpiryNote` shows stock/entry expiry inline (warn-tone ≤30d or past). Semantic tokens only. Schedule (2/3/4) chip = `TODO(G-F)` — no `cd_schedule` column, not invented. _ControlledDrugs.tsx (`DrugCell`, `ExpiryNote`)._
 
 ## G. Cross-tab consistency pass (priority 7)
 
-- [ ] **G14** All 7 tabs share: same table chrome, same row interactions (click→detail, right-click→menu), same empty-state pattern, all respond to date/site/client/search. Audit stays append-only/read-only (view/export only).
+- [x] **G14** All 7 tabs verified consistent: shared `TableCard`/card chrome, identical row interactions (`rowProps`/`interactive` → click→detail, right-click→`ShiftContextMenu`, keyboard), shared empty-state + CTA pattern, all driven by the hero date/site/client/search. Audit is read-only (`rowProps(…, true)` → view/client/export only). Added 3 feature tests to `ControlledDrugsTest` (reconciliation fields + current_user + filter props; client-filter scoping; date-window scoping) — suite 6/6 green. _ControlledDrugs.tsx, tests/Feature/Emar/ControlledDrugsTest.php._
 
 ## Backend (`controlled()` + stores) — NO speculative migrations
 
@@ -64,7 +92,7 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 - [x] **BK-balance** Running-balance enforcement: `after = before ± signed qty` — **already enforced** in `storeCDEntry` (ValidationException on `on_hand_after`); covered by `ControlledDrugsTest`.
 - [x] **BK-witness** Witness ≠ recorder — **already enforced** server-side (`different:auth id`) in `storeCDEntry` / `storeBalanceCheck` / destruction.
 - [x] **BK-incident** Balance-check mismatch auto-raises discrepancy + incident (`MedicationIncidentIntegrationService::handleControlledDiscrepancy`); resolve links incident — **already wired**.
-- [ ] **BK-overdue** Overdue-reconciliation escalation: identify/stub a scheduled flag for CDs with no balance check in N days (reuse `MedicationAlertService`) → `TODO(Gx)` if it needs a job; the banner count is derived live from BK-recon.
+- [x] **BK-overdue** Investigated: `MedicationAlertService` has a controlled-*discrepancy* alert but **no overdue-balance-check generator**. The page derives the overdue count + warning banner live from `overdue_check` (BK-recon), so the UI surface is complete. A background *escalation* job (create a `MedicationDashboardAlert` for CDs unchecked in N days) remains `TODO(Gx)` — documented with a code comment at the recon block in `controlled()`. No speculative job/migration added.
 
 ---
 
@@ -72,6 +100,7 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 _(append one line per pass: date · item(s) · what changed · files)_
 
+- **2026-06-16 · Group F + G + BK-overdue (F13, G14, BK-overdue) — LOOP COMPLETE** — `DrugCell` (CD lock glyph + CD badge) + `ExpiryNote` (inline expiry, warn ≤30d) on Register/Reconciliation/Recent; schedule chip stays TODO(G-F). Cross-tab consistency verified; 3 new feature tests added (ControlledDrugsTest 6/6). BK-overdue investigated → UI complete (live `overdue_check`), escalation job = TODO(Gx) w/ code comment. Gates: types ✓, eslint ✓, Pint ✓, build ✓, tests 6/6 ✓. Files: `ControlledDrugs.tsx`, `EmarController.php@controlled`, `tests/Feature/Emar/ControlledDrugsTest.php`.
 - **2026-06-16 · Group E (E11, E12)** — Self-witnessing now blocked in the UI (`witnessOptions` excludes the recorder from every witness select; witness 2 excludes witness 1) via a threaded `current_user`. Record-CD-entry gained an expiry_date field + batch/expiry required on receipts; Balance-check shows a "last checked N days / overdue" hint; Record-destruction requires a denaturing-kit confirmation for CDs. CD Accountable Officer / regulator-notified left as TODO(Gx) (no column). Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`, `_cd-dialogs.tsx`.
 - **2026-06-16 · Group D (D9, D10)** — Every tab now has an Add-Client-style primary create action in its panel header + a matching empty-state CTA button (no more grey-text-only empties). `TableCard` gained `title`/`count`/`action`/`cta`; new `TabHeader` for the discrepancy/loss card tabs; reusable per-tab buttons. Per-row pre-fill already shipped in C. Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`.
 - **2026-06-16 · Group C + BK-detail (C6, C7, C8)** — New `cd-detail-dialog.tsx` read-only detail modal (5 row kinds on WizardShell) + every row on all 7 tabs now click→detail, right-click→`ShiftContextMenu` (per-kind actions incl. View client / Export register), keyboard-focusable; Audit rows read-only. Controller enriched discrepancy/loss/destruction payloads + `current_user`; incident FK link = TODO(Gx) (no column). Gates: types ✓, eslint ✓, Pint ✓, build ✓, ControlledDrugsTest 3/3 ✓. Files: `components/emar/cd-detail-dialog.tsx`, `ControlledDrugs.tsx`, `components/emar/controlled/types.ts`, `EmarController.php@controlled`.
