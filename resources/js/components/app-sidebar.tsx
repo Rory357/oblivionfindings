@@ -2109,11 +2109,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/hr/leave',
             icon: CalendarDays,
         });
-        timeAndLeave.items.push({
-            title: 'Leave Reports',
-            href: '/hr/leave/reports',
-            icon: FileText,
-        });
     }
     if (can?.hr?.time?.view) {
         timeAndLeave.items.push({

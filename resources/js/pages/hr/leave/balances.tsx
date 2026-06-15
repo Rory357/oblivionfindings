@@ -18,6 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { LeaveTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -106,6 +107,8 @@ export default function LeaveBalances({
                     />
                 }
             >
+                <LeaveTabs active="balances" />
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
