@@ -61,6 +61,29 @@ class ReviewsTest extends TestCase
             );
     }
 
+    public function test_review_payload_includes_mar_deeplink(): void
+    {
+        // The row context menu and the detail modal's "Open on MAR" action need a
+        // per-review deep-link to the resident's chart (mirrors the PRN register).
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedReviews();
+
+        MedicationReview::query()->create([
+            'client_id' => $client->id, 'review_type' => 'routine', 'status' => 'scheduled',
+            'scheduled_date' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/emar/reviews?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/Reviews')
+                ->has('reviews', 1)
+                ->where('reviews.0.mar_url', fn ($url) => is_string($url)
+                    && str_contains($url, '/emar/mar')
+                    && str_contains($url, 'client_id='.$client->id))
+            );
+    }
+
     public function test_complete_review_stores_dbi_and_actions(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedReviews();

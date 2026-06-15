@@ -6,7 +6,7 @@ import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { router, useForm } from '@inertiajs/react';
-import { Activity, Calendar, CheckCircle, ClipboardCheck, Pill, Plus, Stethoscope, Trash2, User, Users } from 'lucide-react';
+import { Activity, Calendar, CheckCircle, ClipboardCheck, FileText, Pill, Plus, RefreshCw, Stethoscope, Trash2, User, Users } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,7 @@ export type ReviewRow = {
     whanau_notes: string | null;
     next_review_date: string | null;
     is_overdue: boolean;
+    mar_url: string | null;
 };
 export type ClientOpt = { id: number; first_name: string; last_name: string };
 export type StaffOpt = { id: number; name: string };
@@ -271,12 +272,50 @@ export function RescheduleReviewDialog({ review, onClose }: { review: ReviewRow;
 }
 
 // ── View detail (read-only) ──────────────────────────────────────────────────
-export function ReviewDetailDialog({ review, onClose }: { review: ReviewRow; onClose: () => void }) {
+// Read-only summary with the standard footer Options bar (mirrors
+// components/emar/prn-detail-dialog.tsx): the primary actions (Conduct,
+// Reschedule) re-open the relevant wizard in place via the page-level modal
+// switch, while View client / Open on MAR navigate off-page.
+export function ReviewDetailDialog({ review, onClose, onConduct, onReschedule }: { review: ReviewRow; onClose: () => void; onConduct: () => void; onReschedule: () => void }) {
+    const scheduled = review.status === 'scheduled';
     return (
-        <MedsWizardDialog open onClose={onClose} title="Review detail" description={`${review.client_name} · ${REVIEW_TYPES.find((t) => t.value === review.review_type)?.label ?? review.review_type ?? 'Review'}`} railIcon={ClipboardCheck} railTitle="Review detail" railSubtitle={review.client_name} steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]} stepIndex={0} onStepClick={() => {}} footer={<Button onClick={onClose}>Close</Button>}>
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Review detail"
+            description={`${review.client_name} · ${REVIEW_TYPES.find((t) => t.value === review.review_type)?.label ?? review.review_type ?? 'Review'}`}
+            railIcon={ClipboardCheck}
+            railTitle="Review detail"
+            railSubtitle={review.client_name}
+            steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button variant="outline" onClick={onClose}>Close</Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {scheduled && (
+                            <Button onClick={onConduct}><Stethoscope className="h-4 w-4" />Conduct review</Button>
+                        )}
+                        {scheduled && (
+                            <Button variant="outline" onClick={onReschedule}><RefreshCw className="h-4 w-4" />Reschedule</Button>
+                        )}
+                        {review.client_id != null && (
+                            <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${review.client_id}/care`)}><User className="h-4 w-4" />View client</Button>
+                        )}
+                        {review.mar_url && (
+                            <Button variant="ghost" onClick={() => router.visit(review.mar_url!)}><FileText className="h-4 w-4" />Open on MAR</Button>
+                        )}
+                    </div>
+                </>
+            }
+        >
             <div className="rounded-lg border px-4">
                 <SummaryRow label="Reviewer" value={review.reviewer_name || '—'} />
                 <SummaryRow label="Role" value={review.reviewer_role || '—'} />
+                <SummaryRow label="Type" value={REVIEW_TYPES.find((t) => t.value === review.review_type)?.label ?? review.review_type ?? '—'} />
+                {review.trigger_reason && <SummaryRow label="Trigger" value={review.trigger_reason} />}
+                <SummaryRow label="Scheduled" value={review.scheduled_date || '—'} />
                 <SummaryRow label="Completed" value={review.completed_date || '—'} />
                 <SummaryRow label="Drug Burden Index" value={review.drug_burden_index ?? '—'} />
                 <SummaryRow label="Falls (last quarter)" value={review.falls_last_quarter ?? '—'} />
@@ -288,9 +327,15 @@ export function ReviewDetailDialog({ review, onClose }: { review: ReviewRow; onC
                     <p className="text-sm">{review.clinical_summary}</p>
                 </div>
             )}
+            {review.recommendations && (
+                <div className="mt-4">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommendations</div>
+                    <p className="text-sm">{review.recommendations}</p>
+                </div>
+            )}
             {review.actions.length > 0 && (
                 <div className="mt-4">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Medications reviewed</div>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Medications reviewed &amp; deprescribing</div>
                     <div className="flex flex-col gap-2">
                         {review.actions.map((a, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
@@ -299,7 +344,10 @@ export function ReviewDetailDialog({ review, onClose }: { review: ReviewRow; onC
                                     <span className="ml-2 font-medium">{a.drug}</span>
                                     {a.rationale && <div className="text-xs text-muted-foreground">{a.rationale}</div>}
                                 </div>
-                                <span className="text-xs capitalize text-muted-foreground">{a.gp_status ?? 'pending'}</span>
+                                <div className="flex shrink-0 flex-col items-end gap-0.5 text-xs text-muted-foreground">
+                                    <span className="capitalize">GP: {a.gp_status ?? 'pending'}</span>
+                                    {a.stage && a.action !== 'Continue' && <span className="capitalize">{a.stage === 'gp' ? 'Awaiting GP' : a.stage === 'done' ? 'Closed' : a.stage}</span>}
+                                </div>
                             </div>
                         ))}
                     </div>
