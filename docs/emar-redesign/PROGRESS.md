@@ -122,4 +122,28 @@ Driver: the in-prompt priority order (the referenced `MAR_CHARTS_COMPLETION_LOOP
 - **Honest omissions (per [[feedback_hide_unbuilt_actions]] — no stubs):** the prompt's “View last 24h” and “Add note” have **no backend** (only `record`/`prn`/`prn_effect` endpoints exist; no per‑dose note‑amend or 24h‑history endpoint). “View last 24h” is realised as **“View today's records”** (the existing History tab — real data, honestly labelled); standalone **“Add note” is folded into Record‑in‑full** (the wizard captures notes at sign‑off). Logged here rather than shipping dead controls.
 - **Gates:** types ✓ · eslint (both files) ✓ · build ✓ (`2m45s`). **No backend changed** (reuses `meds.today.record`) → PHP suite unaffected (green at iteration 1); no new feature test (no new backend) — frontend gate is types/lint/build, matching the eMAR‑page precedent.
 
-**Next (Iteration 3):** audit PRs 1–10 (`docs/emar-1chart-gap-analysis.md`) against the code and tick what's genuinely shipped vs. gaps (most already exist in the MAR payload — PR1 reason_code, PR2 alerts, PR3 INR, PR4 admin_rules, PR5 witness re‑auth, PR6 syringe, PR7 approval_status, PR9 pharmac_* are all present); then modal completeness (the `mar-governance-dialogs` set) and the §7 route retirements (`emar.clients.inr.index` → redirect once no importer). Keep the Schedule/Due/PRN/History tabs.
+**Iteration 3 — PR 1–10 audit (✅ all shipped, audited not rebuilt), modal‑completeness verdict, §7 INR retirement + an incidental bug fix.**
+
+**Backend PR audit (verified against the code — file:line evidence):** PRs **1–9 are SHIPPED**, nothing to rebuild:
+- PR1 reason codes — `App\Enums\Medication\NotGivenReason` + `reason_code` col + service validation.
+- PR2 attention alerts/suppression — `client_medication_alerts` + `ClientMedicationAlert` + `clients.suppress_med_admin_alerts` + store/update/resolve/toggle routes.
+- PR3 INR — `client_inr_records` + `ClientInrRecord` (disable‑not‑delete) + store/disable.
+- PR4 facility rules — `medication_admin_rules` + `MedicationAdminRule` + `MedicationRuleService::requirementsFor()` + pulse/BP cols + `medications.settings.manage`.
+- PR5 witness e‑sig — `EnhancedMarService` Hash::check + witness≠administrator + `medications.controlled.witness` + `witnessed_at`/`witness_method`.
+- PR6 syringe drivers — `medication_syringe_drivers`(+`_checks`) + models + store/check/complete.
+- PR7 approval gate — `approval_status`(default **verified**)/`verified_by`/etc. + `scopeActive` (verified **OR NULL**) + `isAdministrable()` + verify/reject + `medications.orders.verify`. ⚠️ Gap‑analysis "backfill" is **moot**: the column default IS `verified` (applied to existing rows on add) AND `scopeActive` treats NULL as active → no production med becomes un‑administrable. Not a gap.
+- PR8 review cadence — `chart_review_interval_months`/`next_chart_review_date` + `CheckMedicationReviews` command (registered `routes/console.php`) + `MedicationReportingService` chart‑review report.
+- PR9 reporting depth — `pharmac_therapeutic_group`/`pharmac_subgroup`/`care_level` cols + observation/usage reports + care‑level filter. ⚠️ Only the *optional* `MedicationTherapeuticGroupSeeder` (starter data prefill) is absent — fields are manually settable; **not a functional gap**.
+- PR10 — **backlog** (inter‑site transfer / nightly encrypted PDF / pill‑pictures): genuinely MISSING, but explicitly deferred/optional per the gap analysis §5 PR10. Out of scope.
+
+**Modal completeness (✅):** the 6 `mar-governance-dialogs.tsx` modals all post to real (shipped) endpoints — Add‑medication (reuses `AddMedicationDialog`), Record‑INR (`…/inr`), Syringe‑driver (`…/syringe-drivers`), Manage‑alerts (`…/attention-alerts`), Verify‑order (`…/medications/{id}/verify|reject`), Chart‑warnings (acknowledge). No gaps. (Minor: Manage‑alerts modal adds only — `toggleMedicationAlertSuppression` exists but has no UI switch; deliberate, low value, logged.)
+
+**§7 INR retirement DONE + incidental bug fix (`feat/emar-mar-completion`):**
+- **Bug found during the audit:** `inrHistory` (`emar.clients.inr.index`, GET) returns **raw JSON** (`response()->json`), but `emar/Index.tsx`'s action‑centre rendered a client‑specific **`review`** item as an Inertia `<Link href="/emar/clients/{id}/inr">` (line 899/268) → clicking it navigated to a JSON endpoint → Inertia "invalid response" error. The real INR/review surface is the **MAR clinical rail** (INR rail + Record‑INR modal; `ClientMedicationTools` already reads `inrRecords` from the page payload, never fetched this endpoint).
+- **Fix:** (a) repointed the `review` deep‑link → `/emar/mar?client_id={id}`; (b) **retired** `inrHistory` — it now `redirect()->route('emar.mar', client_id=…)` (never a 404 / raw‑JSON dump) since it had no UI consumer. Route + name + gate (`medications.view`) kept.
+- **Test:** `test_retired_inr_index_route_redirects_to_mar_chart` (GET inr → redirect to `/emar/mar?client_id=`). `MarChartBoardPayloadTest` green **5/5 (69 assertions)**.
+- **Gates:** pint ✓ · types ✓ · eslint (changed files) ✓ · build ✓ (`2m35s`).
+
+**Net result:** the MAR Charts page's *backend* (PRs 1–10) is complete (audited, not rebuilt); its workflow modals are complete; the standalone INR page is retired to the MAR rail. ⚠️ origin/main advanced past the branch base (`cf1e04ba` → `e23d9f13`) — rebase deferred to final integration (MAR surface is isolated; matches the eMAR redesign's merge‑at‑end pattern).
+
+**Next (Iteration 4):** remaining polish only — the deferred follow‑ups from the MAR resume notes (corrections‑review modal; chart‑warnings auto‑prompt on open via `useEffect`; optional alert‑suppression switch) are small UX niceties; otherwise the page is feature‑complete pending the user's live pixel‑verify vs the prototype (auth‑gated dev server, `.design-drops` absent in this worktree). Consider a rebase onto origin/main before the loop's final summary.

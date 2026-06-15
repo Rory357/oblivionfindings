@@ -2857,11 +2857,15 @@ class EmarController extends Controller
         return redirect()->back()->with('success', 'Medication chart settings updated.');
     }
 
+    /**
+     * Retired endpoint. INR now lives on the MAR clinical rail (Record-INR
+     * modal + disable-not-delete history, served in the page payload), so this
+     * standalone JSON endpoint has no UI consumer. Redirect any direct hit to
+     * the resident's MAR chart rather than dumping raw JSON / 404ing.
+     */
     public function inrHistory(Client $client)
     {
-        return response()->json([
-            'records' => $this->getClientInrRecords($client),
-        ]);
+        return redirect()->route('emar.mar', ['client_id' => $client->id]);
     }
 
     public function storeInr(Request $request, Client $client)

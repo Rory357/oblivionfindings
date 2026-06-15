@@ -265,7 +265,9 @@ function actionHref(it: ActionItem): string {
         case 'cd_balance':
             return '/emar/controlled';
         case 'review':
-            return it.client_id ? `/emar/clients/${it.client_id}/inr` : '/emar/reviews';
+            // The INR / chart-review surface is the resident's MAR clinical rail
+            // (the standalone /emar/clients/{id}/inr endpoint is retired).
+            return it.client_id ? `/emar/mar?client_id=${it.client_id}` : '/emar/reviews';
         case 'complete_review':
             return '/emar/reviews';
         case 'stock':

@@ -190,6 +190,24 @@ class MarChartBoardPayloadTest extends TestCase
             );
     }
 
+    public function test_retired_inr_index_route_redirects_to_mar_chart(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $user = $this->makeRoleUser('admin');
+        $this->grantPermissions($user, ['medications.view']);
+
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+
+        // The standalone INR endpoint is retired — INR lives on the MAR clinical
+        // rail now — so a direct hit redirects to the resident's chart (never a
+        // raw JSON dump or 404).
+        $this->actingAs($user)
+            ->get('/emar/clients/'.$client->id.'/inr')
+            ->assertRedirect('/emar/mar?client_id='.$client->id);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([
