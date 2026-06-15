@@ -1,80 +1,91 @@
 /* eslint-disable no-restricted-syntax -- round cards/list rows are custom-layout
-   bordered panels (progress bar + stat grid + assignee + action) that diverge
-   from Card/CardHeader/CardContent; all colours are semantic tokens. */
+   bordered panels (progress bar + stat grid + assignee + actions + dose expander)
+   that diverge from Card/CardHeader/CardContent; all colours are semantic tokens. */
+import { ClientAvatar } from '@/components/meds/board-bits';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { roundActionLabel, roundStatusMeta, type RoundSummary, type StaffOption } from './types';
-import { Clock, Play, ShieldCheck } from 'lucide-react';
+import { Activity, ArrowRight, Clock, ListChecks, Play, UserRound } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { DoseStatusBadge, RoundStatusBadge } from './round-bits';
+import { roundActionLabel, roundCounts, type RoundCell, type RoundSummary } from './types';
 
 type Props = {
     rounds: RoundSummary[];
     view: 'cards' | 'list';
-    staff: StaffOption[];
-    canManage: boolean;
-    onOpenGuided: (roundId: number) => void;
-    onAssign: (roundId: number, userId: number | null) => void;
+    expanded: Record<number, boolean>;
+    onToggleExpand: (id: number) => void;
+    onOpen: (id: number) => void;
+    onAudit: (round: RoundSummary) => void;
+    onContext: (e: MouseEvent, round: RoundSummary) => void;
 };
-
-const TONE_BADGE: Record<string, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    info: 'bg-status-info-bg text-status-info',
-    warning: 'bg-status-warning-bg text-status-warning',
-    neutral: 'bg-muted text-muted-foreground',
-};
-
-function recorded(r: RoundSummary): number {
-    return r.given + r.refused + r.withheld + r.missed;
-}
-function dueCount(r: RoundSummary): number {
-    return Math.max(0, r.total_medications - recorded(r));
-}
-function percent(r: RoundSummary): number {
-    return r.total_medications ? Math.round((recorded(r) / r.total_medications) * 100) : 0;
-}
-
-function StatusBadge({ status }: { status: string }) {
-    const meta = roundStatusMeta(status);
-    return (
-        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE_BADGE[meta.tone])}>{meta.label}</span>
-    );
-}
 
 function MiniStat({ label, value, tone }: { label: string; value: number; tone: string }) {
     return (
         <div className="rounded-lg border bg-background px-2 py-1.5 text-center">
-            <div className={cn('text-sm font-bold', tone)}>{value}</div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+            <div className={cn('text-[17px] font-bold leading-tight', tone)}>{value}</div>
+            <div className="text-[10px] tracking-wide text-muted-foreground uppercase">{label}</div>
         </div>
     );
 }
 
-function AssigneeSelect({ round, staff, onAssign }: { round: RoundSummary; staff: StaffOption[]; onAssign: Props['onAssign'] }) {
+function primaryMeta(status: string) {
+    if (status === 'completed') return { variant: 'outline' as const, Icon: ListChecks };
+    if (status === 'in_progress' || status === 'partial') return { variant: 'default' as const, Icon: Play };
+    return { variant: 'default' as const, Icon: ArrowRight };
+}
+
+function Assignee({ name }: { name: string | null }) {
+    if (!name) {
+        return (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <UserRound className="h-3.5 w-3.5" />
+                </span>
+                Unassigned
+            </span>
+        );
+    }
+    const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
     return (
-        <Select
-            value={round.assigned_to ? String(round.assigned_to) : 'none'}
-            onValueChange={(v) => onAssign(round.id, v === 'none' ? null : Number(v))}
-        >
-            <SelectTrigger className="h-8 w-full text-xs">
-                <SelectValue placeholder="Unassigned" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {staff.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">{initials}</span>
+            {name}
+        </span>
     );
 }
 
-export default function RoundBoard({ rounds, view, staff, canManage, onOpenGuided, onAssign }: Props) {
+function medLine(c: RoundCell): string {
+    return [`${c.medication_name}${c.dose ? ` ${c.dose}` : ''}`, c.route, c.is_controlled ? 'CD' : null, c.is_high_risk ? 'high-risk' : null]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+function DoseList({ cells }: { cells: RoundCell[] }) {
+    return (
+        <div className="border-t bg-background p-2">
+            {cells.length === 0 ? (
+                <div className="px-2 py-3 text-center text-xs text-muted-foreground">No scheduled doses in this round.</div>
+            ) : (
+                cells.map((c) => (
+                    <div key={`${c.medication_id}-${c.scheduled_for}`} className="flex items-center gap-2.5 rounded-lg px-2 py-2">
+                        <ClientAvatar name={c.resident_name} clientId={c.resident_id} className="h-7 w-7 text-[10px]" />
+                        <div className="min-w-0 flex-1">
+                            <div className="truncate text-[12.5px] font-semibold">{c.resident_name}</div>
+                            <div className="truncate text-[11px] text-muted-foreground">{medLine(c)}</div>
+                        </div>
+                        <DoseStatusBadge status={c.status} />
+                    </div>
+                ))
+            )}
+        </div>
+    );
+}
+
+export default function RoundBoard({ rounds, view, expanded, onToggleExpand, onOpen, onAudit, onContext }: Props) {
     if (rounds.length === 0) {
         return (
             <div className="rounded-2xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">
-                No rounds for this day. Use <span className="font-medium text-foreground">Generate rounds</span> to create them from your templates.
+                No rounds match the current filters. Use <span className="font-medium text-foreground">Generate rounds</span> to create them from your templates.
             </div>
         );
     }
@@ -85,48 +96,60 @@ export default function RoundBoard({ rounds, view, staff, canManage, onOpenGuide
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <tr className="border-b bg-muted text-left text-[11px] tracking-wide text-muted-foreground uppercase">
                                 <th className="px-4 py-2.5">Round</th>
                                 <th className="px-4 py-2.5">Time</th>
                                 <th className="px-4 py-2.5">Status</th>
                                 <th className="px-4 py-2.5">Progress</th>
                                 <th className="px-4 py-2.5">Given / R+H / Due</th>
                                 <th className="px-4 py-2.5">Assignee</th>
-                                <th className="px-4 py-2.5"></th>
+                                <th className="px-4 py-2.5 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {rounds.map((r) => (
-                                <tr key={r.id} className="border-b last:border-b-0">
-                                    <td className="px-4 py-3 font-medium">{r.name}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">
-                                        {r.scheduled_time} · ±{r.window_minutes}m
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <StatusBadge status={r.status} />
-                                    </td>
-                                    <td className="px-4 py-3 text-muted-foreground">{percent(r)}%</td>
-                                    <td className="px-4 py-3 text-muted-foreground">
-                                        <span className="text-status-success">{r.given}</span> /{' '}
-                                        <span className="text-status-warning">{r.refused + r.withheld}</span> /{' '}
-                                        <span className="text-status-critical">{dueCount(r)}</span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {canManage ? (
-                                            <div className="w-40">
-                                                <AssigneeSelect round={r} staff={staff} onAssign={onAssign} />
+                            {rounds.map((r) => {
+                                const counts = roundCounts(r.cells);
+                                const { variant } = primaryMeta(r.status);
+                                return (
+                                    <tr key={r.id} onContextMenu={(e) => onContext(e, r)} className="border-b last:border-b-0">
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium">{r.name}</div>
+                                            <div className="text-[11px] text-muted-foreground">{r.site_name ?? 'All sites'}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">{r.scheduled_time}</td>
+                                        <td className="px-4 py-3">
+                                            <RoundStatusBadge status={r.status} />
+                                        </td>
+                                        <td className="min-w-[150px] px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className={cn('h-full rounded-full', r.status === 'completed' ? 'bg-status-success' : 'bg-primary')}
+                                                        style={{ width: `${counts.pct}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[11px] text-muted-foreground tabular-nums">{counts.pct}%</span>
                                             </div>
-                                        ) : (
-                                            <span className="text-muted-foreground">{r.assignee ?? 'Unassigned'}</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <Button size="sm" variant="outline" onClick={() => onOpenGuided(r.id)}>
-                                            {roundActionLabel(r.status)}
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <span className="font-semibold text-status-success">{counts.given}</span> /{' '}
+                                            <span className="font-semibold text-status-warning">{counts.refused + counts.held}</span> /{' '}
+                                            <span className="font-semibold text-status-critical">{counts.due + counts.missed}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">{r.assignee ?? 'Unassigned'}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="inline-flex items-center justify-end gap-1.5">
+                                                <Button size="sm" variant={variant} onClick={() => onOpen(r.id)}>
+                                                    {roundActionLabel(r.status)}
+                                                </Button>
+                                                <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => onAudit(r)} aria-label="Audit and timeline">
+                                                    <Activity className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -136,53 +159,68 @@ export default function RoundBoard({ rounds, view, staff, canManage, onOpenGuide
 
     return (
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
-            {rounds.map((r) => (
-                <div key={r.id} className="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-2">
-                        <div>
-                            <div className="text-[15px] font-bold leading-tight">{r.name}</div>
-                            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                <Clock className="h-3.5 w-3.5" />
-                                {r.scheduled_time} · ±{r.window_minutes} min
+            {rounds.map((r) => {
+                const counts = roundCounts(r.cells);
+                const { variant, Icon } = primaryMeta(r.status);
+                const isOpen = !!expanded[r.id];
+                return (
+                    <div key={r.id} onContextMenu={(e) => onContext(e, r)} className="flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        <div className="p-4">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="text-[15.5px] leading-tight font-bold">{r.name}</div>
+                                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        {r.scheduled_time} · ±{r.window_minutes} min
+                                    </div>
+                                </div>
+                                <RoundStatusBadge status={r.status} />
+                            </div>
+
+                            <div className="mt-3">
+                                <div className="mb-1 flex items-center justify-between text-[11.5px] text-muted-foreground">
+                                    <span>
+                                        {counts.recorded} of {counts.total} recorded
+                                    </span>
+                                    <span className="font-semibold text-foreground">{counts.pct}%</span>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className={cn('h-full rounded-full', r.status === 'completed' ? 'bg-status-success' : 'bg-primary')}
+                                        style={{ width: `${counts.pct}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-3.5 grid grid-cols-4 gap-1.5">
+                                <MiniStat label="Given" value={counts.given} tone="text-status-success" />
+                                <MiniStat label="Refused" value={counts.refused} tone="text-status-warning" />
+                                <MiniStat label="Held" value={counts.held} tone="text-status-warning" />
+                                <MiniStat label="Due/Missed" value={counts.due + counts.missed} tone="text-status-critical" />
+                            </div>
+
+                            <div className="mt-3">
+                                <Assignee name={r.assignee} />
                             </div>
                         </div>
-                        <StatusBadge status={r.status} />
-                    </div>
 
-                    <div>
-                        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>
-                                {recorded(r)}/{r.total_medications} recorded
-                            </span>
-                            <span>{percent(r)}%</span>
+                        <div className="mt-auto flex items-center gap-2 border-t p-3">
+                            <Button variant={variant} onClick={() => onOpen(r.id)}>
+                                <Icon className="h-4 w-4" />
+                                {roundActionLabel(r.status)}
+                            </Button>
+                            <Button variant="outline" onClick={() => onToggleExpand(r.id)}>
+                                {isOpen ? 'Hide doses' : `View doses (${counts.total})`}
+                            </Button>
+                            <Button size="icon" variant="outline" className="ml-auto" onClick={() => onAudit(r)} aria-label="Audit and timeline">
+                                <Activity className="h-4 w-4" />
+                            </Button>
                         </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-primary" style={{ width: `${percent(r)}%` }} />
-                        </div>
+
+                        {isOpen ? <DoseList cells={r.cells} /> : null}
                     </div>
-
-                    <div className="grid grid-cols-4 gap-1.5">
-                        <MiniStat label="Given" value={r.given} tone="text-status-success" />
-                        <MiniStat label="Refused" value={r.refused} tone="text-status-warning" />
-                        <MiniStat label="Held" value={r.withheld} tone="text-status-warning" />
-                        <MiniStat label="Due" value={dueCount(r)} tone="text-status-critical" />
-                    </div>
-
-                    {canManage ? (
-                        <AssigneeSelect round={r} staff={staff} onAssign={onAssign} />
-                    ) : (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            {r.assignee ?? 'Unassigned'}
-                        </div>
-                    )}
-
-                    <Button className="mt-auto w-full" onClick={() => onOpenGuided(r.id)}>
-                        <Play className="h-4 w-4" />
-                        {roundActionLabel(r.status)}
-                    </Button>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }

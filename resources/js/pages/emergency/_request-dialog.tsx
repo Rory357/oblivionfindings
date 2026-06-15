@@ -115,13 +115,13 @@ export function RequestAccessDialog({
                     <StepHead icon={Search} title="Who needs care?" blurb="Search by name. Only minimal identity is shown until access is granted." />
                     <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3">
                         <Search className="h-4 w-4 text-muted-foreground" />
-                        <input value={search} onChange={(e) => doSearch(e.target.value)} placeholder="Search client by name (min 2 characters)…" className="h-10 flex-1 bg-transparent text-sm outline-none" />
+                        <input aria-label="Search client by name" value={search} onChange={(e) => doSearch(e.target.value)} placeholder="Search client by name (min 2 characters)…" className="h-10 flex-1 bg-transparent text-sm outline-none" />
                     </div>
                     <div className="mt-3 flex flex-col gap-1.5">
                         {search.trim().length < 2 ? <p className="text-sm text-muted-foreground">Type at least two characters to search.</p> : results.length === 0 ? <p className="text-sm text-muted-foreground">No matching residents.</p> : results.map((c) => {
                             const selected = client?.id === c.id;
                             return (
-                                <button key={c.id} type="button" onClick={() => setClient(c)} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
+                                <button key={c.id} type="button" aria-pressed={selected} onClick={() => setClient(c)} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
                                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{`${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()}</span>
                                     <div className="flex-1"><div className="text-sm font-medium">{c.first_name} {c.last_name}</div><div className="text-xs text-muted-foreground">{[c.date_of_birth, c.site?.name].filter(Boolean).join(' · ')}</div></div>
                                     {selected && <Check className="h-4 w-4 text-primary" />}
@@ -136,7 +136,7 @@ export function RequestAccessDialog({
                     <StepHead icon={ShieldCheck} title="Why is access needed?" blurb="A structured reason is required — it is recorded in the audit log and shown to reviewers." />
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {REASON_CATEGORIES.map((c) => (
-                            <button key={c.value} type="button" onClick={() => setCategory(c.value)} className={`rounded-xl border-2 p-3 text-left ${category === c.value ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                            <button key={c.value} type="button" aria-pressed={category === c.value} onClick={() => setCategory(c.value)} className={`rounded-xl border-2 p-3 text-left ${category === c.value ? 'border-primary bg-primary/5' : 'border-border'}`}>
                                 <div className="text-sm font-semibold">{c.value}</div>
                                 <div className="text-xs text-muted-foreground">{c.detail}</div>
                             </button>
@@ -149,7 +149,7 @@ export function RequestAccessDialog({
                         <div className="mb-1.5 text-sm font-medium">Duration</div>
                         <div className="flex flex-wrap gap-2">
                             {DURATIONS.map((d) => (
-                                <button key={d} type="button" onClick={() => setDuration(d)} className={`rounded-full px-3 py-1 text-xs font-medium ${duration === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}>{fmtDur(d)}</button>
+                                <button key={d} type="button" aria-pressed={duration === d} onClick={() => setDuration(d)} className={`rounded-full px-3 py-1 text-xs font-medium ${duration === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}>{fmtDur(d)}</button>
                             ))}
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">Access expires automatically at the end of this window. Max {DURATIONS[DURATIONS.length - 1] / 60} hours.</div>
@@ -160,11 +160,11 @@ export function RequestAccessDialog({
                 <>
                     <StepHead icon={Fingerprint} title="Authorise the access" blurb="Record who is accountable. Co-sign names a second approver, or self-authorise as an RN or above." />
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                        <button type="button" onClick={() => setAuthMode('co_sign')} className={`rounded-xl border-2 p-3.5 text-left ${authMode === 'co_sign' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                        <button type="button" aria-pressed={authMode === 'co_sign'} onClick={() => setAuthMode('co_sign')} className={`rounded-xl border-2 p-3.5 text-left ${authMode === 'co_sign' ? 'border-primary bg-primary/5' : 'border-border'}`}>
                             <div className="flex items-center gap-2 text-sm font-semibold"><Users className="h-4 w-4" />Co-sign (dual auth)</div>
                             <div className="mt-1 text-xs text-muted-foreground">A second authorised staff member is recorded as approver.</div>
                         </button>
-                        <button type="button" onClick={() => setAuthMode('self')} className={`rounded-xl border-2 p-3.5 text-left ${authMode === 'self' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                        <button type="button" aria-pressed={authMode === 'self'} onClick={() => setAuthMode('self')} className={`rounded-xl border-2 p-3.5 text-left ${authMode === 'self' ? 'border-primary bg-primary/5' : 'border-border'}`}>
                             <div className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4" />Self-authorise (RN+)</div>
                             <div className="mt-1 text-xs text-muted-foreground">Permitted for senior clinicians. Logged against you alone.</div>
                         </button>
@@ -177,7 +177,7 @@ export function RequestAccessDialog({
                                     {approvers.map((a) => {
                                         const selected = approver === a.id;
                                         return (
-                                            <button key={a.id} type="button" onClick={() => setApprover(a.id)} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
+                                            <button key={a.id} type="button" aria-pressed={selected} onClick={() => setApprover(a.id)} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left ${selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
                                                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{a.name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()}</span>
                                                 <div className="flex-1"><div className="text-sm font-medium">{a.name}</div>{a.role && <div className="text-xs capitalize text-muted-foreground">{a.role.replace(/_/g, ' ')}</div>}</div>
                                                 {selected && <Check className="h-4 w-4 text-primary" />}

@@ -6,6 +6,7 @@ use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientIncident;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ class EmergencyAccessController extends Controller
         $auditLog = ClientBreakGlassAccess::withTrashed()
             ->tap($orgScope)
             ->tap($bySite)
-            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name'])
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name', 'accessEvents'])
             ->orderByDesc('created_at')
             ->limit(150)
             ->get()
@@ -112,6 +113,12 @@ class EmergencyAccessController extends Controller
                 'revoked_by' => $a->revokedBy?->name,
                 'review_outcome' => $a->review_outcome,
                 'reviewed_by' => $a->reviewedBy?->name,
+                'incident_report_id' => $a->incident_report_id,
+                'events' => $a->accessEvents->sortBy('created_at')->values()->map(fn ($e) => [
+                    'action' => $e->action,
+                    'detail' => $e->detail,
+                    'at' => $e->created_at?->toIso8601String(),
+                ])->all(),
             ])
             ->values();
 
@@ -190,6 +197,18 @@ class EmergencyAccessController extends Controller
             }
         }
 
+        // Incidents for the audit-log clients, for the review modal's link picker.
+        $incidentsByClient = ClientIncident::query()
+            ->whereIn('client_id', $auditLog->pluck('client_id')->unique()->values())
+            ->orderByDesc('occurred_at')
+            ->get(['id', 'client_id', 'type', 'title', 'occurred_at'])
+            ->groupBy('client_id')
+            ->map(fn ($g) => $g->map(fn ($i) => [
+                'id' => $i->id,
+                'label' => $i->title ?: ucfirst((string) $i->type),
+                'date' => $i->occurred_at?->toDateString(),
+            ])->values());
+
         return inertia('emergency/access', [
             'query' => $q,
             'results' => $results,
@@ -218,6 +237,7 @@ class EmergencyAccessController extends Controller
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
             'request_client' => $requestClient,
+            'incidents_by_client' => $incidentsByClient,
         ]);
     }
 }

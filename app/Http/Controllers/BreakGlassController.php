@@ -108,7 +108,8 @@ class BreakGlassController extends Controller
         $data = $request->validate([
             'review_outcome' => ['required', Rule::in(['justified', 'not_justified'])],
             'review_notes' => ['nullable', 'string', 'max:2000'],
-            'incident_report_linked' => ['nullable', 'boolean'],
+            // The linked incident must belong to this access's client.
+            'incident_report_id' => ['nullable', 'integer', Rule::exists('client_incidents', 'id')->where('client_id', $record->client_id)],
         ]);
 
         $record->forceFill([
@@ -116,7 +117,8 @@ class BreakGlassController extends Controller
             'reviewed_by' => $user->id,
             'review_outcome' => $data['review_outcome'],
             'review_notes' => $data['review_notes'] ?? null,
-            'incident_report_linked' => (bool) ($data['incident_report_linked'] ?? false),
+            'incident_report_id' => $data['incident_report_id'] ?? null,
+            'incident_report_linked' => ! empty($data['incident_report_id']),
         ])->save();
 
         return back()->with('success', 'Break-glass review saved.');
