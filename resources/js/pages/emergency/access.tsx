@@ -10,12 +10,13 @@ import { ReviewDialog, type ReviewRecord } from '@/pages/emergency/_review-dialo
 import { Head, router } from '@inertiajs/react';
 import { Ban, Building2, Clock, Download, FileText, Fingerprint, History, MapPin, Pill, Plus, ShieldAlert, ShieldCheck, SlidersHorizontal, TriangleAlert, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 type ActiveAccess = { id: number; client_id: number; client_name: string; site_name: string | null; reason: string; reason_category: string | null; cosign_label: string | null; granted_by: string | null; created_at: string | null; expires_at: string | null; can_revoke: boolean };
 type AuditRow = { id: number; client_id: number; staff: string; client_name: string; site_name: string | null; reason: string; reason_category: string | null; minutes: number | null; created_at: string | null; expires_at: string | null; status: string; revoked_by: string | null; review_outcome: string | null; reviewed_by: string | null };
-type Flagged = { type: string; severity: string; title: string; detail: string };
+type Flagged = { type: string; key: string; severity: string; title: string; detail: string };
 type Policy = { default_minutes: number; max_minutes: number; extend_minutes: number; auto_revoke: boolean; reason_required: boolean; repeat_threshold_count: number; repeat_window_days: number };
 type Stats = { active: number; granted_week: number; awaiting_review: number; flagged: number };
 
@@ -62,6 +63,8 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
     const alreadyGrantedForRequest = requestClient ? activeAccesses.some((a) => a.client_id === requestClient.id) : false;
     const [wizardOpen, setWizardOpen] = useState(() => !!requestClient && !alreadyGrantedForRequest);
     const [reviewRecord, setReviewRecord] = useState<ReviewRecord | null>(null);
+    const [dismissTarget, setDismissTarget] = useState<Flagged | null>(null);
+    const [dismissReason, setDismissReason] = useState('');
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -70,6 +73,14 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
     const onSearch = (q: string) => router.get('/emar/emergency-access', { q, ...(siteFilter ? { site_id: siteFilter } : {}) }, { only: ['results', 'query'], preserveState: true, preserveScroll: true });
     const revoke = (a: ActiveAccess) => { if (confirm(`Revoke ${a.client_name}'s break-glass access?`)) router.delete(`/emar/clients/${a.client_id}/break-glass/${a.id}`, { preserveScroll: true }); };
     const extend = (a: ActiveAccess) => router.post(`/emar/clients/${a.client_id}/break-glass/${a.id}/extend`, {}, { preserveScroll: true });
+    const submitDismiss = () => {
+        if (!dismissTarget) return;
+        router.post('/emar/break-glass-flags/dismiss', { type: dismissTarget.type, key: dismissTarget.key, reason: dismissReason || null }, {
+            preserveScroll: true,
+            onSuccess: () => { toast.success('Signal acknowledged'); setDismissTarget(null); setDismissReason(''); },
+            onError: () => toast.error('Could not acknowledge signal'),
+        });
+    };
 
     const TABS: RosterTabItem[] = [
         { id: 'active', label: 'Active access', icon: ShieldAlert, tone: 'primary', badge: activeAccesses.length || undefined },
@@ -239,7 +250,10 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${crit ? 'bg-status-critical-bg text-status-critical' : 'bg-status-warning-bg text-status-warning'}`}>{f.severity}</span>
                                             </div>
                                             <p className="mt-1 text-sm text-muted-foreground">{f.detail}</p>
-                                            <div className="mt-3"><Button size="sm" variant="outline" onClick={() => setTab('audit')}>Review in audit log</Button></div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => setTab('audit')}>Review in audit log</Button>
+                                                {canReview && <Button size="sm" variant="ghost" onClick={() => setDismissTarget(f)}>Acknowledge</Button>}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -253,6 +267,26 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
 
             {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} prefillClient={requestClient} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
             {reviewRecord && <ReviewDialog record={reviewRecord} onClose={() => setReviewRecord(null)} />}
+            <Dialog open={!!dismissTarget} onOpenChange={(o) => { if (!o) { setDismissTarget(null); setDismissReason(''); } }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Acknowledge signal</DialogTitle>
+                        <DialogDescription>{dismissTarget?.detail}</DialogDescription>
+                    </DialogHeader>
+                    <textarea
+                        value={dismissReason}
+                        onChange={(e) => setDismissReason(e.target.value)}
+                        rows={3}
+                        placeholder="Why is this acceptable? (optional — recorded against the acknowledgement)"
+                        className="w-full rounded-lg border border-input bg-background p-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <p className="text-xs text-muted-foreground">This hides the signal until newer break-glass activity appears.</p>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => { setDismissTarget(null); setDismissReason(''); }}>Cancel</Button>
+                        <Button onClick={submitDismiss}>Acknowledge &amp; resolve</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

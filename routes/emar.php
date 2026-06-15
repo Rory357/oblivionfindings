@@ -295,6 +295,11 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::put('/break-glass-policy', [BreakGlassController::class, 'updatePolicy'])
         ->name('emar.break_glass.policy.update');
 
+    // Acknowledge / dismiss a derived misuse signal (re-surfaces on new activity).
+    Route::post('/break-glass-flags/dismiss', [BreakGlassController::class, 'dismissFlag'])
+        ->middleware('permission:medications.audit.view')
+        ->name('emar.break_glass.flag.dismiss');
+
     // Correction approval workflow
     Route::post('/corrections/{correction}/approve', [MedicationAdministrationCorrectionController::class, 'approve'])
         ->middleware('permission:medications.administer.correct')

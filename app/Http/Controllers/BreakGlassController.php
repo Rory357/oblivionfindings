@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -151,6 +152,27 @@ class BreakGlassController extends Controller
     private function canEditPolicy(User $user): bool
     {
         return $user->hasRole('admin', 'provider_manager');
+    }
+
+    public function dismissFlag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('medications.audit.view'), 403);
+
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['repeat', 'awaiting_review'])],
+            'key' => ['required', 'string', 'max:100'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        // One acknowledgement per (org, type, key); dismissed_through advances on re-ack
+        // so the signal re-surfaces only when newer activity appears.
+        BreakGlassFlagDismissal::updateOrCreate(
+            ['organization_id' => $user->organization_id, 'signal_type' => $data['type'], 'signal_key' => $data['key']],
+            ['dismissed_by' => $user->id, 'reason' => $data['reason'] ?? null, 'dismissed_through' => now()],
+        );
+
+        return back()->with('success', 'Signal acknowledged.');
     }
 
     public function destroy(Request $request, Client $client, ClientBreakGlassAccess $access)
