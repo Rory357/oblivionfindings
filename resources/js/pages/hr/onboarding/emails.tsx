@@ -1,3 +1,4 @@
+import { OnboardingTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -293,12 +294,12 @@ export default function OnboardingEmails({
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/onboarding"
                         title="Onboarding Email Templates"
                         description="Configure and preview the automated emails sent during onboarding."
                     />
                 }
             >
+                <OnboardingTabs active="emails" />
                 {/* Tab Navigation */}
                 <div className="flex gap-1 border-b">
                     {tabs
