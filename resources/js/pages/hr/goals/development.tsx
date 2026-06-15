@@ -168,7 +168,7 @@ export default function DevelopmentGoals({
                     ]}
                 />
 
-                <PerformanceTabs active="goals" />
+                <PerformanceTabs active="development" />
 
                 <div className="flex items-center gap-2">
                     <Label>Status</Label>
@@ -618,6 +618,31 @@ export default function DevelopmentGoals({
                                             }}
                                         />
                                     </div>
+                                </div>
+
+                                <div className="mt-3 space-y-1">
+                                    <Label className="text-xs text-muted-foreground">
+                                        Review notes
+                                    </Label>
+                                    <Textarea
+                                        rows={2}
+                                        defaultValue={goal.review_notes ?? ''}
+                                        placeholder="Coaching notes from the latest review…"
+                                        onBlur={(event) => {
+                                            if (
+                                                (event.target.value ?? '') ===
+                                                (goal.review_notes ?? '')
+                                            )
+                                                return;
+                                            updateGoal(goal.id, {
+                                                status: goal.status,
+                                                progress_percent:
+                                                    goal.progress_percent,
+                                                current_level: goal.current_level,
+                                                review_notes: event.target.value,
+                                            });
+                                        }}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>

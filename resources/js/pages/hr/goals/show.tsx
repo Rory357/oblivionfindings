@@ -240,6 +240,7 @@ export default function GoalShow({
     can,
 }: Props) {
     const [editOpen, setEditOpen] = useState(false);
+    const [addChildOpen, setAddChildOpen] = useState(false);
     const [showKrForm, setShowKrForm] = useState(false);
     const [editingKrId, setEditingKrId] = useState<number | null>(null);
     const [krUpdateValue, setKrUpdateValue] = useState('');
@@ -394,7 +395,7 @@ export default function GoalShow({
                     return (
                         <PageHero category="hr"
                             icon={Target}
-                            backHref="/hr/goals/development"
+                            backHref="/hr/goals"
                             title={goal.title}
                             description={goal.description ?? undefined}
                             meta={heroMeta}
@@ -840,13 +841,12 @@ export default function GoalShow({
                         <div className="space-y-4">
                             {can.manage && (
                                 <div className="flex justify-end">
-                                    <Button size="sm" asChild>
-                                        <Link
-                                            href={`/hr/goals/create?parent_id=${goal.id}`}
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Child Goal
-                                        </Link>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setAddChildOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Child Goal
                                     </Button>
                                 </div>
                             )}
@@ -946,14 +946,12 @@ export default function GoalShow({
                                             <Button
                                                 size="sm"
                                                 className="mt-3"
-                                                asChild
+                                                onClick={() =>
+                                                    setAddChildOpen(true)
+                                                }
                                             >
-                                                <Link
-                                                    href={`/hr/goals/create?parent_id=${goal.id}`}
-                                                >
-                                                    <Plus className="mr-1.5 h-4 w-4" />
-                                                    Add First Child Goal
-                                                </Link>
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                Add First Child Goal
                                             </Button>
                                         )}
                                     </CardContent>
@@ -1252,6 +1250,7 @@ export default function GoalShow({
                         title: goal.title,
                         description: goal.description,
                         goal_type: goal.goal_type,
+                        category: goal.category,
                         priority: goal.priority,
                         parent_goal_id: goal.parent_goal_id,
                         target_value: goal.target_value,
@@ -1259,6 +1258,18 @@ export default function GoalShow({
                         start_date: goal.start_date,
                         due_date: goal.due_date,
                     }}
+                />
+            )}
+
+            {can.manage && (
+                <GoalDialog
+                    open={addChildOpen}
+                    onClose={() => setAddChildOpen(false)}
+                    owners={users}
+                    goalTypes={goalTypes}
+                    priorities={priorities}
+                    parentGoals={parentGoals}
+                    prefillParentId={goal.id}
                 />
             )}
         </AppLayout>
