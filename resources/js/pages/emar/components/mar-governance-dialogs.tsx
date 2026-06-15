@@ -20,6 +20,7 @@ type Props = {
     attentionAlerts: AttentionAlert[];
     awaitingVerification: AwaitingOrder[];
     witnesses: WitnessOption[];
+    suppression: { suppressed: boolean; reason: string | null };
 };
 
 function FooterRow({ onCancel, submitLabel, processing, onBack }: { onCancel: () => void; submitLabel: string; processing: boolean; onBack?: () => void }) {
@@ -41,13 +42,13 @@ function FooterRow({ onCancel, submitLabel, processing, onBack }: { onCancel: ()
     );
 }
 
-export default function MarGovernanceDialogs({ modal, onClose, clientId, attentionAlerts, awaitingVerification, witnesses }: Props) {
+export default function MarGovernanceDialogs({ modal, onClose, clientId, attentionAlerts, awaitingVerification, witnesses, suppression }: Props) {
     return (
         <>
             {modal === 'addMed' && <AddMedicationDialog clientId={clientId} onClose={onClose} />}
             {modal === 'inr' && <RecordInrDialog clientId={clientId} onClose={onClose} />}
             {modal === 'syringe' && <SyringeDriverDialog clientId={clientId} witnesses={witnesses} onClose={onClose} />}
-            {modal === 'alerts' && <ManageAlertsDialog clientId={clientId} onClose={onClose} />}
+            {modal === 'alerts' && <ManageAlertsDialog clientId={clientId} suppression={suppression} onClose={onClose} />}
             {modal === 'verify' && <VerifyOrderDialog orders={awaitingVerification} onClose={onClose} />}
             {modal === 'warnings' && <WarningsDialog alerts={attentionAlerts} onClose={onClose} />}
         </>
@@ -211,12 +212,20 @@ function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: numbe
 }
 
 // ── Manage attention alerts ────────────────────────────────────────────────
-function ManageAlertsDialog({ clientId, onClose }: { clientId: number; onClose: () => void }) {
+function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: number; suppression: { suppressed: boolean; reason: string | null }; onClose: () => void }) {
     const form = useForm({ type: 'warfarin', title: '', detail: '', prompt_on_open: true });
+    const suppressForm = useForm({
+        suppress_med_admin_alerts: suppression.suppressed,
+        reason: suppression.reason ?? '',
+    });
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post(`/emar/clients/${clientId}/attention-alerts`, { preserveScroll: true, onSuccess: onClose });
+    };
+
+    const saveSuppression = () => {
+        suppressForm.post(`/emar/clients/${clientId}/alert-suppression`, { preserveScroll: true, onSuccess: onClose });
     };
 
     return (
@@ -237,6 +246,41 @@ function ManageAlertsDialog({ clientId, onClose }: { clientId: number; onClose: 
                 </form>
             }
         >
+            {/* Med-admin alert suppression (1CHART "Disable Med Admin Alerts") — a
+                per-resident, audited setting; suppressing requires a reason. */}
+            <div className="mb-4 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <div className="text-sm font-semibold">Medication-admin alerts</div>
+                        <div className="text-xs text-muted-foreground">Suppress med-due reminders for this resident. Audited.</div>
+                    </div>
+                    <Segmented
+                        value={suppressForm.data.suppress_med_admin_alerts ? 'suppressed' : 'active'}
+                        onChange={(v) => suppressForm.setData('suppress_med_admin_alerts', v === 'suppressed')}
+                        options={[
+                            { value: 'active', label: 'Active' },
+                            { value: 'suppressed', label: 'Suppressed' },
+                        ]}
+                    />
+                </div>
+                {suppressForm.data.suppress_med_admin_alerts && (
+                    <div className="mt-3">
+                        <Field label="Reason" required error={suppressForm.errors.reason}>
+                            <Input
+                                value={suppressForm.data.reason}
+                                onChange={(e) => suppressForm.setData('reason', e.target.value)}
+                                placeholder="Why are med-admin alerts being suppressed?"
+                            />
+                        </Field>
+                    </div>
+                )}
+                <div className="mt-3 flex justify-end">
+                    <Button type="button" variant="outline" size="sm" disabled={suppressForm.processing} onClick={saveSuppression}>
+                        Save setting
+                    </Button>
+                </div>
+            </div>
+
             <form onSubmit={submit}>
                 <StepHead icon={AlertTriangle} title="Chart alert" blurb="Prompt-on-open alerts must be acknowledged before recording." />
                 <Field label="Alert type" span>

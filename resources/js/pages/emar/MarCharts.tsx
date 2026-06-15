@@ -14,7 +14,7 @@ import type { ClientInfo, NotGivenReasonOption, PrnMedication, ScheduleRow, Witn
 import MarGovernanceDialogs, { type MarModal } from '@/pages/emar/components/mar-governance-dialogs';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, FileDown, HeartPulse, Home, Pill, Plus, Shield, User } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Client = { id: number; first_name: string; last_name: string };
 
@@ -46,7 +46,12 @@ type MarData = {
     }>;
     syringe_drivers?: Array<{ id: number; status: string; rate?: string | null; rate_unit?: string | null; site_of_insertion?: string | null }>;
     awaiting_verification?: Array<{ id: number; name: string; dosage: string }>;
-    settings?: { care_level?: string | null; next_chart_review_date?: string | null };
+    settings?: {
+        care_level?: string | null;
+        next_chart_review_date?: string | null;
+        suppress_med_admin_alerts?: boolean;
+        med_alerts_suppressed_reason?: string | null;
+    };
 };
 
 type Props = {
@@ -131,6 +136,20 @@ export default function MarCharts(props: Props) {
         if (!clientId) return;
         router.get('/emar/mar', { client_id: clientId, date }, { preserveState: true });
     };
+
+    // Chart-warnings prompt-on-open (1CHART "prompt when viewing patient"): when
+    // the resident has enabled attention alerts flagged prompt_on_open, surface
+    // the warnings dialog automatically — once per chart open per session (keyed
+    // by client + date so revisiting the same chart doesn't nag).
+    const infoId = info?.id ?? null;
+    const promptOnOpenCount = (marData.attention_alerts ?? []).filter((a) => a.prompt_on_open).length;
+    useEffect(() => {
+        if (infoId === null || promptOnOpenCount === 0) return;
+        const key = `emar.mar.warned.${infoId}.${date}`;
+        if (sessionStorage.getItem(key)) return;
+        sessionStorage.setItem(key, '1');
+        setModal('warnings');
+    }, [infoId, date, promptOnOpenCount]);
 
     // Build the grid medication rows (rich metadata) keyed to the flat schedule.
     // `marData` is an empty array (not an object) when no resident is selected,
@@ -472,6 +491,10 @@ export default function MarCharts(props: Props) {
                 attentionAlerts={marData.attention_alerts ?? []}
                 awaitingVerification={marData.awaiting_verification ?? []}
                 witnesses={witnesses}
+                suppression={{
+                    suppressed: marData.settings?.suppress_med_admin_alerts ?? false,
+                    reason: marData.settings?.med_alerts_suppressed_reason ?? null,
+                }}
             />
         </AppLayout>
     );
