@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReportsTabs } from '@/components/hr';
+import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -71,8 +71,8 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Reports', href: '/hr/reports' },
-    { title: 'Automations', href: '/hr/reports/automations' },
+    { title: 'Settings', href: '/hr/settings/webhooks' },
+    { title: 'Automations', href: '/hr/settings/automations' },
 ];
 
 const statusClass: Record<string, string> = {
@@ -197,7 +197,7 @@ export default function HrAutomationsPage({
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         if (editingRuleId) {
-            put(`/hr/reports/automations/${editingRuleId}`, {
+            put(`/hr/settings/automations/${editingRuleId}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setEditingRuleId(null);
@@ -232,7 +232,7 @@ export default function HrAutomationsPage({
             return;
         }
 
-        post('/hr/reports/automations', {
+        post('/hr/settings/automations', {
             preserveScroll: true,
             onSuccess: () => {
                 reset();
@@ -264,7 +264,7 @@ export default function HrAutomationsPage({
 
     const toggleRule = (id: number) => {
         router.post(
-            `/hr/reports/automations/${id}/toggle-active`,
+            `/hr/settings/automations/${id}/toggle-active`,
             {},
             { preserveScroll: true },
         );
@@ -298,28 +298,10 @@ export default function HrAutomationsPage({
                             { label: 'Rules', value: rules.length },
                             { label: 'Active', value: rules.filter((r) => r.is_active).length },
                         ]}
-                        actions={
-                            <>
-                                <Button
-                                    variant="outline"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/hr/reports/webhooks">Webhooks</Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/hr/reports">Back to Reports</Link>
-                                </Button>
-                            </>
-                        }
                     />
                 }
             >
-                <ReportsTabs active="automations" />
+                <SettingsTabs active="automations" />
 
                 {can.manage && (
                     <Card>

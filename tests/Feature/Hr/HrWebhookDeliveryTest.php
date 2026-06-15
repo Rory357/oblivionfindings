@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(\Database\Seeders\SeedHrPermissionsSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -34,7 +35,7 @@ beforeEach(function () {
 
 test('hr user can create and toggle webhook endpoints', function () {
     $this->actingAs($this->hr)
-        ->post('/hr/reports/webhooks', [
+        ->post('/hr/settings/webhooks', [
             'name' => 'Ops webhooks',
             'target_url' => 'https://hooks.example.test/hr',
             'signing_secret' => 'secret-signing-key',
@@ -51,7 +52,7 @@ test('hr user can create and toggle webhook endpoints', function () {
     expect($endpoint->event_types)->toContain('leave.request.approved');
 
     $this->actingAs($this->hr)
-        ->post("/hr/reports/webhooks/{$endpoint->id}/toggle-active")
+        ->post("/hr/settings/webhooks/{$endpoint->id}/toggle-active")
         ->assertSessionHas('success');
 
     $endpoint->refresh();

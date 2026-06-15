@@ -1,31 +1,14 @@
 import { router, usePage } from '@inertiajs/react';
-import {
-    BarChart3,
-    Bookmark,
-    LayoutGrid,
-    Settings,
-    Users,
-    Webhook,
-    Wrench,
-} from 'lucide-react';
+import { BarChart3, Bookmark, LayoutGrid, Users, Wrench } from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type ReportsTab =
-    | 'index'
-    | 'builder'
-    | 'saved'
-    | 'automations'
-    | 'webhooks'
-    | 'analytics'
-    | 'headcount';
+export type ReportsTab = 'index' | 'builder' | 'saved' | 'analytics' | 'headcount';
 
 const TAB_URLS: Record<ReportsTab, string> = {
     index: '/hr/reports',
     builder: '/hr/reports/builder',
     saved: '/hr/reports/saved',
-    automations: '/hr/reports/automations',
-    webhooks: '/hr/reports/webhooks',
     analytics: '/hr/analytics',
     headcount: '/hr/headcount',
 };
@@ -42,6 +25,7 @@ type HrCan = {
  * surfaces (hr.reports.view), so tabs are per-tab filtered by the shared
  * auth.can flags — a user only sees the views they can open (no 403-on-click).
  * The active tab is always shown so the current page never hides its own tab.
+ * (Automations + Webhooks moved to the Settings hub.)
  */
 export function ReportsTabs({ active }: { active: ReportsTab }) {
     const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
@@ -61,19 +45,11 @@ export function ReportsTabs({ active }: { active: ReportsTab }) {
             show: !!hr?.reports?.view,
         },
         {
-            item: { id: 'automations', label: 'Automations', icon: Settings, tone: 'success' },
-            show: !!hr?.reports?.view,
-        },
-        {
-            item: { id: 'webhooks', label: 'Webhooks', icon: Webhook, tone: 'warning' },
-            show: !!hr?.reports?.view,
-        },
-        {
-            item: { id: 'analytics', label: 'Analytics', icon: LayoutGrid, tone: 'critical' },
+            item: { id: 'analytics', label: 'Analytics', icon: LayoutGrid, tone: 'success' },
             show: !!hr?.analytics?.view,
         },
         {
-            item: { id: 'headcount', label: 'Headcount', icon: Users, tone: 'info' },
+            item: { id: 'headcount', label: 'Headcount', icon: Users, tone: 'warning' },
             show: !!hr?.analytics?.view,
         },
     ];

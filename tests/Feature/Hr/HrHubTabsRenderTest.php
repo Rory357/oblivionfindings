@@ -43,6 +43,7 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     $this->actingAs($this->hr)->get($url)->assertOk();
 })->with([
     // Settings hub
+    '/hr/settings/automations',
     '/hr/settings/webhooks',
     '/hr/settings/custom-fields',
     '/hr/settings/audit-log',
@@ -54,8 +55,6 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/reports',
     '/hr/reports/builder',
     '/hr/reports/saved',
-    '/hr/reports/automations',
-    '/hr/reports/webhooks',
     // Documents hub
     '/hr/documents',
     '/hr/documents/templates',

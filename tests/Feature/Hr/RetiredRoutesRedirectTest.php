@@ -38,6 +38,8 @@ test('retired HR routes redirect to their canonical replacements', function () {
         ['/hr/surveys', '/hr/wellbeing'],           // S11: HrSurvey retired → wellbeing
         ['/hr/surveys/create', '/hr/wellbeing'],    // S11
         ['/hr/announcements/create', '/hr/announcements'], // S12: create page → modal
+        ['/hr/reports/automations', '/hr/settings/automations'], // M10-B: moved to Settings hub
+        ['/hr/reports/webhooks', '/hr/settings/webhooks'],       // M10-B: moved to Settings hub
     ];
 
     foreach ($cases as [$from, $to]) {
