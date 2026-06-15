@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { ComplianceTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,6 +159,8 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     />
                 }
             >
+                <ComplianceTabs active="vetting" />
+
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-3">
