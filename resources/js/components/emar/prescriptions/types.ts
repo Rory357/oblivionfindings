@@ -5,6 +5,8 @@ export interface PrescriptionOrder {
     id: number;
     client_id: number;
     client_name: string;
+    client_room: string | null;
+    client_site: string | null;
     client_medication_id: number | null;
     order_type: string; // new | change | cease | verbal | telephone
     status: string; // pending | confirmed | dispensed | cancelled | expired
@@ -55,6 +57,7 @@ export interface ClientOption {
     id: number;
     first_name: string;
     last_name: string;
+    site_name?: string | null;
 }
 export interface MedOption {
     id: number;
