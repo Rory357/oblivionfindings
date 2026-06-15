@@ -13,7 +13,7 @@ use Tests\TestCase;
  * S1 — validation foundation for the Add Site modal payload.
  *
  * Exercises the new StoreSiteRequest / UpdateSiteRequest rule blocks
- * (coverage, credentials, shift templates, geofence, finance, capacity).
+ * (coverage, credentials, geofence, finance, capacity).
  * Persistence of these arrays is wired in S2; here we only assert the
  * validator accepts a well-formed payload and rejects malformed ones.
  */
@@ -145,16 +145,6 @@ class AddSiteModalValidationTest extends TestCase
             ->assertSessionHasErrors('rent_frequency');
     }
 
-    public function test_rejects_bad_shift_template_time(): void
-    {
-        $payload = $this->fullPayload();
-        $payload['shift_templates'][0]['starts_time'] = 'noon';
-
-        $this->actingAs($this->admin)
-            ->post('/sites', $payload)
-            ->assertSessionHasErrors('shift_templates.0.starts_time');
-    }
-
     /** The edit path shares the same rule additions via UpdateSiteRequest. */
     public function test_update_request_accepts_rostering_payload(): void
     {
@@ -231,10 +221,6 @@ class AddSiteModalValidationTest extends TestCase
                     'category' => 'mandatory',
                     'expiry_period_months' => 24,
                 ],
-            ],
-
-            'shift_templates' => [
-                ['name' => 'Morning', 'starts_time' => '07:00', 'ends_time' => '15:00'],
             ],
 
             'geofence' => [

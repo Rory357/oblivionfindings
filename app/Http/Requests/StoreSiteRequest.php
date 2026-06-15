@@ -112,12 +112,6 @@ class StoreSiteRequest extends FormRequest
             'credentials.*.category' => ['required_with:credentials', 'in:mandatory,recommended'],
             'credentials.*.expiry_period_months' => ['nullable', 'integer', 'min:0', 'max:120'],
 
-            // Rostering — default shift templates (optional) → RosterTemplate
-            'shift_templates' => ['nullable', 'array'],
-            'shift_templates.*.name' => ['required_with:shift_templates', 'string', 'max:255'],
-            'shift_templates.*.starts_time' => ['required_with:shift_templates', 'date_format:H:i'],
-            'shift_templates.*.ends_time' => ['required_with:shift_templates', 'date_format:H:i'],
-
             // Geofence — circle seeded into the shared AssetGeofence at create
             'geofence' => ['nullable', 'array'],
             'geofence.mode' => ['nullable', 'in:radius,draw'],
