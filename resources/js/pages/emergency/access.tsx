@@ -30,6 +30,7 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    request_client: ClientLite | null;
 };
 
 const fmtLeft = (ms: number) => {
@@ -51,10 +52,12 @@ function exportCsv(rows: AuditRow[]) {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `break-glass-audit-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
-export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour, request_client: requestClient }: Props) {
     const [tab, setTab] = useState('active');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
-    const [wizardOpen, setWizardOpen] = useState(false);
+    // Auto-open the wizard when deep-linked for a client that has no live grant yet.
+    const alreadyGrantedForRequest = requestClient ? activeAccesses.some((a) => a.client_id === requestClient.id) : false;
+    const [wizardOpen, setWizardOpen] = useState(() => !!requestClient && !alreadyGrantedForRequest);
     const [reviewRecord, setReviewRecord] = useState<ReviewRecord | null>(null);
     const [now, setNow] = useState(() => Date.now());
 
@@ -261,7 +264,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                 )}
             </div>
 
-            {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
+            {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} prefillClient={requestClient} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
             {reviewRecord && <ReviewDialog record={reviewRecord} onClose={() => setReviewRecord(null)} />}
         </AppLayout>
     );

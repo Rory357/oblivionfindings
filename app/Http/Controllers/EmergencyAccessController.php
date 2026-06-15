@@ -153,6 +153,23 @@ class EmergencyAccessController extends Controller
 
         $activeSite = $siteId ? Site::find($siteId) : null;
 
+        // Deep-link from the MAR interstitial: pre-open the request wizard for this client.
+        $requestClientId = $request->integer('request_client') ?: null;
+        $requestClient = null;
+        if ($requestClientId) {
+            $rc = Client::query()->with('site:id,name')->find($requestClientId);
+            if ($rc) {
+                $requestClient = [
+                    'id' => $rc->id,
+                    'first_name' => $rc->first_name,
+                    'last_name' => $rc->last_name,
+                    'date_of_birth' => optional($rc->date_of_birth)->format('Y-m-d'),
+                    'status' => $rc->status,
+                    'site' => $rc->site?->only(['id', 'name']),
+                ];
+            }
+        }
+
         return inertia('emergency/access', [
             'query' => $q,
             'results' => $results,
@@ -176,6 +193,7 @@ class EmergencyAccessController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+            'request_client' => $requestClient,
         ]);
     }
 }

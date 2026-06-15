@@ -172,7 +172,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                         title="Break-glass (30d)"
                         value={kpis.breakGlassLast30d}
                         hint="Emergency access events"
-                        href="/emergency-access"
+                        href="/emar/emergency-access"
                     />
                     <KpiCard
                         title="Care Plan Reviews Due"

@@ -28,17 +28,20 @@ export function RequestAccessDialog({
     results,
     query,
     approvers,
+    prefillClient,
     onSearch,
     onClose,
 }: {
     results: ClientLite[];
     query: string;
     approvers: Approver[];
+    prefillClient?: ClientLite | null;
     onSearch: (q: string) => void;
     onClose: () => void;
 }) {
-    const [step, setStep] = useState(0);
-    const [client, setClient] = useState<ClientLite | null>(null);
+    // When deep-linked from the MAR interstitial the client is already known, so skip Find.
+    const [step, setStep] = useState(prefillClient ? 1 : 0);
+    const [client, setClient] = useState<ClientLite | null>(prefillClient ?? null);
     const [category, setCategory] = useState('');
     const [detail, setDetail] = useState('');
     const [duration, setDuration] = useState(60);
