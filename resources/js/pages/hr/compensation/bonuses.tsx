@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHero } from '@/components/page';
+import { CompensationTabs } from '@/components/hr';
 import {
     Select,
     SelectContent,
@@ -151,6 +152,7 @@ export default function BonusIndex({ bonuses, employees, can }: Props) {
                         ) : null
                     }
                 />
+                <CompensationTabs active="bonuses" />
                 <Card>
                     <CardHeader>
                         <CardTitle>All Bonuses ({bonuses.total})</CardTitle>

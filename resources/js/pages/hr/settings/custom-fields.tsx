@@ -29,6 +29,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero } from '@/components/page';
+import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, Settings, Settings2, Trash2 } from 'lucide-react';
@@ -330,6 +331,8 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                     </Dialog>
                     }
                 />
+
+                <SettingsTabs active="custom-fields" />
 
                 <Card>
                     <CardHeader>

@@ -25,6 +25,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero } from '@/components/page';
+import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { ChevronDown, ChevronRight, FileSearch, History } from 'lucide-react';
@@ -187,6 +188,8 @@ export default function AuditLogIndex({
                         { label: 'Model types', value: modelTypes.length },
                     ]}
                 />
+
+                <SettingsTabs active="audit-log" />
 
                 {/* Filters */}
                 <Card className="mb-6">

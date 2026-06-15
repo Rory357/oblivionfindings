@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -192,6 +193,8 @@ export default function HrWebhookIndex({
                     />
                 }
             >
+                <ReportsTabs active="webhooks" />
+
                 {can.manage && (
                     <Card>
                         <CardHeader>

@@ -22,6 +22,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero } from '@/components/page';
+import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, TestTube, Trash2, Webhook } from 'lucide-react';
@@ -237,6 +238,8 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                     </Dialog>
                     }
                 />
+
+                <SettingsTabs active="webhooks" />
 
                 <Card>
                     <CardHeader>

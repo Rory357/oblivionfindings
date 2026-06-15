@@ -18,6 +18,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero, PageLayout } from '@/components/page';
+import { CompensationTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { DollarSign, Pencil, Plus } from 'lucide-react';
@@ -162,6 +163,8 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                     />
                 }
             >
+                <CompensationTabs active="bands" />
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>

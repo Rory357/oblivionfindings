@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -307,6 +308,8 @@ export default function ReportsIndex({
                     />
                 }
             >
+                <ReportsTabs active="index" />
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
