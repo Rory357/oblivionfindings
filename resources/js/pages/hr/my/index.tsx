@@ -5,6 +5,7 @@ import { DonutChart } from '@/components/dashboard/donut-chart';
 import { MiniSparkline } from '@/components/dashboard/mini-sparkline';
 import { WeeklyHoursChart } from '@/components/dashboard/weekly-hours-chart';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -245,6 +246,8 @@ export default function MyHrIndex({
                     </PageHero>
                 }
             >
+                <MyHrTabs active="overview" />
+
                 {/* ============================================= */}
                 {/* ZONE B — KPI Metrics                           */}
                 {/* ============================================= */}

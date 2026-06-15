@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -10,7 +11,7 @@ beforeEach(function () {
     $this->seed(SeedHrPermissionsSeeder::class);
 
     // hr role holds ALL hr.* permissions (SeedHrPermissionsSeeder), so it can
-    // reach every page in the Settings / Compensation / Reports hubs.
+    // reach every page in every hub.
     $this->hr = User::factory()->create([
         'organization_id' => 1,
         'role' => 'hr',
@@ -18,6 +19,21 @@ beforeEach(function () {
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+
+    // Some ESS (my/*) pages resolve the viewer's own employee profile (e.g.
+    // my/documents firstOrFail()s on it), so the self-service user needs one —
+    // the realistic case for an employee viewing their own My HR pages.
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-HUB-'.$this->hr->id,
+        'work_email' => 'hub'.$this->hr->id.'@example.test',
+        'position_title' => 'HR Administrator',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
     ]);
 });
 
@@ -51,4 +67,17 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/feedback',
     '/hr/performance/pips',
     '/hr/succession',
+    // My HR / ESS hub
+    '/hr/my',
+    '/hr/my/profile',
+    '/hr/my/leave',
+    '/hr/my/time',
+    '/hr/my/expenses',
+    '/hr/my/payslips',
+    '/hr/my/reviews',
+    '/hr/my/goals',
+    '/hr/my/training',
+    '/hr/my/documents',
+    '/hr/my/policies',
+    '/hr/my/surveys',
 ]);

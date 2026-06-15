@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -247,6 +248,8 @@ export default function MyDocuments({ documents, categories }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="documents" />
+
                 {/* Folder breadcrumb */}
                 {currentFolder && (
                     <div className="flex items-center gap-2 text-sm">
