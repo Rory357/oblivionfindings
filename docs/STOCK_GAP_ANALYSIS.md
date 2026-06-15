@@ -57,6 +57,11 @@ row click → detail modal; right-click menu on stock + CD rows; View client lan
 page; Client filter filters board; alert strip jumps to right tab; adjust/count/order/receive
 open in-page + partial-reload (no full nav). Run `tests/Feature/Emar/StockManagementTest.php`.
 
+### Tests added this loop
+- Backend `tests/Feature/Emar/StockManagementTest.php` — `client filter scopes stock to one client`, `stock item carries detail modal payload` (movements ledger + delta + mar_url + client_room). 5 passed / 62 assertions.
+- Frontend `resources/js/components/emar/stock-detail-dialog.test.tsx` — renders overview + footer action callbacks, client-care jump (`router.visit`), movement history on the activity tab. 3 passed.
+- All gates green: `tsc --noEmit`, `eslint`, `vite build`.
+
 ## Loop exit (§6)
 Every box `[x]`; types/lint/build pass; every stock + CD row has row-click detail modal +
 right-click menu with View client; footer has Client filter beside Site; stacked alert strip

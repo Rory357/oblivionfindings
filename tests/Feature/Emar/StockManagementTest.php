@@ -87,6 +87,53 @@ class StockManagementTest extends TestCase
         $this->assertSame(7, (int) $stock->refresh()->on_hand);
     }
 
+    public function test_client_filter_scopes_stock_to_one_client(): void
+    {
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedStock();
+
+        // A second client + stock that must be filtered out by ?client_id=.
+        $other = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $otherMed = ClientMedication::query()->create([
+            'client_id' => $other->id, 'name' => 'Aspirin', 'dosage' => '75mg', 'frequency' => 'daily',
+            'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        ClientMedicationStock::query()->create(['client_medication_id' => $otherMed->id, 'on_hand' => 5, 'unit' => 'tablets']);
+
+        $this->actingAs($user)
+            ->get('/emar/stock?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/StockManagement')
+                ->where('client_id', $client->id)
+                ->has('stockItems', 1)
+                ->where('stockItems.0.client_id', $client->id)
+            );
+    }
+
+    public function test_stock_item_carries_detail_modal_payload(): void
+    {
+        ['user' => $user, 'med' => $med, 'client' => $client] = $this->seedStock();
+
+        // Generate a movement on the audit-log ledger (12 → 9 = -3).
+        $this->actingAs($user)
+            ->from('/emar/stock')
+            ->post('/emar/stock/adjust', ['client_medication_id' => $med->id, 'new_quantity' => 9, 'reason' => 'Physical stock count'])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->get('/emar/stock')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/StockManagement')
+                ->has('stockItems.0.movements')
+                ->where('stockItems.0.movements.0.type', 'counted')
+                ->where('stockItems.0.movements.0.delta', -3)
+                ->where('stockItems.0.mar_url', fn ($url) => is_string($url) && str_contains($url, (string) $client->id))
+                ->has('stockItems.0.client_room')
+                ->has('pharmacyOrders')
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);
