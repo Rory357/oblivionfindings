@@ -6,7 +6,6 @@ use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
@@ -16,10 +15,12 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
-use App\Support\EmarUrl;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Support\EmarUrl;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class MedicationControllerTest extends TestCase
@@ -27,20 +28,28 @@ class MedicationControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $providerManager;
+
     protected User $coordinator;
+
     protected User $supportWorker;
+
     protected User $financeUser;
+
     protected User $hrUser;
+
     protected User $auditor;
+
     protected Client $client;
+
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -81,7 +90,7 @@ class MedicationControllerTest extends TestCase
     //  Helper: mock NotificationService to avoid side-effects
     // ──────────────────────────────────────────────────────────────
 
-    protected function mockNotificationService(): \Mockery\MockInterface
+    protected function mockNotificationService(): MockInterface
     {
         $mock = \Mockery::mock(NotificationService::class);
         $mock->shouldReceive('notifyCrud')->andReturnNull();
@@ -195,9 +204,8 @@ class MedicationControllerTest extends TestCase
             ->get(EmarUrl::daily())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('clients', fn ($clients) =>
-                    collect($clients)->pluck('id')->contains($this->client->id) &&
-                    !collect($clients)->pluck('id')->contains($unassignedClient->id)
+                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
+                    ! collect($clients)->pluck('id')->contains($unassignedClient->id)
                 )
             );
     }
@@ -210,8 +218,7 @@ class MedicationControllerTest extends TestCase
             ->get(EmarUrl::daily())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('clients', fn ($clients) =>
-                    collect($clients)->pluck('id')->contains($this->client->id) &&
+                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
                     collect($clients)->pluck('id')->contains($otherClient->id)
                 )
             );
@@ -2677,11 +2684,9 @@ class MedicationControllerTest extends TestCase
         $response = $this->actingAs($worker)
             ->get("/clients/{$this->client->id}/mar");
 
-        // Should see the break-glass request screen (not a 403)
-        $response->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('emergency/request')
-            );
+        // Should be redirected to the emergency-access page with the request wizard
+        // pre-opened for this client (not a bare interstitial, not a 403).
+        $response->assertRedirect(route('emar.emergency_access', ['request_client' => $this->client->id]));
     }
 
     // ══════════════════════════════════════════════════════════════

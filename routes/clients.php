@@ -1,22 +1,23 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ClientController;
+use App\Http\Controllers\BreakGlassController;
+use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
-use App\Http\Controllers\ClientNoteController;
-use App\Http\Controllers\ClientMedicalController;
+use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
+use App\Http\Controllers\ClientIncidentController;
+use App\Http\Controllers\ClientMarController;
+use App\Http\Controllers\ClientMealPreferencesController;
+use App\Http\Controllers\ClientMedicalController;
+use App\Http\Controllers\ClientNoteController;
+use App\Http\Controllers\ClientOnboardingController;
 use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
-use App\Http\Controllers\ClientOnboardingController;
-use App\Http\Controllers\ClientSupportPlanController;
-use App\Http\Controllers\ClientAssessmentController;
-use App\Http\Controllers\ClientMarController;
-use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\BreakGlassController;
-use App\Http\Controllers\ClientIncidentController;
-use App\Http\Controllers\ClientMealPreferencesController;
 use App\Http\Controllers\ClientRiskController;
+use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
+use App\Http\Controllers\Sites\SiteGeocodingController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Client Management Routes
@@ -24,7 +25,6 @@ use App\Http\Controllers\ClientRiskController;
  * Handles client profiles, medical records, documents, incidents,
  * risks, and medication administration.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Client listing and viewing
     Route::middleware('permission:clients.viewAny|clients.viewAssigned')->group(function () {
@@ -82,7 +82,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
         // Address autocomplete for the Add Client wizard (Nominatim proxy,
         // reuses the Sites geocoding controller). Gated to client-creators.
-        Route::get('/clients/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
+        Route::get('/clients/geocode/search', [SiteGeocodingController::class, 'search'])
             ->name('clients.geocode.search');
     });
 
@@ -204,10 +204,8 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:medications.breakglass|medications.audit.view')
         ->name('clients.break_glass.destroy');
 
-    // Emergency access entry point
-    Route::get('/emergency-access', [\App\Http\Controllers\EmergencyAccessController::class, 'index'])
-        ->middleware('permission:medications.breakglass')
-        ->name('emergency_access.index');
+    // Emergency-access entry point is the canonical emar.emergency_access route
+    // (routes/emar.php); bare /emergency-access redirects there (routes/web.php).
 
     // Controlled medication discrepancies
     Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ClientMedicalController::class, 'closeControlledDiscrepancy'])

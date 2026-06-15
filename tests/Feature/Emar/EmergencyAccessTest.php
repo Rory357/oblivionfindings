@@ -210,6 +210,20 @@ class EmergencyAccessTest extends TestCase
             );
     }
 
+    public function test_request_client_query_prefills_the_request_wizard(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->get('/emar/emergency-access?request_client='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('request_client.id', $client->id)
+                ->where('request_client.first_name', $client->first_name)
+                ->where('request_client.last_name', $client->last_name)
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);
