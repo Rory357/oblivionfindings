@@ -380,6 +380,16 @@ export function RecordDoseWizard({
                             <StatusPill status={row.status} />
                         </div>
 
+                        {row.status === 'overdue' || row.status === 'missed' ? (
+                            <InfoCard icon={AlertTriangle} tone="warn">
+                                <strong>This dose is overdue.</strong> It was due at{' '}
+                                {row.time} and the dosing window has passed. Record what
+                                actually happened — give it now (you’ll be asked why it’s
+                                late), or mark it refused/withheld with a reason. Don’t
+                                leave it unrecorded.
+                            </InfoCard>
+                        ) : null}
+
                         {client && client.allergies.length > 0 ? (
                             <InfoCard icon={AlertTriangle} tone="crit">
                                 <strong>Allergies:</strong>{' '}

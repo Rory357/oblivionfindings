@@ -82,8 +82,10 @@ export function DoseContextMenu({
     const recorded = row.recorded !== null;
     // A one-click "given" is only safe when nothing extra must be captured:
     // controlled drugs + witness meds need a countersignature, observation meds
-    // need a reading, and a non-today board makes "now" the wrong timestamp.
-    const needsWizardForGiven = row.is_controlled || row.requires_witness || target.requiresObservation || !isToday;
+    // need a reading, an overdue/missed dose needs a late reason, and a non-today
+    // board makes "now" the wrong timestamp.
+    const isLate = row.status === 'overdue' || row.status === 'missed';
+    const needsWizardForGiven = row.is_controlled || row.requires_witness || target.requiresObservation || isLate || !isToday;
 
     const quickGiven = () => {
         // Same endpoint + pipeline as the wizard; a client_request_uuid makes a
@@ -133,13 +135,15 @@ export function DoseContextMenu({
             {
                 icon: <Check className="h-3.5 w-3.5" />,
                 label: 'Mark given',
-                sub: needsWizardForGiven
-                    ? row.is_controlled || row.requires_witness
-                        ? 'Witness required → full check'
-                        : target.requiresObservation
-                          ? 'Observation required → full check'
-                          : 'Opens the recording flow'
-                    : 'Records to the MAR now',
+                sub: !needsWizardForGiven
+                    ? 'Records to the MAR now'
+                    : row.is_controlled || row.requires_witness
+                      ? 'Witness required → full check'
+                      : target.requiresObservation
+                        ? 'Observation required → full check'
+                        : isLate
+                          ? 'Overdue — record with a reason'
+                          : 'Opens the recording flow',
                 kbd: 'G',
                 tone: 'primary',
                 onClick: needsWizardForGiven ? () => onRecordFull(row) : quickGiven,

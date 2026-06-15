@@ -85,7 +85,7 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                     <div>
                         <div className="text-[15px] font-bold leading-tight">Scheduled medications</div>
                         <div className="text-xs text-muted-foreground">
-                            {meds.length} active order{meds.length === 1 ? '' : 's'} · tap a time cell to record
+                            {meds.length} active order{meds.length === 1 ? '' : 's'} · tap a cell to record · right-click for quick actions
                         </div>
                     </div>
                 </div>
