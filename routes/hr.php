@@ -543,11 +543,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         });
     });
 
-    // Automations + Webhooks moved out of Reports into the Settings hub
-    // (re-gated hr.settings.manage). Old URLs 301-redirect to the new homes.
-    Route::redirect('/reports/automations', '/hr/settings/automations', 301);
-    Route::redirect('/reports/webhooks', '/hr/settings/webhooks', 301);
-
     /*
     |--------------------------------------------------------------------------
     | Directory
