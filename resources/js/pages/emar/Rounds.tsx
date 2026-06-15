@@ -3,10 +3,11 @@
    all colours are semantic tokens. */
 import RoundAuditDialog from '@/components/emar/rounds/round-audit-dialog';
 import RoundBoard from '@/components/emar/rounds/round-board';
+import RoundActivity from '@/components/emar/rounds/round-activity';
+import RoundActivityDialog from '@/components/emar/rounds/round-activity-dialog';
 import RoundChart from '@/components/emar/rounds/round-chart';
 import RoundTimeline from '@/components/emar/rounds/round-timeline';
 import {
-    doseStatusMeta,
     roundCounts,
     roundStatusMeta,
     type ActivityItem,
@@ -32,15 +33,11 @@ import type { NotGivenReasonOption, WitnessOption } from '@/pages/meds/today/typ
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
-    AlertTriangle,
-    Ban,
     CalendarCheck,
     CalendarDays,
-    Check,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    Hand,
     LayoutGrid,
     LayoutList,
     List,
@@ -103,6 +100,7 @@ export default function Rounds(props: Props) {
     const [generateOpen, setGenerateOpen] = useState(false);
     const [templateEditing, setTemplateEditing] = useState<RoundTemplate | 'new' | null>(null);
     const [auditRoundId, setAuditRoundId] = useState<number | null>(null);
+    const [activityView, setActivityView] = useState<ActivityItem | null>(null);
     const [contextMenu, setContextMenu] = useState<ShiftCtxState | null>(null);
 
     const isToday = date === toYmd(new Date());
@@ -446,21 +444,7 @@ export default function Rounds(props: Props) {
                 )}
 
                 {activeTab === 'activity' && (
-                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                        <div className="border-b px-4 py-3.5">
-                            <div className="text-sm font-semibold">Recent round activity</div>
-                            <div className="mt-0.5 text-xs text-muted-foreground">Every administration flows through the audit trail with staff codes.</div>
-                        </div>
-                        {activity.length === 0 ? (
-                            <div className="px-5 py-10 text-center text-sm text-muted-foreground">No round activity yet today.</div>
-                        ) : (
-                            <div className="flex flex-col gap-3.5 px-4 py-4">
-                                {activity.map((a) => (
-                                    <ActivityRow key={a.id} item={a} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <RoundActivity activity={activity} rounds={rounds} siteFilter={siteFilter} residentFilter={residentFilter} onView={setActivityView} />
                 )}
             </div>
 
@@ -488,6 +472,8 @@ export default function Rounds(props: Props) {
                     onPrint={printRoundSheet}
                 />
             )}
+
+            {activityView && <RoundActivityDialog item={activityView} onClose={() => setActivityView(null)} />}
 
             {generateOpen && <GenerateRoundsModal open onClose={() => setGenerateOpen(false)} defaultDate={date} />}
 
@@ -555,41 +541,6 @@ function SegmentedToggle({ value, onChange }: { value: 'cards' | 'list'; onChang
                     </Button>
                 );
             })}
-        </div>
-    );
-}
-
-const ACTIVITY_ICON: Record<string, ComponentType<{ className?: string }>> = {
-    given: Check,
-    refused: Ban,
-    withheld: Hand,
-    missed: AlertTriangle,
-};
-
-const ACTIVITY_TONE: Record<string, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    muted: 'bg-muted text-muted-foreground',
-};
-
-function ActivityRow({ item }: { item: ActivityItem }) {
-    const meta = doseStatusMeta(item.status);
-    const Icon = ACTIVITY_ICON[item.status] ?? Activity;
-    return (
-        <div className="flex items-start gap-3">
-            <span className={`grid h-7.5 w-7.5 shrink-0 place-items-center rounded-full ${ACTIVITY_TONE[meta.tone] ?? ACTIVITY_TONE.muted}`}>
-                <Icon className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-                <div className="text-[13px] leading-snug">
-                    <span className="font-semibold">{item.medication_name ?? 'Medication'}</span> — recorded as {meta.label.toLowerCase()}
-                </div>
-                <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    {item.time ?? ''}
-                    {item.staff ? ` · ${item.staff}` : ''}
-                </div>
-            </div>
         </div>
     );
 }

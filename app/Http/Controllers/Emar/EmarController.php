@@ -1962,15 +1962,37 @@ class EmarController extends Controller
         $roundIds = array_column($rounds, 'id');
         $activity = empty($roundIds) ? [] : ClientMedicationAdministration::query()
             ->whereIn('medication_round_id', $roundIds)
-            ->with(['medication:id,name', 'administeredBy:id,name'])
+            ->with([
+                'medication:id,name',
+                'administeredBy:id,name',
+                'witnessedBy:id,name',
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name',
+                'round:id,name',
+            ])
             ->latest('administered_at')
-            ->limit(40)
+            ->limit(150)
             ->get()
             ->map(fn (ClientMedicationAdministration $a) => [
                 'id' => $a->id,
                 'status' => $a->status,
+                'medication_id' => $a->client_medication_id,
                 'medication_name' => $a->medication?->name,
+                'dose' => $a->dose_given,
+                'resident_id' => $a->client_id,
+                'resident_name' => $a->client ? trim(($a->client->first_name ?? '').' '.($a->client->last_name ?? '')) : null,
+                'site_id' => $a->client?->site_id,
+                'site_name' => $a->client?->site?->name,
+                'round_id' => $a->medication_round_id,
+                'round_name' => $a->round?->name,
                 'staff' => $a->administeredBy?->name,
+                'witnessed_by' => $a->witnessedBy?->name,
+                'blood_glucose_level' => $a->blood_glucose_level !== null ? (float) $a->blood_glucose_level : null,
+                'pulse_bpm' => $a->pulse_bpm,
+                'reason' => $a->reason,
+                'reason_code' => $a->reason_code,
+                'scheduled_for' => $a->scheduled_for?->toIso8601String(),
+                'administered_at' => $a->administered_at?->toIso8601String(),
                 'time' => $a->administered_at?->format('H:i'),
             ])
             ->all();
