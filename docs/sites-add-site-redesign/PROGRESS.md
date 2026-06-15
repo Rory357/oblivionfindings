@@ -35,9 +35,15 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   Sites index (hero button now opens the modal; `/sites/create` route kept). Backend: `_modal` branch
   in store() returns back()+`created_site_id` flash; HandleInertiaRequests shares it. Gate: tsc/lint/
   build green; PHP 58 pass (no `_modal` regression). ⚠️ 2 pre-existing vitest failures (my-day
-  timesheet routing · app-sidebar Finance-nav) are unrelated/untouched by this slice. Commit `<s3>`.
-- [ ] **S4 — Rostering & coverage step (new).** Copy-from + 4 presets + coverage cards (role mix,
-  allow_overstaffing, service_context) + credentials chip-multi + shift-template rows.
+  timesheet routing · app-sidebar Finance-nav) are unrelated/untouched by this slice. Commit `c7f5182d`.
+- [x] **S4 — Rostering & coverage step (new).** Built `StepRostering`: copy-from-site Select (clones +
+  groups a source's per-day coverage rows back into editable cards + its credentials), 4 quick presets
+  (24/7, waking nights, day support, office — verbatim prototype rows), repeatable coverage cards
+  (DayChips, coverage/shift-type selects, start/end times, min-staff Stepper, role-mix Steppers,
+  **allow_overstaffing toggle**, optional service_context select), required-credentials catalogue chips
+  (each → Mandatory/Recommended segmented + expiry months), optional shift-template rows. Produces
+  exactly the payload S2 persists (covered by AddSiteModalStoreTest). Gate: tsc/lint/build green.
+  Commit `<s4>`.
 - [ ] **S5 — Location & geofence step.** AddressAutocomplete (/sites/geocode/search) + GeofenceDrawMap
   radius/draw + 50–500m slider + breach type + access instructions. Circle-only at create.
 - [ ] **S6 — Property & finance + Review & safety steps.** Finance step + review summary/risk/notes +

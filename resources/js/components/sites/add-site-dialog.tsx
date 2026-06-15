@@ -17,10 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
-    ChipMulti,
     Field,
     InfoCard,
     SelectInput,
+    Segmented,
     StepHead,
     SubHead,
     TilePicker,
@@ -52,12 +52,16 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    Clock,
     FileText,
     Loader2,
     MapPin,
+    Minus,
     Package,
     Plus,
     Shield,
+    ShieldCheck,
+    Sparkles,
     Star,
     Trash2,
     Users,
@@ -630,7 +634,7 @@ function StepBody({ stepKey, ctx }: { stepKey: StepKey; ctx: SiteStepCtx }) {
         case 'spaces':
             return <StepSpaces ctx={ctx} />;
         case 'rostering':
-            return <StepRosteringPlaceholder />;
+            return <StepRostering ctx={ctx} />;
         case 'contacts':
             return <StepContacts ctx={ctx} />;
         case 'equipment':
@@ -1363,13 +1367,621 @@ function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
 /*  WIP step heads (built in S4 / S6)                                  */
 /* ------------------------------------------------------------------ */
 
-function StepRosteringPlaceholder() {
+/* ---- rostering reference + presets (from the design prototype) ---- */
+
+const COVERAGE_TYPE_OPTIONS = [
+    { value: 'day', label: 'Day' },
+    { value: 'evening', label: 'Evening' },
+    { value: 'overnight', label: 'Overnight' },
+    { value: 'custom', label: 'Custom' },
+];
+const SHIFT_TYPE_OPTIONS = [
+    { value: 'standard', label: 'Standard' },
+    { value: 'sleepover', label: 'Sleepover' },
+    { value: 'on_call', label: 'On-call' },
+    { value: 'split', label: 'Split' },
+    { value: 'travel', label: 'Travel' },
+];
+const DAY_DEFS: { key: string; label: string }[] = [
+    { key: 'mon', label: 'M' },
+    { key: 'tue', label: 'T' },
+    { key: 'wed', label: 'W' },
+    { key: 'thu', label: 'T' },
+    { key: 'fri', label: 'F' },
+    { key: 'sat', label: 'S' },
+    { key: 'sun', label: 'S' },
+];
+const ALL_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
+
+const PRESETS: { key: string; label: string; desc: string }[] = [
+    { key: '247', label: '24/7 staffed', desc: 'Day, evening & overnight, every day' },
+    { key: 'wakingnights', label: 'Waking nights', desc: 'Awake overnight cover, every night' },
+    { key: 'daysupport', label: 'Day support', desc: '7am–7pm, every day' },
+    { key: 'office', label: 'Office hours', desc: 'Mon–Fri, 9–5' },
+];
+
+function emptyRoles() {
+    return { caregiver: 0, driver: 0, med_competent: 0 };
+}
+
+function presetRows(key: string): CoverageRule[] {
+    const base = {
+        service_context_id: '',
+    };
+    if (key === '247')
+        return [
+            { ...base, name: 'Day cover', coverage_type: 'day', days: [...ALL_WEEK], starts_time: '07:00', ends_time: '15:00', minimum_staff: 2, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 2, driver: 0, med_competent: 1 } },
+            { ...base, name: 'Evening cover', coverage_type: 'evening', days: [...ALL_WEEK], starts_time: '15:00', ends_time: '23:00', minimum_staff: 2, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 2, driver: 0, med_competent: 1 } },
+            { ...base, name: 'Overnight cover', coverage_type: 'overnight', days: [...ALL_WEEK], starts_time: '23:00', ends_time: '07:00', minimum_staff: 1, shift_type: 'sleepover', allow_overstaffing: false, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+        ];
+    if (key === 'wakingnights')
+        return [
+            { ...base, name: 'Waking night', coverage_type: 'overnight', days: [...ALL_WEEK], starts_time: '22:00', ends_time: '06:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: false, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+        ];
+    if (key === 'daysupport')
+        return [
+            { ...base, name: 'Day support', coverage_type: 'day', days: [...ALL_WEEK], starts_time: '07:00', ends_time: '19:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+        ];
+    if (key === 'office')
+        return [
+            { ...base, name: 'Office hours', coverage_type: 'day', days: [...WEEKDAYS], starts_time: '09:00', ends_time: '17:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: true, roles: emptyRoles() },
+        ];
+    return [];
+}
+
+function emptyCoverageRule(): CoverageRule {
+    return {
+        name: 'Coverage rule',
+        coverage_type: 'day',
+        days: [...WEEKDAYS],
+        starts_time: '09:00',
+        ends_time: '17:00',
+        minimum_staff: 1,
+        shift_type: 'standard',
+        allow_overstaffing: true,
+        service_context_id: '',
+        roles: emptyRoles(),
+    };
+}
+
+/** Collapse a source site's per-day coverage rows into editable cards. */
+function groupCopiedCoverage(rows: AddSiteCopyableCoverage[]): CoverageRule[] {
+    const map = new Map<string, CoverageRule>();
+    for (const r of rows) {
+        const roles = emptyRoles();
+        for (const rr of r.role_requirements ?? []) {
+            if (rr.key in roles) roles[rr.key as keyof typeof roles] = rr.minimum;
+        }
+        const key = JSON.stringify([
+            r.name,
+            r.coverage_type,
+            r.starts_time,
+            r.ends_time,
+            r.shift_type,
+            r.allow_overstaffing,
+            r.service_context_id,
+            roles,
+        ]);
+        const existing = map.get(key);
+        if (existing) {
+            if (!existing.days.includes(r.day_of_week)) existing.days.push(r.day_of_week);
+        } else {
+            map.set(key, {
+                name: r.name,
+                coverage_type: (r.coverage_type as CoverageRule['coverage_type']) ?? 'custom',
+                days: [r.day_of_week],
+                starts_time: r.starts_time,
+                ends_time: r.ends_time,
+                minimum_staff: r.minimum_staff,
+                shift_type: (r.shift_type as CoverageRule['shift_type']) ?? 'standard',
+                allow_overstaffing: r.allow_overstaffing,
+                service_context_id: r.service_context_id ? String(r.service_context_id) : '',
+                roles,
+            });
+        }
+    }
+    // Keep days in week order.
+    return Array.from(map.values()).map((c) => ({
+        ...c,
+        days: ALL_WEEK.filter((d) => c.days.includes(d)),
+    }));
+}
+
+function credentialKeyForName(name: string, catalogue: AddSiteCredential[]): string {
+    const hit = catalogue.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    return hit ? hit.key : name.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 50);
+}
+
+/* ---- small controls ---- */
+
+function Stepper({
+    value,
+    onChange,
+    min = 0,
+    max = 12,
+    label,
+}: {
+    value: number;
+    onChange: (v: number) => void;
+    min?: number;
+    max?: number;
+    label?: string;
+}) {
+    const clamp = (v: number) => Math.max(min, Math.min(max, v));
     return (
-        <StepHead
-            icon={CalendarClock}
-            title="Rostering & coverage"
-            blurb="Coverage rules, role mix, credentials and shift templates."
-        />
+        <div className="flex items-center justify-between gap-2">
+            {label ? (
+                <span className="text-[13px] text-muted-foreground">{label}</span>
+            ) : null}
+            <div className="inline-flex items-center gap-1">
+                <button
+                    type="button"
+                    aria-label={`Decrease ${label ?? ''}`.trim()}
+                    onClick={() => onChange(clamp(value - 1))}
+                    className="grid h-7 w-7 place-items-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-40"
+                    disabled={value <= min}
+                >
+                    <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="w-7 text-center text-sm font-semibold tabular-nums">
+                    {value}
+                </span>
+                <button
+                    type="button"
+                    aria-label={`Increase ${label ?? ''}`.trim()}
+                    onClick={() => onChange(clamp(value + 1))}
+                    className="grid h-7 w-7 place-items-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-40"
+                    disabled={value >= max}
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function DayChips({
+    value,
+    onChange,
+}: {
+    value: string[];
+    onChange: (days: string[]) => void;
+}) {
+    const toggle = (k: string) =>
+        onChange(value.includes(k) ? value.filter((d) => d !== k) : [...value, k]);
+    return (
+        <div className="inline-flex flex-wrap gap-1">
+            {DAY_DEFS.map((d, i) => {
+                const on = value.includes(d.key);
+                return (
+                    <button
+                        key={`${d.key}-${i}`}
+                        type="button"
+                        aria-pressed={on}
+                        aria-label={d.key}
+                        onClick={() => toggle(d.key)}
+                        className={cn(
+                            'h-8 w-8 rounded-md border text-[13px] font-semibold transition-colors',
+                            on
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-card text-muted-foreground hover:border-primary/50',
+                        )}
+                    >
+                        {d.label}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Step: Rostering & coverage                                        */
+/* ------------------------------------------------------------------ */
+
+function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
+    const { data, set, ref } = ctx;
+
+    const applyPreset = (key: string) =>
+        set('coverage', [...data.coverage, ...presetRows(key)]);
+
+    const copyFrom = (value: string) => {
+        const source = ref.copyableSites.find((s) => String(s.id) === value);
+        if (!source) {
+            set('copy_from', '');
+            return;
+        }
+        const credentials: CredentialRow[] = source.credentials.map((c) => ({
+            key: credentialKeyForName(c.name, ref.credentialCatalogue),
+            name: c.name,
+            category: c.category === 'recommended' ? 'recommended' : 'mandatory',
+            expiry_period_months: c.expiry_period_months ?? '',
+        }));
+        ctx.setMany({
+            copy_from: value,
+            coverage: groupCopiedCoverage(source.coverage),
+            credentials,
+        });
+    };
+
+    const updateRule = (i: number, patch: Partial<CoverageRule>) =>
+        set(
+            'coverage',
+            data.coverage.map((r, idx) => (idx === i ? { ...r, ...patch } : r)),
+        );
+    const removeRule = (i: number) =>
+        set('coverage', data.coverage.filter((_, idx) => idx !== i));
+
+    const toggleCredential = (cat: AddSiteCredential) => {
+        const has = data.credentials.some((c) => c.key === cat.key);
+        if (has) {
+            set('credentials', data.credentials.filter((c) => c.key !== cat.key));
+        } else {
+            set('credentials', [
+                ...data.credentials,
+                {
+                    key: cat.key,
+                    name: cat.name,
+                    category: 'mandatory',
+                    expiry_period_months: cat.default_expiry_months || '',
+                },
+            ]);
+        }
+    };
+    const updateCredential = (key: string, patch: Partial<CredentialRow>) =>
+        set(
+            'credentials',
+            data.credentials.map((c) => (c.key === key ? { ...c, ...patch } : c)),
+        );
+
+    const updateTemplate = (i: number, patch: Partial<ShiftTemplateRow>) =>
+        set(
+            'shift_templates',
+            data.shift_templates.map((t, idx) => (idx === i ? { ...t, ...patch } : t)),
+        );
+
+    return (
+        <div>
+            <StepHead
+                icon={CalendarClock}
+                title="Rostering & coverage"
+                blurb="Define who needs to be on site, when — plus the credentials staff must hold."
+            />
+            <div className="grid gap-5">
+                {/* Copy a pattern */}
+                {ref.copyableSites.length > 0 ? (
+                    <Field
+                        label="Copy a pattern"
+                        hint="clone coverage & credentials from another site"
+                        span
+                    >
+                        <SelectInput
+                            value={data.copy_from}
+                            onChange={copyFrom}
+                            placeholder="Start from an existing site…"
+                            options={ref.copyableSites.map((s) => ({
+                                value: String(s.id),
+                                label: s.name,
+                            }))}
+                        />
+                    </Field>
+                ) : null}
+
+                {/* Presets */}
+                <div>
+                    <SubHead icon={Sparkles}>Quick coverage presets</SubHead>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {PRESETS.map((p) => (
+                            <button
+                                key={p.key}
+                                type="button"
+                                onClick={() => applyPreset(p.key)}
+                                className="rounded-lg border border-border bg-card/60 p-3 text-left transition-colors hover:border-primary/50 hover:bg-card"
+                            >
+                                <div className="flex items-center gap-1.5 text-[13px] font-semibold">
+                                    <Plus className="h-3.5 w-3.5 text-primary" /> {p.label}
+                                </div>
+                                <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                                    {p.desc}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Coverage requirements */}
+                <div>
+                    <SubHead icon={CalendarClock}>Coverage requirements</SubHead>
+                    <div className="mt-2 grid gap-3">
+                        {data.coverage.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-border p-5 text-center text-[13px] text-muted-foreground">
+                                No coverage rules yet — pick a preset above or add a custom rule.
+                            </div>
+                        ) : null}
+                        {data.coverage.map((rule, i) => (
+                            <CoverageCard
+                                key={i}
+                                rule={rule}
+                                roleKeys={ref.coverageRoleKeys}
+                                serviceContexts={ref.serviceContexts}
+                                onChange={(patch) => updateRule(i, patch)}
+                                onRemove={() => removeRule(i)}
+                            />
+                        ))}
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => set('coverage', [...data.coverage, emptyCoverageRule()])}
+                            >
+                                <Plus className="h-3.5 w-3.5" /> Add coverage rule
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Required credentials */}
+                <div>
+                    <SubHead icon={ShieldCheck}>Required staff credentials</SubHead>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                        {ref.credentialCatalogue.map((cat) => {
+                            const on = data.credentials.some((c) => c.key === cat.key);
+                            return (
+                                <button
+                                    key={cat.key}
+                                    type="button"
+                                    aria-pressed={on}
+                                    onClick={() => toggleCredential(cat)}
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
+                                        on
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-border bg-card text-foreground hover:border-primary/50',
+                                    )}
+                                >
+                                    {on ? <Check className="h-3 w-3" /> : <Shield className="h-3 w-3" />}
+                                    {cat.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {data.credentials.length > 0 ? (
+                        <div className="mt-3 grid gap-2">
+                            {data.credentials.map((c) => (
+                                <div
+                                    key={c.key}
+                                    className="grid items-center gap-2 rounded-lg border border-border bg-card/70 p-2.5 sm:grid-cols-[1.4fr_1.2fr_1fr]"
+                                >
+                                    <span className="text-[13px] font-semibold">{c.name}</span>
+                                    <Segmented
+                                        value={c.category}
+                                        onChange={(v) => updateCredential(c.key, { category: v })}
+                                        options={[
+                                            { value: 'mandatory', label: 'Mandatory' },
+                                            { value: 'recommended', label: 'Recommended' },
+                                        ]}
+                                    />
+                                    <div className="flex items-center gap-1.5">
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={120}
+                                            value={String(c.expiry_period_months ?? '')}
+                                            onChange={(e) =>
+                                                updateCredential(c.key, {
+                                                    expiry_period_months: e.target.value,
+                                                })
+                                            }
+                                            placeholder="—"
+                                            className="h-8"
+                                        />
+                                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                                            mo. expiry
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+
+                {/* Default shift templates */}
+                <div>
+                    <SubHead icon={Clock}>Default shift templates</SubHead>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                        Optional — seeds a “{data.name || 'Site'} default week” roster template.
+                    </p>
+                    <div className="mt-2 grid gap-2">
+                        {data.shift_templates.map((t, i) => (
+                            <div
+                                key={i}
+                                className="grid items-center gap-2 rounded-lg border border-border bg-card/70 p-2.5 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
+                            >
+                                <Input
+                                    value={t.name}
+                                    onChange={(e) => updateTemplate(i, { name: e.target.value })}
+                                    placeholder="e.g. Morning"
+                                    className="h-8"
+                                />
+                                <Input
+                                    type="time"
+                                    value={t.starts_time}
+                                    onChange={(e) => updateTemplate(i, { starts_time: e.target.value })}
+                                    className="h-8"
+                                />
+                                <Input
+                                    type="time"
+                                    value={t.ends_time}
+                                    onChange={(e) => updateTemplate(i, { ends_time: e.target.value })}
+                                    className="h-8"
+                                />
+                                <button
+                                    type="button"
+                                    aria-label="Remove shift template"
+                                    onClick={() =>
+                                        set(
+                                            'shift_templates',
+                                            data.shift_templates.filter((_, idx) => idx !== i),
+                                        )
+                                    }
+                                    className="justify-self-center text-muted-foreground hover:text-status-critical"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    set('shift_templates', [
+                                        ...data.shift_templates,
+                                        { name: '', starts_time: '09:00', ends_time: '17:00' },
+                                    ])
+                                }
+                            >
+                                <Plus className="h-3.5 w-3.5" /> Add shift template
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CoverageCard({
+    rule,
+    roleKeys,
+    serviceContexts,
+    onChange,
+    onRemove,
+}: {
+    rule: CoverageRule;
+    roleKeys: AddSiteRoleKey[];
+    serviceContexts: AddSiteServiceContext[];
+    onChange: (patch: Partial<CoverageRule>) => void;
+    onRemove: () => void;
+}) {
+    return (
+        <div className="rounded-xl border border-border bg-card/70 p-3.5">
+            <div className="mb-3 flex items-center gap-2">
+                <Input
+                    value={rule.name}
+                    onChange={(e) => onChange({ name: e.target.value })}
+                    placeholder="Rule name"
+                    className="h-8 flex-1 font-semibold"
+                />
+                <button
+                    type="button"
+                    aria-label="Remove coverage rule"
+                    onClick={onRemove}
+                    className="text-muted-foreground hover:text-status-critical"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            </div>
+
+            <div className="grid gap-3">
+                <Field label="Days">
+                    <DayChips value={rule.days} onChange={(days) => onChange({ days })} />
+                </Field>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Coverage type">
+                        <SelectInput
+                            value={rule.coverage_type}
+                            onChange={(v) =>
+                                onChange({ coverage_type: v as CoverageRule['coverage_type'] })
+                            }
+                            placeholder="Type"
+                            options={COVERAGE_TYPE_OPTIONS}
+                        />
+                    </Field>
+                    <Field label="Shift type">
+                        <SelectInput
+                            value={rule.shift_type}
+                            onChange={(v) =>
+                                onChange({ shift_type: v as CoverageRule['shift_type'] })
+                            }
+                            placeholder="Shift type"
+                            options={SHIFT_TYPE_OPTIONS}
+                        />
+                    </Field>
+                    <Field label="Start time">
+                        <Input
+                            type="time"
+                            value={rule.starts_time}
+                            onChange={(e) => onChange({ starts_time: e.target.value })}
+                        />
+                    </Field>
+                    <Field label="End time">
+                        <Input
+                            type="time"
+                            value={rule.ends_time}
+                            onChange={(e) => onChange({ ends_time: e.target.value })}
+                        />
+                    </Field>
+                </div>
+
+                <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-2">
+                    <Field label="Minimum staff">
+                        <Stepper
+                            value={rule.minimum_staff}
+                            min={1}
+                            max={12}
+                            onChange={(v) => onChange({ minimum_staff: v })}
+                        />
+                    </Field>
+                    <div className="grid gap-1.5">
+                        <span className="text-[13px] font-medium text-muted-foreground">
+                            Role mix
+                        </span>
+                        {roleKeys.map((rk) => (
+                            <Stepper
+                                key={rk.key}
+                                label={rk.label}
+                                value={rule.roles[rk.key as keyof CoverageRule['roles']] ?? 0}
+                                min={0}
+                                max={12}
+                                onChange={(v) =>
+                                    onChange({ roles: { ...rule.roles, [rk.key]: v } })
+                                }
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <label className="flex items-center gap-2.5">
+                        <Switch
+                            checked={rule.allow_overstaffing}
+                            onCheckedChange={(v) => onChange({ allow_overstaffing: v })}
+                        />
+                        <span className="text-[13px] text-muted-foreground">
+                            Allow overstaffing
+                        </span>
+                    </label>
+                    {serviceContexts.length > 0 ? (
+                        <div className="min-w-[200px]">
+                            <SelectInput
+                                value={rule.service_context_id}
+                                onChange={(v) => onChange({ service_context_id: v })}
+                                placeholder="Service (optional)"
+                                options={serviceContexts.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                }))}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        </div>
     );
 }
 function StepFinancePlaceholder() {
