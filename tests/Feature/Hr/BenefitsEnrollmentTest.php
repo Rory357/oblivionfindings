@@ -61,7 +61,7 @@ beforeEach(function () {
 test('the benefits index lists tenant enrollments and ships employees', function () {
     // Regression: index used forTenant($user->tenant_id) — null — which becomes
     // whereNull(tenant_id), so real (profile-tenant) enrollments never appeared.
-    $response = $this->actingAs($this->hr)->get('/hr/benefits');
+    $response = $this->actingAs($this->hr)->get('/hr/compensation/benefits');
     $response->assertOk();
 
     $enrollmentIds = collect($response->inertiaProps('enrollments.data'))->pluck('id')->all();
@@ -73,7 +73,7 @@ test('the benefits index lists tenant enrollments and ships employees', function
 
 test('an enrollment can be updated from the UI endpoint', function () {
     $response = $this->actingAs($this->hr)->put(
-        "/hr/benefits/enrollments/{$this->enrollment->id}",
+        "/hr/compensation/benefits/enrollments/{$this->enrollment->id}",
         ['status' => 'suspended', 'employee_contribution_rate' => 5],
     );
 
@@ -88,7 +88,7 @@ test('an enrollment can be updated from the UI endpoint', function () {
 
 test('creating a benefit plan resolves the tenant', function () {
     // Regression: storePlan wrote tenant_id => null but the column is NOT NULL.
-    $response = $this->actingAs($this->hr)->post('/hr/benefits/plans', [
+    $response = $this->actingAs($this->hr)->post('/hr/compensation/benefits/plans', [
         'name' => 'Health Cover',
         'type' => 'health_insurance',
         'employer_contribution_rate' => 0,
@@ -105,7 +105,7 @@ test('creating a benefit plan resolves the tenant', function () {
 
 test('a user without hr.benefits.manage cannot update an enrollment', function () {
     $this->actingAs($this->worker)->put(
-        "/hr/benefits/enrollments/{$this->enrollment->id}",
+        "/hr/compensation/benefits/enrollments/{$this->enrollment->id}",
         ['status' => 'terminated'],
     )->assertForbidden();
 

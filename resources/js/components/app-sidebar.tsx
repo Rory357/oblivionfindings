@@ -2131,18 +2131,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         label: 'Pay & Benefits',
         items: [],
     };
-    if (can?.hr?.compensation?.view) {
+    if (can?.hr?.compensation?.view || can?.hr?.benefits?.view) {
         payAndBenefits.items.push({
-            title: 'Compensation',
-            href: '/hr/compensation/bands',
+            title: 'Compensation & Benefits',
+            href: can?.hr?.compensation?.view
+                ? '/hr/compensation/bands'
+                : '/hr/compensation/benefits',
             icon: DollarSign,
-        });
-    }
-    if (can?.hr?.benefits?.view) {
-        payAndBenefits.items.push({
-            title: 'Benefits',
-            href: '/hr/benefits',
-            icon: Shield,
         });
     }
     if (can?.hr?.expenses?.view) {

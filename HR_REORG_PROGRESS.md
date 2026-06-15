@@ -42,7 +42,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 
 - [x] **S1 — Webhooks → Settings only** *(half-done before loop)* ✅
 - [x] **S2 — Leave Reports → Leave & Rosters tab** ✅
-- [ ] **S3 — Benefits → Compensation & Benefits tab**
+- [x] **S3 — Benefits → Compensation & Benefits tab** ✅
 - [ ] **S4 — Expenses (admin) → Comp & Benefits tab**
 - [ ] **S5 — Skills → Performance ▸ Competencies & Skills**
 - [ ] **S6 — Policies → Documents & Policies hub**
@@ -98,6 +98,33 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   snapshots — same Win↔Linux divergence as the Vite-hash note) and there's no served app in this headless
   worktree; running it yields false diffs and updating would corrupt cross-platform snapshots. Live visual parity
   is the user's browser check per the loop DoD.
+
+### S3 — DONE
+- Benefits was a standalone mini-hub: `/hr/benefits` (enrollments) + `/hr/benefits/plans` + POST/PUT actions,
+  gated `hr.benefits.view`/`manage`. Clean-cut **re-home** into the Compensation hub (no redirect).
+- **Routes** (`routes/hr.php`): re-prefixed the group `benefits` → `compensation/benefits` and renamed
+  `hr.benefits.*` → `hr.compensation.benefits.*`. **Kept the `permission:hr.benefits.view`/`manage` gates** as a
+  SEPARATE group (not nested in the `hr.compensation.view` group) so permissions stay frozen (golden rule #3).
+- **Pages**: `git mv` `pages/hr/benefits/{index,plans}.tsx` → `pages/hr/compensation/benefits/` (git detected
+  renames R098/R097, history preserved). Updated their breadcrumbs + body URLs `/hr/benefits` →
+  `/hr/compensation/benefits`, added `<CompensationTabs active="benefits" />` to each (Inertia resolves pages by
+  glob, so no import to fix; `BenefitsController` render paths `'hr/benefits/…'` → `'hr/compensation/benefits/…'`).
+- **CompensationTabs** rewritten to the per-tab-gated pattern (mirrors ComplianceTabs): bands/reviews/bonuses gated
+  `hr.compensation.view`, the new **Benefits** tab gated `hr.benefits.view` (cross-gate, no 403-on-click), active
+  always shown. Hub renamed "Compensation & Benefits".
+- **Sidebar**: removed the standalone "Benefits" item; renamed "Compensation" → "Compensation & Benefits" with a
+  **conditional href** (`compensation.view ? /…/bands : /…/benefits`) so a benefits-only user keeps a working hub
+  entry (no access lost). `Shield` import still used (13 other uses).
+- **Tests**: re-homed `/hr/benefits` → `/hr/compensation/benefits` in BenefitsEnrollmentTest + BenefitPlanLifecycleTest
+  (Feature, in gate) + HrBenefitsTest (Browser). The 336 pest passes are UNCHANGED in count — same tests, new URLs.
+- **Orphan grep (resources/ app/ tests/ routes/):** `hr/benefits` → 0, `benefits.index` → 0. The remaining
+  `hr.benefits.` matches are exclusively the FROZEN permission key `hr.benefits.view`/`manage` (+ one comment).
+- **Files touched:** `routes/hr.php`, `app/Http/Controllers/Hr/BenefitsController.php`, `components/hr/compensation-tabs.tsx`,
+  `components/app-sidebar.tsx`, moved `pages/hr/compensation/benefits/{index,plans}.tsx`, 3 test files, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint 1-err (baseline) · build exit 0 · vitest 5/156 (baseline, run alone)
+  · pest 1-fail (baseline RecruitmentJobPostingSyncTest), 336 pass (benefits tests pass at new URLs). Hand-formatted.
+- **Discovered:** the Benefits *Plans* page had no UI link from the Enrollments page (reachable only by URL) — a
+  pre-existing nav gap, preserved as-is (not adding sub-nav = no scope creep).
 
 ## Discovered (out of scope — do not fix here)
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.

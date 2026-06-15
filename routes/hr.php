@@ -646,10 +646,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Benefits
+    | Benefits (folded into the Compensation & Benefits hub)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.benefits.view')->prefix('benefits')->name('benefits.')->group(function () {
+    Route::middleware('permission:hr.benefits.view')->prefix('compensation/benefits')->name('compensation.benefits.')->group(function () {
         Route::get('/', [BenefitsController::class, 'index'])->name('index');
         Route::get('/plans', [BenefitsController::class, 'plans'])->name('plans');
 
