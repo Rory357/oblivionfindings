@@ -26,14 +26,14 @@ search pill from PRN footer; `MedsWizardDialog`/`SummaryRow` (`@/components/meds
 ---
 
 ## A. Stock detail / "view" modal + clickable rows
-- [ ] A1 — Read-only `StockDetailDialog` (on `WizardShell`, prn-detail idiom): medication + client (avatar/room/site), on-hand vs reorder, batch + expiry, cold-chain/controlled flags, last count + variance, recent movement history, any open pharmacy order. Footer Options bar: Adjust stock · Run count · Order more · View client · Open on MAR.
-- [ ] A2 — `StockRowView` rows clickable (cursor-pointer + hover + keyboard-focusable, role=button + Enter/Space) → open detail modal. Keep inline Count/Adjust buttons, wrap in `stopPropagation`.
+- [x] A1 — `StockDetailDialog` (`components/emar/stock-detail-dialog.tsx`, on `WizardShell`): Overview (resident name/room/site, medication + CD/cold-chain flags + dose + storage, on-hand vs reorder w/ ratio bar + status pill, batch/expiry/supplier) + Activity (last count, open pharmacy order panel, recent movements list w/ +/− deltas). Footer Options bar: Adjust stock · Run count · Order more · Client · MAR.
+- [x] A2 — `StockRowView` rows clickable (cursor-pointer + hover + `role=button` + `tabIndex` + Enter/Space) → detail modal. Inline Count/Adjust kept, `stopPropagation` on each button. (StockManagement.tsx)
 
 ## B. Right-click context menu on every row
-- [ ] B3 — `onContextMenu` → `ShiftContextMenu` on each stock row AND each CD-register row (copy PRN `openRowCtx`). Items: View details (primary), Adjust stock, Run count (CD → balance check), Order more, Receive against order (when an open order exists for it), sep, View client, Open on MAR, sep, Mark expired / quarantine (critical, when expired). Header tag = stock-state pill (OK/low/expiring/expired); meta = client · medication · on-hand.
+- [x] B3 — `onContextMenu` → `ShiftContextMenu` on every stock row (`openStockCtx`) AND every CD-register row (`openCdCtx`). Stock items: View details (primary) · Adjust stock · Run count/CD balance check · Order more · Receive against order (only when an open order matches) · sep · View client · Open on MAR · sep · Mark expired/quarantine (critical, only when expired). CD items: View details · Record CD balance check · Adjust · Order more · sep · View client · Open CD register · Investigate (critical, when unreconciled). Header tag = stock-state pill (OK/Low/Expiring/Expired or CD OK/CD discrepancy) via CSS-var tokens; meta = client · medication · on-hand. (StockManagement.tsx)
 
 ## C. "View client" jump
-- [ ] C4 — Client group header → link to `/operations/clients/{id}/care`; wire View client in context menu (B) and detail modal footer (A). Off-page nav only for View client / Open on MAR; all stock actions open modals in place.
+- [x] C4 — Client group header is now a button → `/operations/clients/{id}/care`; View client wired in both context menus and the detail modal footer. Off-page nav only for View client / Open on MAR; all stock actions open modals in place. (StockManagement.tsx)
 
 ## D. Client filter in the footer
 - [ ] D5 — `Client` `EntityFilter` (allLabel="All clients", onDark) in the hero footer next to Site, built from payload clients; wire to `client_id` on `stock()` via `router.get('/emar/stock', …, { preserveState, preserveScroll })`. Search/chip/tab stay client-side.

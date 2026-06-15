@@ -27,6 +27,15 @@ export type StockMed = {
     client?: { first_name: string; last_name: string } | null;
     scan_verification?: MedicationScanVerification | null;
 };
+export type StockMovement = {
+    id: number;
+    at: string | null;
+    actor: string | null;
+    type: 'created' | 'received' | 'removed' | 'adjusted' | 'counted' | 'updated';
+    summary: string;
+    delta: number | null;
+    unit: string | null;
+};
 export type StockRow = {
     id: number;
     medication_id: number;
@@ -34,6 +43,8 @@ export type StockRow = {
     medication_dose: string | null;
     client_id: number | null;
     client_name: string;
+    client_room: string | null;
+    mar_url: string | null;
     site_id: number | null;
     site_name: string | null;
     on_hand: number;
@@ -52,6 +63,7 @@ export type StockRow = {
     is_expiring_soon: boolean;
     is_expiring_90: boolean;
     scan_verification?: MedicationScanVerification | null;
+    movements: StockMovement[];
 };
 export type StaffOpt = { id: number; name: string };
 export type ClientOpt = { id: number; first_name: string; last_name: string };
