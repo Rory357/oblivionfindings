@@ -12,10 +12,17 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
 - [x] **S1 — Validation foundation.** Added coverage/credentials/shift_templates/geofence/finance/
   total_capacity rule blocks to StoreSiteRequest + UpdateSiteRequest (no migration — cols already
   exist). `tests/Feature/Sites/AddSiteModalValidationTest.php` (14 tests/29 assertions, green); Pint
-  clean. Commit `<s1>`.
-- [ ] **S2 — Controller fan-out + index props.** Transactional store fan-out (coverage rows,
-  credentials, shift templates, finance cents, circle AssetGeofence) + index reference props +
-  config/site_credentials.php. Feature tests.
+  clean. Commit `90f1d77f`.
+- [x] **S2 — Controller fan-out + index props.** `store()` now wraps everything in `DB::transaction`
+  and fans out coverage (days→rows, roles map→role_requirements), credentials→SiteStaffRequirement
+  (unique-respected), shift templates→RosterTemplate "{Site} default week" (Option A, 7 day-rows/
+  template, identity FKs null), finance dollars→cents, circle AssetGeofence (mirrors
+  SiteGeofenceController scope/shape, coords-gated). `total_capacity` added to Site $fillable. Index
+  exposes `addSite` reference props (users, checklistTemplates, availableAssets, regionOptions,
+  serviceContexts, copyableSites+coverage/credentials, credentialCatalogue, coverageRoleKeys) gated on
+  sites.create. New `config/site_credentials.php` (6-item catalogue + role keys).
+  `AddSiteModalStoreTest.php` (10 tests/62 assertions, green); 48 existing SiteControllerTest pass;
+  Pint clean. Commit `<s2>`.
 - [ ] **S3 — Dialog scaffold + existing steps.** add-site-dialog.tsx (9 steps) mounted on sites index;
   Basics/Location-shell/Spaces/Contacts/Equipment/Documents wired from _wizard.tsx + must-add fields.
 - [ ] **S4 — Rostering & coverage step (new).** Copy-from + 4 presets + coverage cards (role mix,

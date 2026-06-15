@@ -46,6 +46,7 @@ class Site extends Model
         'archived',
         'archived_at',
         'primary_contact_user_id',
+        'total_capacity',
         'rent_amount',
         'rent_frequency',
         'lease_start_date',
