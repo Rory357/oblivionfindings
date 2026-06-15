@@ -2208,17 +2208,12 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     }
-    if (can?.hr?.documents?.view) {
+    if (can?.hr?.documents?.view || can?.hr?.policies?.view) {
         records.items.push({
-            title: 'Documents',
-            href: '/hr/documents',
-            icon: FileText,
-        });
-    }
-    if (can?.hr?.policies?.view) {
-        records.items.push({
-            title: 'Policies',
-            href: '/hr/policies',
+            title: 'Documents & Policies',
+            href: can?.hr?.documents?.view
+                ? '/hr/documents'
+                : '/hr/documents/policies',
             icon: FileText,
         });
     }

@@ -38,7 +38,7 @@ class PolicyAttestationController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('hr/policies/attestations', [
+        return Inertia::render('hr/documents/policies/attestations', [
             'attestations' => $attestations,
             'filters' => [
                 'policy_id' => $request->query('policy_id'),

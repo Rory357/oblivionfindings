@@ -32,8 +32,8 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Policies', href: '/hr/policies' },
-    { title: 'Create Policy', href: '/hr/policies/create' },
+    { title: 'Policies', href: '/hr/documents/policies' },
+    { title: 'Create Policy', href: '/hr/documents/policies/create' },
 ];
 
 export default function CreatePolicy({
@@ -101,7 +101,7 @@ export default function CreatePolicy({
                     ? current.content_summary
                     : '',
         }));
-        post('/hr/policies', {
+        post('/hr/documents/policies', {
             forceFormData: true,
         });
     };
@@ -141,7 +141,7 @@ export default function CreatePolicy({
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/policies"
+                        backHref="/hr/documents/policies"
                         title="Create New Policy"
                         description="Add a new policy to the library."
                     />
@@ -552,7 +552,7 @@ export default function CreatePolicy({
                     </Card>
 
                     <div className="flex items-center justify-end gap-4">
-                        <Link href="/hr/policies">
+                        <Link href="/hr/documents/policies">
                             <Button type="button" variant="outline">
                                 Cancel
                             </Button>

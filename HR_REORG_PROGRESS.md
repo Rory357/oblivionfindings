@@ -47,7 +47,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S3 — Benefits → Compensation & Benefits tab** ✅
 - [x] **S4 — Expenses (admin) → Comp & Benefits tab** ✅
 - [x] **S5 — Skills → Performance ▸ Competencies & Skills** ✅
-- [ ] **S6 — Policies → Documents & Policies hub**
+- [x] **S6 — Policies → Documents & Policies hub** ✅
 - [ ] **S7 — Training hub (pull out of Compliance)**
 - [ ] **S8 — Goals consolidation**
 - [ ] **S9 — Calendar hub (merge three calendars)**
@@ -183,6 +183,33 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   · vitest 5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass. NB: no skills-specific pest Feature test
   exists, so the re-homed route resolution is covered by types/build/wayfinder + the Browser HrMiscTest, not pest.
   Hand-formatted (no prettier).
+
+### S6 — DONE
+- Policies was a 5-page mini-hub (`/hr/policies` index + show/edit/create/attestations + store/version/attest/download),
+  controllers PolicyController + PolicyAttestationController, gated `hr.policies.view`/`manage`/`attest`. **Re-homed**
+  to `/hr/documents/policies` and folded into the Documents hub (clean cut, no redirect).
+- ⚠️ **Kept the route NAME `policies.`** (only changed the prefix `policies` → `documents/policies`). Policies has
+  `redirect()->route('hr.policies.index')` in the controller — keeping the name means those route() calls stay valid
+  with ZERO controller-route edits; only the URL changes. (S3/S4/S5 renamed names because they had no route() calls.)
+- **Pages**: git mv all 5 → `pages/hr/documents/policies/` (renames R095–R098); controllers' Inertia::render paths
+  re-homed; URLs re-homed in the 5 pages + 2 tests + the **PolicyAttestationDueNotification** action URLs (a file the
+  first orphan-grep CAUGHT — re-ran grep after fixing → clean).
+- **DocumentsTabs**: added a per-tab-gated **Policies** tab (`hr.policies.view`, cross-gate vs documents.view); the
+  policies index now carries `<DocumentsTabs active="policies" />`. Hub renamed "Documents & Policies".
+- **Sidebar**: merged the separate "Documents" + "Policies" items into one "Documents & Policies" entry (shown for
+  documents OR policies view, href lands a policies-only user on /hr/documents/policies). `FileText` import still used.
+- **`/hr/my/policies` UNTOUCHED** (MyHrController personal lens). Its page's admin-download link
+  `/hr/policies/{id}/download` WAS re-homed to `/hr/documents/policies/{id}/download` (that's an admin-route
+  cross-reference, not the personal lens — `/hr/my/policies` itself never matched the `hr/policies` substring).
+- **Orphan grep (resources/ app/ tests/ routes/):** `hr/policies` → 0. The only `hr.policies.` matches are the FROZEN
+  permission keys (view/manage/attest) + the 2 VALID `route('hr.policies.index')` calls (kept name).
+- **Files touched (13):** routes/hr.php, PolicyController.php, PolicyAttestationController.php,
+  PolicyAttestationDueNotification.php, documents-tabs.tsx, app-sidebar.tsx, moved
+  pages/hr/documents/policies/{index,show,edit,create,attestations}.tsx, my/policies.tsx, 2 test files, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint 0-err (no new in touched, no unrelated staged) · build exit 0 · vitest
+  5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass (PolicyShowContentTest passes at new URL). Hand-formatted.
+- **Discovered:** strip added to the policies INDEX only (show/edit/create/attestations are sub-pages with backHref) —
+  matches the S4 pattern; revisit if every hub sub-page should carry the strip.
 
 ## Discovered (out of scope — do not fix here)
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.

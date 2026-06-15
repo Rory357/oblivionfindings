@@ -189,7 +189,7 @@ export default function MyPolicies({ policies }: Props) {
                                                                 <div className="h-full min-h-[60vh] flex-1 overflow-hidden rounded-lg bg-muted">
                                                                     {currentVersion.document_path ? (
                                                                         <iframe
-                                                                            src={`/hr/policies/${policy.id}/download`}
+                                                                            src={`/hr/documents/policies/${policy.id}/download`}
                                                                             className="h-full w-full"
                                                                             title={
                                                                                 policy.title

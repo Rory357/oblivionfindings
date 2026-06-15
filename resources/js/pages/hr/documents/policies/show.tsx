@@ -111,8 +111,8 @@ const getCategoryColor = (category: string) => {
 export default function PolicyShow({ policy, attestationStats, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
-        { title: 'Policies', href: '/hr/policies' },
-        { title: policy.title, href: `/hr/policies/${policy.id}` },
+        { title: 'Policies', href: '/hr/documents/policies' },
+        { title: policy.title, href: `/hr/documents/policies/${policy.id}` },
     ];
 
     const handleAttest = () => {
@@ -121,7 +121,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                 'By clicking confirm, you attest that you have read and understood this policy.',
             )
         ) {
-            router.post(`/hr/policies/${policy.id}/attest`);
+            router.post(`/hr/documents/policies/${policy.id}/attest`);
         }
     };
 
@@ -133,7 +133,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/policies"
+                        backHref="/hr/documents/policies"
                         title={
                             <span className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-muted-foreground" />
@@ -184,7 +184,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 {policy.current_version?.document_path && (
                                     <>
                                         <Link
-                                            href={`/hr/policies/${policy.id}/download`}
+                                            href={`/hr/documents/policies/${policy.id}/download`}
                                             target="_blank"
                                         >
                                             <Button size="sm" variant="outline">
@@ -193,7 +193,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                             </Button>
                                         </Link>
                                         <Link
-                                            href={`/hr/policies/${policy.id}/download`}
+                                            href={`/hr/documents/policies/${policy.id}/download`}
                                             download
                                         >
                                             <Button size="sm" variant="outline">
@@ -205,7 +205,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 )}
                                 {can.manage && (
                                     <Link
-                                        href={`/hr/policies/${policy.id}/edit`}
+                                        href={`/hr/documents/policies/${policy.id}/edit`}
                                     >
                                         <Button size="sm" variant="outline">
                                             <Edit className="mr-1.5 h-4 w-4" />

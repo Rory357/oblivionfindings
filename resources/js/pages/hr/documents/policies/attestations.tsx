@@ -39,8 +39,8 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Policies', href: '/hr/policies' },
-    { title: 'Attestations', href: '/hr/policies/attestations' },
+    { title: 'Policies', href: '/hr/documents/policies' },
+    { title: 'Attestations', href: '/hr/documents/policies/attestations' },
 ];
 
 const formatDateTime = (value?: string | null) => {
@@ -60,7 +60,7 @@ const formatDateTime = (value?: string | null) => {
 export default function PolicyAttestations({ attestations, filters }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/policies/attestations',
+            '/hr/documents/policies/attestations',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -81,7 +81,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                         ]}
                         actions={
                             <Link
-                                href="/hr/policies"
+                                href="/hr/documents/policies"
                                 className="rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-3 py-2 text-xs text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20"
                             >
                                 Back to Policies
@@ -130,7 +130,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                                     <TableRow key={att.id}>
                                         <TableCell>
                                             <Link
-                                                href={`/hr/policies/${att.policy.id}`}
+                                                href={`/hr/documents/policies/${att.policy.id}`}
                                                 className="font-medium text-status-info hover:underline"
                                             >
                                                 {att.policy.title}

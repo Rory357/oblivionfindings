@@ -89,7 +89,7 @@ export default function EditPolicy({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/hr/policies/${policy.id}`);
+        put(`/hr/documents/policies/${policy.id}`);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,7 +113,7 @@ export default function EditPolicy({
     const handleVersionSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        postVersion(`/hr/policies/${policy.id}/versions`, {
+        postVersion(`/hr/documents/policies/${policy.id}/versions`, {
             forceFormData: true,
             onSuccess: () => {
                 setShowNewVersionForm(false);
@@ -132,13 +132,13 @@ export default function EditPolicy({
                 'Are you sure you want to delete this policy? This action cannot be undone.',
             )
         ) {
-            router.delete(`/hr/policies/${policy.id}`);
+            router.delete(`/hr/documents/policies/${policy.id}`);
         }
     };
 
     const handleDeleteVersion = (versionId: number) => {
         if (confirm('Are you sure you want to delete this version?')) {
-            router.delete(`/hr/policies/${policy.id}/versions/${versionId}`);
+            router.delete(`/hr/documents/policies/${policy.id}/versions/${versionId}`);
         }
     };
 
@@ -170,9 +170,9 @@ export default function EditPolicy({
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
-        { title: 'Policies', href: '/hr/policies' },
-        { title: policy.title, href: `/hr/policies/${policy.id}` },
-        { title: 'Edit', href: `/hr/policies/${policy.id}/edit` },
+        { title: 'Policies', href: '/hr/documents/policies' },
+        { title: policy.title, href: `/hr/documents/policies/${policy.id}` },
+        { title: 'Edit', href: `/hr/documents/policies/${policy.id}/edit` },
     ];
 
     return (
@@ -183,7 +183,7 @@ export default function EditPolicy({
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/policies"
+                        backHref="/hr/documents/policies"
                         title="Edit Policy"
                         description="Update policy details"
                     />
@@ -368,7 +368,7 @@ export default function EditPolicy({
                     </Card>
 
                     <div className="flex items-center justify-end gap-4">
-                        <Link href={`/hr/policies/${policy.id}`}>
+                        <Link href={`/hr/documents/policies/${policy.id}`}>
                             <Button type="button" variant="outline">
                                 Cancel
                             </Button>

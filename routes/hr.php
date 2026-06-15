@@ -407,7 +407,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Policies & Attestations
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.policies.view')->prefix('policies')->name('policies.')->group(function () {
+    Route::middleware('permission:hr.policies.view')->prefix('documents/policies')->name('policies.')->group(function () {
         Route::get('/', [PolicyController::class, 'index'])->name('index');
         Route::get('/attestations', [PolicyAttestationController::class, 'index'])->name('attestations.index');
 

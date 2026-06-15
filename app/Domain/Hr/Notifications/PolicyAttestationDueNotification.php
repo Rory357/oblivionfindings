@@ -35,7 +35,7 @@ class PolicyAttestationDueNotification extends Notification implements ShouldQue
             ->line("**Policy:** {$title}")
             ->line("**Category:** " . ucfirst($this->policy->category ?? 'General'))
             ->line("**Due by:** {$formattedDueDate}")
-            ->action('Review & Attest', url("/hr/policies/{$this->policy->id}"))
+            ->action('Review & Attest', url("/hr/documents/policies/{$this->policy->id}"))
             ->line('Please review the policy and confirm your attestation before the due date.');
     }
 
@@ -46,7 +46,7 @@ class PolicyAttestationDueNotification extends Notification implements ShouldQue
             'policy_title' => $this->policy->title,
             'policy_id'    => $this->policy->id,
             'due_date'     => $this->dueDate?->toIso8601String(),
-            'action_url'   => "/hr/policies/{$this->policy->id}",
+            'action_url'   => "/hr/documents/policies/{$this->policy->id}",
         ];
     }
 }

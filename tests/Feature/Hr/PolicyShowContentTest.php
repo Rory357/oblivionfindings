@@ -50,7 +50,7 @@ beforeEach(function () {
 test('the policy show page ships the current version content_summary', function () {
     // Regression: show.tsx read currentVersion.content (a phantom field) so the
     // summary always rendered empty. The real field is content_summary.
-    $response = $this->actingAs($this->manager)->get("/hr/policies/{$this->policy->id}");
+    $response = $this->actingAs($this->manager)->get("/hr/documents/policies/{$this->policy->id}");
     $response->assertOk();
 
     expect($response->inertiaProps('policy.current_version.content_summary'))
@@ -59,13 +59,13 @@ test('the policy show page ships the current version content_summary', function 
 
 test('a user without hr.policies.view cannot open a policy', function () {
     $this->actingAs($this->worker)
-        ->get("/hr/policies/{$this->policy->id}")
+        ->get("/hr/documents/policies/{$this->policy->id}")
         ->assertForbidden();
 });
 
 test('the policy show page does not render content via an XSS sink', function () {
     // The summary is plain text — it must be rendered as text, never piped through
     // dangerouslySetInnerHTML (which would execute an injected <script>).
-    $source = file_get_contents(resource_path('js/pages/hr/policies/show.tsx'));
+    $source = file_get_contents(resource_path('js/pages/hr/documents/policies/show.tsx'));
     expect($source)->not->toContain('dangerouslySetInnerHTML');
 });
