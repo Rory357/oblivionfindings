@@ -64,13 +64,20 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 
 ## C. Reviews due — richer wizard modal
 
-- [ ] **C6.** Migrate effectiveness capture onto the Add-Client `WizardShell` chrome (replace the bare
+- [x] **C6.** Migrate effectiveness capture onto the Add-Client `WizardShell` chrome (replace the bare
   `prn-effect-dialog.tsx` `<Dialog>`); rail shows an administration context card (client, med,
-  given-at, ago). 3 steps per spec (Outcome → Observations → Escalation & sign-off).
-- [ ] **C7.** Effectiveness field gap analysis (see "Backend gap analysis" below) — implement the
-  data-layer-supported fields; stub the rest as `TODO(Gx)`.
-- [ ] **C8.** Reviews-due rows open this wizard; after save, Inertia partial-reload + success pane (no
-  nav). Header surfaces count + "within 4h of dose".
+  given-at, ago). 3 steps per spec (Outcome → Observations → Escalation & sign-off). — _done: new
+  `resources/js/components/emar/prn-effectiveness-dialog.tsx` (`PrnEffectivenessDialog`) on `WizardShell`
+  (rail = client + `{med} · given {time} · {ago}`). **Did NOT mutate the shared `prn-effect-dialog.tsx`**
+  (the worker board still uses it) — created an eMAR-scoped component and swapped only `PrnRecords.tsx`._
+- [x] **C7.** Effectiveness field gap analysis (see "Backend gap analysis" below) — implement the
+  data-layer-supported fields; stub the rest as `TODO(Gx)`. — _done: implemented `review_minutes_after`
+  (Segmented 15/30/45/60/90) + `observations`; G1–G7 left as `TODO(Gx)` comments in
+  `WorkerMedsController@recordPrnEffect` referencing this doc (no invented migrations)._
+- [x] **C8.** Reviews-due rows open this wizard; after save, Inertia partial-reload + success pane (no
+  nav). Header surfaces count + "within 4h of dose". — _done: rows + context menu + detail modal all
+  open `{type:'effect'}` → the new wizard; submit posts with `preserveState`+`preserveScroll` → success
+  pane; Reviews-due header now shows "Within 4h of the dose"._
 
 ## D. Near limit — drill-down modal
 
@@ -110,17 +117,23 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
   (not the 200-row cap). Return `{ data, meta }`.
 - [ ] **BK3.** Near-limit detail: extend each near-limit med with today's per-dose timeline (time,
   dose, given-by, effectiveness), next-allowable-time, over-limit incident reference.
-- [ ] **BK4.** Effectiveness extra fields: add only schema-supported fields to the payload; stub the
-  rest as `TODO(Gx)`.
+- [x] **BK4.** Effectiveness extra fields: add only schema-supported fields to the payload; stub the
+  rest as `TODO(Gx)`. — _done: `recordPrnEffect` now accepts the explicit `review_minutes_after` chip
+  (nullable; derives from elapsed time when omitted so the worker board is unaffected) and
+  `updateOrCreate`s the single `hasOne` register entry so "Re-record effectiveness" revises rather than
+  blocks/duplicates. G1–G7 deferred as `TODO(Gx)` comments. Files: `WorkerMedsController.php`._
 - [x] **BK5.** Detail modal: ensure each administration carries baseline observations + effectiveness
   sub-record the detail modal needs. — _done: `prn()` register payload now eager-loads
   `client.room`/`client.site`/`medication.route`/`prnEffectiveness.reviewedByUser` and emits
   `client_room`/`client_site`/`route`/`prescribed_dose`/`notes`/`mar_url`/`baseline{bgl,pulse,bp,insulin}`/
   `effectiveness_detail{outcome,review_minutes_after,observations,escalation,reviewed_by,reviewed_label}`.
   Added `use App\Support\EmarUrl`._
-- [ ] **BK6.** Manager record endpoint: confirm a manager-scoped record path delegating to
+- [x] **BK6.** Manager record endpoint: confirm a manager-scoped record path delegating to
   `EnhancedMarService` (currently `WorkerMedsController@recordPrn`, gated `medications.administer.record`
-  || `clients.update`), called by the Record/Re-record wizard via `useForm().post()`.
+  || `clients.update`), called by the Record/Re-record wizard via `useForm().post()`. — _confirmed:
+  `recordPrn` delegates to `EnhancedMarService::recordAdministration` (constructor-injected) and is gated
+  `medications.administer.record || clients.update` (broad enough for managers); `PrnWizard` posts there.
+  No new endpoint needed — the existing path already satisfies the original gap #1._
 
 ---
 
@@ -185,3 +198,12 @@ Missing for the drill-down (to add in `prn()` near-limit list, derive — no sch
   touched files; only the worktree's pre-existing `@/routes` gap remains), `eslint` clean on both
   frontend files, `php -l` clean. **Next pass:** Group C (migrate effectiveness capture onto
   `WizardShell` 3-step + the effectiveness field gap analysis — C6/C7/C8 + BK4).
+- _(pass 3)_ **Closed Group C + BK4 + BK6.** New `components/emar/prn-effectiveness-dialog.tsx` (3-step
+  `WizardShell`: Outcome tile-picker + reviewed-after Segmented → Observations → Escalation & sign-off
+  with summary); `PrnRecords.tsx` swapped to it (worker board keeps the shared `prn-effect-dialog`),
+  Reviews-due header gained "Within 4h of the dose". Backend: `recordPrnEffect` accepts the explicit
+  `review_minutes_after` chip and `updateOrCreate`s (re-record support); G1–G7 stubbed as `TODO(Gx)`;
+  BK6 confirmed (`recordPrn` → `EnhancedMarService`). Files: `prn-effectiveness-dialog.tsx`,
+  `PrnRecords.tsx`, `WorkerMedsController.php`. Verified: scoped `tsc` clean (no touched-file mentions),
+  `eslint` clean, `php -l` clean. **Next pass:** Group D (Near-limit drill-down modal + BK3 payload —
+  per-dose timeline, next-allowable, over-limit incident).

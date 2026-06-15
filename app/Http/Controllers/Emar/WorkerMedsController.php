@@ -363,38 +363,60 @@ class WorkerMedsController extends Controller
         $data = $request->validate([
             'client_medication_administration_id' => ['required', 'integer', 'exists:client_medication_administrations,id'],
             'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],
+            // Explicit "reviewed X minutes after the dose" chip from the eMAR
+            // effectiveness wizard; when omitted we derive it from the elapsed
+            // time (the worker board's quick follow-up never sends it).
+            'review_minutes_after' => ['nullable', 'integer', 'min:0', 'max:1440'],
             'observations' => ['nullable', 'string', 'max:2000'],
             'escalation_needed' => ['nullable', 'boolean'],
             'escalation_action' => ['nullable', 'string', 'max:500'],
         ]);
 
+        // The medication_prn_effectiveness schema only supports the fields above.
+        // Richer review data the eMAR design asked for needs migrations and is
+        // deferred (see docs/PRN_GAP_ANALYSIS.md "effectiveness extra fields"):
+        //   TODO(G1): structured side-effects (chip-multi) — folded into observations for now
+        //   TODO(G2): symptom/pain score before→after (0–10)
+        //   TODO(G3): vitals after dose (pulse/BP/resp)
+        //   TODO(G4): "further dose likely?" flag
+        //   TODO(G5): structured "who was notified" (GP/family/senior)
+        //   TODO(G6): follow-up due time
+        //   TODO(G7): link to care/behaviour plan
         $administration = ClientMedicationAdministration::with(['medication:id,name,is_prn', 'prnEffectiveness'])
             ->findOrFail($data['client_medication_administration_id']);
 
         abort_unless($administration->medication?->is_prn, 422, 'Only PRN doses take an effectiveness check.');
 
-        if ($administration->prnEffectiveness) {
-            return back()->with('warning', 'The effect of this dose has already been recorded.');
-        }
+        $reviewMinutes = $data['review_minutes_after']
+            ?? ($administration->administered_at
+                ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
+                : null);
 
-        $reviewMinutes = $administration->administered_at
-            ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
-            : null;
+        // updateOrCreate (keyed on the hasOne administration) so the eMAR
+        // "Re-record effectiveness" action revises the single register entry
+        // rather than blocking or duplicating it.
+        $existed = (bool) $administration->prnEffectiveness;
+        MedicationPrnEffectiveness::updateOrCreate(
+            ['client_medication_administration_id' => $administration->id],
+            [
+                'client_id' => $administration->client_id,
+                'client_medication_id' => $administration->client_medication_id,
+                'effectiveness' => $data['effectiveness'],
+                'review_minutes_after' => $reviewMinutes,
+                'observations' => $data['observations'] ?? null,
+                'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
+                'escalation_action' => $data['escalation_action'] ?? null,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now(),
+            ],
+        );
 
-        MedicationPrnEffectiveness::create([
-            'client_medication_administration_id' => $administration->id,
-            'client_id' => $administration->client_id,
-            'client_medication_id' => $administration->client_medication_id,
-            'effectiveness' => $data['effectiveness'],
-            'review_minutes_after' => $reviewMinutes,
-            'observations' => $data['observations'] ?? null,
-            'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
-            'escalation_action' => $data['escalation_action'] ?? null,
-            'reviewed_by' => $user->id,
-            'reviewed_at' => now(),
-        ]);
-
-        return back()->with('success', 'Follow-up recorded — effect noted on the PRN register.');
+        return back()->with(
+            'success',
+            $existed
+                ? 'Effectiveness review updated on the PRN register.'
+                : 'Follow-up recorded — effect noted on the PRN register.',
+        );
     }
 
     /**

@@ -1,12 +1,12 @@
 /* eslint-disable no-restricted-syntax -- the register/near-limit/trends surfaces are
    custom-layout bordered panels (not Card/Button); all colours are semantic tokens. */
 import { PrnDetailDialog, type PrnAdministration } from '@/components/emar/prn-detail-dialog';
+import { PrnEffectivenessDialog } from '@/components/emar/prn-effectiveness-dialog';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { PrnEffectDialog } from '@/pages/meds/today/components/prn-effect-dialog';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type { ClientInfo, PrnFollowUp, PrnMedication } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
@@ -326,7 +326,7 @@ export default function PrnRecords(props: Props) {
 
                 {activeTab === 'reviews' && (
                     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                        <div className="flex items-center gap-2 border-b bg-status-warning-bg/40 px-5 py-3 text-sm font-medium text-status-warning"><Clock className="h-4 w-4" />Effectiveness reviews due ({reviews.length})</div>
+                        <div className="flex flex-wrap items-center gap-2 border-b bg-status-warning-bg/40 px-5 py-3 text-sm font-medium text-status-warning"><Clock className="h-4 w-4" />Effectiveness reviews due ({reviews.length})<span className="ml-auto text-xs font-normal text-muted-foreground">Within 4h of the dose</span></div>
                         {reviews.length === 0 ? <div className="px-5 py-10 text-center text-sm text-muted-foreground">No effectiveness reviews due.</div> : (
                             <ul className="divide-y">
                                 {reviews.map((r) => (
@@ -391,7 +391,7 @@ export default function PrnRecords(props: Props) {
                 <PrnWizard medications={prnMeds} clients={clientsMap} date={date} witnesses={witnesses} signedAs={{ name: signer.name, role_label: signer.role_label }} initialMedId={modal.initialMedId ?? null} onClose={() => setModal(null)} />
             )}
             {modal?.type === 'effect' && (
-                <PrnEffectDialog followUp={modal.followUp} client={clientsMap.get(modal.followUp.client_id)} onClose={() => setModal(null)} />
+                <PrnEffectivenessDialog followUp={modal.followUp} client={clientsMap.get(modal.followUp.client_id)} onClose={() => setModal(null)} />
             )}
             {modal?.type === 'detail' && (
                 <PrnDetailDialog
