@@ -23,8 +23,8 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 ## B. Alert banner — real stacked strip (priority 2)
 
-- [ ] **B4** Replace the single discrepancy banner with a stacked alert strip from loaded data: open discrepancies (critical → Discrepancies), overdue balance checks (warning → Reconciliation), open loss investigations (critical → Loss Reports), CDs at/below reorder or expiring (warning → Register). Each: icon + count + message + "Review" → switches tab. Dismissible per session.
-- [ ] **B5** Wire shared `OfflineStatusBanner` so the hero "synced" eyebrow is truthful + pending CD mutations show a count. (CD mutations use the localStorage queue → IndexedDB convergence = `TODO(Gx)`, don't rewrite the queue.)
+- [x] **B4** Single banner → stacked, per-session-dismissible alert strip (`AlertRow` + `cdAlerts`): open discrepancies (critical→Discrepancies), open loss investigations (critical→Loss), overdue balance checks (warning→Reconciliation), stock at/below reorder OR expiring ≤30d (warning→Register). Each icon+count+message + Review (switches tab) + ✕. Dismissals persist in `sessionStorage`. _ControlledDrugs.tsx._
+- [x] **B5** Hero eyebrow now driven by `useOfflineQueueState()` — truthful "synced / N queued to sync / syncing N… / offline · N queued" with tone-matched dot (literal classes, no dynamic Tailwind). CD wizards post directly via Inertia (not the shared queue) → a CD-specific pending count + IndexedDB convergence = `TODO(Gx)` (queue not rewritten). _ControlledDrugs.tsx._
 
 ## C. All tabs — right-click menu + read-only detail modal + View client (priority 3, biggest gap)
 
@@ -72,4 +72,5 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 _(append one line per pass: date · item(s) · what changed · files)_
 
+- **2026-06-16 · Group B (B4, B5)** — Single discrepancy banner → stacked, per-session-dismissible (`sessionStorage`) alert strip covering discrepancies / open losses / overdue checks / stock reorder+expiry, each with a Review tab-jump. Hero "synced" eyebrow now reflects real device sync state via `useOfflineQueueState()` (synced/queued/syncing/offline) with literal tone classes. CD-queue convergence left as TODO(Gx) (wizards post via Inertia, not the queue). Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`.
 - **2026-06-16 · Group A + backend (A1–A3, BK-params, BK-recon, BK-schedule)** — Hero footer now has day-stepper + DayPickerChip + search + Site + Client filter (PRN parity); search drives all 7 tabs client-side; date/site/client round-trip via `reload()`. `controlled()` accepts `date`/`client_id`/`q`, scopes movements to the selected day, computes always-current per-med last-balance-check + overdue server-side, exposes stock expiry/batch/reorder. Gates: types ✓, eslint ✓, build ✓, Pint ✓, ControlledDrugsTest 3/3 ✓. Files: `ControlledDrugs.tsx`, `components/emar/controlled/types.ts`, `EmarController.php@controlled`.

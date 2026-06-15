@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { BalanceCheckDialog, CdPill, LossActionDialog, RecordCdEntryDialog, RecordDestructionDialog, ReportLossDialog, ResolveDiscrepancyDialog } from '@/pages/emar/_cd-dialogs';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
+import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { Head, router } from '@inertiajs/react';
 import { Activity, AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, FileWarning, Lock, Package, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -42,6 +43,33 @@ type Modal =
 /** Case-insensitive match of a query against a row's text fields. */
 function matchq(q: string, ...parts: (string | null | undefined)[]): boolean {
     return !q || parts.filter(Boolean).join(' ').toLowerCase().includes(q);
+}
+
+type CdAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof AlertTriangle; message: string; tab: string };
+
+const DISMISSED_ALERTS_KEY = 'cd-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
 }
 
 export default function ControlledDrugs(props: Props) {
@@ -92,6 +120,43 @@ export default function ControlledDrugs(props: Props) {
     const openLosses = lossReports.filter((l) => ['reported', 'investigating'].includes(l.investigation_status));
     const overdueChecks = medications.filter((m) => m.overdue_check).length;
 
+    // Device sync state for the hero eyebrow (truthful "synced" badge). The shared
+    // offline queue is global; CD wizards currently post directly via Inertia, so a
+    // CD-specific pending count isn't surfaced — TODO(Gx) convergence (don't rewrite
+    // the queue here). See docs/CONTROLLED_GAP_ANALYSIS.md (B5).
+    const { online, pendingCount, syncing } = useOfflineQueueState();
+    // Literal Tailwind classes (no dynamic interpolation — keeps the JIT scanner happy).
+    const sync: { label: string; dotClass: string; pingClass: string | null } = !online
+        ? { label: pendingCount > 0 ? `offline · ${pendingCount} queued` : 'offline', dotClass: 'bg-status-warning', pingClass: null }
+        : syncing
+          ? { label: pendingCount > 0 ? `syncing ${pendingCount}…` : 'syncing…', dotClass: 'bg-status-info', pingClass: 'bg-status-info/70' }
+          : pendingCount > 0
+            ? { label: `${pendingCount} queued to sync`, dotClass: 'bg-status-info', pingClass: null }
+            : { label: 'synced', dotClass: 'bg-status-success', pingClass: 'bg-status-success/70' };
+
+    // CDs at/below reorder level or expiring within 30 days (stock-risk alert → Register).
+    const stockRisks = useMemo(
+        () => medications.filter((m) => {
+            const s = m.stock;
+            if (!s) return false;
+            const onHand = s.on_hand == null ? null : Number(s.on_hand);
+            const lowStock = s.reorder_level != null && onHand != null && onHand <= Number(s.reorder_level);
+            const expiring = !!s.expiry_date && (parseYmd(s.expiry_date).getTime() - Date.now()) / 86_400_000 <= 30;
+            return lowStock || expiring;
+        }),
+        [medications],
+    );
+
+    // Stacked, dismissible (per session) alert strip built from already-loaded data.
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
+    const alerts: CdAlert[] = [
+        discrepancies.length > 0 && { kind: 'disc', tone: 'critical' as const, icon: AlertTriangle, message: `${discrepancies.length} open controlled-drug discrepanc${discrepancies.length === 1 ? 'y' : 'ies'} — investigate and resolve.`, tab: 'discrepancies' },
+        openLosses.length > 0 && { kind: 'loss', tone: 'critical' as const, icon: FileWarning, message: `${openLosses.length} open loss investigation${openLosses.length === 1 ? '' : 's'} awaiting follow-up.`, tab: 'loss' },
+        overdueChecks > 0 && { kind: 'overdue', tone: 'warning' as const, icon: ShieldCheck, message: `${overdueChecks} controlled drug${overdueChecks === 1 ? '' : 's'} overdue a balance check (≥ 7 days).`, tab: 'reconciliation' },
+        stockRisks.length > 0 && { kind: 'stock', tone: 'warning' as const, icon: Package, message: `${stockRisks.length} controlled drug${stockRisks.length === 1 ? '' : 's'} at/below reorder level or expiring within 30 days.`, tab: 'register' },
+    ].filter((a): a is CdAlert => Boolean(a) && !dismissed.includes((a as CdAlert).kind));
+
     const TABS: RosterTabItem[] = [
         { id: 'register', label: 'Register', icon: Lock, tone: 'primary', badge: medications.length || undefined },
         { id: 'recent', label: 'Recent Entries', icon: Package, tone: 'info', badge: recentEntries.length || undefined },
@@ -122,10 +187,10 @@ export default function ControlledDrugs(props: Props) {
                         <span>
                             <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
                                 <span aria-hidden className="relative inline-flex h-2 w-2">
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                    {sync.pingClass ? <span className={`absolute inset-0 animate-ping rounded-full ${sync.pingClass}`} /> : null}
+                                    <span className={`relative inline-flex h-2 w-2 rounded-full ${sync.dotClass}`} />
                                 </span>
-                                Controlled drug register · synced
+                                Controlled drug register · {sync.label}
                             </span>
                             <span className="mt-1 block text-[26px] font-bold leading-tight">
                                 CD register for{' '}
@@ -221,13 +286,11 @@ export default function ControlledDrugs(props: Props) {
                     }
                 />
 
-                {discrepancies.length > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-critical">
-                            <AlertTriangle className="h-4 w-4" />
-                            {discrepancies.length} open controlled-drug discrepanc{discrepancies.length === 1 ? 'y' : 'ies'} — investigate and resolve.
-                        </span>
-                        <Button size="sm" variant="outline" onClick={() => setActiveTab('discrepancies')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setActiveTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
                     </div>
                 )}
 
@@ -392,4 +455,27 @@ function TableCard({ head, empty, children }: { head: string[]; empty: string | 
 
 function EmptyCard({ text }: { text: string }) {
     return <div className="rounded-2xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">{text}</div>;
+}
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session dismiss. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: CdAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                {/* eslint-disable-next-line no-restricted-syntax -- inline dismiss affordance on the alert strip. */}
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
+    );
 }
