@@ -59,3 +59,6 @@ Closed most of the original deferrals + design gaps. Migration `2026_06_15_08000
 - Editable **Policy** store (toggles shown read-only), co-sign **PIN/re-auth** verification (currently records approver only), Flagged **dismiss** persistence, repeat-misuse **auto-block** enforcement, real `incident_report_id` linkage + access-scope activity log.
 - Cleanup: retire `emergency/request.tsx` (open the wizard prefilled from the MAR interstitial) + consolidate the duplicate `emar.emergency_access` / `emergency_access.index` routes.
 - Browser: axe a11y / responsive + side-by-side-vs-design pixel parity on the dev server / .com.
+
+### Pass 3 — Tier 3 + cleanup (2026-06-15, in progress)
+- ✅ **1. Card de-dup** — the active grant card no longer prints the reason category twice when a grant has no free-text detail. `reasonBody` shows a *distinct* free-text detail when present, otherwise nothing for categorised grants (the uppercase eyebrow already names it); legacy rows with no category still render the raw reason. `access.tsx`.

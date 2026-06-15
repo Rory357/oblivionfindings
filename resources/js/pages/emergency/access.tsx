@@ -150,7 +150,9 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                     const leftMs = expires - now;
                                     const pct = Math.max(0, Math.min(1, leftMs / total));
                                     const urgent = leftMs <= 600000 ? 'var(--status-critical)' : leftMs <= 1800000 ? 'var(--status-warning)' : 'var(--primary)';
-                                    const detailLine = a.reason && a.reason !== a.reason_category ? a.reason : null;
+                                    // Free-text detail when present; otherwise the eyebrow already names the category, so
+                                    // fall back to the raw reason only for legacy rows that have no category.
+                                    const reasonBody = a.reason && a.reason !== a.reason_category ? a.reason : a.reason_category ? null : a.reason;
                                     return (
                                         <div key={a.id} className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${leftMs <= 600000 ? 'border-status-critical/50' : ''}`}>
                                             <div className="h-1" style={{ background: urgent }} />
@@ -166,7 +168,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                                                     <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{a.site_name ?? '—'} · granted {fmtDateTime(a.created_at)}</div>
                                                     <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-1.5">
                                                         {a.reason_category && <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{a.reason_category}</div>}
-                                                        <div className="text-xs">{detailLine ?? a.reason}</div>
+                                                        {reasonBody && <div className="text-xs">{reasonBody}</div>}
                                                     </div>
                                                     <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground"><Fingerprint className="h-3 w-3" />{a.cosign_label ? `${a.cosign_label} · ` : ''}by {a.granted_by ?? 'Unknown'}</div>
                                                 </div>
