@@ -46,4 +46,16 @@ Eyebrow live-ping `LIVE · BREAK-GLASS MONITORING`; title "Emergency access for 
 
 ## 7. Notes / deferrals (backlog)
 - §3d: the workflow modal is the **Request-access wizard** on `MedsWizardDialog` (real grant write).
-- **Deferred (no endpoint — not stubbed):** Extend (+30 min — no update route), post-event **Review** modal (no review columns/route), Policy **editing** (no policy store — shown read-only), Flagged **dismiss** (no route), and the handoff's structured `reason_category`/`authorization_mode`/`co_signed_by`/ack/`review_*`/`incident_report_id` columns + co-sign verification + repeat-block enforcement. The wizard captures reason-category + acks as **UI** (composed into `reason` / client-side gates). Reasons: new columns + endpoints out of scope. Core = brand 4-tab oversight surface + real grant wizard + real revoke + **audit-retention immutability fix** + derived flagged + read-only policy.
+
+### ✅ Pass 2 — Tier 1+2 implemented (2026-06-15)
+Closed most of the original deferrals + design gaps. Migration `2026_06_15_080000_add_structured_fields_to_break_glass_accesses` adds `reason_category`, `authorization_mode`, `co_signed_by`, `acknowledged_min_necessary`, `acknowledged_incident_report`, `reviewed_at`, `reviewed_by`, `review_outcome`, `review_notes`, `incident_report_linked` (all nullable/default-off → legacy + the legacy request page keep working). Model gains `coSignedBy()`/`reviewedBy()` relations, `authorizationLabel()`, and `DEFAULT_MINUTES=60` / `MAX_MINUTES=240` / `EXTEND_MINUTES=30` constants (single source of truth for store/extend/policy payload).
+- **Wizard** now 4 steps (Find → Justify → **Authorise** → Review) — co-sign approver / self-authorise persisted (authorization_mode + co_signed_by; co-signer must be a different person); acks persisted.
+- **Extend** endpoint `emar.clients.break_glass.extend` (+30 min, capped at created_at + MAX_MINUTES) wired to the card Extend button.
+- **Review** endpoint `emar.clients.break_glass.review` (justified/not_justified + notes + incident-linked, `medications.audit.view`-gated) + new `_review-dialog.tsx`, surfaced from the audit table's per-row Review button + Review-state pill.
+- **Card** parity: two-tier reason (uppercase category + detail), `{cosign_label} · by {staff}` line, Extend button, red Revoke, `1h 55m` time format. **Audit** gains Duration + Review columns. **Hero** gains badges + an honest **Awaiting review** stat. **Flagged** gains a derived "awaiting review" signal. `store` now enforces the policy max (240, not 1440).
+- Tests: `EmergencyAccessTest` (10 green) — structured grant + co-sign-different-person, duration cap, extend within/at cap, review records outcome + audit-gating, approvers/awaiting-review payload.
+
+### Still deferred (Tier 3 — governance decisions, not stubbed)
+- Editable **Policy** store (toggles shown read-only), co-sign **PIN/re-auth** verification (currently records approver only), Flagged **dismiss** persistence, repeat-misuse **auto-block** enforcement, real `incident_report_id` linkage + access-scope activity log.
+- Cleanup: retire `emergency/request.tsx` (open the wizard prefilled from the MAR interstitial) + consolidate the duplicate `emar.emergency_access` / `emergency_access.index` routes.
+- Browser: axe a11y / responsive + side-by-side-vs-design pixel parity on the dev server / .com.
