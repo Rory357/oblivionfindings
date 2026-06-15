@@ -39,13 +39,13 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 ## E. Modal completeness (priority 5)
 
-- [ ] **E11** Audit each `_cd-dialogs.tsx` wizard vs CD best practice; implement data-supported, stub the rest:
-  - Record CD entry → auto-fill balance-before from latest register balance; show Schedule (TODO — no column); require batch+expiry on receipts; reconcile hint (✅ present). *Server balance reconcile already enforced.*
-  - Balance check → mismatch auto-raises incident + forces discrepancy note (✅ verify end-to-end); "last checked N days ago" hint.
-  - Record destruction → denaturing-kit confirmation + CD Accountable Officer; two-distinct-witness + authorisation (✅ present).
-  - Report loss / Loss action → CD Accountable Officer / regulator notification; link created incident; escalation history.
-  - Resolve discrepancy → surface/link the auto-created `incident_id`; outcome categories.
-- [ ] **E12** Enforce witness ≠ recorder in the UI (disable self in witness select) on every CD modal. *Server rule (`different:auth id`) already enforced for entry + destruction + balance check.*
+- [x] **E11** Modal completeness audit + data-supported fixes:
+  - Record CD entry → balance-before auto-fill (✅ already), reconcile hint (✅ already); **added expiry_date field + batch+expiry required when entry_type==='receipt'** (backend already accepts expiry_date). Schedule chip = `TODO(G-F)` (no column).
+  - Balance check → **added "Last balance check N days ago / Overdue" hint** from the picked med's `days_since_check`/`overdue_check`; mismatch→discrepancy→incident already verified server-side.
+  - Record destruction → **added a required "Denaturing kit used" confirmation for CDs** (UI gate; no column to persist — disposal_method already records denaturing); two-witness + authoriser already present; **witness 2 now excludes witness 1**.
+  - Report loss / Loss action → police + pharmacy escalation already captured; **CD Accountable Officer / regulator-notified = `TODO(Gx)`** (no column on `controlled_drug_loss_reports` — not invented).
+  - Resolve discrepancy → outcome categories already via `RESOLUTION_ACTIONS`; incident link is server-side (`MedicationIncidentIntegrationService`), no FK to surface.
+- [x] **E12** Witness ≠ recorder enforced in the UI: `witnessOptions(staff, exclude)` excludes `current_user.id` from every witness `SelectInput` (entry `witnessed_by`, balance `witnessed_by`, destruction `witness_1`/`witness_2`); witness 2 also excludes witness 1. Mirrors the server `different:auth id` rule. _ControlledDrugs.tsx (threads `currentUserId`), _cd-dialogs.tsx._
 
 ## F. Schedule / expiry visibility on Register & Reconciliation (priority 6)
 
@@ -72,6 +72,7 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 
 _(append one line per pass: date · item(s) · what changed · files)_
 
+- **2026-06-16 · Group E (E11, E12)** — Self-witnessing now blocked in the UI (`witnessOptions` excludes the recorder from every witness select; witness 2 excludes witness 1) via a threaded `current_user`. Record-CD-entry gained an expiry_date field + batch/expiry required on receipts; Balance-check shows a "last checked N days / overdue" hint; Record-destruction requires a denaturing-kit confirmation for CDs. CD Accountable Officer / regulator-notified left as TODO(Gx) (no column). Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`, `_cd-dialogs.tsx`.
 - **2026-06-16 · Group D (D9, D10)** — Every tab now has an Add-Client-style primary create action in its panel header + a matching empty-state CTA button (no more grey-text-only empties). `TableCard` gained `title`/`count`/`action`/`cta`; new `TabHeader` for the discrepancy/loss card tabs; reusable per-tab buttons. Per-row pre-fill already shipped in C. Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`.
 - **2026-06-16 · Group C + BK-detail (C6, C7, C8)** — New `cd-detail-dialog.tsx` read-only detail modal (5 row kinds on WizardShell) + every row on all 7 tabs now click→detail, right-click→`ShiftContextMenu` (per-kind actions incl. View client / Export register), keyboard-focusable; Audit rows read-only. Controller enriched discrepancy/loss/destruction payloads + `current_user`; incident FK link = TODO(Gx) (no column). Gates: types ✓, eslint ✓, Pint ✓, build ✓, ControlledDrugsTest 3/3 ✓. Files: `components/emar/cd-detail-dialog.tsx`, `ControlledDrugs.tsx`, `components/emar/controlled/types.ts`, `EmarController.php@controlled`.
 - **2026-06-16 · Group B (B4, B5)** — Single discrepancy banner → stacked, per-session-dismissible (`sessionStorage`) alert strip covering discrepancies / open losses / overdue checks / stock reorder+expiry, each with a Review tab-jump. Hero "synced" eyebrow now reflects real device sync state via `useOfflineQueueState()` (synced/queued/syncing/offline) with literal tone classes. CD-queue convergence left as TODO(Gx) (wizards post via Inertia, not the queue). Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`.

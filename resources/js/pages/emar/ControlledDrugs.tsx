@@ -30,6 +30,7 @@ type Props = {
     date_label: string;
     client_id: number | null;
     q: string | null;
+    current_user: { id: number; name: string } | null;
 };
 
 type Modal =
@@ -530,11 +531,11 @@ export default function ControlledDrugs(props: Props) {
                 )}
             </div>
 
-            {modal?.type === 'entry' && <RecordCdEntryDialog medications={medications} staff={staff} onClose={() => setModal(null)} />}
-            {modal?.type === 'balance' && <BalanceCheckDialog medications={medications} staff={staff} onClose={() => setModal(null)} />}
-            {modal?.type === 'balanceMed' && <BalanceCheckDialog medications={medications} staff={staff} presetMedId={modal.medId} onClose={() => setModal(null)} />}
+            {modal?.type === 'entry' && <RecordCdEntryDialog medications={medications} staff={staff} currentUserId={props.current_user?.id ?? null} onClose={() => setModal(null)} />}
+            {modal?.type === 'balance' && <BalanceCheckDialog medications={medications} staff={staff} currentUserId={props.current_user?.id ?? null} onClose={() => setModal(null)} />}
+            {modal?.type === 'balanceMed' && <BalanceCheckDialog medications={medications} staff={staff} currentUserId={props.current_user?.id ?? null} presetMedId={modal.medId} onClose={() => setModal(null)} />}
             {modal?.type === 'loss' && <ReportLossDialog medications={medications} onClose={() => setModal(null)} />}
-            {modal?.type === 'destruction' && <RecordDestructionDialog medications={medications} staff={staff} onClose={() => setModal(null)} />}
+            {modal?.type === 'destruction' && <RecordDestructionDialog medications={medications} staff={staff} currentUserId={props.current_user?.id ?? null} onClose={() => setModal(null)} />}
             {modal?.type === 'resolveDisc' && <ResolveDiscrepancyDialog discrepancy={modal.disc} onClose={() => setModal(null)} />}
             {modal?.type === 'lossAction' && <LossActionDialog report={modal.report} action={modal.action} onClose={() => setModal(null)} />}
             {modal?.type === 'detail' && (
