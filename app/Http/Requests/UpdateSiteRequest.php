@@ -52,6 +52,7 @@ class UpdateSiteRequest extends FormRequest
             'rooms.*.id' => ['nullable', 'integer'],
             'rooms.*.name' => ['required_with:rooms.*', 'string', 'max:255'],
             'rooms.*.notes' => ['nullable', 'string', 'max:2000'],
+            'rooms.*.is_assignable' => ['nullable', 'boolean'],
 
             'resources' => ['nullable', 'array'],
             'resources.*.id' => ['nullable', 'integer'],

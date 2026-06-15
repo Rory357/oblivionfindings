@@ -11,7 +11,6 @@ import GeofenceDrawMap, {
     type GeofenceShape,
 } from '@/components/geofence-draw-map';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -43,7 +42,6 @@ import {
 import { cn } from '@/lib/utils';
 import { CONTACT_TYPES } from '@/pages/sites/contacts/_helpers';
 import {
-    FREQUENCIES,
     NZ_REGION_OPTIONS,
     RESOURCE_TYPES,
     SITE_TYPES,
@@ -65,6 +63,7 @@ import {
     MapPin,
     Minus,
     Package,
+    Pill,
     Plus,
     Shield,
     ShieldCheck,
@@ -81,21 +80,6 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 /* ------------------------------------------------------------------ */
 
 export type AddSiteUser = { id: number; name: string };
-export type AddSiteChecklistTemplate = {
-    id: number;
-    name: string;
-    description?: string | null;
-    applicable_to_type?: string | null;
-    frequency?: string | null;
-};
-export type AddSiteAsset = {
-    id: number;
-    name: string;
-    asset_tag?: string | null;
-    category?: string | null;
-    serial_number?: string | null;
-    is_assigned_here?: boolean;
-};
 export type AddSiteServiceContext = {
     id: number;
     name: string;
@@ -133,8 +117,6 @@ export type AddSiteRoleKey = { key: string; label: string };
 
 export type AddSiteReferenceData = {
     users: AddSiteUser[];
-    checklistTemplates: AddSiteChecklistTemplate[];
-    availableAssets: AddSiteAsset[];
     regionOptions: string[];
     serviceContexts: AddSiteServiceContext[];
     copyableSites: AddSiteCopyableSite[];
@@ -173,7 +155,7 @@ export type SiteContactRow = {
     email: string;
     is_primary: boolean;
 };
-export type RoomRow = { name: string; notes: string };
+export type RoomRow = { name: string; notes: string; is_assignable: boolean };
 export type ResourceRow = { name: string; resource_type: string; capacity: string };
 export type ZoneRow = { name: string; zone_type: string };
 export type ChecklistRow = {
@@ -268,7 +250,7 @@ const STEPS: readonly (WizardStep & { key: StepKey })[] = [
     { key: 'spaces', label: 'Spaces', icon: Package, blurb: 'Rooms, resources & zones' },
     { key: 'rostering', label: 'Rostering', icon: CalendarClock, blurb: 'Coverage & credentials' },
     { key: 'contacts', label: 'Contacts', icon: Users, blurb: 'Who to call' },
-    { key: 'equipment', label: 'Equipment & checks', icon: Package, blurb: 'Assets & checklists' },
+    { key: 'equipment', label: 'Medication', icon: Pill, blurb: 'Where meds are stored' },
     { key: 'documents', label: 'Documents', icon: FileText, blurb: 'Files & certificates' },
     { key: 'finance', label: 'Property & finance', icon: Wallet, blurb: 'Tenancy & budget' },
     { key: 'review', label: 'Review', icon: CheckCircle2, blurb: 'Risk, safety & create' },
@@ -980,6 +962,11 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
 /*  Step: Spaces                                                       */
 /* ------------------------------------------------------------------ */
 
+const ROOM_TYPE_OPTIONS = [
+    { value: 'bedroom', label: 'Bedroom' },
+    { value: 'communal', label: 'Communal / shared' },
+];
+
 function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
     const { data, set } = ctx;
     const showCapacity = data.type === 'house' || data.type === 'residential';
@@ -1070,14 +1057,22 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                         addLabel="Add room"
                         rows={data.rooms}
                         onChange={(rows) => set('rooms', rows)}
-                        empty="No rooms yet — add the bedrooms and communal spaces."
-                        makeEmpty={() => ({ name: '', notes: '' })}
+                        empty="No rooms yet — add bedrooms and communal spaces like the lounge or kitchen."
+                        makeEmpty={() => ({ name: '', notes: '', is_assignable: true })}
                         renderRow={(row, update) => (
-                            <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1.3fr]">
                                 <Input
                                     value={row.name}
                                     onChange={(e) => update({ name: e.target.value })}
-                                    placeholder="Room name"
+                                    placeholder="e.g. Bedroom 1, Lounge"
+                                />
+                                <SelectInput
+                                    value={row.is_assignable ? 'bedroom' : 'communal'}
+                                    onChange={(v) =>
+                                        update({ is_assignable: v === 'bedroom' })
+                                    }
+                                    placeholder="Room type"
+                                    options={ROOM_TYPE_OPTIONS}
                                 />
                                 <Input
                                     value={row.notes}
@@ -1274,135 +1269,15 @@ function StepContacts({ ctx }: { ctx: SiteStepCtx }) {
 /* ------------------------------------------------------------------ */
 
 function StepEquipment({ ctx }: { ctx: SiteStepCtx }) {
-    const { data, set, ref } = ctx;
-    const toggleAsset = (id: number, on: boolean) =>
-        set('assets', on ? [...data.assets, id] : data.assets.filter((a) => a !== id));
-    const checklistFor = (templateId: number) =>
-        data.checklists.find((c) => c.template_id === templateId);
-    const setChecklist = (templateId: number, patch: Partial<ChecklistRow>) => {
-        const existing = checklistFor(templateId);
-        if (existing) {
-            set(
-                'checklists',
-                data.checklists.map((c) =>
-                    c.template_id === templateId ? { ...c, ...patch } : c,
-                ),
-            );
-        } else {
-            set('checklists', [
-                ...data.checklists,
-                {
-                    template_id: templateId,
-                    enabled: true,
-                    frequency: 'monthly',
-                    assigned_to_user_id: '',
-                    ...patch,
-                },
-            ]);
-        }
-    };
-
+    const { data, set } = ctx;
     return (
         <div>
             <StepHead
-                icon={Package}
-                title="Equipment & checks"
-                blurb="Link assets, schedule recurring checklists, and note medication storage."
+                icon={Pill}
+                title="Medication storage"
+                blurb="Where medication is kept on site — this feeds eMAR and site readiness."
             />
             <div className="grid gap-4">
-                <SubHead icon={Package}>Assets &amp; devices</SubHead>
-                {ref.availableAssets.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-3.5 text-center text-[13px] text-muted-foreground">
-                        No unassigned assets available to link.
-                    </div>
-                ) : (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        {ref.availableAssets.map((a) => {
-                            const on = data.assets.includes(a.id);
-                            return (
-                                <label
-                                    key={a.id}
-                                    className={cn(
-                                        'flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 transition-colors',
-                                        on ? 'border-primary bg-primary/10' : 'border-border bg-card/60',
-                                    )}
-                                >
-                                    <Checkbox
-                                        checked={on}
-                                        onCheckedChange={(v) => toggleAsset(a.id, v as boolean)}
-                                    />
-                                    <span className="min-w-0">
-                                        <span className="block truncate text-[13px] font-semibold">
-                                            {a.name}
-                                        </span>
-                                        <span className="block truncate text-[11px] text-muted-foreground">
-                                            {[a.asset_tag, a.category].filter(Boolean).join(' · ')}
-                                        </span>
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
-                )}
-
-                <SubHead icon={CheckCircle2}>Recurring checklists</SubHead>
-                {ref.checklistTemplates.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-3.5 text-center text-[13px] text-muted-foreground">
-                        No checklist templates configured.
-                    </div>
-                ) : (
-                    <div className="grid gap-2">
-                        {ref.checklistTemplates.map((t) => {
-                            const row = checklistFor(t.id);
-                            const on = !!row?.enabled;
-                            return (
-                                <div
-                                    key={t.id}
-                                    className="rounded-lg border border-border bg-card/60 p-3"
-                                >
-                                    <div className="flex items-center gap-2.5">
-                                        <Switch
-                                            checked={on}
-                                            onCheckedChange={(v) =>
-                                                setChecklist(t.id, { enabled: v })
-                                            }
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-[13px] font-semibold">{t.name}</div>
-                                            {t.description ? (
-                                                <div className="truncate text-[11px] text-muted-foreground">
-                                                    {t.description}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                    {on ? (
-                                        <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-                                            <SelectInput
-                                                value={row?.frequency ?? 'monthly'}
-                                                onChange={(v) => setChecklist(t.id, { frequency: v })}
-                                                placeholder="Frequency"
-                                                options={FREQUENCIES}
-                                            />
-                                            <SelectInput
-                                                value={row?.assigned_to_user_id ?? ''}
-                                                onChange={(v) =>
-                                                    setChecklist(t.id, { assigned_to_user_id: v })
-                                                }
-                                                placeholder="Assign to…"
-                                                options={ref.users.map((u) => ({
-                                                    value: String(u.id),
-                                                    label: u.name,
-                                                }))}
-                                            />
-                                        </div>
-                                    ) : null}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
                 <Field label="Medication storage location" span>
                     <Input
                         value={data.medication_storage_location}
@@ -1410,6 +1285,10 @@ function StepEquipment({ ctx }: { ctx: SiteStepCtx }) {
                         placeholder="e.g. Locked cabinet in the office"
                     />
                 </Field>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                    Devices, assets and recurring checklists are set up from the
+                    site profile once it&apos;s created.
+                </p>
             </div>
         </div>
     );
@@ -1797,7 +1676,7 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                 title="Rostering & coverage"
                 blurb="Define who needs to be on site, when — plus the credentials staff must hold."
             />
-            <div className="grid gap-5">
+            <div className="grid gap-6">
                 {/* Copy a pattern */}
                 {ref.copyableSites.length > 0 ? (
                     <Field
@@ -1820,20 +1699,28 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                 {/* Presets */}
                 <div>
                     <SubHead icon={Sparkles}>Quick coverage presets</SubHead>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                        Tap one to add ready-made coverage rules, then tweak them below.
+                    </p>
+                    <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                         {PRESETS.map((p) => (
                             <button
                                 key={p.key}
                                 type="button"
                                 onClick={() => applyPreset(p.key)}
-                                className="rounded-lg border border-border bg-card/60 p-3 text-left transition-colors hover:border-primary/50 hover:bg-card"
+                                className="flex items-start gap-2.5 rounded-xl border border-border bg-card/60 p-3.5 text-left transition-colors hover:border-primary/50 hover:bg-card"
                             >
-                                <div className="flex items-center gap-1.5 text-[13px] font-semibold">
-                                    <Plus className="h-3.5 w-3.5 text-primary" /> {p.label}
-                                </div>
-                                <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                                    {p.desc}
-                                </div>
+                                <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                                    <Plus className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">
+                                        {p.label}
+                                    </span>
+                                    <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
+                                        {p.desc}
+                                    </span>
+                                </span>
                             </button>
                         ))}
                     </div>
