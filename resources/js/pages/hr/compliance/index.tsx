@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { ComplianceTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -145,6 +146,8 @@ export default function ComplianceIndex({
                     />
                 }
             >
+                <ComplianceTabs active="overview" />
+
                 {/* Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>

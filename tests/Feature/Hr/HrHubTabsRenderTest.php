@@ -80,4 +80,11 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/my/documents',
     '/hr/my/policies',
     '/hr/my/surveys',
+    // Compliance hub
+    '/hr/compliance',
+    '/hr/compliance/matrix',
+    '/hr/compliance/calendar',
+    '/hr/compliance/training',
+    '/hr/compliance/vetting',
+    '/hr/compliance/drivers',
 ]);
