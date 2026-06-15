@@ -236,7 +236,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
-        Route::get('/compliance/training', [TrainingDashboardController::class, 'index'])->name('training.index');
+        Route::get('/training', [TrainingDashboardController::class, 'index'])->name('training.index');
     });
 
     /*

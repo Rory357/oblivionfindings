@@ -26,4 +26,5 @@ export * from './recruitment-tabs';
 export * from './reports-tabs';
 export * from './settings-tabs';
 export * from './status-badge';
+export * from './training-tabs';
 export * from './wizard';

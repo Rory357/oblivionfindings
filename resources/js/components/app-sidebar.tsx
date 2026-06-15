@@ -2158,6 +2158,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: ClipboardCheck,
         });
     }
+    if (can?.hr?.training?.view) {
+        performance.items.push({
+            title: 'Training',
+            href: '/hr/training',
+            icon: GraduationCap,
+        });
+    }
     if (performance.items.length > 0) groups.push(performance);
 
     // Engagement

@@ -38,7 +38,8 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
     this file's *HR* section only — do **not** fix the Finance assertion as part of HR work.
   - `my-day/index-audit-fixes.test.tsx` › 4 my-day/attendance wiring tests.
 - **pest (tests/Feature/Hr):** 1 failure — `RecruitmentJobPostingSyncTest` › "hr can sync and unpublish external
-  posting channels" (L67: `external_posting_status` stays `posted` after unpublish). 336 pass.
+  posting channels" (L67: `external_posting_status` stays `posted` after unpublish). **337 pass** (was 336; S7 added
+  a `/hr/training/catalog` render case to HrHubTabsRenderTest — the new baseline pass count is 337).
 
 ## Slices
 
@@ -48,7 +49,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S4 — Expenses (admin) → Comp & Benefits tab** ✅
 - [x] **S5 — Skills → Performance ▸ Competencies & Skills** ✅
 - [x] **S6 — Policies → Documents & Policies hub** ✅
-- [ ] **S7 — Training hub (pull out of Compliance)**
+- [x] **S7 — Training hub (pull out of Compliance)** ✅
 - [ ] **S8 — Goals consolidation**
 - [ ] **S9 — Calendar hub (merge three calendars)**
 - [ ] **S10 — Final regroup + group split** *(last)*
@@ -210,6 +211,36 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass (PolicyShowContentTest passes at new URL). Hand-formatted.
 - **Discovered:** strip added to the policies INDEX only (show/edit/create/attestations are sub-pages with backHref) —
   matches the S4 pattern; revisit if every hub sub-page should carry the strip.
+
+### S7 — DONE
+- NOT a re-home — CREATED a standalone Training hub by pulling Training out of Compliance. Training was split: the
+  **dashboard** at the odd URL `/hr/compliance/training` (TrainingDashboardController, name `hr.training.index`,
+  StaffTrainingRecord data) + the **catalog** at `/hr/training/catalog` (TrainingController). Pages already lived under
+  `pages/hr/training/` so NO file moves.
+- **Route**: re-homed the dashboard URL `/hr/compliance/training` → `/hr/training` (kept name `training.index`, so the
+  `redirect()->route('hr.training.index')` in routes/training.php stays valid). Catalog/course routes unchanged.
+- **New `components/hr/training-tabs.tsx`** (TrainingTabs): **Dashboard** (`/hr/training`) + **Catalog**
+  (`/hr/training/catalog`), gated `hr.training.view`. ⚠️ **HONEST 2 tabs, not §A's "Catalog·Assignments·Records"** —
+  there is NO built "Assignments" page (enrollments are an action on the course-detail page, not a page); the dashboard
+  IS the records view. Did not invent an Assignments tab. Exported from the barrel.
+- training/index.tsx + catalog.tsx now render `<TrainingTabs active="dashboard|catalog">` instead of `<ComplianceTabs>`;
+  their `/hr/compliance/training` URLs re-homed to `/hr/training`.
+- **compliance-tabs.tsx**: removed the `training` + `catalog` tabs (+ their now-unused GraduationCap/BookOpen imports +
+  the `training` HrCan field + the type-union members). Compliance hub now: Overview·Matrix·Calendar·Vetting·Drivers.
+- **Sidebar**: added a new "Training" item (`/hr/training`, GraduationCap, gated `hr.training.view`) under the
+  **Performance** group (→ "Performance & Development" per §A; S10 renames the group label). There was NO standalone
+  Training sidebar item before (it was only a Compliance tab).
+- **Tests**: re-homed `/hr/compliance/training` → `/hr/training` in HrComplianceTest + TrainingTest (Browser); the
+  orphan-grep CAUGHT a missed Feature test HrHubTabsRenderTest (had `/hr/compliance/training` in its render list) →
+  moved it to a new "Training hub" section with both `/hr/training` + `/hr/training/catalog` (so pest now renders both
+  new pages → +1 pass, 337).
+- **`/hr/my/training` (personal) UNTOUCHED.**
+- **Orphan grep (resources/ app/ tests/ routes/):** `compliance/training` → 0. The `compliance.training` dotted
+  matches are exclusively the UNRELATED governance metric `compliance.training_compliance` (PerformanceReviewService).
+- **Files touched (10):** routes/hr.php, NEW training-tabs.tsx, components/hr/index.ts, compliance-tabs.tsx,
+  app-sidebar.tsx, training/{index,catalog}.tsx, HrComplianceTest.php, TrainingTest.php, HrHubTabsRenderTest.php, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint 0-err (no new, no unrelated staged) · build exit 0 · vitest 5/156
+  (baseline) · pest 1-fail (baseline), 337 pass. Hand-formatted (no prettier).
 
 ## Discovered (out of scope — do not fix here)
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.
