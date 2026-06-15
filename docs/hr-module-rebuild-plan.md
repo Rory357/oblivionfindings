@@ -623,11 +623,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     deactivating CLOSES a plan to new enrollments (index() loads active() plans for the enroll dropdown) but does
     NOT orphan existing enrollments (they reference benefit_plan_id by id) — so a free toggle is safe, no guard
     needed. BenefitsController already used ResolvesHrTenant (no tenant bug). 3 tests (BenefitPlanLifecycleTest).
-  - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
-    self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
-    HrDemoSeederTest + SurveySystemRetiredTest, so dropping requires editing all of those too). **HrDashboardConfig**
-    (fully standalone leaf — cleanest drop, zero test fallout). HrEmployeeProfileVersion/HrEmployeeStatusChange +
-    HrCompensationReviewItem are dead *relationships on LIVE parents* (lower priority / future scope — leave).
+  - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* ✅ **HrDashboardConfig DONE (S32)** —
+    re-confirmed truly orphaned (repo-wide grep: only the model + its create migration; no controller/route/service/
+    seeder/factory/test/relationship). Reversible drop migration 2026_06_16_000001 (down() recreates id/user_id-unique-FK/
+    layout-json/timestamps) + deleted the model. 3 tests (HrDashboardConfigDroppedTest: table gone via Schema::hasTable,
+    model file_exists false, down() method exists). REMAINING: **HrSurvey\*** (4 tables — NOT a clean self-contained drop:
+    wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory + HrDemoSeederTest + SurveySystemRetiredTest, so dropping
+    requires editing all of those too). HrEmployeeProfileVersion/HrEmployeeStatusChange + HrCompensationReviewItem are dead
+    *relationships on LIVE parents* (lower priority / future scope — leave).
   - *Static a11y/token (build+eslint-verifiable):* ✅ **same-token contrast killers DONE (S28)** — was actually 162
     instances across 44 files (not ~15); all swapped `bg-status-X`→`bg-status-X-bg`. REMAINING: raw-palette
     `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls
