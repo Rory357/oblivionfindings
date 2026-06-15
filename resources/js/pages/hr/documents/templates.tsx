@@ -107,7 +107,7 @@ export default function DocumentTemplates({
                     />
                 }
             >
-                <DocumentsTabs active="templates" canManage={can.manage} />
+                <DocumentsTabs active="templates" />
 
                 <div className="flex flex-wrap items-center gap-3">
                     <Input

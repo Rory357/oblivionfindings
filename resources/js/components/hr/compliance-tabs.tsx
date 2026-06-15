@@ -1,5 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
 import {
+    BookOpen,
     CalendarDays,
     Car,
     GraduationCap,
@@ -15,6 +16,7 @@ export type ComplianceTab =
     | 'matrix'
     | 'calendar'
     | 'training'
+    | 'catalog'
     | 'vetting'
     | 'drivers';
 
@@ -23,6 +25,7 @@ const TAB_URLS: Record<ComplianceTab, string> = {
     matrix: '/hr/compliance/matrix',
     calendar: '/hr/compliance/calendar',
     training: '/hr/compliance/training',
+    catalog: '/hr/training/catalog',
     vetting: '/hr/compliance/vetting',
     drivers: '/hr/compliance/drivers',
 };
@@ -60,6 +63,10 @@ export function ComplianceTabs({ active }: { active: ComplianceTab }) {
         },
         {
             item: { id: 'training', label: 'Training', icon: GraduationCap, tone: 'success' },
+            show: !!hr?.training?.view,
+        },
+        {
+            item: { id: 'catalog', label: 'Catalog', icon: BookOpen, tone: 'info' },
             show: !!hr?.training?.view,
         },
         {
