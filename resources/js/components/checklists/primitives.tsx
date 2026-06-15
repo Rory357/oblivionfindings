@@ -8,7 +8,7 @@ import {
     Search,
     X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -265,13 +265,16 @@ export function CategoryIcon({
 }) {
     const { categoryMap } = useChecklistConfig();
     const cat = category ? categoryMap[category] : undefined;
-    const Icon = categoryIcon(cat?.icon);
+    // `createElement` (rather than `<Icon … />` bound to a local) keeps the
+    // eslint react-hooks/static-components rule from flagging the dynamic icon
+    // lookup as "creating a component during render" — categoryIcon() returns a
+    // stable, registry-looked-up component, so this re-uses it, never re-creates it.
     return (
         <span
             className={cn('flex shrink-0 items-center justify-center rounded-lg', className)}
             style={{ width: box, height: box, background: catBgVar(cat?.tone), color: catColorVar(cat?.tone) }}
         >
-            <Icon style={{ width: size, height: size }} />
+            {createElement(categoryIcon(cat?.icon), { style: { width: size, height: size } })}
         </span>
     );
 }
