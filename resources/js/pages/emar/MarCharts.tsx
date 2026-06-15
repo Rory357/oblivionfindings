@@ -11,7 +11,7 @@ import { addDays, DayPickerChip, toYmd } from '@/components/meds/day-picker-chip
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
 import type { ClientInfo, NotGivenReasonOption, PrnMedication, ScheduleRow, WitnessOption } from '@/pages/meds/today/types';
-import MarGovernanceDialogs, { type MarModal } from '@/pages/emar/components/mar-governance-dialogs';
+import MarGovernanceDialogs, { type MarModal, type PendingCorrection } from '@/pages/emar/components/mar-governance-dialogs';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, FileDown, HeartPulse, Home, Pill, Plus, Shield, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -72,9 +72,10 @@ type Props = {
         conditions: Array<{ id: number; label: string; severity?: string | null }>;
         emergency_contacts: Array<{ id: number; name: string; relationship?: string | null; phone?: string | null }>;
     } | null;
-    pendingCorrections: Array<{ id: number }>;
+    pendingCorrections: PendingCorrection[];
     can: {
         record: boolean;
+        correct?: boolean;
         verify_orders?: boolean;
         manage_inr?: boolean;
         manage_syringe_drivers?: boolean;
@@ -431,10 +432,12 @@ export default function MarCharts(props: Props) {
                             manageInr: !!can.manage_inr,
                             manageSyringeDrivers: !!can.manage_syringe_drivers,
                             verifyOrders: !!can.verify_orders,
+                            reviewCorrections: !!can.correct,
                         }}
                         onRecordInr={() => setModal('inr')}
                         onStartDriver={() => setModal('syringe')}
                         onVerifyOrders={() => setModal('verify')}
+                        onReviewCorrections={() => setModal('corrections')}
                     />
                 </div>
             </div>
@@ -490,6 +493,7 @@ export default function MarCharts(props: Props) {
                 clientId={info.id}
                 attentionAlerts={marData.attention_alerts ?? []}
                 awaitingVerification={marData.awaiting_verification ?? []}
+                corrections={pendingCorrections}
                 witnesses={witnesses}
                 suppression={{
                     suppressed: marData.settings?.suppress_med_admin_alerts ?? false,

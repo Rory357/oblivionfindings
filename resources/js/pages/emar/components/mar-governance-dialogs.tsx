@@ -5,13 +5,23 @@ import { Input } from '@/components/ui/input';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
 import { useForm } from '@inertiajs/react';
-import { AlertTriangle, FileText, HeartPulse, Pill, ShieldCheck, Syringe } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, FileText, HeartPulse, Pill, ShieldCheck, Syringe } from 'lucide-react';
 import { useState } from 'react';
 
-export type MarModal = 'addMed' | 'inr' | 'syringe' | 'alerts' | 'verify' | 'warnings' | null;
+export type MarModal = 'addMed' | 'inr' | 'syringe' | 'alerts' | 'verify' | 'warnings' | 'corrections' | null;
 
 type AttentionAlert = { id: number; type: string; title: string; detail?: string | null; prompt_on_open: boolean };
 type AwaitingOrder = { id: number; name: string; dosage: string };
+
+export type PendingCorrection = {
+    id: number;
+    medication_name: string;
+    status: string;
+    dose_given?: string | null;
+    correction_reason?: string | null;
+    submitted_by?: string | null;
+    submitted_at?: string | null;
+};
 
 type Props = {
     modal: MarModal;
@@ -19,6 +29,7 @@ type Props = {
     clientId: number;
     attentionAlerts: AttentionAlert[];
     awaitingVerification: AwaitingOrder[];
+    corrections: PendingCorrection[];
     witnesses: WitnessOption[];
     suppression: { suppressed: boolean; reason: string | null };
 };
@@ -42,7 +53,7 @@ function FooterRow({ onCancel, submitLabel, processing, onBack }: { onCancel: ()
     );
 }
 
-export default function MarGovernanceDialogs({ modal, onClose, clientId, attentionAlerts, awaitingVerification, witnesses, suppression }: Props) {
+export default function MarGovernanceDialogs({ modal, onClose, clientId, attentionAlerts, awaitingVerification, corrections, witnesses, suppression }: Props) {
     return (
         <>
             {modal === 'addMed' && <AddMedicationDialog clientId={clientId} onClose={onClose} />}
@@ -50,6 +61,7 @@ export default function MarGovernanceDialogs({ modal, onClose, clientId, attenti
             {modal === 'syringe' && <SyringeDriverDialog clientId={clientId} witnesses={witnesses} onClose={onClose} />}
             {modal === 'alerts' && <ManageAlertsDialog clientId={clientId} suppression={suppression} onClose={onClose} />}
             {modal === 'verify' && <VerifyOrderDialog orders={awaitingVerification} onClose={onClose} />}
+            {modal === 'corrections' && <CorrectionsReviewDialog corrections={corrections} onClose={onClose} />}
             {modal === 'warnings' && <WarningsDialog alerts={attentionAlerts} onClose={onClose} />}
         </>
     );
@@ -376,6 +388,88 @@ function VerifyOrderDialog({ orders, onClose }: { orders: AwaitingOrder[]; onClo
                                         placeholder="Reason for rejection"
                                     />
                                     <Button type="submit" variant="destructive" size="sm" disabled={form.processing}>
+                                        Confirm
+                                    </Button>
+                                </form>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </MedsWizardDialog>
+    );
+}
+
+// ── Review corrections ─────────────────────────────────────────────────────
+function CorrectionsReviewDialog({ corrections, onClose }: { corrections: PendingCorrection[]; onClose: () => void }) {
+    const [rejectId, setRejectId] = useState<number | null>(null);
+    const form = useForm({ reason: '' });
+
+    const approve = (id: number) => form.post(`/emar/corrections/${id}/approve`, { preserveScroll: true, onSuccess: onClose });
+    const reject = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (rejectId) form.post(`/emar/corrections/${rejectId}/reject`, { preserveScroll: true, onSuccess: onClose });
+    };
+
+    return (
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Review corrections"
+            description="Approve or reject pending corrections to recorded administrations"
+            railIcon={ClipboardCheck}
+            railTitle="Corrections"
+            railSubtitle={`${corrections.length} pending`}
+            steps={[{ key: 'review', label: 'Review', blurb: 'Approve or reject', icon: ClipboardCheck }]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <Button type="button" variant="ghost" onClick={onClose}>
+                    Close
+                </Button>
+            }
+        >
+            <StepHead icon={ClipboardCheck} title="Pending corrections" blurb="An approved correction supersedes the original record; both are kept in the audit trail." />
+            {corrections.length === 0 ? (
+                <InfoCard icon={ClipboardCheck}>No corrections are pending review.</InfoCard>
+            ) : (
+                <ul className="flex flex-col gap-2">
+                    {corrections.map((correction) => (
+                        <li key={correction.id} className="rounded-lg border p-3">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-medium">
+                                        {correction.medication_name}
+                                        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                            {correction.status}
+                                        </span>
+                                    </div>
+                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                        {[correction.dose_given, correction.submitted_by ? `by ${correction.submitted_by}` : null]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </div>
+                                    {correction.correction_reason && (
+                                        <div className="mt-1 text-[11.5px] italic text-muted-foreground">“{correction.correction_reason}”</div>
+                                    )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setRejectId(rejectId === correction.id ? null : correction.id)}>
+                                        Reject
+                                    </Button>
+                                    <Button size="sm" disabled={form.processing} onClick={() => approve(correction.id)}>
+                                        Approve
+                                    </Button>
+                                </div>
+                            </div>
+                            {rejectId === correction.id && (
+                                <form onSubmit={reject} className="mt-2 flex items-center gap-2">
+                                    <Input
+                                        value={form.data.reason}
+                                        onChange={(e) => form.setData('reason', e.target.value)}
+                                        placeholder="Reason for rejection (required)"
+                                    />
+                                    <Button type="submit" variant="destructive" size="sm" disabled={form.processing || !form.data.reason.trim()}>
                                         Confirm
                                     </Button>
                                 </form>
