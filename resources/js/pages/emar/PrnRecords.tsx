@@ -1,15 +1,15 @@
 /* eslint-disable no-restricted-syntax -- the register/near-limit/trends surfaces are
    custom-layout bordered panels (not Card/Button); all colours are semantic tokens. */
+import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { PrnEffectDialog } from '@/pages/meds/today/components/prn-effect-dialog';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type { ClientInfo, PrnFollowUp, PrnMedication } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, Clock, Pill, Plus, Search, TrendingUp } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Pill, Plus, Search, TrendingUp, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type PrnAdministration = {
@@ -39,6 +39,12 @@ type Props = {
     witnesses: { id: number; name: string }[];
     board_user: { name: string; role_label: string | null };
     date: string;
+    today: string;
+    is_today: boolean;
+    date_label: string;
+    range: number;
+    client_id: number | null;
+    q: string | null;
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
@@ -75,13 +81,33 @@ const STATUS_FILTERS = [
 ];
 
 export default function PrnRecords(props: Props) {
-    const { administrations, pending_reviews: reviews, prn_medications: prnMeds, clients, witnesses, board_user: signer, date, sites, active_site: activeSite, site_brand_colour: brandColour } = props;
+    const { administrations, pending_reviews: reviews, prn_medications: prnMeds, clients, witnesses, board_user: signer, date, today, is_today: isToday, range, sites, active_site: activeSite, site_brand_colour: brandColour } = props;
 
     const [activeTab, setActiveTab] = useState('register');
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(props.q ?? '');
     const [statusFilter, setStatusFilter] = useState('all');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(props.client_id ?? null);
     const [modal, setModal] = useState<Modal>(null);
+
+    // Calendar + Site + Client round-trip to the server (the register is a
+    // server-windowed query); the text search stays client-side over the loaded
+    // rows. `over` keys set to undefined are dropped from the query string.
+    const reload = (over: Record<string, string | number | undefined>) => {
+        const params: Record<string, string | number | undefined> = {
+            ...(siteFilter ? { site_id: siteFilter } : {}),
+            ...(clientFilter ? { client_id: clientFilter } : {}),
+            ...(date !== today ? { date } : {}),
+            ...(range && range !== 30 ? { range } : {}),
+            ...over,
+        };
+        Object.keys(params).forEach((k) => params[k] === undefined && delete params[k]);
+        router.get('/emar/prn', params, { preserveState: true, preserveScroll: true });
+    };
+    const goDate = (ymd: string) => reload({ date: ymd === today ? undefined : ymd });
+    const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id ?? undefined }); };
+    const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id ?? undefined }); };
+    const stepLabel = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
 
     const clientsMap = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
     const nearLimit = useMemo(() => prnMeds.filter((m) => m.near_limit || m.over_limit), [prnMeds]);
@@ -153,11 +179,73 @@ export default function PrnRecords(props: Props) {
                         </Button>
                     }
                     footer={
-                        sites.length > 0 ? (
-                            <div className="flex items-center justify-end py-3">
-                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={(id) => { setSiteFilter(id); router.get('/emar/prn', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); }} onDark />
+                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {/* eslint-disable no-restricted-syntax -- segmented day-stepper on the dark hero; not a shadcn Button (rostering idiom). */}
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goDate(addDays(date, -1))}
+                                >
+                                    <ChevronLeft className="h-3.5 w-3.5" />
+                                    {stepLabel(addDays(date, -1))}
+                                </button>
+                                <DayPickerChip date={date} isToday={isToday} onPick={goDate} caption="Register, reviews and trends are for the selected day's lookback window." />
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goDate(addDays(date, 1))}
+                                >
+                                    {stepLabel(addDays(date, 1))}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                                {!isToday ? (
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
+                                        onClick={() => goDate(today)}
+                                    >
+                                        Back to today
+                                    </button>
+                                ) : null}
+                                {/* eslint-enable no-restricted-syntax */}
                             </div>
-                        ) : undefined
+                            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
+                                <div className="relative w-full max-w-xs md:w-[260px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per the design handoff. */}
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search client or medication…"
+                                        aria-label="Search PRN records"
+                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                    />
+                                    {search ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
+                                        <button
+                                            type="button"
+                                            aria-label="Clear search"
+                                            onClick={() => setSearch('')}
+                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
+                                </div>
+                                {sites.length > 0 ? (
+                                    <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />
+                                ) : null}
+                                <EntityFilter
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={clients.map((c) => ({ id: c.id, name: c.name, description: c.site_name }))}
+                                    value={clientFilter}
+                                    onChange={onClient}
+                                    onDark
+                                />
+                            </div>
+                        </div>
                     }
                 />
 
@@ -166,10 +254,7 @@ export default function PrnRecords(props: Props) {
                 {activeTab === 'register' && (
                     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                         <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
-                            <div className="relative">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client or medication…" className="w-64 pl-8" />
-                            </div>
+                            <span className="text-sm font-semibold">PRN administration register</span>
                             <div className="flex flex-wrap gap-1">
                                 {STATUS_FILTERS.map((f) => (
                                     <Button key={f.id} size="sm" variant={statusFilter === f.id ? 'secondary' : 'ghost'} onClick={() => setStatusFilter(f.id)}>{f.label}</Button>

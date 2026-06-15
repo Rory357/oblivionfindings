@@ -1071,16 +1071,33 @@ class EmarController extends Controller
     {
         $user = $request->user();
         $siteFilter = $request->integer('site_id') ?: null;
+        $clientFilter = $request->integer('client_id') ?: null;
+        $search = trim((string) $request->string('q')) ?: null;
         $scheduleService = app(MarScheduleService::class);
         $timezone = $scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
 
-        // The register — recent PRN-given administrations (flat; the redesigned
-        // page filters by tab/search/status client-side).
+        // Date anchor + lookback window for the register (mirrors the meds/today
+        // hero day-stepper). The register ends on the selected day and looks back
+        // `range` days; the page filters by tab/search/status client-side.
+        $today = $now->copy()->startOfDay();
+        $anchorYmd = $request->string('date')->toString();
+        try {
+            $anchor = $anchorYmd !== '' ? Carbon::parse($anchorYmd, $timezone)->startOfDay() : $today->copy();
+        } catch (\Throwable) {
+            $anchor = $today->copy();
+        }
+        $isToday = $anchor->isSameDay($today);
+        $rangeDays = max(1, min(90, $request->integer('range') ?: 30));
+        $windowStart = $anchor->copy()->subDays($rangeDays - 1)->startOfDay();
+        $windowEnd = $anchor->copy()->endOfDay();
+
+        // The register — PRN-given administrations within the selected window.
         $administrations = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
-            ->where('administered_at', '>=', $now->copy()->subDays(30)->utc())
+            ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
+            ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
             ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,max_per_day,indication,controlled_drug', 'administeredBy:id,name', 'prnEffectiveness'])
             ->latest('administered_at')
             ->limit(200)
@@ -1114,6 +1131,7 @@ class EmarController extends Controller
         $pendingReviews = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->where('status', 'given')
             ->where('administered_at', '>=', $now->copy()->subHours(24)->utc())
             ->whereDoesntHave('prnEffectiveness')
@@ -1135,17 +1153,30 @@ class EmarController extends Controller
                 ];
             })->all();
 
-        $prnClientIds = ClientMedication::active()->prn()->distinct()->pluck('client_id')->all();
+        // All PRN clients for the active site drive the Client filter dropdown;
+        // the data lists (near-limit meds, record wizard) honour the client filter.
+        $siteClientIds = ClientMedication::active()->prn()
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->distinct()->pluck('client_id')->all();
+        $dataClientIds = $clientFilter
+            ? array_values(array_intersect($siteClientIds, [$clientFilter]))
+            : $siteClientIds;
         $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/PrnRecords', [
             'administrations' => $administrations,
             'pending_reviews' => $pendingReviews,
-            'prn_medications' => $this->boardPayload->prnMedications($prnClientIds, $now),
-            'clients' => $this->boardPayload->clientsPayload($prnClientIds),
+            'prn_medications' => $this->boardPayload->prnMedications($dataClientIds, $now),
+            'clients' => $this->boardPayload->clientsPayload($siteClientIds),
             'witnesses' => $this->boardPayload->witnesses($user),
             'board_user' => $this->boardPayload->boardUser($user),
-            'date' => $now->toDateString(),
+            'date' => $anchor->toDateString(),
+            'today' => $today->toDateString(),
+            'is_today' => $isToday,
+            'date_label' => $anchor->isoFormat('ddd D MMM'),
+            'range' => $rangeDays,
+            'client_id' => $clientFilter,
+            'q' => $search,
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
