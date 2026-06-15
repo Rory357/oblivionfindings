@@ -671,6 +671,16 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     HrHubTabsRenderTest now covers all 38 hub pages. types+eslint+build green.
   - ✅ **EVERY HR HUB NOW HAS STANDARDISED TABS** — People + Recruitment (pre-existing) + Settings/Compensation/Reports (S35) +
     Documents/Performance (S36) + My-HR/ESS (S37) + Compliance (S38). (A) COMPLETE. Only the M10-5 visual-parity pass is browser-blocked.
+  - ✅ **DONE — left-nav consolidation (S39):** the tab work added the in-hub strips but the sidebar still listed every now-tab
+    surface as a flat entry (user-reported). Collapsed `buildHrSubPanelGroups` (app-sidebar.tsx) so each tabbed hub is ONE entry:
+    My HR (dropped My Documents/Training/Payslips), People (dropped Directory/Positions/Org Chart — their routes already redirect
+    to /hr/people; widened the People entry to viewAny||viewOwn), Performance (dropped 360 Feedback/PIPs/Competencies/Succession/
+    Goals), Compliance (dropped Calendar/Vetting/Drivers/Training Dashboard + the standalone Departments which folds into People),
+    Reports (dropped Report Builder), Settings (dropped Custom Fields/Audit Log). ⚠️ SAFE re access: verified in the seeders that
+    vetting/driver/training.view are ALWAYS granted alongside compliance.view, and the People sub-routes redirect — so no role
+    loses a nav entry; the dropped surfaces are reachable via the hub tab strips (and old bookmarks still redirect). Kept genuinely
+    separate surfaces (Import/Export, Recruitment, Course Catalog, Assets, Analytics, Onboarding, Payroll, Policies, etc.). types +
+    eslint + build green.
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
   hero/tabs/modals visually match; no dead buttons; DoD met. → **DEFERRED-TO-USER (browser-blocked).**
 
