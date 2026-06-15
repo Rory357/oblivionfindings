@@ -114,12 +114,20 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 
 ## F. History — new tab with filters
 
-- [ ] **F12.** Add a **History** tab (`History` icon, tone info/neutral) to the `TabStrip` between
-  Trends and the end. The full filterable archive (Register stays the recent/working view).
-- [ ] **F13.** History filters: inherits hero date-range + site + client + search, plus its own local
+- [x] **F12.** Add a **History** tab (`History` icon, tone info/neutral) to the `TabStrip` between
+  Trends and the end. The full filterable archive (Register stays the recent/working view). — _done in
+  `PrnRecords.tsx`: History tab added after Trends, `History` lucide icon, tone `info`, badge =
+  `history.meta.total`._
+- [x] **F13.** History filters: inherits hero date-range + site + client + search, plus its own local
   chips (medication, effectiveness outcome, CD-only, escalations-only, given-by). Columns = register +
   effectiveness outcome + reviewed-after + escalation flag. **Server-side paginated** (Prev/Next +
-  "Showing N of M"). Rows get the same right-click menu + detail modal.
+  "Showing N of M"). Rows get the same right-click menu + detail modal. — _done: History panel has a
+  medication `EntityFilter` (over prnMeds), given-by `EntityFilter` (over `history_givers`), an
+  effectiveness chip row, and CD-only/Escalations toggle chips — all round-trip via `setHist()`→`reload()`
+  (composing with the hero filters, which `reload` now folds `historyParams()` into); hero search applies
+  to the archive on Enter/clear. Table adds Reviewed + Esc. columns; Prev/Next + "Showing from–to of
+  total". Rows reuse `setModal({type:'detail'})` + `openRowCtx` (History rows are the same
+  `PrnAdministration` shape)._
 
 ## Backend (`prn()` props + manager endpoint — NO speculative migrations)
 
@@ -129,8 +137,14 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
   clamped `range` (1–90, default 30) lookback window, and `client_id`/`q`; register + pending-reviews
   honour `client_id`; `clients` dropdown stays site-scoped while data lists honour the client filter;
   added `today`/`is_today`/`date_label`/`range`/`client_id`/`q` props._
-- [ ] **BK2.** History: a paginated, server-filtered PRN administration query keyed off the params
-  (not the 200-row cap). Return `{ data, meta }`.
+- [x] **BK2.** History: a paginated, server-filtered PRN administration query keyed off the params
+  (not the 200-row cap). Return `{ data, meta }`. — _done in `EmarController@prn`: extracted the
+  register-row map into a shared `serializePrnAdministration()` helper (register + History share ONE row
+  shape); added a `->paginate(25, ['*'], 'history_page')->withQueryString()` query honouring
+  date/range/site/client/q + History chips (`history_med`/`history_eff` incl. `review_due` →
+  whereDoesntHave / `history_cd` / `history_esc` whereHas escalation / `history_given_by`). Returns
+  `history = {data, meta:{current_page,last_page,per_page,total,from,to}}` + `history_givers` (distinct
+  PRN administerers in scope) + `history_active` (seeds the chip state)._
 - [x] **BK3.** Near-limit detail: extend each near-limit med with today's per-dose timeline (time,
   dose, given-by, effectiveness), next-allowable-time, over-limit incident reference. — _done in
   `EmarController@prn`: near/over-limit meds get `today_doses[]` (last-24h doses, derived) and over-limit

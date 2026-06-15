@@ -11,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type { ClientInfo, PrnFollowUp, PrnMedication } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Eye, FileText, Flag, Pill, Plus, Printer, RotateCcw, Search, Stethoscope, TrendingUp, User, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Eye, FileText, Flag, History, Pill, Plus, Printer, RotateCcw, Search, Stethoscope, TrendingUp, User, X } from 'lucide-react';
 import { useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -29,10 +29,23 @@ type Props = {
     range: number;
     client_id: number | null;
     q: string | null;
+    history: { data: PrnAdministration[]; meta: HistoryMeta };
+    history_givers: { id: number; name: string }[];
+    history_active: { med: number | null; eff: string | null; cd: boolean; esc: boolean; given_by: number | null };
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
 };
+
+type HistoryMeta = { current_page: number; last_page: number; per_page: number; total: number; from: number | null; to: number | null };
+
+const HISTORY_EFF: { id: string; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'effective', label: 'Effective' },
+    { id: 'partially_effective', label: 'Partial' },
+    { id: 'not_effective', label: 'Not effective' },
+    { id: 'review_due', label: 'Review due' },
+];
 
 type Modal =
     | { type: 'record'; initialMedId?: number | null }
@@ -132,15 +145,37 @@ export default function PrnRecords(props: Props) {
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
+    // History tab is server-filtered (paginated archive); these chips drive
+    // router.get, unlike the register's client-side search/status chips.
+    const history = props.history;
+    const historyGivers = props.history_givers;
+    const [medFilter, setMedFilter] = useState<number | null>(props.history_active.med);
+    const [effFilter, setEffFilter] = useState(props.history_active.eff ?? 'all');
+    const [cdOnly, setCdOnly] = useState(props.history_active.cd);
+    const [escOnly, setEscOnly] = useState(props.history_active.esc);
+    const [giverFilter, setGiverFilter] = useState<number | null>(props.history_active.given_by);
+
+    // The active History server-filter params; folded into every reload so the
+    // History archive keeps composing with the hero date/site/client filters.
+    const historyParams = (): Record<string, string | number | undefined> => ({
+        q: search || undefined,
+        history_med: medFilter ?? undefined,
+        history_eff: effFilter !== 'all' ? effFilter : undefined,
+        history_cd: cdOnly ? 1 : undefined,
+        history_esc: escOnly ? 1 : undefined,
+        history_given_by: giverFilter ?? undefined,
+    });
+
     // Calendar + Site + Client round-trip to the server (the register is a
-    // server-windowed query); the text search stays client-side over the loaded
-    // rows. `over` keys set to undefined are dropped from the query string.
+    // server-windowed query); the register's text search stays client-side over
+    // the loaded rows. `over` keys set to undefined are dropped from the query.
     const reload = (over: Record<string, string | number | undefined>) => {
         const params: Record<string, string | number | undefined> = {
             ...(siteFilter ? { site_id: siteFilter } : {}),
             ...(clientFilter ? { client_id: clientFilter } : {}),
             ...(date !== today ? { date } : {}),
             ...(range && range !== 30 ? { range } : {}),
+            ...historyParams(),
             ...over,
         };
         Object.keys(params).forEach((k) => params[k] === undefined && delete params[k]);
@@ -150,6 +185,10 @@ export default function PrnRecords(props: Props) {
     const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id ?? undefined }); };
     const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id ?? undefined }); };
     const stepLabel = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
+
+    // History chip changes reset to page 1; pagination keeps the active filters.
+    const setHist = (over: Record<string, string | number | undefined>) => reload({ history_page: 1, ...over });
+    const goHistoryPage = (page: number) => reload({ history_page: page });
 
     const openRowCtx = (e: ReactMouseEvent, a: PrnAdministration) => {
         e.preventDefault();
@@ -188,6 +227,7 @@ export default function PrnRecords(props: Props) {
         { id: 'reviews', label: 'Reviews due', icon: Clock, tone: 'warning', badge: reviews.length || undefined },
         { id: 'near', label: 'Near limit', icon: AlertTriangle, tone: 'critical', badge: nearLimit.length || undefined },
         { id: 'trends', label: 'Trends', icon: TrendingUp, tone: 'info' },
+        { id: 'history', label: 'History', icon: History, tone: 'info', badge: history.meta.total || undefined },
     ];
 
     const heroStats: PageHeroStat[] = [
@@ -334,7 +374,8 @@ export default function PrnRecords(props: Props) {
                                     <input
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
-                                        placeholder="Search client or medication…"
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && activeTab === 'history') setHist({}); }}
+                                        placeholder={activeTab === 'history' ? 'Search archive — press Enter…' : 'Search client or medication…'}
                                         aria-label="Search PRN records"
                                         className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
                                     />
@@ -343,7 +384,7 @@ export default function PrnRecords(props: Props) {
                                         <button
                                             type="button"
                                             aria-label="Clear search"
-                                            onClick={() => setSearch('')}
+                                            onClick={() => { setSearch(''); if (activeTab === 'history') reload({ q: undefined, history_page: 1 }); }}
                                             className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
                                         >
                                             <X className="h-3.5 w-3.5" />
@@ -515,6 +556,69 @@ export default function PrnRecords(props: Props) {
                             </div>
                         </div>
                     )
+                )}
+
+                {activeTab === 'history' && (
+                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
+                            <span className="text-sm font-semibold">PRN history archive</span>
+                            <EntityFilter label="Medication" allLabel="All meds" pluralLabel="meds" items={prnMeds.map((m) => ({ id: m.id, name: m.name, description: m.client_name }))} value={medFilter} onChange={(id) => { setMedFilter(id); setHist({ history_med: id ?? undefined }); }} />
+                            <EntityFilter label="Given by" allLabel="All staff" pluralLabel="staff" items={historyGivers} value={giverFilter} onChange={(id) => { setGiverFilter(id); setHist({ history_given_by: id ?? undefined }); }} />
+                            <div className="flex flex-wrap gap-1">
+                                {HISTORY_EFF.map((f) => (
+                                    <Button key={f.id} size="sm" variant={effFilter === f.id ? 'secondary' : 'ghost'} onClick={() => { setEffFilter(f.id); setHist({ history_eff: f.id !== 'all' ? f.id : undefined }); }}>{f.label}</Button>
+                                ))}
+                            </div>
+                            <Button size="sm" variant={cdOnly ? 'secondary' : 'ghost'} onClick={() => { const v = !cdOnly; setCdOnly(v); setHist({ history_cd: v ? 1 : undefined }); }}>CD only</Button>
+                            <Button size="sm" variant={escOnly ? 'secondary' : 'ghost'} onClick={() => { const v = !escOnly; setEscOnly(v); setHist({ history_esc: v ? 1 : undefined }); }}>Escalations</Button>
+                            <span className="ml-auto text-xs text-muted-foreground">{history.meta.total} total</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[980px] text-sm">
+                                <thead>
+                                    <tr className="bg-muted text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-2.5">Date / time</th>
+                                        <th className="px-4 py-2.5">Client</th>
+                                        <th className="px-4 py-2.5">Medication</th>
+                                        <th className="px-4 py-2.5">Indication</th>
+                                        <th className="px-4 py-2.5">Today</th>
+                                        <th className="px-4 py-2.5">Effectiveness</th>
+                                        <th className="px-4 py-2.5">Reviewed</th>
+                                        <th className="px-4 py-2.5">Esc.</th>
+                                        <th className="px-4 py-2.5">Given by</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {history.data.length === 0 ? (
+                                        <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No PRN doses match these filters.</td></tr>
+                                    ) : history.data.map((a) => {
+                                        const med = medCountById.get(a.client_medication_id);
+                                        return (
+                                            <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/40" onClick={() => setModal({ type: 'detail', admin: a })} onContextMenu={(e) => openRowCtx(e, a)}>
+                                                <td className="px-4 py-3"><div className="font-medium">{a.given_time}</div><div className="text-xs text-muted-foreground">{a.given_date}</div></td>
+                                                <td className="px-4 py-3"><span className="flex items-center gap-2"><Avatar id={a.client_id} name={a.client_name} />{a.client_name}</span></td>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-1.5 font-medium">{a.medication_name}{a.controlled_drug && <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">CD</span>}</div>{a.dose_given && <div className="text-xs text-muted-foreground">{a.dose_given}</div>}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{a.reason ?? a.indication ?? '—'}</td>
+                                                <td className="px-4 py-3">{med && med.max_per_day ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${med.over_limit ? 'bg-status-critical-bg text-status-critical' : med.near_limit ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'}`}>{med.given_last_24h} of {med.max_per_day}</span> : <span className="text-muted-foreground">—</span>}</td>
+                                                <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${effTone(a.effectiveness)}`}>{a.effectiveness_label ?? 'Review due'}</span></td>
+                                                <td className="px-4 py-3 text-muted-foreground">{a.effectiveness_detail?.review_minutes_after != null ? `${a.effectiveness_detail.review_minutes_after} min` : '—'}</td>
+                                                <td className="px-4 py-3">{a.effectiveness_detail?.escalation_needed ? <span className="inline-flex items-center rounded-full bg-status-critical-bg px-1.5 py-0.5 text-status-critical"><Flag className="h-3 w-3" /></span> : <span className="text-muted-foreground">—</span>}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{a.given_by ?? '—'}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 border-t p-3.5 text-xs text-muted-foreground">
+                            <span>{history.meta.total === 0 ? 'No results' : `Showing ${history.meta.from}–${history.meta.to} of ${history.meta.total}`}</span>
+                            <div className="ml-auto flex items-center gap-2">
+                                <Button size="sm" variant="outline" disabled={history.meta.current_page <= 1} onClick={() => goHistoryPage(history.meta.current_page - 1)}><ChevronLeft className="h-4 w-4" />Prev</Button>
+                                <span>Page {history.meta.current_page} of {history.meta.last_page}</span>
+                                <Button size="sm" variant="outline" disabled={history.meta.current_page >= history.meta.last_page} onClick={() => goHistoryPage(history.meta.current_page + 1)}>Next<ChevronRight className="h-4 w-4" /></Button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
 

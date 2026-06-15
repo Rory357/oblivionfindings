@@ -1094,70 +1094,30 @@ class EmarController extends Controller
         $windowStart = $anchor->copy()->subDays($rangeDays - 1)->startOfDay();
         $windowEnd = $anchor->copy()->endOfDay();
 
-        // The register — PRN-given administrations within the selected window.
+        // Eager loads shared by the register + History archive (both serialize
+        // through serializePrnAdministration()).
+        $prnWith = [
+            'client:id,first_name,last_name,room_id',
+            'client.room:id,name',
+            'client.site:id,name',
+            'medication:id,name,dosage,route,max_per_day,indication,controlled_drug',
+            'administeredBy:id,name',
+            'prnEffectiveness.reviewedByUser:id,name',
+        ];
+
+        // The register — recent PRN-given administrations within the window
+        // (capped working view; the History tab is the paginated full archive).
         $administrations = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
-            ->with([
-                'client:id,first_name,last_name,room_id',
-                'client.room:id,name',
-                'client.site:id,name',
-                'medication:id,name,dosage,route,max_per_day,indication,controlled_drug',
-                'administeredBy:id,name',
-                'prnEffectiveness.reviewedByUser:id,name',
-            ])
+            ->with($prnWith)
             ->latest('administered_at')
             ->limit(200)
             ->get()
-            ->map(function (ClientMedicationAdministration $a) use ($timezone) {
-                $at = $a->getRawOriginal('administered_at') ? $this->boardPayload->rawUtcInstant($a, 'administered_at') : null;
-                $eff = $a->prnEffectiveness;
-
-                return [
-                    'id' => $a->id,
-                    'client_id' => $a->client_id,
-                    'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'Unknown',
-                    'client_room' => $a->client?->room?->name,
-                    'client_site' => $a->client?->site?->name,
-                    'client_medication_id' => $a->client_medication_id,
-                    'medication_name' => $a->medication?->name,
-                    'route' => $a->medication?->route,
-                    'prescribed_dose' => $a->medication?->dosage,
-                    'controlled_drug' => (bool) ($a->medication?->controlled_drug ?? false),
-                    'dose_given' => $a->dose_given,
-                    'reason' => $a->reason,
-                    'indication' => $a->medication?->indication,
-                    'notes' => $a->notes,
-                    'status' => $a->status,
-                    'administered_at' => $at?->toIso8601String(),
-                    'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
-                    'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
-                    'given_by' => $a->administeredBy?->name,
-                    'mar_url' => EmarUrl::mar($a->client_id),
-                    'baseline' => array_filter([
-                        'blood_glucose_level' => $a->blood_glucose_level,
-                        'pulse_bpm' => $a->pulse_bpm,
-                        'blood_pressure_systolic' => $a->blood_pressure_systolic,
-                        'blood_pressure_diastolic' => $a->blood_pressure_diastolic,
-                        'insulin_units_given' => $a->insulin_units_given,
-                    ], fn ($v) => $v !== null),
-                    'effectiveness' => $eff?->effectiveness,
-                    'effectiveness_label' => $eff?->effectiveness_label,
-                    'effectiveness_detail' => $eff ? [
-                        'effectiveness' => $eff->effectiveness,
-                        'label' => $eff->effectiveness_label,
-                        'review_minutes_after' => $eff->review_minutes_after,
-                        'observations' => $eff->observations,
-                        'escalation_needed' => (bool) $eff->escalation_needed,
-                        'escalation_action' => $eff->escalation_action,
-                        'reviewed_by' => $eff->reviewedByUser?->name,
-                        'reviewed_at' => $eff->reviewed_at?->toIso8601String(),
-                        'reviewed_label' => $eff->reviewed_at ? $eff->reviewed_at->copy()->timezone($timezone)->format('H:i · j M') : null,
-                    ] : null,
-                ];
-            })->all();
+            ->map(fn (ClientMedicationAdministration $a) => $this->serializePrnAdministration($a, $timezone))
+            ->all();
 
         // Pending effectiveness reviews — given PRN doses with no review yet
         // (PrnFollowUp shape for the reused PrnEffectDialog).
@@ -1250,10 +1210,65 @@ class EmarController extends Controller
             return $m;
         }, $boardPrn);
 
+        // BK2 — History: the paginated, server-filtered full archive (the
+        // register's 200-row cap is not enough here). Honours the hero
+        // date/site/client/q plus its own chip filters; serialized through the
+        // same helper as the register so the detail modal + row menu work.
+        $historyEff = in_array($request->string('history_eff')->toString(), ['effective', 'partially_effective', 'not_effective', 'review_due'], true)
+            ? $request->string('history_eff')->toString()
+            : null;
+        $history = ClientMedicationAdministration::query()
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
+            ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
+            ->when($search, fn ($q) => $q->where(fn ($w) => $w
+                ->whereHas('medication', fn ($m) => $m->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('client', fn ($c) => $c->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"]))))
+            ->when($request->integer('history_med') ?: null, fn ($q, $id) => $q->where('client_medication_id', $id))
+            ->when($request->integer('history_given_by') ?: null, fn ($q, $id) => $q->where('administered_by', $id))
+            ->when($request->boolean('history_cd'), fn ($q) => $q->whereHas('medication', fn ($m) => $m->where('controlled_drug', true)))
+            ->when($request->boolean('history_esc'), fn ($q) => $q->whereHas('prnEffectiveness', fn ($e) => $e->where('escalation_needed', true)))
+            ->when($historyEff === 'review_due', fn ($q) => $q->whereDoesntHave('prnEffectiveness'))
+            ->when($historyEff && $historyEff !== 'review_due', fn ($q) => $q->whereHas('prnEffectiveness', fn ($e) => $e->where('effectiveness', $historyEff)))
+            ->with($prnWith)
+            ->latest('administered_at')
+            ->paginate(25, ['*'], 'history_page')
+            ->withQueryString();
+
+        $giverIds = ClientMedicationAdministration::query()
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
+            ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
+            ->whereNotNull('administered_by')
+            ->distinct()
+            ->pluck('administered_by')
+            ->all();
+
         return Inertia::render('emar/PrnRecords', [
             'administrations' => $administrations,
             'pending_reviews' => $pendingReviews,
             'prn_medications' => $boardPrn,
+            'history' => [
+                'data' => collect($history->items())->map(fn (ClientMedicationAdministration $a) => $this->serializePrnAdministration($a, $timezone))->all(),
+                'meta' => [
+                    'current_page' => $history->currentPage(),
+                    'last_page' => $history->lastPage(),
+                    'per_page' => $history->perPage(),
+                    'total' => $history->total(),
+                    'from' => $history->firstItem(),
+                    'to' => $history->lastItem(),
+                ],
+            ],
+            'history_givers' => User::whereIn('id', $giverIds)->orderBy('name')->get(['id', 'name']),
+            'history_active' => [
+                'med' => $request->integer('history_med') ?: null,
+                'eff' => $historyEff,
+                'cd' => $request->boolean('history_cd'),
+                'esc' => $request->boolean('history_esc'),
+                'given_by' => $request->integer('history_given_by') ?: null,
+            ],
             'clients' => $this->boardPayload->clientsPayload($siteClientIds),
             'witnesses' => $this->boardPayload->witnesses($user),
             'board_user' => $this->boardPayload->boardUser($user),
@@ -1268,6 +1283,59 @@ class EmarController extends Controller
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
         ]);
+    }
+
+    /**
+     * Flat row shape for a PRN administration, shared by the register, the
+     * History archive, and the detail modal (PrnDetailDialog's contract).
+     */
+    private function serializePrnAdministration(ClientMedicationAdministration $a, string $timezone): array
+    {
+        $at = $a->getRawOriginal('administered_at') ? $this->boardPayload->rawUtcInstant($a, 'administered_at') : null;
+        $eff = $a->prnEffectiveness;
+
+        return [
+            'id' => $a->id,
+            'client_id' => $a->client_id,
+            'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'Unknown',
+            'client_room' => $a->client?->room?->name,
+            'client_site' => $a->client?->site?->name,
+            'client_medication_id' => $a->client_medication_id,
+            'medication_name' => $a->medication?->name,
+            'route' => $a->medication?->route,
+            'prescribed_dose' => $a->medication?->dosage,
+            'controlled_drug' => (bool) ($a->medication?->controlled_drug ?? false),
+            'dose_given' => $a->dose_given,
+            'reason' => $a->reason,
+            'indication' => $a->medication?->indication,
+            'notes' => $a->notes,
+            'status' => $a->status,
+            'administered_at' => $at?->toIso8601String(),
+            'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
+            'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
+            'given_by' => $a->administeredBy?->name,
+            'mar_url' => EmarUrl::mar($a->client_id),
+            'baseline' => array_filter([
+                'blood_glucose_level' => $a->blood_glucose_level,
+                'pulse_bpm' => $a->pulse_bpm,
+                'blood_pressure_systolic' => $a->blood_pressure_systolic,
+                'blood_pressure_diastolic' => $a->blood_pressure_diastolic,
+                'insulin_units_given' => $a->insulin_units_given,
+            ], fn ($v) => $v !== null),
+            'effectiveness' => $eff?->effectiveness,
+            'effectiveness_label' => $eff?->effectiveness_label,
+            'effectiveness_detail' => $eff ? [
+                'effectiveness' => $eff->effectiveness,
+                'label' => $eff->effectiveness_label,
+                'review_minutes_after' => $eff->review_minutes_after,
+                'observations' => $eff->observations,
+                'escalation_needed' => (bool) $eff->escalation_needed,
+                'escalation_action' => $eff->escalation_action,
+                'reviewed_by' => $eff->reviewedByUser?->name,
+                'reviewed_at' => $eff->reviewed_at?->toIso8601String(),
+                'reviewed_label' => $eff->reviewed_at ? $eff->reviewed_at->copy()->timezone($timezone)->format('H:i · j M') : null,
+            ] : null,
+        ];
     }
 
     // ─── Controlled Drugs ──────────────────────────────────
