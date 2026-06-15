@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     AreaChart,
@@ -112,8 +112,13 @@ interface Props extends PageProps {
     revenueByMonth: MonthlyData[];
     expensesByMonth: MonthlyData[];
     topExpenseCategories: ExpenseCategory[];
+    revenueByFundingStream?: { name: string; amount: number }[];
     upcomingBillsDue: UpcomingBill[];
+    apDueWithin7?: { count: number; total: number };
+    cashRunwayDays?: number | null;
     recentJournals: RecentJournal[];
+    period?: Period;
+    periodLabel?: string;
     // Reference data for the quick-action wizard modals. Supplied by the
     // controller in Phase B; default to empty so the modals still open.
     accounts?: RefItem[];
@@ -175,14 +180,6 @@ function computeTrend(data: MonthlyData[]): { percent: number } | null {
 // Placeholder data — clearly marked. Replaced by real props in later phases.
 // ---------------------------------------------------------------------------
 
-// TODO(B): revenue-by-funding-stream from real GL/funding pipeline.
-const DONUT_REVENUE: DonutSegment[] = [
-    { key: 'moh', label: 'MoH Disability (SIL/Home & Living)', value: 248, color: 'var(--chart-1)' },
-    { key: 'if', label: 'Individualised Funding', value: 96, color: 'var(--chart-5)' },
-    { key: 'respite', label: 'Respite/Carer', value: 54, color: 'var(--chart-4)' },
-    { key: 'acc', label: 'ACC', value: 51, color: 'var(--chart-2)' },
-    { key: 'private', label: 'Private/top-up', value: 38, color: 'var(--chart-3)' },
-];
 // TODO(D): claim-utilisation buckets from the funding/remittance pipeline.
 const DONUT_UTILISATION: DonutSegment[] = [
     { key: 'paid', label: 'Claimed & paid', value: 312, color: 'var(--status-success)' },
@@ -283,7 +280,10 @@ export default function FinanceDashboard({
     accountsPayable,
     revenueByMonth,
     expensesByMonth,
+    revenueByFundingStream = [],
     upcomingBillsDue,
+    apDueWithin7,
+    cashRunwayDays,
     recentJournals,
     accounts = [],
     costCentres = [],
@@ -294,11 +294,58 @@ export default function FinanceDashboard({
     siteOptions = [],
     funderOptions = [],
     orgName = 'Whakaora Support Services',
+    period: serverPeriod = 'month',
+    periodLabel,
 }: Props) {
-    const [period, setPeriod] = useState<Period>('month');
+    const [period, setPeriod] = useState<Period>(serverPeriod);
     const [modal, setModal] = useState<Modal>(null);
     const [siteFilter, setSiteFilter] = useState<number[]>([]);
     const [funderFilter, setFunderFilter] = useState<number[]>([]);
+
+    // Period / filter changes → real Inertia partial reload. `only` trims the
+    // payload to the period-aware metric props (ref-data closures are skipped).
+    const reload = (next: { period?: Period; site?: number[]; funder?: number[] }) => {
+        router.reload({
+            only: [
+                'totalRevenue', 'totalExpenses', 'netProfit', 'cashBalance', 'accountsReceivable',
+                'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
+                'revenueByFundingStream', 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
+                'recentJournals', 'period', 'periodLabel',
+            ],
+            data: {
+                period: next.period ?? period,
+                site: next.site ?? siteFilter,
+                funder: next.funder ?? funderFilter,
+            },
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+    const changePeriod = (p: Period) => {
+        setPeriod(p);
+        reload({ period: p });
+    };
+    const changeSite = (v: number[]) => {
+        setSiteFilter(v);
+        reload({ site: v });
+    };
+    const changeFunder = (v: number[]) => {
+        setFunderFilter(v);
+        reload({ funder: v });
+    };
+
+    // §5 donut 1 — real revenue-by-funding-stream (dollars). Donuts 2 & 3 stay
+    // placeholder (thousands) until Phases D / C.
+    const REVENUE_COLORS = ['var(--chart-1)', 'var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-3)'];
+    const revenueStreamTotal = revenueByFundingStream.reduce((sum, s) => sum + s.amount, 0);
+    const revenueStreamSegments: DonutSegment[] = revenueByFundingStream.length
+        ? revenueByFundingStream.map((s, i) => ({
+              key: `fs-${i}`,
+              label: s.name,
+              value: s.amount,
+              color: REVENUE_COLORS[i % REVENUE_COLORS.length],
+          }))
+        : [{ key: 'none', label: 'No revenue in period', value: 1, color: 'var(--border)' }];
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -331,7 +378,7 @@ export default function FinanceDashboard({
                             <span>
                                 <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/85 md:justify-start">
                                     <PulseDot />
-                                    Live ledger · {PERIOD_LABEL[period]}
+                                    Live ledger · {periodLabel ?? PERIOD_LABEL[period]}
                                 </span>
                                 <span className="block">Finance Dashboard</span>
                             </span>
@@ -403,7 +450,7 @@ export default function FinanceDashboard({
                                         <button
                                             key={p.key}
                                             type="button"
-                                            onClick={() => setPeriod(p.key)}
+                                            onClick={() => changePeriod(p.key)}
                                             className={cn(
                                                 'rounded-md px-3 py-1 text-[12.5px] font-semibold transition-colors',
                                                 period === p.key
@@ -421,7 +468,7 @@ export default function FinanceDashboard({
                                         allLabel="All sites"
                                         items={siteOptions}
                                         value={siteFilter}
-                                        onChange={setSiteFilter}
+                                        onChange={changeSite}
                                         onDark
                                     />
                                     <MultiEntityFilter
@@ -430,7 +477,7 @@ export default function FinanceDashboard({
                                         pluralLabel="funding streams"
                                         items={funderOptions}
                                         value={funderFilter}
-                                        onChange={setFunderFilter}
+                                        onChange={changeFunder}
                                         onDark
                                     />
                                 </div>
@@ -467,7 +514,13 @@ export default function FinanceDashboard({
                         delta={profitTrend ? { percent: profitTrend.percent, good: profitTrend.percent >= 0 } : null}
                         sub={`${margin}% margin`}
                     />
-                    <KpiCard label="Cash position" value={formatMoneyCompact(cashBalance)} icon={Wallet} tone="info" sub="cash on hand" />
+                    <KpiCard
+                        label="Cash position"
+                        value={formatMoneyCompact(cashBalance)}
+                        icon={Wallet}
+                        tone="info"
+                        sub={cashRunwayDays != null ? `${cashRunwayDays} days runway` : 'cash on hand'}
+                    />
                     <KpiCard
                         label="AR outstanding"
                         value={formatMoneyCompact(accountsReceivable)}
@@ -480,7 +533,7 @@ export default function FinanceDashboard({
                         value={formatMoneyCompact(accountsPayable)}
                         icon={CreditCard}
                         tone="critical"
-                        sub={`${upcomingBillsDue.length} due ≤7d · ${formatMoneyCompact(billsDueTotal)}`}
+                        sub={`${apDueWithin7?.count ?? upcomingBillsDue.length} due ≤7d · ${formatMoneyCompact(apDueWithin7?.total ?? billsDueTotal)}`}
                     />
                     <KpiCard
                         label="Expenses"
@@ -502,14 +555,14 @@ export default function FinanceDashboard({
                         tone="primary"
                         title="Revenue by funding stream"
                         subtitle="Posted GL revenue this period"
-                        segments={DONUT_REVENUE}
-                        centerValue="$487k"
+                        segments={revenueStreamSegments}
+                        centerValue={formatMoneyCompact(revenueStreamTotal)}
                         centerLabel="revenue"
-                        accentKeys={['moh']}
+                        accentKeys={[revenueStreamSegments[0]?.key ?? '']}
                         active={false}
                         cta="View funding streams"
-                        onClick={() => setModal(null)}
-                        formatValue={fmtK}
+                        onClick={() => router.visit('/finance/funding-streams')}
+                        formatValue={(v) => formatMoneyCompact(v)}
                         showPercent
                     />
                     <DonutCard
