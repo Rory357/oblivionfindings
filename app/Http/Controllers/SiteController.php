@@ -1132,6 +1132,15 @@ class SiteController extends Controller
             'url' => url('/sites'),
         ]);
 
+        // The Add Site modal submits with `_modal` and stays open to show its
+        // success pane (linking to the new profile), so return back with the new
+        // id flashed. The full-page wizard keeps the redirect-to-profile flow.
+        if ($request->boolean('_modal')) {
+            return back()
+                ->with('created_site_id', $site->id)
+                ->with('success', 'Site created.');
+        }
+
         return redirect()
             ->route('sites.show', $site)
             ->with('success', 'Site created.');

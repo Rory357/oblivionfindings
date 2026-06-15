@@ -22,9 +22,20 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   serviceContexts, copyableSites+coverage/credentials, credentialCatalogue, coverageRoleKeys) gated on
   sites.create. New `config/site_credentials.php` (6-item catalogue + role keys).
   `AddSiteModalStoreTest.php` (10 tests/62 assertions, green); 48 existing SiteControllerTest pass;
-  Pint clean. Commit `<s2>`.
-- [ ] **S3 — Dialog scaffold + existing steps.** add-site-dialog.tsx (9 steps) mounted on sites index;
-  Basics/Location-shell/Spaces/Contacts/Equipment/Documents wired from _wizard.tsx + must-add fields.
+  Pint clean. Commit `42aeec4e`.
+- [x] **S3 — Dialog scaffold + existing steps.** `components/sites/add-site-dialog.tsx` mirrors
+  AddClientDialog via the shared `WizardShell`: one Inertia `useForm<SiteWizardForm>` (full payload
+  shape), 9 `STEPS`, step switch, `validateStep`/`stepForError`, discard-draft confirm, completeness
+  ring, submit `POST /sites` `forceFormData` w/ `_modal` flag. Built Basics (type tiles, name,
+  phone/email, lead, active; brand colour intentionally omitted), Location (address + NZ region
+  auto-derive + access instructions — geofence/autocomplete land in S5), Spaces (type-specific
+  rooms/resources/zones + total_capacity), Contacts (typed cards + primary star), Equipment (asset
+  checkboxes + checklist toggles w/ frequency + assignee + medication_storage_location), Documents
+  (file dropzone + rows). Rostering/Finance/Review are WIP step-heads (filled S4/S6). Mounted on the
+  Sites index (hero button now opens the modal; `/sites/create` route kept). Backend: `_modal` branch
+  in store() returns back()+`created_site_id` flash; HandleInertiaRequests shares it. Gate: tsc/lint/
+  build green; PHP 58 pass (no `_modal` regression). ⚠️ 2 pre-existing vitest failures (my-day
+  timesheet routing · app-sidebar Finance-nav) are unrelated/untouched by this slice. Commit `<s3>`.
 - [ ] **S4 — Rostering & coverage step (new).** Copy-from + 4 presets + coverage cards (role mix,
   allow_overstaffing, service_context) + credentials chip-multi + shift-template rows.
 - [ ] **S5 — Location & geofence step.** AddressAutocomplete (/sites/geocode/search) + GeofenceDrawMap
