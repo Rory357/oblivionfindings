@@ -2069,64 +2069,27 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
 
     // My HR - always visible
+    // Documents, Training, Payslips, Leave, etc. are now tabs within the My HR hub.
     const myHr: SubPanelGroup = {
         label: 'My HR',
-        items: [
-            { title: 'My HR', href: '/hr/my', icon: Home },
-            {
-                title: 'My Documents',
-                href: '/hr/my/documents',
-                icon: FolderOpen,
-            },
-            { title: 'My Training', href: '/hr/my/training', icon: Target },
-            { title: 'My Payslips', href: '/hr/my/payslips', icon: FileText },
-        ],
+        items: [{ title: 'My HR', href: '/hr/my', icon: Home }],
     };
     groups.push(myHr);
 
-    // People
+    // People — Directory, Positions, Departments & Org chart are now tabs within
+    // the People hub (their old routes redirect to /hr/people).
     const people: SubPanelGroup = {
         label: 'People',
         items: [],
     };
     if (can?.hr?.employees?.viewAny || can?.hr?.employees?.viewOwn) {
-        people.items.push({
-            title: 'Directory',
-            href: '/hr/directory',
-            icon: Users,
-        });
+        people.items.push({ title: 'People', href: '/hr/people', icon: Users });
     }
     if (can?.hr?.employees?.viewAny) {
-        people.items.push({ title: 'People', href: '/hr/people', icon: Users });
         people.items.push({
             title: 'Import/Export',
             href: '/hr/import-export',
             icon: FileText,
-        });
-    }
-    if (can?.hr?.positions?.view) {
-        people.items.push({
-            title: 'Positions',
-            href: '/hr/positions',
-            icon: Briefcase,
-        });
-    }
-    const hasAnyHr =
-        can?.hr?.recruitment?.view ||
-        can?.hr?.employees?.viewAny ||
-        can?.hr?.compliance?.view ||
-        can?.hr?.leave?.viewAny ||
-        can?.hr?.performance?.view ||
-        can?.hr?.reports?.view ||
-        can?.hr?.policies?.view ||
-        can?.hr?.positions?.view ||
-        can?.hr?.time?.view ||
-        can?.hr?.compensation?.view;
-    if (hasAnyHr) {
-        people.items.push({
-            title: 'Org Chart',
-            href: '/hr/orgchart',
-            icon: GitBranch,
         });
     }
     if (can?.hr?.recruitment?.view) {
@@ -2136,7 +2099,7 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Users,
         });
     }
-    groups.push(people);
+    if (people.items.length > 0) groups.push(people);
 
     // Time & Leave
     const timeAndLeave: SubPanelGroup = { label: 'Time & Leave', items: [] };
@@ -2189,40 +2152,14 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     if (timeAndLeave.items.length > 0) groups.push(timeAndLeave);
 
-    // Performance
+    // Performance — Reviews, Goals & OKRs, Competencies, 360 Feedback, PIPs &
+    // Succession are now tabs within the Performance hub.
     const performance: SubPanelGroup = { label: 'Performance', items: [] };
     if (can?.hr?.performance?.view) {
         performance.items.push({
             title: 'Performance',
             href: '/hr/performance',
             icon: ClipboardCheck,
-        });
-        performance.items.push({
-            title: '360 Feedback',
-            href: '/hr/feedback',
-            icon: Users,
-        });
-        performance.items.push({
-            title: 'PIPs',
-            href: '/hr/performance/pips',
-            icon: ClipboardList,
-        });
-        performance.items.push({
-            title: 'Competencies',
-            href: '/hr/performance/competencies',
-            icon: Target,
-        });
-        performance.items.push({
-            title: 'Succession',
-            href: '/hr/succession',
-            icon: Users,
-        });
-    }
-    if (can?.hr?.goals?.view) {
-        performance.items.push({
-            title: 'Goals',
-            href: '/hr/goals',
-            icon: Target,
         });
     }
     if (performance.items.length > 0) groups.push(performance);
@@ -2260,23 +2197,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     // Admin
     const admin: SubPanelGroup = { label: 'Admin', items: [] };
+    // Compliance — Matrix, Calendar, Training, Vetting & Drivers are now tabs
+    // within the Compliance hub. (Departments folded into the People hub.)
     if (can?.hr?.compliance?.view) {
         admin.items.push({
             title: 'Compliance',
             href: '/hr/compliance',
             icon: Shield,
-        });
-        admin.items.push({
-            title: 'Compliance Calendar',
-            href: '/hr/compliance/calendar',
-            icon: CalendarDays,
-        });
-    }
-    if (can?.hr?.settings?.manage || can?.hr?.employees?.manage) {
-        admin.items.push({
-            title: 'Departments',
-            href: '/hr/departments',
-            icon: Briefcase,
         });
     }
     if (can?.hr?.training?.view) {
@@ -2284,11 +2211,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Course Catalog',
             href: '/hr/training/catalog',
             icon: BookOpen,
-        });
-        admin.items.push({
-            title: 'Training Dashboard',
-            href: '/hr/compliance/training',
-            icon: GraduationCap,
         });
     }
     if (can?.hr?.assets?.view) {
@@ -2318,20 +2240,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Calendar',
             href: '/hr/calendar',
             icon: CalendarDays,
-        });
-    }
-    if (can?.hr?.vetting?.view) {
-        admin.items.push({
-            title: 'Vetting',
-            href: '/hr/compliance/vetting',
-            icon: Shield,
-        });
-    }
-    if (can?.hr?.driver?.view) {
-        admin.items.push({
-            title: 'Drivers',
-            href: '/hr/compliance/drivers',
-            icon: Users,
         });
     }
     if (can?.hr?.onboarding?.view) {
@@ -2379,16 +2287,17 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     }
-    if (can?.hr?.payroll?.view) {
+    // Payroll hub — Runs (/hr/payroll, hr.payroll.view) and Payslips
+    // (/hr/payroll/payslips, hr.payslips.view) are now tabs of the Payroll hub.
+    // Show the single entry if the user can open either tab; deep-link to the
+    // first page they can actually open (no 403-on-click).
+    if (can?.hr?.payroll?.view || can?.hr?.payslips?.view) {
         admin.items.push({
             title: 'Payroll',
-            href: '/hr/payroll',
+            href: can?.hr?.payroll?.view
+                ? '/hr/payroll'
+                : '/hr/payroll/payslips',
             icon: DollarSign,
-        });
-        admin.items.push({
-            title: 'Payslips',
-            href: '/hr/payroll/payslips',
-            icon: FileText,
         });
     }
     if (can?.hr?.policies?.view) {
@@ -2405,33 +2314,21 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Users,
         });
     }
+    // Reports — Builder, Saved, Automations & Webhooks are now tabs within the
+    // Reports hub.
     if (can?.hr?.reports?.view) {
         admin.items.push({
             title: 'Reports',
             href: '/hr/reports',
             icon: FileText,
         });
-        admin.items.push({
-            title: 'Report Builder',
-            href: '/hr/reports/builder',
-            icon: LayoutGrid,
-        });
     }
+    // Settings — Custom fields & Audit log are now tabs within the Settings hub.
     if (can?.hr?.settings?.manage) {
         admin.items.push({
             title: 'Settings',
             href: '/hr/settings/webhooks',
             icon: Settings,
-        });
-        admin.items.push({
-            title: 'Custom Fields',
-            href: '/hr/settings/custom-fields',
-            icon: Settings,
-        });
-        admin.items.push({
-            title: 'Audit Log',
-            href: '/hr/settings/audit-log',
-            icon: FileText,
         });
     }
     if (admin.items.length > 0) groups.push(admin);

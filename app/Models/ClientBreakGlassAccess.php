@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientBreakGlassAccess extends Model
@@ -35,6 +36,7 @@ class ClientBreakGlassAccess extends Model
         'review_outcome',
         'review_notes',
         'incident_report_linked',
+        'incident_report_id',
     ];
 
     protected $casts = [
@@ -68,6 +70,16 @@ class ClientBreakGlassAccess extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function incident(): BelongsTo
+    {
+        return $this->belongsTo(ClientIncident::class, 'incident_report_id');
+    }
+
+    public function accessEvents(): HasMany
+    {
+        return $this->hasMany(BreakGlassAccessEvent::class, 'break_glass_access_id');
     }
 
     /** Short attribution label for the grant card / audit ("Self-authorised", "Co-signed by …"). */

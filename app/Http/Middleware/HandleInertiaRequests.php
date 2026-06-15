@@ -625,6 +625,10 @@ class HandleInertiaRequests extends Middleware
                     'view' => $user->canDo('hr.payroll.view'),
                     'export' => $user->canDo('hr.payroll.export'),
                 ],
+                'payslips' => [
+                    'view' => $user->canDo('hr.payslips.view'),
+                    'generate' => $user->canDo('hr.payslips.generate'),
+                ],
                 'reports' => [
                     'view' => $user->canDo('hr.reports.view'),
                     'export' => $user->canDo('hr.reports.export'),

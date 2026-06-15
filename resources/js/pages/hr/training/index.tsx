@@ -1,4 +1,5 @@
 import { PageHero } from '@/components/page';
+import { ComplianceTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -168,6 +169,7 @@ export default function TrainingIndex({
                         </>
                     }
                 />
+                <ComplianceTabs active="training" />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

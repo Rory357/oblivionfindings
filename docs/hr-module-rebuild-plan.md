@@ -663,17 +663,133 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     + injected into all 12 my/*.tsx pages (11 PageLayout via an LF-safe line-targeted Node script; time.tsx PageShell manually).
     HrHubTabsRenderTest now covers all 32 hub pages — ⚠️ the ESS user needs an HrEmployeeProfile (my/documents firstOrFail()s
     on it) so the test seeds one. types+eslint+build green.
-  - REMAINING hubs (per the recorded plan; one/tick):
-    - **My-HR/ESS** (12 tabs Overview·Profile·Leave·Time·Expenses·Payslips·Reviews·Goals·Training·Documents·Policies·Surveys)
-      — no per-tab gate (whole my.* group is any-authed-user); wide strip but all genuine peers.
-    - **Compliance** (6 tabs Overview·Matrix·Calendar·Training·Vetting·Drivers — pages span sibling dirs training/vetting/drivers)
-      — ⚠️ per-tab perm gates DIFFER (matrix=manage, training=hr.training.view, vetting=hr.vetting.view, drivers=hr.driver.view)
-      → filter ITEMS by `auth.can` flags (verify each page exposes them) OR accept static list (a lacking-perm tab 403s on click).
-    - **Performance** (7 tabs Supervision·Reviews·Goals·Competencies·360 Feedback·PIPs·Succession — pages span performance/goals/
-      feedback/succession dirs) — uniform gate hr.performance.view (no per-tab divergence); ⚠️ the audit proposed `neutral` for
-      Succession which is NOT a valid tone → use a valid tone (e.g. reuse one). 7 tabs.
+  - ✅ **DONE — Compliance (S38) → ALL 7 needing-tabs hubs tabbed:** 6 tabs (Overview·Matrix·Calendar·Training·Vetting·Drivers)
+    across the compliance/, training/, vetting/, drivers/ dirs. ⚠️ per-tab perm gates DIFFER, so ComplianceTabs reads the shared
+    `auth.can.hr` flags via `usePage()` (HandleInertiaRequests exposes compliance.view/manage, training.view, vetting.view,
+    driver.view) and shows each tab only when its gate is truthy — a user only sees views they can open (no 403-on-click), with
+    the active tab always shown as a safety net. Component + barrel + 6 page injections (5 PageLayout, training/index direct-hero).
+    HrHubTabsRenderTest now covers all 38 hub pages. types+eslint+build green.
+  - ✅ **EVERY HR HUB NOW HAS STANDARDISED TABS** — People + Recruitment (pre-existing) + Settings/Compensation/Reports (S35) +
+    Documents/Performance (S36) + My-HR/ESS (S37) + Compliance (S38). (A) COMPLETE. Only the M10-5 visual-parity pass is browser-blocked.
+  - ✅ **DONE — left-nav consolidation (S39):** the tab work added the in-hub strips but the sidebar still listed every now-tab
+    surface as a flat entry (user-reported). Collapsed `buildHrSubPanelGroups` (app-sidebar.tsx) so each tabbed hub is ONE entry:
+    My HR (dropped My Documents/Training/Payslips), People (dropped Directory/Positions/Org Chart — their routes already redirect
+    to /hr/people; widened the People entry to viewAny||viewOwn), Performance (dropped 360 Feedback/PIPs/Competencies/Succession/
+    Goals), Compliance (dropped Calendar/Vetting/Drivers/Training Dashboard + the standalone Departments which folds into People),
+    Reports (dropped Report Builder), Settings (dropped Custom Fields/Audit Log). ⚠️ SAFE re access: verified in the seeders that
+    vetting/driver/training.view are ALWAYS granted alongside compliance.view, and the People sub-routes redirect — so no role
+    loses a nav entry; the dropped surfaces are reachable via the hub tab strips (and old bookmarks still redirect). Kept genuinely
+    separate surfaces (Import/Export, Recruitment, Course Catalog, Assets, Analytics, Onboarding, Payroll, Policies, etc.). types +
+    eslint + build green.
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
-  hero/tabs/modals visually match; no dead buttons; DoD met.
+  hero/tabs/modals visually match; no dead buttons; DoD met. → **DEFERRED-TO-USER (browser-blocked).**
+
+---
+
+## M10 — DEFINITION OF DONE (rebuild complete, 2026-06-15)
+
+The HR module rebuild **M0–M10 is COMPLETE and merged to `main`** (headless work done; all gates green every commit).
+
+**Shipped — M0–M9** (per the milestone sections above): the design spine + every hub (People, Recruitment, Onboarding/
+Offboarding, Time & Leave, Payroll→Finance, Performance, Recognition, Compliance/Training, Comp/Benefits, Engagement,
+Reports/Analytics, Approvals, My-HR), each rebuilt to PageHero + WizardShell modals, with the dead-backend wiring and the
+recurring null-tenant (`ResolvesHrTenant`) fixes.
+
+**Shipped — M10 polish ledger (S18–S38):**
+- *Demo seeders* (S18–S19) — every hub populated under `migrate:fresh --seed`.
+- *De-dup close-out* (S20) + ESS leave-cancel (S21) + my/training LMS link (S23).
+- *Payslip true PDF via dompdf* (S24); *HrSurvey controller/service/pages removal* (S25).
+- *a11y:* icon-button aria-labels (S26), same-token contrast-killer sweep 162/44 files (S28), star-fill→`amberx` token +
+  remaining unlabelled controls (S34).
+- *Finish-half-built backends (no dead buttons):* comp-review **approve** (S27), asset **retire/maintenance** lifecycle +
+  AssetController null-tenant fix (S29), expense **receipt upload** (S30), benefit-plan **deactivate** (S31).
+- *Orphan-table drops (reversible):* HrCheckIn (S22), HrDashboardConfig (S32), HrSurvey\* 4-table cluster + seeder/factory/
+  test rewire (S33).
+- *Standardised-tabs hub shells (A):* Settings/Compensation/Reports (S35), Documents/Performance (S36), My-HR/ESS (S37),
+  Compliance (S38) — **every HR hub now has the Rostering TabStrip** (People + Recruitment were already tabbed). Pattern:
+  a `<HubTabs active>` nav-link strip per existing page (no page-merge), gated tabs filtered by `auth.can` where gates differ.
+  Verified by `HrHubTabsRenderTest` (38 hub pages render 200).
+
+**DEFERRED — needs the USER (browser / product decision), cannot be done headless:**
+1. **M10-5 live visual verification on oblivionfindings.com** — side-by-side parity of the new tab strips vs Rostering +
+   live axe/mobile a11y pass. (Headless gates cover compile + route-render; they cannot confirm pixel parity or client
+   interaction.)
+2. **Server permission-seeder runbook — NOTHING to do:** ⚠️ NO new permission keys were introduced in the entire rebuild;
+   every gate reused an existing key, so no extra `db:seed` step is required on deploy.
+3. **Approvals `initiateApproval` integration** — a duplicate-approval **design decision** (the generic approval engine is
+   parallel/unused; wiring it would create a second source of approval truth). Needs product direction, not code.
+4. **HrJobPosting model + legacy `CareerPortalController` removal** — touches the PUBLIC careers site, which can't be
+   browser-verified headless; left for the user to confirm + remove.
+
+---
+
+## M10-B — Sidebar information architecture (no group > ~7 items)
+
+**Problem (verified live on oblivionfindings.com 2026-06-15 + re-derived from `buildHrSubPanelGroups`):**
+after S39 collapsed each tabbed hub to one sidebar entry, the **Admin** group still held **20 flat
+items** and **Time & Leave** held **7** — un-scannable. M10-A gave every hub a Rostering TabStrip;
+M10-B finishes the job by (1) **folding** the remaining peer sub-pages into their hub's tab strip and
+(2) **re-grouping** the residue into short labelled groups.
+
+**Planning workflow (`hr-sidebar-ia-audit`, 7 parallel agents) — verified facts (all re-derived from code,
+prior claims treated as untrusted):**
+
+| Candidate | Route / gate | Verdict |
+|---|---|---|
+| **Expiring Docs** `/hr/documents/expiring` | **NO route, NO controller method, NO page — 404 dead link** | **REMOVE** the sidebar item (nothing to fold; do not point a tab at a 404) |
+| **Signatures** `/hr/signatures/pending` (`ESignatureController@pending`) | route is **auth-only** (owner-scoped `abort_unless($user)`); sidebar gates `documents.view‖manage` | **FOLD** -> Documents hub tab (always-shown, `hr.documents.view`), tone `warning` |
+| **Payroll Runs** `/hr/payroll` (`PayrollExportController@index`) | `hr.payroll.view` | hub root (Runs tab) |
+| **Payslips** `/hr/payroll/payslips` (`PayslipController@index`) | **`hr.payslips.view`** (!= payroll.view) | **FOLD** -> new Payroll hub tab; **per-tab gate** `hr.payslips.view` (fixes a latent 403-on-click: sidebar shows it under `payroll.view`) |
+| **Onboarding Checklist** `/hr/onboarding` (`OnboardingController@index`) | `hr.onboarding.view` | hub root (Checklists tab) |
+| **Onboarding Emails** `/hr/onboarding/emails` (`OnboardingEmailController@index`) | route group `onboarding.view` BUT controller `abort_unless(...manage)` -> **effective `hr.onboarding.manage`** | **FOLD** -> new Onboarding hub tab; **per-tab gate** `hr.onboarding.manage` |
+| **Analytics** `/hr/analytics` (`AnalyticsDashboardController@index`) | **`hr.analytics.view`** (!= reports.view) | **FOLD** -> Reports hub tab; convert reports-tabs to per-tab gating |
+| **Headcount** `/hr/headcount` (`HeadcountController@index`) | **`hr.analytics.view`** (same as Analytics) | **FOLD** -> Reports hub tab; per-tab gate `hr.analytics.view` |
+| **Course Catalog** `/hr/training/catalog` (`TrainingController@catalog`) | `hr.training.view‖training.viewAny` (peer of existing Training tab, distinct data: `HrCourse` vs `StaffTrainingRecord`) | **FOLD** -> Compliance hub tab after Training, gate `hr.training.view`, tone `info` (clean) |
+
+**RBAC safety (RbacSeeder + SeedHrPermissionsSeeder, fully read): ALL 7 folds SAFE.** For every fold the
+roles able to open the folded page are a subset of (or equal to) roles able to open the hub entry — no role
+loses access. Non-admin holders of `documents.view`/`reports.view`/`payroll.view`/`payslips.view`/
+`analytics.view`/`onboarding.manage` = **`{hr}` only** (admin gets all); `compliance.view` and
+`training.viewAny` are **always co-granted** (the vetting/driver/training precedent holds -> Catalog within Compliance).
+**No hub sidebar gate needs widening to a union.** (Future-proofing only: the collapsed Payroll entry is gated
+`payroll.view ‖ payslips.view` so a hypothetical payslips-only role still sees it.)
+
+**Injection mechanics per page (where the `<HubTabs>` strip goes):**
+`PageLayout` (hero is a prop) -> strip is the FIRST body child after the opening tag: Payroll Runs+Payslips,
+Onboarding Checklist+Emails, Analytics, Signatures. `PageShell`/inline `<PageHero>` -> strip right after
+`</PageHero>`: Headcount, Course Catalog.
+
+**Final IA (target — every group <= 5 items):**
+
+| Group | Items | Delta |
+|---|---|---|
+| My HR | My HR | — |
+| People | People · Import/Export · Recruitment | — |
+| **Time & Leave** | Leave & Rosters · Leave Reports · Timekeeping · Time Off Calendar | split (was 7) |
+| **Pay & Benefits** | Compensation · Benefits · Expenses | **new** (split out of Time & Leave) |
+| Performance | Performance | — |
+| Engagement | Community Feed · Announcements · Surveys & Wellbeing | — |
+| **Compliance & Records** | Compliance · Documents · Policies · Assets · Skills | re-group of Admin |
+| **Employee Lifecycle** | Onboarding · HR Cases · Exit Interviews · Approvals | re-group of Admin |
+| **Payroll & Admin** | Payroll · Reports · Calendar · Settings | re-group of Admin |
+
+Admin (20) -> folds remove 7 (Course Catalog, Analytics, Headcount, Onboarding Emails, Payslips, Signatures,
+Expiring-Docs[dead]) -> 13 -> re-grouped into 3 labelled groups of 5/4/4. Time & Leave (7) -> 4 + 3.
+
+**Implementation ticks (one coherent green sub-commit each; each removes its flat nav entry, adds folded routes
+to `HrHubTabsRenderTest`, then merge/push + browser-verify on .com):**
+1. **Payroll hub** — new `payroll-tabs.tsx` (Runs `primary` / Payslips `info`, per-tab gated `payroll.view`/`payslips.view`); strip into `payroll/index.tsx` + `payroll/payslips.tsx`; collapse sidebar Payroll+Payslips -> one **Payroll** entry (`payroll.view ‖ payslips.view`).
+2. **Onboarding hub** — new `onboarding-tabs.tsx` (Checklists `primary` / Emails `info`, Emails gated `onboarding.manage`); strip into `onboarding/index.tsx` + `onboarding/emails.tsx`; collapse sidebar -> one **Onboarding** entry.
+3. **Course Catalog -> Compliance** — extend `compliance-tabs.tsx` (Catalog tab after Training, `training.view`, `info`); strip into `training/catalog.tsx`; remove Course Catalog from sidebar.
+4. **Analytics + Headcount -> Reports** — convert `reports-tabs.tsx` to per-tab gating (compliance-tabs pattern), add Analytics + Headcount (`analytics.view`); strips into `analytics/index.tsx` (PageLayout) + `headcount/index.tsx` (PageShell); remove both from sidebar.
+5. **Signatures -> Documents + remove dead Expiring Docs** — extend `documents-tabs.tsx` (Signatures tab, always-shown `warning`); strip into `signatures/pending.tsx`; remove Signatures + dead Expiring-Docs from sidebar.
+6. **Re-group Admin + split Time & Leave** — pure `buildHrSubPanelGroups` data change to the final IA above (zero route risk).
+
+**Out-of-scope observations (pre-existing sidebar-gate != route-gate divergences, NOT introduced here, not fixed):**
+Timekeeping (sidebar `time.view` vs route `timesheets.viewAny`), Community Feed (`announcements.view` vs route
+`recognition.view`), Skills (`skills.view` vs route `performance.view`), Exit Interviews (`cases.view` vs route
+`exit-interviews.*`). The Payslips + Onboarding-Emails divergences ARE fixed (via per-tab hub gating). The rest are
+benign (over-show, never under-show) and left for a separate gate-audit pass.
 
 ---
 
