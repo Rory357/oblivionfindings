@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -363,6 +364,8 @@ export default function MyGoals({ goals }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="goals" />
+
                 {goals.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">

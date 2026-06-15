@@ -8,6 +8,7 @@ export * from './documents-tabs';
 export * from './hr-hero';
 export * from './hr-tabs';
 export * from './leave-request-dialog';
+export * from './my-hr-tabs';
 export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
 export * from './onboarding-wizard-dialog';

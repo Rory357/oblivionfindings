@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -236,6 +237,8 @@ export default function MyTime({
                         { label: 'Upcoming shifts', value: upcomingShifts.length },
                     ]}
                 />
+
+                <MyHrTabs active="time" />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

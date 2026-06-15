@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -127,6 +128,8 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="leave" />
+
                 {/* Leave Balances */}
                 {balances.length > 0 && (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

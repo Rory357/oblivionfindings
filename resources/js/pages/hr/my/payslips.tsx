@@ -1,5 +1,6 @@
 import { MiniSparkline } from '@/components/dashboard/mini-sparkline';
 import { PageHero, PageLayout } from '@/components/page';
+import { MyHrTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -226,6 +227,8 @@ export default function MyPayslips({ payslips }: Props) {
                     />
                 }
             >
+                <MyHrTabs active="payslips" />
+
                 {/* Summary Cards */}
                 {payslips.data.length > 0 && (
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

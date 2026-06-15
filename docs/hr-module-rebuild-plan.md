@@ -658,6 +658,11 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     Supervision·Reviews·Goals & OKRs·Competencies·360 Feedback·PIPs·Succession across performance/goals/feedback/succession
     dirs, all under hr.performance.view; Succession uses tone `info` since `neutral` is not a valid RosterTabTone). 2 components
     + barrel + 9 page injections. HrHubTabsRenderTest now covers all 20 hub pages (200 for hr role). types+eslint+build green.
+  - ✅ **DONE — My-HR/ESS (S37):** 12-tab static strip (Overview·Profile·Leave·Time·Expenses·Payslips·Reviews·Goals·
+    Training·Documents·Policies·Surveys) — no per-tab gate (the my.* group is any-authed-user). MyHrTabs component + barrel
+    + injected into all 12 my/*.tsx pages (11 PageLayout via an LF-safe line-targeted Node script; time.tsx PageShell manually).
+    HrHubTabsRenderTest now covers all 32 hub pages — ⚠️ the ESS user needs an HrEmployeeProfile (my/documents firstOrFail()s
+    on it) so the test seeds one. types+eslint+build green.
   - REMAINING hubs (per the recorded plan; one/tick):
     - **My-HR/ESS** (12 tabs Overview·Profile·Leave·Time·Expenses·Payslips·Reviews·Goals·Training·Documents·Policies·Surveys)
       — no per-tab gate (whole my.* group is any-authed-user); wide strip but all genuine peers.
