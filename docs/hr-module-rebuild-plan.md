@@ -627,10 +627,16 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     re-confirmed truly orphaned (repo-wide grep: only the model + its create migration; no controller/route/service/
     seeder/factory/test/relationship). Reversible drop migration 2026_06_16_000001 (down() recreates id/user_id-unique-FK/
     layout-json/timestamps) + deleted the model. 3 tests (HrDashboardConfigDroppedTest: table gone via Schema::hasTable,
-    model file_exists false, down() method exists). REMAINING: **HrSurvey\*** (4 tables — NOT a clean self-contained drop:
-    wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory + HrDemoSeederTest + SurveySystemRetiredTest, so dropping
-    requires editing all of those too). HrEmployeeProfileVersion/HrEmployeeStatusChange + HrCompensationReviewItem are dead
-    *relationships on LIVE parents* (lower priority / future scope — leave).
+    model file_exists false, down() method exists).
+  - ✅ **HrSurvey\* 4-table cluster DONE (S33) → category C orphan-drops COMPLETE:** reversible drop migration
+    2026_06_16_000002 (up drops answers→responses→questions→surveys FK-safe; down recreates all 4 exactly) + git rm the 4
+    models. Rewired non-model touch-points: HrDemoSeeder (seedAnnouncementsAndSurveys→seedAnnouncements, dropped survey
+    block + 2 imports + renamed call site), DuskDatabaseSeeder (removed HrSurvey::factory line), deleted HrSurveyFactory,
+    HrDemoSeederTest (removed hr_surveys/hr_survey_questions count assertions), SurveySystemRetiredTest (rewrote the
+    model-dependent test → GET /hr/surveys/999, the Route::redirect needs no real row, dropped import). KEPT the
+    hr.surveys.* redirect routes + can.surveys exposure. 10 tests (HrSurveyTablesDroppedTest + SurveySystemRetiredTest +
+    RetiredRoutesRedirectTest + HrDemoSeederTest) green. REMAINING orphans (LEAVE — dead *relationships on LIVE parents*,
+    future scope): HrEmployeeProfileVersion/HrEmployeeStatusChange + HrCompensationReviewItem.
   - *Static a11y/token (build+eslint-verifiable):* ✅ **same-token contrast killers DONE (S28)** — was actually 162
     instances across 44 files (not ~15); all swapped `bg-status-X`→`bg-status-X-bg`. REMAINING: raw-palette
     `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls

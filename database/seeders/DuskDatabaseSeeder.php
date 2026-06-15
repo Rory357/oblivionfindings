@@ -623,7 +623,6 @@ class DuskDatabaseSeeder extends Seeder
         // $this->seed(fn () => \App\Domain\Hr\Models\HrOnboardingChecklist::factory()->create());
         $this->seed(fn () => \App\Domain\Hr\Models\HrCompensationReview::factory()->create());
         $this->seed(fn () => \App\Domain\Hr\Models\HrSuccessionPlan::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrSurvey::factory()->create());
 
         // ──────────────────────────────────────────────
         // Finance
