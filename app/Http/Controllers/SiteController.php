@@ -15,7 +15,6 @@ use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
-use App\Models\RosterTemplate;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
@@ -1077,7 +1076,6 @@ class SiteController extends Controller
         // after the Site exists (see persist* helpers below).
         $coverage = $validated['coverage'] ?? [];
         $credentials = $validated['credentials'] ?? [];
-        $shiftTemplates = $validated['shift_templates'] ?? [];
         $geofence = $validated['geofence'] ?? null;
         // Documents come from the multipart request with UploadedFile
         // instances; saveDocuments() reads them directly from $request.
@@ -1096,7 +1094,6 @@ class SiteController extends Controller
             $validated['documents'],
             $validated['coverage'],
             $validated['credentials'],
-            $validated['shift_templates'],
             $validated['geofence'],
             $validated['weekly_food_budget'],
         );
@@ -1105,7 +1102,7 @@ class SiteController extends Controller
             unset($validated['weekly_food_budget_cents']);
         }
 
-        $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $shiftTemplates, $geofence, $request, $user) {
+        $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $geofence, $request, $user) {
             $site = Site::create($validated);
 
             $this->syncContacts($site, $contacts);
@@ -1118,7 +1115,6 @@ class SiteController extends Controller
             // Rostering + geofence fan-out (all reuse existing models).
             $this->persistCoverageRequirements($site, $coverage, $user);
             $this->persistStaffRequirements($site, $credentials, $user);
-            $this->persistShiftTemplates($site, $shiftTemplates, $user);
             $this->persistSiteGeofence($site, $geofence);
 
             // Documents last so disk writes only happen once every DB op succeeds.
@@ -1235,46 +1231,6 @@ class SiteController extends Controller
                 ],
             );
         }
-    }
-
-    /**
-     * Default shift templates → a per-site RosterTemplate "{Site} default week"
-     * (decision A). The lightweight {name,start,end} rows each expand to one
-     * template shift per weekday (day_of_week 0-6); identity FKs stay null
-     * (the request permits it) so nothing is fabricated.
-     *
-     * @param  array<int, array<string, mixed>>  $shiftTemplates
-     */
-    private function persistShiftTemplates(Site $site, array $shiftTemplates, ?User $user): void
-    {
-        if (empty($shiftTemplates)) {
-            return;
-        }
-
-        $template = RosterTemplate::create([
-            'organization_id' => $user?->organization_id,
-            'name' => "{$site->name} default week",
-            'description' => 'Created from the Add Site modal.',
-            'template_type' => 'weekly',
-            'is_active' => true,
-            'created_by' => $user?->id,
-        ]);
-
-        $rows = [];
-        foreach ($shiftTemplates as $tpl) {
-            for ($day = 0; $day <= 6; $day++) {
-                $rows[] = [
-                    'organization_id' => $user?->organization_id,
-                    'day_of_week' => $day,
-                    'start_time' => $tpl['starts_time'],
-                    'end_time' => $tpl['ends_time'],
-                    'shift_type' => 'standard',
-                    'notes' => $tpl['name'],
-                ];
-            }
-        }
-
-        $template->templateShifts()->createMany($rows);
     }
 
     /**
@@ -1498,7 +1454,6 @@ class SiteController extends Controller
             $validated['checklists'],
             $validated['coverage'],
             $validated['credentials'],
-            $validated['shift_templates'],
             $validated['geofence'],
             $validated['weekly_food_budget'],
         );

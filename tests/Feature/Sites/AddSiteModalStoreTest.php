@@ -4,7 +4,6 @@ namespace Tests\Feature\Sites;
 
 use App\Models\AssetGeofence;
 use App\Models\Role;
-use App\Models\RosterTemplate;
 use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteHouseRoom;
@@ -184,24 +183,6 @@ class AddSiteModalStoreTest extends TestCase
         $this->assertSame('weekly', $site->rent_frequency);
         $this->assertSame('Acme Property', $site->landlord_name);
         $this->assertSame('2026-01-01', $site->lease_start_date->toDateString());
-    }
-
-    public function test_store_persists_shift_templates_as_roster_template(): void
-    {
-        $payload = $this->basePayload([
-            'shift_templates' => [
-                ['name' => 'Morning', 'starts_time' => '07:00', 'ends_time' => '15:00'],
-            ],
-        ]);
-
-        $this->actingAs($this->admin)->post('/sites', $payload)->assertRedirect();
-        $site = Site::where('name', 'Modal House')->firstOrFail();
-
-        $template = RosterTemplate::where('name', "{$site->name} default week")->firstOrFail();
-        $this->assertSame('weekly', $template->template_type);
-        // One row × 7 days.
-        $this->assertSame(7, $template->templateShifts()->count());
-        $this->assertSame('Morning', $template->templateShifts()->first()->notes);
     }
 
     public function test_store_with_no_rostering_creates_no_extra_rows(): void

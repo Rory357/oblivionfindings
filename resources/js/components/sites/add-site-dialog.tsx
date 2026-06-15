@@ -57,7 +57,6 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    Clock,
     FileText,
     Loader2,
     MapPin,
@@ -147,7 +146,6 @@ export type CredentialRow = {
     category: 'mandatory' | 'recommended';
     expiry_period_months: number | string;
 };
-export type ShiftTemplateRow = { name: string; starts_time: string; ends_time: string };
 export type SiteContactRow = {
     type: string;
     name: string;
@@ -208,7 +206,6 @@ export type SiteWizardForm = {
     copy_from: string;
     coverage: CoverageRule[];
     credentials: CredentialRow[];
-    shift_templates: ShiftTemplateRow[];
     // contacts
     contacts: SiteContactRow[];
     // equipment & checks
@@ -288,7 +285,6 @@ function initialForm(): SiteWizardForm {
         copy_from: '',
         coverage: [],
         credentials: [],
-        shift_templates: [],
         contacts: [],
         assets: [],
         checklists: [],
@@ -369,7 +365,6 @@ function validateStep(key: StepKey, d: SiteWizardForm): Record<string, string> {
 const STEP_FOR_PREFIX: { prefix: string; step: StepKey }[] = [
     { prefix: 'coverage', step: 'rostering' },
     { prefix: 'credentials', step: 'rostering' },
-    { prefix: 'shift_templates', step: 'rostering' },
     { prefix: 'address_', step: 'location' },
     { prefix: 'suburb', step: 'location' },
     { prefix: 'city', step: 'location' },
@@ -1746,12 +1741,6 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
             data.credentials.map((c) => (c.key === key ? { ...c, ...patch } : c)),
         );
 
-    const updateTemplate = (i: number, patch: Partial<ShiftTemplateRow>) =>
-        set(
-            'shift_templates',
-            data.shift_templates.map((t, idx) => (idx === i ? { ...t, ...patch } : t)),
-        );
-
     return (
         <div>
             <StepHead
@@ -1909,68 +1898,6 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                     ) : null}
                 </div>
 
-                {/* Default shift templates */}
-                <div>
-                    <SubHead icon={Clock}>Default shift templates</SubHead>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                        Optional — seeds a “{data.name || 'Site'} default week” roster template.
-                    </p>
-                    <div className="mt-2 grid gap-2">
-                        {data.shift_templates.map((t, i) => (
-                            <div
-                                key={i}
-                                className="grid items-center gap-2 rounded-lg border border-border bg-card/70 p-2.5 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
-                            >
-                                <Input
-                                    value={t.name}
-                                    onChange={(e) => updateTemplate(i, { name: e.target.value })}
-                                    placeholder="e.g. Morning"
-                                    className="h-8"
-                                />
-                                <Input
-                                    type="time"
-                                    value={t.starts_time}
-                                    onChange={(e) => updateTemplate(i, { starts_time: e.target.value })}
-                                    className="h-8"
-                                />
-                                <Input
-                                    type="time"
-                                    value={t.ends_time}
-                                    onChange={(e) => updateTemplate(i, { ends_time: e.target.value })}
-                                    className="h-8"
-                                />
-                                <button
-                                    type="button"
-                                    aria-label="Remove shift template"
-                                    onClick={() =>
-                                        set(
-                                            'shift_templates',
-                                            data.shift_templates.filter((_, idx) => idx !== i),
-                                        )
-                                    }
-                                    className="justify-self-center text-muted-foreground hover:text-status-critical"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                        <div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    set('shift_templates', [
-                                        ...data.shift_templates,
-                                        { name: '', starts_time: '09:00', ends_time: '17:00' },
-                                    ])
-                                }
-                            >
-                                <Plus className="h-3.5 w-3.5" /> Add shift template
-                            </Button>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     );
@@ -2357,14 +2284,6 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             value={
                                 data.credentials.length > 0
                                     ? `${data.credentials.length} required`
-                                    : null
-                            }
-                        />
-                        <ReviewRow
-                            label="Shift templates"
-                            value={
-                                data.shift_templates.length > 0
-                                    ? String(data.shift_templates.length)
                                     : null
                             }
                         />
