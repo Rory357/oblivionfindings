@@ -1,3 +1,4 @@
+import { ComplianceTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -234,6 +235,8 @@ export default function TrainingCatalog({
                         </>
                     }
                 />
+
+                <ComplianceTabs active="catalog" />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

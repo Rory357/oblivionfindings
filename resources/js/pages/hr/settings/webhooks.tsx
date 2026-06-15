@@ -1,50 +1,58 @@
-import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { PageHero } from '@/components/page';
+import { PageHero, PageLayout } from '@/components/page';
 import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Pencil, Plus, TestTube, Trash2, Webhook } from 'lucide-react';
-import { useState } from 'react';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Webhook } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-type BreadcrumbItem = { title: string; href: string };
+interface EventOption {
+    value: string;
+    label: string;
+}
 
-interface WebhookRecord {
+interface Endpoint {
     id: number;
-    url: string;
-    secret: string;
-    events: string[];
+    name: string;
+    target_url: string;
+    event_types: string[];
+    headers: Record<string, string>;
+    timeout_seconds: number;
+    retry_limit: number;
     is_active: boolean;
-    last_triggered_at: string | null;
-    failure_count: number;
-    creator: { id: number; name: string } | null;
-    created_at: string;
+    last_delivery_at: string | null;
+    last_status: string | null;
+    last_error: string | null;
+    deliveries_count: number;
+    failed_deliveries_count: number;
+}
+
+interface Delivery {
+    id: number;
+    endpoint_id: number;
+    endpoint_name: string | null;
+    event_type: string;
+    status: 'pending' | 'retrying' | 'success' | 'failed';
+    attempts: number;
+    max_attempts: number;
+    queued_at: string | null;
+    delivered_at: string | null;
+    failed_at: string | null;
+    response_code: number | null;
+    error_message: string | null;
 }
 
 interface Props {
-    webhooks: WebhookRecord[];
-    availableEvents: string[];
+    endpoints: Endpoint[];
+    deliveries: Delivery[];
+    eventOptions: EventOption[];
+    can: { manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -53,327 +61,543 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Webhooks', href: '/hr/settings/webhooks' },
 ];
 
-const formatDate = (value?: string | null) => {
-    if (!value) return 'Never';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
+const statusClass: Record<string, string> = {
+    pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    retrying: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    success: 'border-status-success/30 text-status-success bg-status-success-bg',
+    failed: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
 };
 
-export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
-    const [open, setOpen] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
-
-    const form = useForm({
-        url: '',
-        events: [] as string[],
+export default function HrWebhookIndex({
+    endpoints,
+    deliveries,
+    eventOptions,
+    can,
+}: Props) {
+    const [editingEndpointId, setEditingEndpointId] = useState<number | null>(
+        null,
+    );
+    const { data, setData, post, put, processing, errors, reset } = useForm({
+        name: '',
+        target_url: '',
+        signing_secret: '',
+        event_types: [] as string[],
+        timeout_seconds: '10',
+        retry_limit: '3',
         is_active: true,
     });
 
-    const openCreate = () => {
-        form.reset();
-        form.setData({ url: '', events: [], is_active: true });
-        setEditingId(null);
-        setOpen(true);
-    };
+    const eventTypeLabelByValue = useMemo(
+        () =>
+            new Map(
+                eventOptions.map((eventOption) => [
+                    eventOption.value,
+                    eventOption.label,
+                ]),
+            ),
+        [eventOptions],
+    );
 
-    const openEdit = (webhook: WebhookRecord) => {
-        form.setData({
-            url: webhook.url,
-            events: webhook.events,
-            is_active: webhook.is_active,
-        });
-        setEditingId(webhook.id);
-        setOpen(true);
+    const toggleEvent = (eventType: string, checked: boolean) => {
+        const next = new Set(data.event_types);
+        if (checked) {
+            next.add(eventType);
+        } else {
+            next.delete(eventType);
+        }
+        setData('event_types', Array.from(next));
     };
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (editingId) {
-            form.put(`/hr/settings/webhooks/${editingId}`, {
-                onSuccess: () => setOpen(false),
+        const onSuccess = () => {
+            setEditingEndpointId(null);
+            reset();
+            setData('timeout_seconds', '10');
+            setData('retry_limit', '3');
+            setData('is_active', true);
+        };
+
+        if (editingEndpointId) {
+            put(`/hr/settings/webhooks/${editingEndpointId}`, {
+                preserveScroll: true,
+                onSuccess,
             });
-        } else {
-            form.post('/hr/settings/webhooks', {
-                onSuccess: () => setOpen(false),
-            });
+            return;
         }
+
+        post('/hr/settings/webhooks', {
+            preserveScroll: true,
+            onSuccess,
+        });
     };
 
-    const toggleEvent = (event: string) => {
-        const current = form.data.events;
-        if (current.includes(event)) {
-            form.setData(
-                'events',
-                current.filter((e) => e !== event),
-            );
-        } else {
-            form.setData('events', [...current, event]);
-        }
+    const toggleEndpoint = (id: number) => {
+        router.post(
+            `/hr/settings/webhooks/${id}/toggle-active`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
-    const deleteWebhook = (id: number) => {
-        if (confirm('Are you sure you want to delete this webhook?')) {
-            router.delete(`/hr/settings/webhooks/${id}`);
-        }
+    const retryDelivery = (id: number) => {
+        router.post(
+            `/hr/settings/webhooks/deliveries/${id}/retry`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
-    const testWebhook = (id: number) => {
-        router.post(`/hr/settings/webhooks/${id}/test`);
+    const startEdit = (endpoint: Endpoint) => {
+        setEditingEndpointId(endpoint.id);
+        setData({
+            name: endpoint.name,
+            target_url: endpoint.target_url,
+            signing_secret: '',
+            event_types: endpoint.event_types,
+            timeout_seconds: String(endpoint.timeout_seconds),
+            retry_limit: String(endpoint.retry_limit),
+            is_active: endpoint.is_active,
+        });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Webhooks - HR Settings" />
-            <PageShell>
-                <PageHero category="hr"
-                    icon={Webhook}
-                    title="Webhooks"
-                    description="Manage webhook endpoints for HR event notifications."
-                    stats={[
-                        { label: 'Total', value: webhooks.length },
-                        {
-                            label: 'Active',
-                            value: webhooks.filter((w) => w.is_active).length,
-                        },
-                        { label: 'Available events', value: availableEvents.length },
-                    ]}
-                    actions={
-                        <Dialog open={open} onOpenChange={setOpen}>
-                            <DialogTrigger asChild>
-                                <Button onClick={openCreate}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Webhook
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle>
-                                    {editingId
-                                        ? 'Edit Webhook'
-                                        : 'Create Webhook'}
-                                </DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={submit} className="space-y-4">
-                                <div>
-                                    <Label htmlFor="url">Endpoint URL</Label>
+            <Head title="HR Webhooks" />
+            <PageLayout
+                hero={
+                    <PageHero category="hr"
+                        icon={Webhook}
+                        title="HR Webhooks"
+                        description="Manage webhook endpoints for HR event notifications."
+                    />
+                }
+            >
+                <SettingsTabs active="webhooks" />
+
+                {can.manage && (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">
+                                    {editingEndpointId
+                                        ? 'Edit Webhook Endpoint'
+                                        : 'Create Webhook Endpoint'}
+                                </CardTitle>
+                                {editingEndpointId && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingEndpointId(null);
+                                            reset();
+                                            setData('timeout_seconds', '10');
+                                            setData('retry_limit', '3');
+                                            setData('is_active', true);
+                                        }}
+                                    >
+                                        Cancel Edit
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <form
+                                className="grid gap-4 md:grid-cols-2"
+                                onSubmit={submit}
+                            >
+                                <div className="space-y-2">
+                                    <Label>Name</Label>
                                     <Input
-                                        id="url"
-                                        type="url"
-                                        value={form.data.url}
+                                        value={data.name}
                                         onChange={(e) =>
-                                            form.setData('url', e.target.value)
+                                            setData('name', e.target.value)
                                         }
-                                        placeholder="https://example.com/webhook"
-                                        required
+                                        placeholder="Operations Alerts"
                                     />
-                                    {form.errors.url && (
-                                        <p className="mt-1 text-sm text-status-critical">
-                                            {form.errors.url}
+                                    {errors.name && (
+                                        <p className="text-xs text-status-critical">
+                                            {errors.name}
                                         </p>
                                     )}
                                 </div>
 
-                                <div>
-                                    <Label>Events</Label>
-                                    <div className="mt-2 grid max-h-48 grid-cols-2 gap-2 overflow-y-auto">
-                                        {availableEvents.map((event) => (
+                                <div className="space-y-2">
+                                    <Label>Target URL</Label>
+                                    <Input
+                                        value={data.target_url}
+                                        onChange={(e) =>
+                                            setData(
+                                                'target_url',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="https://hooks.example.test/hr"
+                                    />
+                                    {errors.target_url && (
+                                        <p className="text-xs text-status-critical">
+                                            {errors.target_url}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Signing Secret (optional)</Label>
+                                    <Input
+                                        value={data.signing_secret}
+                                        onChange={(e) =>
+                                            setData(
+                                                'signing_secret',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="hmac-secret"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                        <Label>Timeout Seconds</Label>
+                                        <Input
+                                            type="number"
+                                            min={2}
+                                            max={30}
+                                            value={data.timeout_seconds}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'timeout_seconds',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Retry Limit</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={6}
+                                            value={data.retry_limit}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'retry_limit',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label>Event Types</Label>
+                                    <div className="grid gap-2 md:grid-cols-3">
+                                        {eventOptions.map((eventOption) => (
                                             <label
-                                                key={event}
-                                                className="flex items-center gap-2 text-sm"
+                                                key={eventOption.value}
+                                                className="flex items-center gap-2 rounded border p-2 text-sm"
                                             >
                                                 <Checkbox
-                                                    checked={form.data.events.includes(
-                                                        event,
+                                                    checked={data.event_types.includes(
+                                                        eventOption.value,
                                                     )}
-                                                    onCheckedChange={() =>
-                                                        toggleEvent(event)
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        toggleEvent(
+                                                            eventOption.value,
+                                                            Boolean(checked),
+                                                        )
                                                     }
                                                 />
-                                                {event}
+                                                <span>{eventOption.label}</span>
                                             </label>
                                         ))}
                                     </div>
-                                    {form.errors.events && (
-                                        <p className="mt-1 text-sm text-status-critical">
-                                            {form.errors.events}
+                                    {errors.event_types && (
+                                        <p className="text-xs text-status-critical">
+                                            {errors.event_types}
                                         </p>
                                     )}
                                 </div>
 
-                                {editingId && (
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm">
-                                            <Checkbox
-                                                checked={form.data.is_active}
-                                                onCheckedChange={(checked) =>
-                                                    form.setData(
-                                                        'is_active',
-                                                        !!checked,
-                                                    )
-                                                }
-                                            />
-                                            Active
-                                        </label>
-                                    </div>
-                                )}
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <Checkbox
+                                            checked={data.is_active}
+                                            onCheckedChange={(checked) =>
+                                                setData(
+                                                    'is_active',
+                                                    Boolean(checked),
+                                                )
+                                            }
+                                        />
+                                        <span>Endpoint is active</span>
+                                    </label>
+                                </div>
 
-                                <DialogFooter>
+                                <div className="flex justify-end md:col-span-2">
                                     <Button
                                         type="submit"
-                                        disabled={form.processing}
+                                        disabled={
+                                            processing ||
+                                            data.event_types.length === 0
+                                        }
                                     >
-                                        {editingId ? 'Update' : 'Create'}
+                                        {editingEndpointId
+                                            ? 'Update Endpoint'
+                                            : 'Create Endpoint'}
                                     </Button>
-                                </DialogFooter>
+                                </div>
                             </form>
-                        </DialogContent>
-                    </Dialog>
-                    }
-                />
-
-                <SettingsTabs active="webhooks" />
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Webhook className="h-5 w-5" />
-                            Registered Webhooks
+                        <CardTitle className="text-base">
+                            Webhook Endpoints
                         </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {webhooks.length === 0 ? (
-                            <p className="py-8 text-center text-muted-foreground">
-                                No webhooks configured yet.
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>URL</TableHead>
-                                        <TableHead>Events</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Failures</TableHead>
-                                        <TableHead>Last Triggered</TableHead>
-                                        <TableHead className="text-right">
-                                            Actions
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {webhooks.map((webhook) => (
-                                        <TableRow key={webhook.id}>
-                                            <TableCell className="max-w-[200px] truncate font-mono text-xs">
-                                                {webhook.url}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {webhook.events
-                                                        .slice(0, 3)
-                                                        .map((event) => (
-                                                            <Badge
-                                                                key={event}
-                                                                variant="secondary"
-                                                                className="text-xs"
-                                                            >
-                                                                {event}
-                                                            </Badge>
-                                                        ))}
-                                                    {webhook.events.length >
-                                                        3 && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            +
-                                                            {webhook.events
-                                                                .length - 3}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
+                    <CardContent className="p-0">
+                        <table className="w-full text-sm">
+                            <thead className="border-b bg-muted/50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Name
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        URL
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Events
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Health
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {endpoints.map((endpoint) => (
+                                    <tr
+                                        key={endpoint.id}
+                                        className="align-top hover:bg-muted/30"
+                                    >
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium">
+                                                {endpoint.name}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                retries {endpoint.retry_limit},
+                                                timeout{' '}
+                                                {endpoint.timeout_seconds}s
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">
+                                            {endpoint.target_url}
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                                            {endpoint.event_types
+                                                .map(
+                                                    (eventType) =>
+                                                        eventTypeLabelByValue.get(
+                                                            eventType,
+                                                        ) || eventType,
+                                                )
+                                                .join(', ')}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
                                                 <Badge
-                                                    variant={
-                                                        webhook.is_active
-                                                            ? 'default'
-                                                            : 'secondary'
+                                                    variant="outline"
+                                                    className={
+                                                        endpoint.is_active
+                                                            ? statusClass.success
+                                                            : statusClass.pending
                                                     }
                                                 >
-                                                    {webhook.is_active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
+                                                    {endpoint.is_active
+                                                        ? 'active'
+                                                        : 'paused'}
                                                 </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {webhook.failure_count > 0 ? (
-                                                    <Badge variant="destructive">
-                                                        {webhook.failure_count}
+                                                {endpoint.last_status && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            statusClass[
+                                                                endpoint
+                                                                    .last_status
+                                                            ] ||
+                                                            statusClass.pending
+                                                        }
+                                                    >
+                                                        {endpoint.last_status}
                                                     </Badge>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        0
-                                                    </span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {formatDate(
-                                                    webhook.last_triggered_at,
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-1">
+                                            </div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {endpoint.deliveries_count}{' '}
+                                                deliveries,{' '}
+                                                {
+                                                    endpoint.failed_deliveries_count
+                                                }{' '}
+                                                failed
+                                            </div>
+                                            {endpoint.last_error && (
+                                                <div className="mt-1 max-w-md text-xs text-status-critical">
+                                                    {endpoint.last_error}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {can.manage && (
+                                                <div className="flex items-center justify-end gap-2">
                                                     <Button
-                                                        variant="ghost"
+                                                        variant="outline"
                                                         size="sm"
                                                         onClick={() =>
-                                                            testWebhook(
-                                                                webhook.id,
-                                                            )
+                                                            startEdit(endpoint)
                                                         }
-                                                        title="Test"
                                                     >
-                                                        <TestTube className="h-4 w-4" />
+                                                        Edit
                                                     </Button>
                                                     <Button
-                                                        variant="ghost"
+                                                        variant="outline"
                                                         size="sm"
                                                         onClick={() =>
-                                                            openEdit(webhook)
-                                                        }
-                                                        title="Edit"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            deleteWebhook(
-                                                                webhook.id,
+                                                            toggleEndpoint(
+                                                                endpoint.id,
                                                             )
                                                         }
-                                                        title="Delete"
                                                     >
-                                                        <Trash2 className="h-4 w-4 text-status-critical" />
+                                                        {endpoint.is_active
+                                                            ? 'Pause'
+                                                            : 'Resume'}
                                                     </Button>
                                                 </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {endpoints.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={5}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
+                                            No webhook endpoints configured.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Recent Deliveries
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <table className="w-full text-sm">
+                            <thead className="border-b bg-muted/50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Endpoint
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Event
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Attempts
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Response
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {deliveries.map((delivery) => (
+                                    <tr
+                                        key={delivery.id}
+                                        className="hover:bg-muted/30"
+                                    >
+                                        <td className="px-4 py-3 font-medium">
+                                            {delivery.endpoint_name || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">
+                                            {eventTypeLabelByValue.get(
+                                                delivery.event_type,
+                                            ) || delivery.event_type}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <Badge
+                                                variant="outline"
+                                                className={
+                                                    statusClass[
+                                                        delivery.status
+                                                    ] || statusClass.pending
+                                                }
+                                            >
+                                                {delivery.status}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">
+                                            {delivery.attempts}/
+                                            {delivery.max_attempts}
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">
+                                            {delivery.response_code || '-'}
+                                            {delivery.error_message
+                                                ? ` - ${delivery.error_message}`
+                                                : ''}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {can.manage &&
+                                                delivery.status ===
+                                                    'failed' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            retryDelivery(
+                                                                delivery.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Retry
+                                                    </Button>
+                                                )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {deliveries.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={6}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
+                                            No webhook deliveries yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </CardContent>
+                </Card>
+            </PageLayout>
         </AppLayout>
     );
 }

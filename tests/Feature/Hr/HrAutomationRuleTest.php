@@ -17,6 +17,7 @@ beforeEach(function () {
     Notification::fake();
 
     $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(\Database\Seeders\SeedHrPermissionsSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -41,7 +42,7 @@ beforeEach(function () {
 
 test('hr user can create and toggle automation rule', function () {
     $this->actingAs($this->hr)
-        ->post('/hr/reports/automations', [
+        ->post('/hr/settings/automations', [
             'name' => 'Leave approvals alert',
             'event_type' => 'leave.request.approved',
             'condition_field' => 'status',
@@ -64,7 +65,7 @@ test('hr user can create and toggle automation rule', function () {
     expect(data_get($rule->actions, '0.type'))->toBe('notify_users');
 
     $this->actingAs($this->hr)
-        ->post("/hr/reports/automations/{$rule->id}/toggle-active")
+        ->post("/hr/settings/automations/{$rule->id}/toggle-active")
         ->assertSessionHas('success');
 
     $rule->refresh();
@@ -323,7 +324,7 @@ test('automation rule can execute multiple actions in one run', function () {
 
 test('controller accepts advanced JSON payload for conditions and actions', function () {
     $this->actingAs($this->hr)
-        ->post('/hr/reports/automations', [
+        ->post('/hr/settings/automations', [
             'name' => 'Advanced JSON payload rule',
             'event_type' => 'leave.request.approved',
             'condition_logic' => 'all',

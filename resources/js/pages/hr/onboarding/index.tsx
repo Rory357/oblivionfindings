@@ -1,3 +1,4 @@
+import { OnboardingTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -276,6 +277,7 @@ export default function OnboardingIndex({
                     />
                 }
             >
+                <OnboardingTabs active="checklists" />
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Input

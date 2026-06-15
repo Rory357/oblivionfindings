@@ -22,7 +22,7 @@ class HrWebhookController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.view'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
@@ -66,12 +66,12 @@ class HrWebhookController extends Controller
             ])
             ->values();
 
-        return Inertia::render('hr/reports/webhooks', [
+        return Inertia::render('hr/settings/webhooks', [
             'endpoints' => $endpoints,
             'deliveries' => $deliveries,
             'eventOptions' => $this->webhookService->eventOptions(),
             'can' => [
-                'manage' => $user->canDo('hr.reports.export'),
+                'manage' => $user->canDo('hr.settings.manage'),
             ],
         ]);
     }
@@ -79,7 +79,7 @@ class HrWebhookController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
@@ -103,7 +103,7 @@ class HrWebhookController extends Controller
     public function update(Request $request, HrWebhookEndpoint $endpoint)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $endpoint->tenant_id);
 
@@ -128,7 +128,7 @@ class HrWebhookController extends Controller
     public function toggle(Request $request, HrWebhookEndpoint $endpoint)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $endpoint->tenant_id);
 
@@ -143,7 +143,7 @@ class HrWebhookController extends Controller
     public function retryDelivery(Request $request, HrWebhookDelivery $delivery)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $delivery->tenant_id);
 

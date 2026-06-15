@@ -1,39 +1,50 @@
-import { router } from '@inertiajs/react';
-import { FolderOpen, LayoutTemplate } from 'lucide-react';
+import { router, usePage } from '@inertiajs/react';
+import { FolderOpen, LayoutTemplate, PenSquare } from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type DocumentsTab = 'library' | 'templates';
+export type DocumentsTab = 'library' | 'signatures' | 'templates';
 
 const TAB_URLS: Record<DocumentsTab, string> = {
     library: '/hr/documents',
+    signatures: '/hr/signatures/pending',
     templates: '/hr/documents/templates',
+};
+
+type HrCan = {
+    documents?: { view?: boolean; manage?: boolean };
 };
 
 /**
  * Section-level tab strip shared across the HR Documents pages so the cluster
- * reads as one hub. Templates is hr.documents.manage-gated, so the tab only
- * appears for managers (pass `canManage` from the page's `can.manage` prop) —
- * no view-only user is shown a tab that would 403.
+ * reads as one hub. Tabs are filtered by the shared auth.can flags: Documents
+ * (library) is hr.documents.view, Templates is hr.documents.manage, and
+ * Signatures (documents awaiting the user's signature) is auth-only so it is
+ * always shown. The active tab is always rendered so the current page never
+ * hides its own tab.
  */
-export function DocumentsTabs({
-    active,
-    canManage = false,
-}: {
-    active: DocumentsTab;
-    canManage?: boolean;
-}) {
-    const items: HrTabItem[] = [
-        { id: 'library', label: 'Documents', icon: FolderOpen, tone: 'primary' },
+export function DocumentsTabs({ active }: { active: DocumentsTab }) {
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
+        ?.hr;
+
+    const all: Array<{ item: HrTabItem; show: boolean }> = [
+        {
+            item: { id: 'library', label: 'Documents', icon: FolderOpen, tone: 'primary' },
+            show: !!hr?.documents?.view,
+        },
+        {
+            item: { id: 'signatures', label: 'Signatures', icon: PenSquare, tone: 'warning' },
+            show: true,
+        },
+        {
+            item: { id: 'templates', label: 'Templates', icon: LayoutTemplate, tone: 'info' },
+            show: !!hr?.documents?.manage,
+        },
     ];
-    if (canManage) {
-        items.push({
-            id: 'templates',
-            label: 'Templates',
-            icon: LayoutTemplate,
-            tone: 'info',
-        });
-    }
+
+    const items: HrTabItem[] = all
+        .filter((t) => t.show || t.item.id === active)
+        .map((t) => t.item);
 
     return (
         <HrTabs

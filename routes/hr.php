@@ -64,7 +64,6 @@ use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
 use App\Http\Controllers\Hr\TrainingDashboardController;
 use App\Http\Controllers\Hr\VettingController;
-use App\Http\Controllers\Hr\WebhookController;
 use App\Http\Controllers\Hr\WellbeingController;
 use Illuminate\Support\Facades\Route;
 
@@ -535,8 +534,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/reports', [HrReportController::class, 'index'])->name('reports.index');
         Route::match(['get', 'post'], '/reports/generate', [HrReportController::class, 'generate'])->name('reports.generate');
         Route::get('/reports/exports/{export}', [HrReportController::class, 'showExport'])->name('reports.exports.show');
-        Route::get('/reports/webhooks', [HrWebhookController::class, 'index'])->name('reports.webhooks.index');
-        Route::get('/reports/automations', [HrAutomationController::class, 'index'])->name('reports.automations.index');
 
         Route::middleware('permission:hr.reports.export')->group(function () {
             Route::match(['get', 'post'], '/reports/export', [HrReportController::class, 'export'])->name('reports.export');
@@ -544,15 +541,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/reports/subscriptions', [HrReportController::class, 'storeSubscription'])->name('reports.subscriptions.store');
             Route::put('/reports/subscriptions/{subscription}', [HrReportController::class, 'updateSubscription'])->name('reports.subscriptions.update');
             Route::post('/reports/subscriptions/{subscription}/toggle-active', [HrReportController::class, 'toggleSubscription'])->name('reports.subscriptions.toggleActive');
-            Route::post('/reports/webhooks', [HrWebhookController::class, 'store'])->name('reports.webhooks.store');
-            Route::put('/reports/webhooks/{endpoint}', [HrWebhookController::class, 'update'])->name('reports.webhooks.update');
-            Route::post('/reports/webhooks/{endpoint}/toggle-active', [HrWebhookController::class, 'toggle'])->name('reports.webhooks.toggleActive');
-            Route::post('/reports/webhooks/deliveries/{delivery}/retry', [HrWebhookController::class, 'retryDelivery'])->name('reports.webhooks.deliveries.retry');
-            Route::post('/reports/automations', [HrAutomationController::class, 'store'])->name('reports.automations.store');
-            Route::put('/reports/automations/{rule}', [HrAutomationController::class, 'update'])->name('reports.automations.update');
-            Route::post('/reports/automations/{rule}/toggle-active', [HrAutomationController::class, 'toggle'])->name('reports.automations.toggleActive');
         });
     });
+
+    // Automations + Webhooks moved out of Reports into the Settings hub
+    // (re-gated hr.settings.manage). Old URLs 301-redirect to the new homes.
+    Route::redirect('/reports/automations', '/hr/settings/automations', 301);
+    Route::redirect('/reports/webhooks', '/hr/settings/webhooks', 301);
 
     /*
     |--------------------------------------------------------------------------
@@ -1010,11 +1005,19 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.settings.manage')->prefix('settings')->name('settings.')->group(function () {
-        Route::get('/webhooks', [WebhookController::class, 'index'])->name('webhooks');
-        Route::post('/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
-        Route::put('/webhooks/{webhook}', [WebhookController::class, 'update'])->name('webhooks.update');
-        Route::delete('/webhooks/{webhook}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
-        Route::post('/webhooks/{webhook}/test', [WebhookController::class, 'test'])->name('webhooks.test');
+        // Automations + Webhooks (HR event-driven rules + outbound endpoints)
+        // moved here from the Reports hub. Backed by HrAutomationController /
+        // HrWebhookController — the live system with delivery logs + retry.
+        Route::get('/automations', [HrAutomationController::class, 'index'])->name('automations.index');
+        Route::post('/automations', [HrAutomationController::class, 'store'])->name('automations.store');
+        Route::put('/automations/{rule}', [HrAutomationController::class, 'update'])->name('automations.update');
+        Route::post('/automations/{rule}/toggle-active', [HrAutomationController::class, 'toggle'])->name('automations.toggleActive');
+
+        Route::get('/webhooks', [HrWebhookController::class, 'index'])->name('webhooks.index');
+        Route::post('/webhooks', [HrWebhookController::class, 'store'])->name('webhooks.store');
+        Route::put('/webhooks/{endpoint}', [HrWebhookController::class, 'update'])->name('webhooks.update');
+        Route::post('/webhooks/{endpoint}/toggle-active', [HrWebhookController::class, 'toggle'])->name('webhooks.toggleActive');
+        Route::post('/webhooks/deliveries/{delivery}/retry', [HrWebhookController::class, 'retryDelivery'])->name('webhooks.deliveries.retry');
 
         Route::get('/custom-fields', [CustomFieldController::class, 'definitions'])->name('custom-fields');
         Route::post('/custom-fields', [CustomFieldController::class, 'storeDefinition'])->name('custom-fields.store');

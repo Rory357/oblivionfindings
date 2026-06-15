@@ -44,6 +44,7 @@ test('site geofence can be created with assigned assets and completes readiness 
     $user = siteGeofenceTestUser();
     $site = Site::factory()->create([
         'name' => 'Kauri House',
+        'type' => 'house',
         'latitude' => -36.8485,
         'longitude' => 174.7633,
         'is_active' => true,
@@ -67,7 +68,7 @@ test('site geofence can be created with assigned assets and completes readiness 
 
     expect($geofence)->not->toBeNull()
         ->and($geofence->asset_id)->toBeNull()
-        ->and($geofence->scope)->toBe('vehicle')
+        ->and($geofence->scope)->toBe('house')
         ->and($geofence->breach_type)->toBe('both');
 
     foreach ($assets as $asset) {

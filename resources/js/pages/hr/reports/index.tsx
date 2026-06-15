@@ -289,22 +289,6 @@ export default function ReportsIndex({
                             { label: 'Recent exports', value: recentExports.length },
                             { label: 'Subscriptions', value: subscriptions.length },
                         ]}
-                        actions={
-                            can.export_data ? (
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                        <Link href="/hr/reports/automations">
-                                            Automations
-                                        </Link>
-                                    </Button>
-                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                        <Link href="/hr/reports/webhooks">
-                                            Webhooks
-                                        </Link>
-                                    </Button>
-                                </div>
-                            ) : undefined
-                        }
                     />
                 }
             >

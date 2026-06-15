@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { ComplianceTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -95,6 +96,8 @@ export default function ComplianceCalendar({ events, filters }: Props) {
                     />
                 }
             >
+                <ComplianceTabs active="calendar" />
+
                 {/* Filter */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Select

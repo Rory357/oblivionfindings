@@ -227,6 +227,9 @@ class HandleInertiaRequests extends Middleware
                 // The Add Client wizard reads this after a successful create so
                 // its success pane can link straight to the new profile.
                 'created_client_id' => session('created_client_id'),
+                // The Add Site modal reads this after a successful create so its
+                // success pane can link straight to the new site profile.
+                'created_site_id' => session('created_site_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
@@ -621,6 +624,10 @@ class HandleInertiaRequests extends Middleware
                 'payroll' => [
                     'view' => $user->canDo('hr.payroll.view'),
                     'export' => $user->canDo('hr.payroll.export'),
+                ],
+                'payslips' => [
+                    'view' => $user->canDo('hr.payslips.view'),
+                    'generate' => $user->canDo('hr.payslips.generate'),
                 ],
                 'reports' => [
                     'view' => $user->canDo('hr.reports.view'),

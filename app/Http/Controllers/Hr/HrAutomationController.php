@@ -52,7 +52,7 @@ class HrAutomationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.view'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
@@ -113,7 +113,7 @@ class HrAutomationController extends Controller
             ])
             ->values();
 
-        return Inertia::render('hr/reports/automations', [
+        return Inertia::render('hr/settings/automations', [
             'rules' => $rules,
             'recentRuns' => $recentRuns,
             'eventOptions' => $this->webhookService->eventOptions(),
@@ -137,7 +137,7 @@ class HrAutomationController extends Controller
                 ])->values(),
             'recipientOptions' => $recipientOptions,
             'can' => [
-                'manage' => $user->canDo('hr.reports.export'),
+                'manage' => $user->canDo('hr.settings.manage'),
             ],
         ]);
     }
@@ -145,7 +145,7 @@ class HrAutomationController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $this->validatePayload($request, $tenantId);
@@ -168,7 +168,7 @@ class HrAutomationController extends Controller
     public function update(Request $request, HrAutomationRule $rule)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
 
@@ -190,7 +190,7 @@ class HrAutomationController extends Controller
     public function toggle(Request $request, HrAutomationRule $rule)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
 

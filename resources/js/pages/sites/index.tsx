@@ -46,6 +46,10 @@ import {
     useState,
 } from 'react';
 
+import {
+    AddSiteDialog,
+    type AddSiteReferenceData,
+} from '@/components/sites/add-site-dialog';
 import { Card } from '@/components/ui/card';
 import {
     DropdownMenu,
@@ -167,6 +171,7 @@ type PageProps = {
         risks: { value: string; label: string }[];
     };
     savedViewCounts: SavedViewCounts;
+    addSite: AddSiteReferenceData;
     auth: { user?: { name?: string } | null; can?: Can };
     labels?: Record<string, string>;
 };
@@ -1212,8 +1217,10 @@ export default function SitesIndex() {
         sites,
         summary,
         labels,
+        addSite,
     } = usePage<PageProps>().props;
     const can = auth?.can ?? {};
+    const [addSiteOpen, setAddSiteOpen] = useState(false);
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
     const firstName =
@@ -1584,13 +1591,14 @@ export default function SitesIndex() {
                 {selectMode ? 'Done selecting' : 'Select'}
             </button>
             {can.sites?.create ? (
-                <Link
-                    href="/sites/create"
+                <button
+                    type="button"
+                    onClick={() => setAddSiteOpen(true)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary-foreground px-3.5 text-sm font-semibold text-primary transition hover:bg-primary-foreground/90"
                 >
                     <Plus className="h-4 w-4" />
                     Add {siteSingular.toLowerCase()}
-                </Link>
+                </button>
             ) : null}
         </>
     );
@@ -1873,6 +1881,19 @@ export default function SitesIndex() {
                     site={ctx.site}
                     items={actionsFor(ctx.site)}
                     onClose={() => setCtx(null)}
+                />
+            ) : null}
+
+            {can.sites?.create ? (
+                <AddSiteDialog
+                    isOpen={addSiteOpen}
+                    onClose={() => setAddSiteOpen(false)}
+                    {...addSite}
+                    onSaved={() =>
+                        router.reload({
+                            only: ['sites', 'summary', 'savedViewCounts'],
+                        })
+                    }
                 />
             ) : null}
         </AppLayout>

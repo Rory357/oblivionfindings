@@ -43,6 +43,7 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     $this->actingAs($this->hr)->get($url)->assertOk();
 })->with([
     // Settings hub
+    '/hr/settings/automations',
     '/hr/settings/webhooks',
     '/hr/settings/custom-fields',
     '/hr/settings/audit-log',
@@ -54,11 +55,22 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/reports',
     '/hr/reports/builder',
     '/hr/reports/saved',
-    '/hr/reports/automations',
-    '/hr/reports/webhooks',
     // Documents hub
     '/hr/documents',
     '/hr/documents/templates',
+    // Payroll hub
+    '/hr/payroll',
+    '/hr/payroll/payslips',
+    // Onboarding hub
+    '/hr/onboarding',
+    '/hr/onboarding/emails',
+    // Reports hub — folded Analytics + Headcount dashboards
+    '/hr/analytics',
+    '/hr/headcount',
+    // Compliance hub — folded Course Catalog
+    '/hr/training/catalog',
+    // Documents hub — folded Signatures
+    '/hr/signatures/pending',
     // Performance hub
     '/hr/performance',
     '/hr/performance/reviews',
@@ -80,4 +92,11 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/my/documents',
     '/hr/my/policies',
     '/hr/my/surveys',
+    // Compliance hub
+    '/hr/compliance',
+    '/hr/compliance/matrix',
+    '/hr/compliance/calendar',
+    '/hr/compliance/training',
+    '/hr/compliance/vetting',
+    '/hr/compliance/drivers',
 ]);
