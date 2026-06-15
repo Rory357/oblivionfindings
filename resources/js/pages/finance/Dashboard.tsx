@@ -113,6 +113,15 @@ interface Props extends PageProps {
     expensesByMonth: MonthlyData[];
     topExpenseCategories: ExpenseCategory[];
     revenueByFundingStream?: { name: string; amount: number }[];
+    fundingClaims?: { reference: string; funder: string; period: string; status: string; amount: number }[];
+    fundingUtilisation?: {
+        claimed_paid: number;
+        awaiting_remittance: number;
+        delivered_unclaimed: number;
+        write_off_risk: number;
+        unclaimed_total: number;
+        utilisation_pct: number;
+    };
     arAging?: {
         current: number;
         d1_30: number;
@@ -173,9 +182,14 @@ const KPI_TILE: Record<KpiTone, string> = {
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
-// fmtK for donut legends: values are carried in thousands so the SVG arc math
-// stays small; multiply back up for the money label.
-const fmtK = (v: number) => formatMoneyCompact(v * 1000);
+// Funding-claim status → badge tone.
+const CLAIM_TONE: Record<string, StatusTone> = {
+    paid: 'success',
+    approved: 'success',
+    submitted: 'warning',
+    draft: 'neutral',
+    rejected: 'critical',
+};
 
 function computeTrend(data: MonthlyData[]): { percent: number } | null {
     if (data.length < 2) return null;
@@ -188,22 +202,6 @@ function computeTrend(data: MonthlyData[]): { percent: number } | null {
 // ---------------------------------------------------------------------------
 // Placeholder data — clearly marked. Replaced by real props in later phases.
 // ---------------------------------------------------------------------------
-
-// TODO(D): claim-utilisation buckets from the funding/remittance pipeline.
-const DONUT_UTILISATION: DonutSegment[] = [
-    { key: 'paid', label: 'Claimed & paid', value: 312, color: 'var(--status-success)' },
-    { key: 'awaiting', label: 'Awaiting remittance', value: 88, color: 'var(--chart-2)' },
-    { key: 'delivered', label: 'Delivered, not yet claimed', value: 54, color: 'var(--status-warning)' },
-    { key: 'writeoff', label: 'Unfunded / write-off risk', value: 33, color: 'var(--status-critical)' },
-];
-// TODO(D): funding claims from the funding pipeline.
-const FUNDING_CLAIMS: { ref: string; funder: string; period: string; status: string; tone: StatusTone; amount: number }[] = [
-    { ref: 'FC-3391', funder: 'MoH', period: 'May 2026', status: 'Awaiting remittance', tone: 'warning', amount: 214800 },
-    { ref: 'FC-3402', funder: 'ACC', period: 'May 2026', status: 'Approved', tone: 'success', amount: 48260 },
-    { ref: 'FC-3410', funder: 'Individualised Funding', period: 'Jun 2026', status: 'Delivered · unclaimed', tone: 'warning', amount: 31540 },
-    { ref: 'FC-3415', funder: 'Respite/Carer', period: 'Jun 2026', status: 'Draft', tone: 'neutral', amount: 12900 },
-    { ref: 'FC-3388', funder: 'MoH', period: 'Apr 2026', status: 'Write-off risk', tone: 'critical', amount: 8470 },
-];
 
 // TODO(B/D/F): attention items from real queries (AR aging, remittances, bills
 // due, payroll state, GST calendar, delivered-unclaimed).
@@ -282,6 +280,8 @@ export default function FinanceDashboard({
     revenueByMonth,
     expensesByMonth,
     revenueByFundingStream = [],
+    fundingClaims = [],
+    fundingUtilisation,
     arAging,
     upcomingBillsDue,
     apDueWithin7,
@@ -311,7 +311,8 @@ export default function FinanceDashboard({
             only: [
                 'totalRevenue', 'totalExpenses', 'netProfit', 'cashBalance', 'accountsReceivable',
                 'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
-                'revenueByFundingStream', 'arAging', 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
+                'revenueByFundingStream', 'fundingClaims', 'fundingUtilisation', 'arAging',
+                'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
                 'recentJournals', 'period', 'periodLabel',
             ],
             data: {
@@ -364,6 +365,19 @@ export default function FinanceDashboard({
     const arAgingDonut: DonutSegment[] = arAgingSegments.length
         ? arAgingSegments
         : [{ key: 'none', label: 'No outstanding receivables', value: 1, color: 'var(--border)' }];
+
+    // §5 donut 2 — real funding-claim utilisation buckets.
+    const utilSegmentsRaw: DonutSegment[] = fundingUtilisation
+        ? [
+              { key: 'paid', label: 'Claimed & paid', value: fundingUtilisation.claimed_paid, color: 'var(--status-success)' },
+              { key: 'awaiting', label: 'Awaiting remittance', value: fundingUtilisation.awaiting_remittance, color: 'var(--chart-2)' },
+              { key: 'delivered', label: 'Delivered, not yet claimed', value: fundingUtilisation.delivered_unclaimed, color: 'var(--status-warning)' },
+              { key: 'writeoff', label: 'Unfunded / write-off risk', value: fundingUtilisation.write_off_risk, color: 'var(--status-critical)' },
+          ].filter((s) => s.value > 0)
+        : [];
+    const utilDonut: DonutSegment[] = utilSegmentsRaw.length
+        ? utilSegmentsRaw
+        : [{ key: 'none', label: 'No funding activity', value: 1, color: 'var(--border)' }];
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -561,8 +575,17 @@ export default function FinanceDashboard({
                         delta={expenseTrend ? { percent: expenseTrend.percent, good: expenseTrend.percent < 0 } : null}
                         sub="vs prev period"
                     />
-                    {/* TODO(A): real prop in Phase B */}
-                    <KpiCard label="Funding utilisation" value="87%" icon={Gauge} tone="primary" sub="target 90% · $54k unclaimed" />
+                    <KpiCard
+                        label="Funding utilisation"
+                        value={fundingUtilisation ? `${fundingUtilisation.utilisation_pct}%` : '—'}
+                        icon={Gauge}
+                        tone="primary"
+                        sub={
+                            fundingUtilisation
+                                ? `target 90% · ${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`
+                                : 'claimed vs delivered'
+                        }
+                    />
                     {/* TODO(A): real prop in Phase B */}
                     <KpiCard label="Revenue / resident" value="$6,340" icon={Users} tone="success" sub="77 funded · benchmark $6.2k" />
                 </div>
@@ -587,14 +610,14 @@ export default function FinanceDashboard({
                         tone="warning"
                         title="Funding claim utilisation"
                         subtitle="Delivered vs claimed vs paid"
-                        segments={DONUT_UTILISATION}
-                        centerValue="87%"
+                        segments={utilDonut}
+                        centerValue={`${fundingUtilisation?.utilisation_pct ?? 0}%`}
                         centerLabel="utilised"
                         accentKeys={['paid']}
                         active={false}
-                        cta="Match remittances"
-                        onClick={() => setModal(null)}
-                        formatValue={fmtK}
+                        cta="View funding claims"
+                        onClick={() => router.visit('/finance/funding-streams')}
+                        formatValue={(v) => formatMoneyCompact(v)}
                         showPercent
                     />
                     <DonutCard
@@ -755,34 +778,37 @@ export default function FinanceDashboard({
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {/* TODO(D): real funding-claim pipeline data. */}
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Ref</TableHead>
-                                        <TableHead>Funder · period</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {FUNDING_CLAIMS.map((claim) => (
-                                        <TableRow key={claim.ref}>
-                                            <TableCell className="font-semibold text-primary">{claim.ref}</TableCell>
-                                            <TableCell>
-                                                <span className="block">{claim.funder}</span>
-                                                <span className="block text-[11px] text-muted-foreground">{claim.period}</span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <StatusBadge status={claim.status} tone={claim.tone} label={claim.status} />
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold tabular-nums">
-                                                {formatMoney(claim.amount)}
-                                            </TableCell>
+                            {fundingClaims.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No funding claims yet.</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Ref</TableHead>
+                                            <TableHead>Funder · period</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {fundingClaims.map((claim) => (
+                                            <TableRow key={claim.reference}>
+                                                <TableCell className="font-semibold text-primary">{claim.reference}</TableCell>
+                                                <TableCell>
+                                                    <span className="block">{claim.funder}</span>
+                                                    <span className="block text-[11px] text-muted-foreground">{claim.period}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <StatusBadge status={claim.status} tone={CLAIM_TONE[claim.status] ?? 'neutral'} />
+                                                </TableCell>
+                                                <TableCell className="text-right font-semibold tabular-nums">
+                                                    {formatMoney(claim.amount)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

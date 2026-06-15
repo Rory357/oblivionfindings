@@ -6,6 +6,8 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
+use App\Models\BillingEntry;
+use App\Models\FundingClaim;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,8 @@ class DashboardAggregatorService
             'expensesByMonth' => $this->getMonthlyTotals($orgId, 'expense', 6, $costCentreIds, $fundingStreamIds),
             'topExpenseCategories' => $this->getTopExpenseCategories($orgId, $start, $end, $costCentreIds, $fundingStreamIds),
             'revenueByFundingStream' => $this->getRevenueByFundingStream($orgId, $start, $end, $costCentreIds, $fundingStreamIds),
+            'fundingClaims' => $this->getFundingClaims($orgId),
+            'fundingUtilisation' => $this->getFundingUtilisation($orgId),
             'upcomingBillsDue' => $this->getUpcomingBills($orgId),
             'apDueWithin7' => $this->getApDueWithin7($orgId),
             'cashRunwayDays' => $this->getCashRunwayDays($orgId),
@@ -272,6 +276,75 @@ class DashboardAggregatorService
                 'amount' => round((float) $row->total, 2),
             ])
             ->toArray();
+    }
+
+    /**
+     * Recent funding claims for the dashboard table. Funder name comes from the
+     * linked service agreement's funding_body. Org-scoped snapshot (claims have
+     * no GL funding-stream dimension, so the funder filter doesn't apply here).
+     */
+    private function getFundingClaims(?int $orgId): array
+    {
+        return FundingClaim::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->with('serviceAgreement:id,funding_body')
+            ->orderByDesc('period_end')
+            ->limit(6)
+            ->get()
+            ->map(fn (FundingClaim $claim) => [
+                'reference' => $claim->claim_reference ?: ('FC-'.$claim->id),
+                'funder' => $claim->serviceAgreement?->funding_body ?: 'Unassigned',
+                'period' => $claim->period_end?->format('M Y') ?? '—',
+                'status' => $claim->status,
+                'amount' => (float) $claim->total_amount,
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Funding-claim utilisation buckets (point-in-time snapshot from existing
+     * data, no invented figures):
+     *  - claimed & paid: FundingClaim status=paid
+     *  - awaiting remittance: claimed but unpaid (status submitted/approved)
+     *  - delivered, not yet claimed: pending BillingEntry within the last 90 days
+     *  - write-off risk: pending BillingEntry older than 90 days
+     * utilisation_pct = claimed value ÷ total deliverable value.
+     */
+    private function getFundingUtilisation(?int $orgId): array
+    {
+        $byStatus = FundingClaim::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->selectRaw('status, COALESCE(SUM(total_amount), 0) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $paid = (float) ($byStatus['paid'] ?? 0);
+        $awaiting = (float) ($byStatus['submitted'] ?? 0) + (float) ($byStatus['approved'] ?? 0);
+
+        $cutoff = Carbon::now()->subDays(90)->toDateString();
+        $deliveredUnclaimed = (float) BillingEntry::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'pending')
+            ->where('service_date', '>=', $cutoff)
+            ->sum('amount');
+        $writeOffRisk = (float) BillingEntry::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'pending')
+            ->where('service_date', '<', $cutoff)
+            ->sum('amount');
+
+        $claimed = $paid + $awaiting;
+        $unclaimed = $deliveredUnclaimed + $writeOffRisk;
+        $deliverable = $claimed + $unclaimed;
+
+        return [
+            'claimed_paid' => round($paid, 2),
+            'awaiting_remittance' => round($awaiting, 2),
+            'delivered_unclaimed' => round($deliveredUnclaimed, 2),
+            'write_off_risk' => round($writeOffRisk, 2),
+            'unclaimed_total' => round($unclaimed, 2),
+            'utilisation_pct' => $deliverable > 0 ? (int) round(($claimed / $deliverable) * 100) : 0,
+        ];
     }
 
     private function getUpcomingBills(?int $orgId): array
