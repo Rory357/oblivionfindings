@@ -579,6 +579,7 @@ export default function FinanceDashboard({
                     />
                 }
             >
+                <div className="flex flex-col gap-[18px]">
                 {/* §2 Finance hubs quick-links */}
                 <FinanceHubsBar />
 
@@ -960,6 +961,7 @@ export default function FinanceDashboard({
                         )}
                     </CardContent>
                 </Card>
+                </div>
             </PageLayout>
 
             {/* Quick-action wizard modals (reused dialogs). */}
