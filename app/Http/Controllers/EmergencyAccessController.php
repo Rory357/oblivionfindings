@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\Site;
@@ -28,6 +29,8 @@ class EmergencyAccessController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
+
+        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
 
         $q = trim((string) $request->get('q', ''));
 
@@ -110,16 +113,16 @@ class EmergencyAccessController extends Controller
             ])
             ->values();
 
-        // Flagged: repeat break-glass — the same user activating ≥4 times in 7 days.
-        $weekAgo = now()->subDays(7);
-        $recent = ClientBreakGlassAccess::withTrashed()->tap($orgScope)->where('created_at', '>=', $weekAgo)->with('user:id,name')->get();
+        // Flagged: repeat break-glass — one user activating ≥ the policy threshold within its window.
+        $windowStart = now()->subDays($policy->repeat_window_days);
+        $recent = ClientBreakGlassAccess::withTrashed()->tap($orgScope)->where('created_at', '>=', $windowStart)->with('user:id,name')->get();
         $flaggedSignals = $recent->groupBy('user_id')
-            ->filter(fn ($g) => $g->count() >= 4)
+            ->filter(fn ($g) => $g->count() >= $policy->repeat_threshold_count)
             ->map(fn ($g) => [
                 'type' => 'repeat',
                 'severity' => 'critical',
                 'title' => 'Repeat break-glass — same user',
-                'detail' => ($g->first()->user?->name ?? 'A staff member').' activated break-glass '.$g->count().' times in the last 7 days.',
+                'detail' => ($g->first()->user?->name ?? 'A staff member').' activated break-glass '.$g->count().' times in the last '.$policy->repeat_window_days.' days.',
             ])
             ->values();
 
@@ -179,11 +182,15 @@ class EmergencyAccessController extends Controller
             'approvers' => $approvers,
             'can_review' => $user->hasRole('admin', 'provider_manager') || $user->canDo('medications.audit.view'),
             'policy' => [
-                'default_minutes' => ClientBreakGlassAccess::DEFAULT_MINUTES,
-                'max_minutes' => ClientBreakGlassAccess::MAX_MINUTES,
+                'default_minutes' => $policy->default_minutes,
+                'max_minutes' => $policy->max_minutes,
+                'extend_minutes' => $policy->extend_minutes,
                 'auto_revoke' => true,
-                'reason_required' => true,
+                'reason_required' => $policy->reason_required,
+                'repeat_threshold_count' => $policy->repeat_threshold_count,
+                'repeat_window_days' => $policy->repeat_window_days,
             ],
+            'can_edit_policy' => $user->hasRole('admin', 'provider_manager'),
             'stats' => [
                 'active' => $activeAccesses->count(),
                 'granted_week' => $recent->count(),

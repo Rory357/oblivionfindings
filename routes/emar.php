@@ -291,6 +291,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.audit.view')
         ->name('emar.clients.break_glass.review');
 
+    // Editable per-organisation break-glass policy (admin-gated in-controller).
+    Route::put('/break-glass-policy', [BreakGlassController::class, 'updatePolicy'])
+        ->name('emar.break_glass.policy.update');
+
     // Correction approval workflow
     Route::post('/corrections/{correction}/approve', [MedicationAdministrationCorrectionController::class, 'approve'])
         ->middleware('permission:medications.administer.correct')
