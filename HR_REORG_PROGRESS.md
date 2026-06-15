@@ -57,7 +57,9 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S7 — Training hub (pull out of Compliance)** ✅
 - [x] **S8 — Goals consolidation** ✅ *(safe re-home; deeper data-merge deferred — see log)*
 - [x] **S9 — Calendar hub (merge three calendars)** ✅
-- [ ] **S10 — Final regroup + group split** *(last)*
+- [x] **S10 — Final regroup + group split** *(last)* ✅
+
+### 🎉 ALL S1–S10 COMPLETE — `HR_REORG_COMPLETE`
 
 ## Log
 
@@ -296,6 +298,34 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   calendar/index.tsx, calendar/time-off.tsx, app-sidebar.tsx, tracker.
 - **Gates:** types 0 · lint 0-err (no new, no unrelated staged) · build exit 0 · vitest 5/156 (baseline) · pest NOT
   re-run (ZERO PHP/route diff → provably at the 2-fail baseline). Hand-formatted (no prettier).
+
+### S10 — DONE (final regroup; frontend-only)
+- Rewrote `buildHrSubPanelGroups()` in app-sidebar.tsx to the §A 10-group structure (no routes/PHP touched):
+  1. **People**: removed the Import/Export item (moved → group 10).
+  2. **Performance** group label → "**Performance & Development**" (already had Performance + Training from S7).
+  3. **Employee Lifecycle**: added **Offboarding** (`/hr/offboarding`, OffboardingController route EXISTS, gated
+     `hr.onboarding.view` — matching the route's `permission:hr.onboarding.view`; verified, not invented).
+  4. Split **"Payroll & Admin"** → two groups: **Payroll** (the Payroll hub item) + **Admin & Configuration**
+     (Reports + Settings + the moved Import/Export, gate `employees.viewAny` kept).
+- The HR sub-panel now emits exactly the §A 10 groups in order: My HR · People · Time & Leave · Pay & Benefits ·
+  Performance & Development · Engagement · Compliance & Records · Employee Lifecycle · Payroll · Admin & Configuration.
+- **All permissions frozen** (each item kept its existing gate; Import/Export kept employees.viewAny, Offboarding =
+  onboarding.view). **No test change needed** — `app-sidebar.test.ts` does NOT reference `buildHrSubPanelGroups`
+  (it only asserts Finance/Operations/Workforce nav; the 1 baseline failure is the unrelated Finance billing
+  assertion, left exactly as-is).
+- **Files touched (1):** resources/js/components/app-sidebar.tsx (+ tracker).
+- **Gates:** types 0 · lint 0-err (no new, no unrelated staged) · build exit 0 · vitest 5/156 (baseline; app-sidebar
+  test unaffected). pest/wayfinder N/A (frontend-only). Hand-formatted.
+
+## 🎉 PROJECT DONE — `HR_REORG_COMPLETE`
+All ten slices S1–S10 shipped as independent, gate-verified, minimal-diff commits (251e1405 · 531fcb98 · 6363d994 ·
+506f588a · 463a0f39 · 20b072a7 · 1f0d68c7 · f5bbcf43 · 281c7f1d · this S10). HR module reorganised: Webhooks clean
+cut; Leave/Compensation&Benefits/Documents&Policies hubs consolidated; Skills→Performance; Training pulled into its
+own hub; Dev-Goals re-homed under Goals; Calendar hub built; sidebar regrouped into the §A 10 groups. NO redirects
+(clean cut). Permissions frozen throughout. REMAINING (USER/BROWSER, out of headless scope): live visual parity +
+`npm run visual:test` snapshot review on a served app; the deeper Goals data-merge (HrDevelopmentGoal vs HrGoal,
+documented above) is a product/migration decision. The two pest baseline fails are pre-existing/environmental
+(RecruitmentJobPostingSync + the 06-16 date-rollover ShiftPayroll), unrelated to this reorg.
 
 ## Discovered (out of scope — do not fix here)
 - **S8 DEEPER MERGE:** HrDevelopmentGoal (dev plans) and HrGoal (OKRs) are distinct models/features sharing the

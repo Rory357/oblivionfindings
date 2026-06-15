@@ -2085,13 +2085,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.hr?.employees?.viewAny || can?.hr?.employees?.viewOwn) {
         people.items.push({ title: 'People', href: '/hr/people', icon: Users });
     }
-    if (can?.hr?.employees?.viewAny) {
-        people.items.push({
-            title: 'Import/Export',
-            href: '/hr/import-export',
-            icon: FileText,
-        });
-    }
     if (can?.hr?.recruitment?.view) {
         people.items.push({
             title: 'Recruitment',
@@ -2156,7 +2149,10 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     // Performance — Reviews, Goals & OKRs, Competencies, 360 Feedback, PIPs &
     // Succession are now tabs within the Performance hub.
-    const performance: SubPanelGroup = { label: 'Performance', items: [] };
+    const performance: SubPanelGroup = {
+        label: 'Performance & Development',
+        items: [],
+    };
     if (can?.hr?.performance?.view) {
         performance.items.push({
             title: 'Performance',
@@ -2251,6 +2247,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: ClipboardCheck,
         });
     }
+    if (can?.hr?.onboarding?.view) {
+        lifecycle.items.push({
+            title: 'Offboarding',
+            href: '/hr/offboarding',
+            icon: ClipboardCheck,
+        });
+    }
     if (can?.hr?.cases?.view) {
         lifecycle.items.push({
             title: 'HR Cases',
@@ -2274,16 +2277,12 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     if (lifecycle.items.length > 0) groups.push(lifecycle);
 
-    // Payroll & Admin — pay, reporting, the HR calendar and configuration.
-    const payrollAdmin: SubPanelGroup = {
-        label: 'Payroll & Admin',
-        items: [],
-    };
-    // Payroll hub — Runs (hr.payroll.view) + Payslips (hr.payslips.view) are
-    // tabs; show one entry if either is openable, deep-linked to a page the
-    // user can actually open (no 403-on-click).
+    // Payroll — Runs (hr.payroll.view) + Payslips (hr.payslips.view) are tabs
+    // within the Payroll hub; show one entry if either is openable, deep-linked
+    // to a page the user can actually open (no 403-on-click).
+    const payroll: SubPanelGroup = { label: 'Payroll', items: [] };
     if (can?.hr?.payroll?.view || can?.hr?.payslips?.view) {
-        payrollAdmin.items.push({
+        payroll.items.push({
             title: 'Payroll',
             href: can?.hr?.payroll?.view
                 ? '/hr/payroll'
@@ -2291,21 +2290,35 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: DollarSign,
         });
     }
+    if (payroll.items.length > 0) groups.push(payroll);
+
+    // Admin & Configuration — reporting, configuration and data import/export.
+    const adminConfig: SubPanelGroup = {
+        label: 'Admin & Configuration',
+        items: [],
+    };
     if (can?.hr?.reports?.view) {
-        payrollAdmin.items.push({
+        adminConfig.items.push({
             title: 'Reports',
             href: '/hr/reports',
             icon: FileText,
         });
     }
     if (can?.hr?.settings?.manage) {
-        payrollAdmin.items.push({
+        adminConfig.items.push({
             title: 'Settings',
             href: '/hr/settings/webhooks',
             icon: Settings,
         });
     }
-    if (payrollAdmin.items.length > 0) groups.push(payrollAdmin);
+    if (can?.hr?.employees?.viewAny) {
+        adminConfig.items.push({
+            title: 'Import/Export',
+            href: '/hr/import-export',
+            icon: FileText,
+        });
+    }
+    if (adminConfig.items.length > 0) groups.push(adminConfig);
 
     return groups;
 }
