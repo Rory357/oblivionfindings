@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -1662,12 +1663,29 @@ class EmarController extends Controller
     public function stock(Request $request)
     {
         $siteFilter = $request->integer('site_id') ?: null;
+        $clientFilter = $request->integer('client_id') ?: null;
         $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+        $byClient = fn ($q) => $q->where('client_id', $clientFilter);
 
         $stockModels = ClientMedicationStock::query()
-            ->with(['medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id', 'client.site:id,name'])])
-            ->whereHas('medication', fn ($q) => $q->active()->when($siteFilter, $bySite))
+            ->with(['medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id,room_id', 'client.site:id,name', 'client.room:id,name'])])
+            ->whereHas('medication', fn ($q) => $q->active()
+                ->when($siteFilter, $bySite)
+                ->when($clientFilter, $byClient))
             ->get();
+
+        // Honest movement history per stock item — sourced from the audit log
+        // (AuditableChanges on ClientMedicationStock), no dedicated movements
+        // table. One grouped query; the detail modal shows the recent few.
+        $movementsByStock = AuditLog::query()
+            ->where('auditable_type', (new ClientMedicationStock)->getMorphClass())
+            ->whereIn('auditable_id', $stockModels->pluck('id'))
+            ->whereIn('action', ['clientmedicationstock.create', 'clientmedicationstock.update'])
+            ->with('user:id,name')
+            ->latest()
+            ->limit(400)
+            ->get()
+            ->groupBy('auditable_id');
 
         $stockItems = $stockModels->map(fn ($s) => [
             'id' => $s->id,
@@ -1676,12 +1694,14 @@ class EmarController extends Controller
             'medication_dose' => $s->medication?->dosage,
             'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
             'client_id' => $s->medication?->client_id,
+            'client_room' => $s->medication?->client?->room?->name,
+            'mar_url' => $s->medication?->client_id ? EmarUrl::mar($s->medication->client_id) : null,
             'site_id' => $s->medication?->client?->site_id,
             'site_name' => $s->medication?->client?->site?->name,
             'on_hand' => $s->on_hand,
             'unit' => $s->unit,
             'reorder_level' => $s->reorder_level,
-            'last_counted_at' => $s->last_counted_at,
+            'last_counted_at' => $s->last_counted_at?->toIso8601String(),
             'is_low' => $s->isLowStock(),
             'controlled' => (bool) $s->medication?->controlled_drug,
             'storage_condition' => $s->storage_condition ?? 'ambient',
@@ -1696,6 +1716,10 @@ class EmarController extends Controller
             'scan_verification' => $s->medication?->client
                 ? $this->buildMedicationScanPayload($s->medication->client, $s->medication)
                 : null,
+            'movements' => ($movementsByStock->get($s->id) ?? collect())
+                ->take(6)
+                ->map(fn (AuditLog $log) => $this->formatStockMovement($log, $s->unit))
+                ->values(),
         ])->values();
 
         $lowStockCount = $stockItems->where('is_low', true)->count();
@@ -1742,11 +1766,13 @@ class EmarController extends Controller
         $pharmacyOrders = MedicationPharmacyOrder::query()
             ->with(['client:id,first_name,last_name', 'medication:id,name'])
             ->when($siteFilter, $bySite)
+            ->when($clientFilter, $byClient)
             ->latest()
             ->limit(40)
             ->get()
             ->map(fn (MedicationPharmacyOrder $o) => [
                 'id' => $o->id,
+                'medication_id' => $o->client_medication_id,
                 'client_name' => $o->client ? trim($o->client->first_name.' '.$o->client->last_name) : 'Unknown',
                 'medication_name' => $o->medication?->name,
                 'pharmacy_name' => $o->pharmacy_name,
@@ -1776,6 +1802,7 @@ class EmarController extends Controller
             'activeMedications' => ClientMedication::active()
                 ->with('client:id,first_name,last_name')
                 ->when($siteFilter, $bySite)
+                ->when($clientFilter, $byClient)
                 ->orderBy('name')
                 ->get(['id', 'name', 'client_id', 'dosage', 'barcode', 'nzulm_code', 'controlled_drug'])
                 ->map(fn (ClientMedication $medication) => [
@@ -1797,6 +1824,70 @@ class EmarController extends Controller
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
         ]);
+    }
+
+    /**
+     * Format one ClientMedicationStock audit-log entry into a movement row for
+     * the stock detail modal. This is an honest change-ledger derivation from the
+     * recorded before/after snapshot — no invented quantities or movement table.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatStockMovement(AuditLog $log, ?string $unit): array
+    {
+        $meta = $log->meta ?? [];
+        $after = $meta['after'] ?? [];
+        $before = $meta['before'] ?? [];
+        $fields = $meta['fields'] ?? array_keys($after);
+        $isCreate = str_ends_with($log->action, '.create');
+
+        $delta = null;
+        if (array_key_exists('on_hand', $after) && is_numeric($after['on_hand'])) {
+            $to = (int) $after['on_hand'];
+            $from = $isCreate ? 0 : (int) ($before['on_hand'] ?? 0);
+            $delta = $to - $from;
+        }
+
+        $notes = $after['notes'] ?? null;
+        $reason = is_string($notes) ? preg_replace('/^Stock adjustment:\s*/', '', $notes) : null;
+
+        if ($isCreate) {
+            $type = 'created';
+            $summary = 'Stock record created';
+        } elseif (in_array('on_hand', $fields, true)) {
+            // An on_hand change with a logged reason came through the adjust/count
+            // path; one without a reason is a receipt increment.
+            if (in_array('notes', $fields, true) && is_string($notes) && str_starts_with($notes, 'Stock adjustment')) {
+                $isCount = $reason !== null && stripos($reason, 'count') !== false;
+                $type = $isCount ? 'counted' : 'adjusted';
+                $summary = $reason !== '' && $reason !== null ? $reason : ($isCount ? 'Stock counted' : 'Stock adjusted');
+            } else {
+                $type = ($delta ?? 0) >= 0 ? 'received' : 'removed';
+                $summary = $type === 'received' ? 'Stock received' : 'Stock removed';
+            }
+        } else {
+            $type = 'updated';
+            $labelMap = [
+                'reorder_level' => 'reorder level',
+                'reorder_quantity' => 'reorder qty',
+                'expiry_date' => 'expiry',
+                'batch_number' => 'batch',
+                'supplier_name' => 'supplier',
+                'storage_condition' => 'storage',
+            ];
+            $labels = array_values(array_intersect_key($labelMap, array_flip($fields)));
+            $summary = $labels ? 'Updated '.implode(', ', $labels) : 'Stock details updated';
+        }
+
+        return [
+            'id' => $log->id,
+            'at' => $log->created_at?->toIso8601String(),
+            'actor' => $log->user?->name,
+            'type' => $type,
+            'summary' => $summary,
+            'delta' => $delta,
+            'unit' => $unit,
+        ];
     }
 
     // ─── Prescriptions / Prescriber Orders ─────────────────
