@@ -1478,6 +1478,17 @@ class SiteController extends Controller
         $assets = $validated['assets'] ?? [];
         $checklists = $validated['checklists'] ?? [];
 
+        // Finance: keep the dollars→cents conversion symmetric with store() so an
+        // edited weekly food budget actually persists.
+        $cents = $this->dollarsToCents($validated['weekly_food_budget'] ?? null);
+        if ($cents !== null) {
+            $validated['weekly_food_budget_cents'] = $cents;
+        }
+
+        // UpdateSiteRequest accepts the same rostering/geofence arrays as the
+        // store request (so the edit path can share the modal), but the
+        // edit-via-modal fan-out is a follow-up — drop them here explicitly
+        // rather than letting Eloquent silently discard the non-fillable keys.
         unset(
             $validated['contacts'],
             $validated['rooms'],
@@ -1485,6 +1496,11 @@ class SiteController extends Controller
             $validated['zones'],
             $validated['assets'],
             $validated['checklists'],
+            $validated['coverage'],
+            $validated['credentials'],
+            $validated['shift_templates'],
+            $validated['geofence'],
+            $validated['weekly_food_budget'],
         );
 
         $site->update($validated);

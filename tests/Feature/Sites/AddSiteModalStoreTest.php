@@ -256,6 +256,39 @@ class AddSiteModalStoreTest extends TestCase
             );
     }
 
+    public function test_update_persists_food_budget_cents_and_drops_unhandled_rostering(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->put("/sites/{$site->id}", [
+                'name' => $site->name,
+                'type' => 'house',
+                'is_active' => true,
+                'weekly_food_budget' => 180.25,
+                'total_capacity' => 5,
+                // Accepted by UpdateSiteRequest but the edit-via-modal fan-out is a
+                // follow-up, so update() drops these rather than silently dropping
+                // them via mass-assignment.
+                'coverage' => [[
+                    'name' => 'Day cover',
+                    'coverage_type' => 'day',
+                    'days' => ['mon'],
+                    'starts_time' => '07:00',
+                    'ends_time' => '15:00',
+                    'minimum_staff' => 1,
+                ]],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $site->refresh();
+        $this->assertSame(18025, (int) $site->weekly_food_budget_cents);
+        $this->assertSame(5, (int) $site->total_capacity);
+        // Rostering fan-out is store-only for now; update must not persist it.
+        $this->assertSame(0, SiteCoverageRequirement::where('site_id', $site->id)->count());
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>

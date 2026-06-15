@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
+    FieldErr,
     InfoCard,
     SelectInput,
     Segmented,
@@ -361,6 +362,21 @@ function validateStep(key: StepKey, d: SiteWizardForm): Record<string, string> {
         if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email))
             e.email = 'Enter a valid email';
     }
+    if (key === 'rostering') {
+        // Mirror the server rules (coverage.*.days min:1, name + times
+        // required_with) so a stripped-down rule surfaces inline instead of a
+        // silent 422 with no visible message.
+        const bad = d.coverage.some(
+            (c) =>
+                c.days.length === 0 ||
+                !c.name.trim() ||
+                !c.starts_time ||
+                !c.ends_time,
+        );
+        if (bad)
+            e.coverage_days =
+                'Each coverage rule needs a name, at least one day, and start & end times.';
+    }
     if (key === 'finance' && d.lease_start_date && d.lease_end_date) {
         if (d.lease_end_date < d.lease_start_date)
             e.lease_end_date = 'Lease end must be on or after the start date';
@@ -427,7 +443,12 @@ export type SiteStepCtx = {
 export type AddSiteDialogProps = AddSiteReferenceData & {
     isOpen: boolean;
     onClose: () => void;
-    onSaved?: (siteId: number | null) => void;
+    /**
+     * Fires after a successful create (non "add another"). No id is passed: the
+     * created_site_id flash is only reliably readable at render time (the success
+     * pane uses it), not inside this post-response closure.
+     */
+    onSaved?: () => void;
 };
 
 export function AddSiteDialog(props: AddSiteDialogProps) {
@@ -508,7 +529,7 @@ function AddSiteBody({
                     resetAll();
                 } else {
                     setDone(true);
-                    onSaved?.(page.props.flash?.created_site_id ?? null);
+                    onSaved?.();
                 }
             },
             onError: (errs: Record<string, string>) => {
@@ -1715,7 +1736,7 @@ function DayChips({
 /* ------------------------------------------------------------------ */
 
 function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
-    const { data, set, ref } = ctx;
+    const { data, set, ref, err } = ctx;
 
     const applyPreset = (key: string) =>
         set('coverage', [...data.coverage, ...presetRows(key)]);
@@ -1827,6 +1848,9 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                 {/* Coverage requirements */}
                 <div>
                     <SubHead icon={CalendarClock}>Coverage requirements</SubHead>
+                    {err('coverage_days') ? (
+                        <FieldErr>{err('coverage_days')}</FieldErr>
+                    ) : null}
                     <div className="mt-2 grid gap-3">
                         {data.coverage.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-border p-5 text-center text-[13px] text-muted-foreground">
