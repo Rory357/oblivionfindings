@@ -1,35 +1,17 @@
 /* eslint-disable no-restricted-syntax -- the register/near-limit/trends surfaces are
    custom-layout bordered panels (not Card/Button); all colours are semantic tokens. */
+import { PrnDetailDialog, type PrnAdministration } from '@/components/emar/prn-detail-dialog';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { PrnEffectDialog } from '@/pages/meds/today/components/prn-effect-dialog';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type { ClientInfo, PrnFollowUp, PrnMedication } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Pill, Plus, Search, TrendingUp, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-
-type PrnAdministration = {
-    id: number;
-    client_id: number;
-    client_name: string;
-    client_medication_id: number;
-    medication_name: string | null;
-    controlled_drug: boolean;
-    dose_given: string | null;
-    reason: string | null;
-    indication: string | null;
-    status: string;
-    administered_at: string | null;
-    given_time: string | null;
-    given_date: string | null;
-    given_by: string | null;
-    effectiveness: string | null;
-    effectiveness_label: string | null;
-};
+import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Eye, FileText, Flag, Pill, Plus, Printer, RotateCcw, Search, Stethoscope, TrendingUp, User, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
     administrations: PrnAdministration[];
@@ -50,7 +32,32 @@ type Props = {
     site_brand_colour: string | null;
 };
 
-type Modal = { type: 'record' } | { type: 'effect'; followUp: PrnFollowUp } | null;
+type Modal =
+    | { type: 'record'; initialMedId?: number | null }
+    | { type: 'effect'; followUp: PrnFollowUp }
+    | { type: 'detail'; admin: PrnAdministration }
+    | null;
+
+/** Map a register administration to the PrnFollowUp shape the effect wizard takes. */
+function adminToFollowUp(a: PrnAdministration): PrnFollowUp {
+    return {
+        administration_id: a.id,
+        client_id: a.client_id,
+        medication_name: a.medication_name,
+        dose_given: a.dose_given,
+        given_at: a.administered_at,
+        given_time: a.given_time,
+        check_at: null,
+    };
+}
+
+/** Effectiveness → context-menu header tag colour (semantic token CSS vars). */
+function effCtxTag(eff: string | null, label: string | null): { tag: string; tagBg: string; tagColor: string } {
+    if (eff === 'effective') return { tag: label ?? 'Effective', tagBg: 'var(--status-success-bg)', tagColor: 'var(--status-success)' };
+    if (eff === 'partially_effective') return { tag: label ?? 'Partial', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' };
+    if (eff === 'not_effective') return { tag: label ?? 'Not effective', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' };
+    return { tag: 'Review due', tagBg: 'var(--status-info-bg)', tagColor: 'var(--status-info)' };
+}
 
 function hue(id: number): number {
     return Math.round((id * 137.508) % 360);
@@ -89,6 +96,7 @@ export default function PrnRecords(props: Props) {
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [clientFilter, setClientFilter] = useState<number | null>(props.client_id ?? null);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     // Calendar + Site + Client round-trip to the server (the register is a
     // server-windowed query); the text search stays client-side over the loaded
@@ -108,6 +116,24 @@ export default function PrnRecords(props: Props) {
     const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id ?? undefined }); };
     const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id ?? undefined }); };
     const stepLabel = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
+
+    const openRowCtx = (e: ReactMouseEvent, a: PrnAdministration) => {
+        e.preventDefault();
+        const t = effCtxTag(a.effectiveness, a.effectiveness_label);
+        const reviewDue = !a.effectiveness;
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: `${a.medication_name ?? 'PRN'}${a.given_time ? ` · ${a.given_time}` : ''}`, tone: 'primary', onClick: () => setModal({ type: 'detail', admin: a }) },
+            ...(reviewDue ? [{ icon: <Stethoscope className="h-3.5 w-3.5" />, label: 'Record effectiveness', sub: 'Did it help?', onClick: () => setModal({ type: 'effect', followUp: adminToFollowUp(a) }) } satisfies ShiftCtxItem] : []),
+            { icon: <RotateCcw className="h-3.5 w-3.5" />, label: 'Re-record / correct dose', onClick: () => setModal({ type: 'record', initialMedId: a.client_medication_id }) },
+            { sep: true },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${a.client_id}/care`) },
+            ...(a.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(a.mar_url!) } satisfies ShiftCtxItem] : []),
+            { icon: <Printer className="h-3.5 w-3.5" />, label: 'Print PRN slip', onClick: () => window.print() },
+            { sep: true },
+            { icon: <Flag className="h-3.5 w-3.5" />, label: 'Flag concern', sub: 'Raise an incident', tone: 'critical', onClick: () => router.visit(`/clients/${a.client_id}/incidents`) },
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: t.tag, tagBg: t.tagBg, tagColor: t.tagColor, meta: `${a.client_name} · ${a.medication_name ?? 'PRN'}${a.given_time ? ` · ${a.given_time}` : ''}`, items });
+    };
 
     const clientsMap = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
     const nearLimit = useMemo(() => prnMeds.filter((m) => m.near_limit || m.over_limit), [prnMeds]);
@@ -281,7 +307,7 @@ export default function PrnRecords(props: Props) {
                                     ) : register.map((a) => {
                                         const med = medCountById.get(a.client_medication_id);
                                         return (
-                                            <tr key={a.id} className="border-b last:border-b-0">
+                                            <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/40" onClick={() => setModal({ type: 'detail', admin: a })} onContextMenu={(e) => openRowCtx(e, a)}>
                                                 <td className="px-4 py-3"><div className="font-medium">{a.given_time}</div><div className="text-xs text-muted-foreground">{a.given_date}</div></td>
                                                 <td className="px-4 py-3"><span className="flex items-center gap-2"><Avatar id={a.client_id} name={a.client_name} />{a.client_name}</span></td>
                                                 <td className="px-4 py-3"><div className="flex items-center gap-1.5 font-medium">{a.medication_name}{a.controlled_drug && <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">CD</span>}</div>{a.dose_given && <div className="text-xs text-muted-foreground">{a.dose_given}</div>}</td>
@@ -362,11 +388,21 @@ export default function PrnRecords(props: Props) {
             </div>
 
             {modal?.type === 'record' && (
-                <PrnWizard medications={prnMeds} clients={clientsMap} date={date} witnesses={witnesses} signedAs={{ name: signer.name, role_label: signer.role_label }} onClose={() => setModal(null)} />
+                <PrnWizard medications={prnMeds} clients={clientsMap} date={date} witnesses={witnesses} signedAs={{ name: signer.name, role_label: signer.role_label }} initialMedId={modal.initialMedId ?? null} onClose={() => setModal(null)} />
             )}
             {modal?.type === 'effect' && (
                 <PrnEffectDialog followUp={modal.followUp} client={clientsMap.get(modal.followUp.client_id)} onClose={() => setModal(null)} />
             )}
+            {modal?.type === 'detail' && (
+                <PrnDetailDialog
+                    admin={modal.admin}
+                    med={medCountById.get(modal.admin.client_medication_id)}
+                    onClose={() => setModal(null)}
+                    onRecordEffectiveness={() => setModal({ type: 'effect', followUp: adminToFollowUp(modal.admin) })}
+                    onReRecordDose={() => setModal({ type: 'record', initialMedId: modal.admin.client_medication_id })}
+                />
+            )}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }

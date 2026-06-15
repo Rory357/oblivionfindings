@@ -43,15 +43,24 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 
 ## B. Register — right-click actions + a "view" detail modal
 
-- [ ] **B4.** `onContextMenu` per register row → `ShiftContextMenu`: View details (primary) · Record
+- [x] **B4.** `onContextMenu` per register row → `ShiftContextMenu`: View details (primary) · Record
   effectiveness (when review due) · Re-record/correct dose · — · View client · Open on MAR chart ·
   Print PRN slip · — · Flag concern (critical). Header tag = effectiveness pill; meta = client·med·time.
-- [ ] **B5.** PRN administration **detail modal** on `WizardShell` chrome (read-only `ReviewCard`/
+  — _done: `openRowCtx()` in `PrnRecords.tsx` builds the menu (review-effectiveness item only when no
+  review yet), header tag colour from `effCtxTag()` semantic CSS vars. Flag concern → client incidents
+  page (`/clients/{id}/incidents`, real gated route — not a dead button); Print → `window.print()`
+  (no PRN-slip PDF endpoint exists); Open MAR → `mar_url` (EmarUrl::mar). Self-clamps/closes via the
+  shared `ShiftContextMenu`._
+- [x] **B5.** PRN administration **detail modal** on `WizardShell` chrome (read-only `ReviewCard`/
   `ReviewRow`/`InfoCard`). Opens on row click + menu "View details". Shows client (avatar+room+site),
   medication (+CD lock/route/dose), indication, dose given, time + given-by, today's count vs cap,
   baseline observations captured at admin, effectiveness outcome + reviewed-after + observations +
   escalation, audit trail. Footer Options bar: Record/Re-record effectiveness · Re-record dose ·
-  View client · Open on MAR · Print. Primary actions open wizards in place (no off-page nav).
+  View client · Open on MAR · Print. Primary actions open wizards in place (no off-page nav). — _done:
+  new `resources/js/components/emar/prn-detail-dialog.tsx` (`PrnDetailDialog`) on `WizardShell` with two
+  read-only section panes (Administration / Review & audit). Footer Options open the effect/record
+  wizards in place via page callbacks; View client/MAR via `router.visit`; Print via `window.print()`.
+  Row click + menu "View details" both open it._
 
 ## C. Reviews due — richer wizard modal
 
@@ -103,8 +112,12 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
   dose, given-by, effectiveness), next-allowable-time, over-limit incident reference.
 - [ ] **BK4.** Effectiveness extra fields: add only schema-supported fields to the payload; stub the
   rest as `TODO(Gx)`.
-- [ ] **BK5.** Detail modal: ensure each administration carries baseline observations + effectiveness
-  sub-record the detail modal needs.
+- [x] **BK5.** Detail modal: ensure each administration carries baseline observations + effectiveness
+  sub-record the detail modal needs. — _done: `prn()` register payload now eager-loads
+  `client.room`/`client.site`/`medication.route`/`prnEffectiveness.reviewedByUser` and emits
+  `client_room`/`client_site`/`route`/`prescribed_dose`/`notes`/`mar_url`/`baseline{bgl,pulse,bp,insulin}`/
+  `effectiveness_detail{outcome,review_minutes_after,observations,escalation,reviewed_by,reviewed_label}`.
+  Added `use App\Support\EmarUrl`._
 - [ ] **BK6.** Manager record endpoint: confirm a manager-scoped record path delegating to
   `EnhancedMarService` (currently `WorkerMedsController@recordPrn`, gated `medications.administer.record`
   || `clients.update`), called by the Record/Re-record wizard via `useForm().post()`.
@@ -162,3 +175,13 @@ Missing for the drill-down (to add in `prn()` near-limit list, derive — no sch
   has no `vendor/` and no generated routes; consistent with prior eMAR loop passes.)
   **Next pass:** Group B (register right-click `ShiftContextMenu` + the `WizardShell` detail modal,
   B4/B5 + BK5).
+- _(pass 2)_ **Closed Group B + BK5.** Added register row right-click `ShiftContextMenu`
+  (`openRowCtx`) and a read-only `PrnDetailDialog` (new `components/emar/prn-detail-dialog.tsx`) on
+  `WizardShell` chrome, opened on row click + "View details"; footer Options open the effect/record
+  wizards in place. Backend BK5: extended the `prn()` register payload with room/site/route/prescribed
+  dose/notes/mar_url/baseline-observations/full effectiveness sub-record (eager-loaded). Files:
+  `resources/js/pages/emar/PrnRecords.tsx`, `resources/js/components/emar/prn-detail-dialog.tsx`,
+  `app/Http/Controllers/Emar/EmarController.php`. Verified: scoped `tsc` clean (zero errors mention the
+  touched files; only the worktree's pre-existing `@/routes` gap remains), `eslint` clean on both
+  frontend files, `php -l` clean. **Next pass:** Group C (migrate effectiveness capture onto
+  `WizardShell` 3-step + the effectiveness field gap analysis — C6/C7/C8 + BK4).

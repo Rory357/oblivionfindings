@@ -46,6 +46,7 @@ use App\Services\MedicationScanVerificationService;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
+use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -1098,7 +1099,14 @@ class EmarController extends Controller
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
-            ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,max_per_day,indication,controlled_drug', 'administeredBy:id,name', 'prnEffectiveness'])
+            ->with([
+                'client:id,first_name,last_name,room_id',
+                'client.room:id,name',
+                'client.site:id,name',
+                'medication:id,name,dosage,route,max_per_day,indication,controlled_drug',
+                'administeredBy:id,name',
+                'prnEffectiveness.reviewedByUser:id,name',
+            ])
             ->latest('administered_at')
             ->limit(200)
             ->get()
@@ -1110,19 +1118,43 @@ class EmarController extends Controller
                     'id' => $a->id,
                     'client_id' => $a->client_id,
                     'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'Unknown',
+                    'client_room' => $a->client?->room?->name,
+                    'client_site' => $a->client?->site?->name,
                     'client_medication_id' => $a->client_medication_id,
                     'medication_name' => $a->medication?->name,
+                    'route' => $a->medication?->route,
+                    'prescribed_dose' => $a->medication?->dosage,
                     'controlled_drug' => (bool) ($a->medication?->controlled_drug ?? false),
                     'dose_given' => $a->dose_given,
                     'reason' => $a->reason,
                     'indication' => $a->medication?->indication,
+                    'notes' => $a->notes,
                     'status' => $a->status,
                     'administered_at' => $at?->toIso8601String(),
                     'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
                     'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
                     'given_by' => $a->administeredBy?->name,
+                    'mar_url' => EmarUrl::mar($a->client_id),
+                    'baseline' => array_filter([
+                        'blood_glucose_level' => $a->blood_glucose_level,
+                        'pulse_bpm' => $a->pulse_bpm,
+                        'blood_pressure_systolic' => $a->blood_pressure_systolic,
+                        'blood_pressure_diastolic' => $a->blood_pressure_diastolic,
+                        'insulin_units_given' => $a->insulin_units_given,
+                    ], fn ($v) => $v !== null),
                     'effectiveness' => $eff?->effectiveness,
                     'effectiveness_label' => $eff?->effectiveness_label,
+                    'effectiveness_detail' => $eff ? [
+                        'effectiveness' => $eff->effectiveness,
+                        'label' => $eff->effectiveness_label,
+                        'review_minutes_after' => $eff->review_minutes_after,
+                        'observations' => $eff->observations,
+                        'escalation_needed' => (bool) $eff->escalation_needed,
+                        'escalation_action' => $eff->escalation_action,
+                        'reviewed_by' => $eff->reviewedByUser?->name,
+                        'reviewed_at' => $eff->reviewed_at?->toIso8601String(),
+                        'reviewed_label' => $eff->reviewed_at ? $eff->reviewed_at->copy()->timezone($timezone)->format('H:i · j M') : null,
+                    ] : null,
                 ];
             })->all();
 
