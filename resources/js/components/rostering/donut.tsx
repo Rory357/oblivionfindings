@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,13 @@ export type DonutLegendProps = {
     segments: DonutSegment[];
     accentKeys?: string[];
     className?: string;
+    /**
+     * Optional formatter for the per-row value (e.g. money). Defaults to the
+     * raw number — additive so existing callers (rostering) are unchanged.
+     */
+    formatValue?: (value: number) => ReactNode;
+    /** Show each segment's share of the total as a right-aligned percent. */
+    showPercent?: boolean;
 };
 
 export type DonutProps = {
@@ -118,7 +125,10 @@ export function DonutLegend({
     segments,
     accentKeys,
     className,
+    formatValue,
+    showPercent,
 }: DonutLegendProps) {
+    const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
     return (
         <ul className={cn('mt-1 space-y-1.5', className)}>
             {segments.map((s) => {
@@ -138,7 +148,14 @@ export function DonutLegend({
                             style={{ background: s.color }}
                         />
                         <span className="flex-1 truncate">{s.label}</span>
-                        <span className="tabular-nums">{s.value}</span>
+                        <span className="tabular-nums">
+                            {formatValue ? formatValue(s.value) : s.value}
+                        </span>
+                        {showPercent ? (
+                            <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground/60">
+                                {Math.round((s.value / total) * 100)}%
+                            </span>
+                        ) : null}
                     </li>
                 );
             })}

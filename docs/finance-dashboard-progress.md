@@ -1,14 +1,14 @@
 # Finance Dashboard — build progress (loop state)
 - [x] Phase 0  Audit -> docs/finance-dashboard-audit-findings.md
-- [ ] A1 Hero (primary gradient, period control, Site+Funding filters)
-- [ ] A2 Quick-action wizard modals
-- [ ] A3 Finance hubs quick-links bar
-- [ ] A4 KPI cards (8)
-- [ ] A5 Donut row (3)
-- [ ] A6 Charts row (area + bar, tokens)
-- [ ] A7 Tables row + recent journals
-- [ ] A8 Footer
-- [ ] A9 Needs-attention strip
+- [x] A1 Hero (primary gradient, period control, Site+Funding filters)
+- [x] A2 Quick-action wizard modals
+- [x] A3 Finance hubs quick-links bar
+- [x] A4 KPI cards (8)
+- [x] A5 Donut row (3)
+- [x] A6 Charts row (area + bar, tokens)
+- [x] A7 Tables row + recent journals
+- [x] A8 Footer
+- [x] A9 Needs-attention strip
 - [ ] B  Period-aware real data + new metrics
 - [ ] C  P0 correctness (3.1, 3.2, 4.1, 2.1/2.2)
 - [ ] D  Funding pipeline (1.1, 1.2, 1.3) + utilisation donut/table
@@ -16,4 +16,6 @@
 - [ ] F  Budgets (5.1, 5.2) + finance calendar (5.3)
 notes:
 - 2026-06-15 first run: created progress file; design drop lives in parent repo (.design-drops gitignored). Starting Phase 0 audit.
-- 2026-06-15 Phase 0 DONE: wrote docs/finance-dashboard-audit-findings.md. Verified gap claims vs live code — concurrent Finance loop already fixed 3.2 (markPaid posts journal), 3.3, 4.1 (lock generates payslips), partial 4.2 (net-pay journal done, direct-credit file missing). Dashboard AR KPI (DashboardAggregatorService:73) still reads orphaned App\Models\Invoice — the one live 3.1 break. Phase C is small; substantive new work = D (funding/remittance), E (payday filing + DC file), F (budgets + calendar surfacing). Next: A1 hero.
+- 2026-06-15 Phase 0 DONE: wrote docs/finance-dashboard-audit-findings.md. Verified gap claims vs live code — concurrent Finance loop already fixed 3.2 (markPaid posts journal), 3.3, 4.1 (lock generates payslips), partial 4.2 (net-pay journal done, direct-credit file missing). Dashboard AR KPI (DashboardAggregatorService:73) still reads orphaned App\Models\Invoice — the one live 3.1 break. Phase C is small; substantive new work = D (funding/remittance), E (payday filing + DC file), F (budgets + calendar surfacing).
+- 2026-06-15 Phase A DONE (one commit): full Dashboard.tsx rebuild to README §1-9. New presentational comps: components/finance/{finance-hubs-bar,needs-attention-strip,finance-dashboard-footer}.tsx. Reused PageHero (NO category→purple), MultiEntityFilter (onDark), DonutCard, the 4 wizard dialogs (open/onClose modal state; ref-data props default [] → real data Phase B), formatMoney/Compact, StatusBadge. Additive (backwards-compat) props on shared rostering Donut: DonutLegend/DonutCard gained formatValue + showPercent (defaults preserve rostering). Tokens only (zero hex; chart-1..5/primary/status-warning). Placeholders clearly TODO-marked: donuts (TODO B/C/D), funding-claims table (TODO D), attention items (TODO B/D/F), funding-util + revenue/resident KPIs (TODO A→B). Gates: tsc clean, eslint clean, vite build OK (3m29s).
+- ⚠️ WORKTREE SETUP (bare worktree had no node_modules/vendor/.env/Wayfinder TS): node_modules resolves via parent up-walk; copied resources/js/{routes,actions,wayfinder} from parent (gitignored); robocopied vendor + .env from parent; vite build needs PHP_INI_SCAN_DIR=C:\Users\steph\AppData\Local\Temp\phpmem_fin (memory_limit=1024M) because the @laravel/vite-plugin-wayfinder runs `php artisan wayfinder:generate` on build. Run build via bash `npx vite build` (PowerShell npx can't find vite). Next: Phase B (period-aware real data + controller ref-data for modals/filters).
