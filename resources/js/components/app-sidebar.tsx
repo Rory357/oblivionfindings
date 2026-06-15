@@ -2122,27 +2122,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Clock,
         });
     }
-    if (can?.hr?.compensation?.view) {
-        timeAndLeave.items.push({
-            title: 'Compensation',
-            href: '/hr/compensation/bands',
-            icon: DollarSign,
-        });
-    }
-    if (can?.hr?.benefits?.view) {
-        timeAndLeave.items.push({
-            title: 'Benefits',
-            href: '/hr/benefits',
-            icon: Shield,
-        });
-    }
-    if (can?.hr?.expenses?.view) {
-        timeAndLeave.items.push({
-            title: 'Expenses',
-            href: '/hr/expenses',
-            icon: DollarSign,
-        });
-    }
     if (can?.hr?.leave?.viewAny || can?.hr?.leave?.viewOwn) {
         timeAndLeave.items.push({
             title: 'Time Off Calendar',
@@ -2151,6 +2130,34 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     }
     if (timeAndLeave.items.length > 0) groups.push(timeAndLeave);
+
+    // Pay & Benefits — compensation, benefit plans and expense reimbursement.
+    const payAndBenefits: SubPanelGroup = {
+        label: 'Pay & Benefits',
+        items: [],
+    };
+    if (can?.hr?.compensation?.view) {
+        payAndBenefits.items.push({
+            title: 'Compensation',
+            href: '/hr/compensation/bands',
+            icon: DollarSign,
+        });
+    }
+    if (can?.hr?.benefits?.view) {
+        payAndBenefits.items.push({
+            title: 'Benefits',
+            href: '/hr/benefits',
+            icon: Shield,
+        });
+    }
+    if (can?.hr?.expenses?.view) {
+        payAndBenefits.items.push({
+            title: 'Expenses',
+            href: '/hr/expenses',
+            icon: DollarSign,
+        });
+    }
+    if (payAndBenefits.items.length > 0) groups.push(payAndBenefits);
 
     // Performance — Reviews, Goals & OKRs, Competencies, 360 Feedback, PIPs &
     // Succession are now tabs within the Performance hub.
@@ -2195,76 +2202,98 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     if (engagement.items.length > 0) groups.push(engagement);
 
-    // Admin
-    const admin: SubPanelGroup = { label: 'Admin', items: [] };
-    // Compliance — Matrix, Calendar, Training, Vetting & Drivers are now tabs
-    // within the Compliance hub. (Departments folded into the People hub.)
+    // The former flat "Admin" group (20 items) is split into three short,
+    // scannable panels. Several entries became hub tabs and are reached from
+    // their hub's tab strip: Course Catalog -> Compliance; Analytics +
+    // Headcount -> Reports; Onboarding Emails -> Onboarding; Payslips ->
+    // Payroll; Signatures -> Documents. ("Expiring Docs" pointed at a
+    // non-existent route and was removed.)
+
+    // Compliance & Records — regulatory compliance plus the document, policy,
+    // asset and skills registers.
+    const records: SubPanelGroup = { label: 'Compliance & Records', items: [] };
     if (can?.hr?.compliance?.view) {
-        admin.items.push({
+        records.items.push({
             title: 'Compliance',
             href: '/hr/compliance',
             icon: Shield,
         });
     }
-    // Course Catalog (/hr/training/catalog) is now a tab of the Compliance hub.
+    if (can?.hr?.documents?.view) {
+        records.items.push({
+            title: 'Documents',
+            href: '/hr/documents',
+            icon: FileText,
+        });
+    }
+    if (can?.hr?.policies?.view) {
+        records.items.push({
+            title: 'Policies',
+            href: '/hr/policies',
+            icon: FileText,
+        });
+    }
     if (can?.hr?.assets?.view) {
-        admin.items.push({
+        records.items.push({
             title: 'Assets',
             href: '/hr/assets',
             icon: Package,
         });
     }
     if (can?.hr?.skills?.view) {
-        admin.items.push({ title: 'Skills', href: '/hr/skills', icon: Target });
-    }
-    // Analytics (/hr/analytics) and Headcount (/hr/headcount) are now tabs of
-    // the Reports hub.
-    if (can?.hr?.calendar?.view) {
-        admin.items.push({
-            title: 'Calendar',
-            href: '/hr/calendar',
-            icon: CalendarDays,
+        records.items.push({
+            title: 'Skills',
+            href: '/hr/skills',
+            icon: Target,
         });
     }
-    // Onboarding hub — Checklists (/hr/onboarding) and Emails
-    // (/hr/onboarding/emails) are now tabs of the Onboarding hub.
+    if (records.items.length > 0) groups.push(records);
+
+    // Employee Lifecycle — joiners, casework, leavers and approvals.
+    const lifecycle: SubPanelGroup = {
+        label: 'Employee Lifecycle',
+        items: [],
+    };
     if (can?.hr?.onboarding?.view) {
-        admin.items.push({
+        lifecycle.items.push({
             title: 'Onboarding',
             href: '/hr/onboarding',
             icon: ClipboardCheck,
         });
     }
-    // Documents hub — Signatures (/hr/signatures/pending) is now a tab here.
-    // (The old "Expiring Docs" link pointed at a non-existent route and was
-    // removed.)
-    if (can?.hr?.documents?.view) {
-        admin.items.push({
-            title: 'Documents',
-            href: '/hr/documents',
-            icon: FileText,
-        });
-    }
-    if (can?.hr?.approvals?.view || can?.hr?.approvals?.manage) {
-        admin.items.push({
-            title: 'Approvals',
-            href: '/hr/approvals/pending',
-            icon: ClipboardCheck,
-        });
-    }
     if (can?.hr?.cases?.view) {
-        admin.items.push({
+        lifecycle.items.push({
             title: 'HR Cases',
             href: '/hr/cases',
             icon: Shield,
         });
     }
-    // Payroll hub — Runs (/hr/payroll, hr.payroll.view) and Payslips
-    // (/hr/payroll/payslips, hr.payslips.view) are now tabs of the Payroll hub.
-    // Show the single entry if the user can open either tab; deep-link to the
-    // first page they can actually open (no 403-on-click).
+    if (can?.hr?.cases?.view || can?.hr?.employees?.manage) {
+        lifecycle.items.push({
+            title: 'Exit Interviews',
+            href: '/hr/exit-interviews',
+            icon: Users,
+        });
+    }
+    if (can?.hr?.approvals?.view || can?.hr?.approvals?.manage) {
+        lifecycle.items.push({
+            title: 'Approvals',
+            href: '/hr/approvals/pending',
+            icon: ClipboardCheck,
+        });
+    }
+    if (lifecycle.items.length > 0) groups.push(lifecycle);
+
+    // Payroll & Admin — pay, reporting, the HR calendar and configuration.
+    const payrollAdmin: SubPanelGroup = {
+        label: 'Payroll & Admin',
+        items: [],
+    };
+    // Payroll hub — Runs (hr.payroll.view) + Payslips (hr.payslips.view) are
+    // tabs; show one entry if either is openable, deep-linked to a page the
+    // user can actually open (no 403-on-click).
     if (can?.hr?.payroll?.view || can?.hr?.payslips?.view) {
-        admin.items.push({
+        payrollAdmin.items.push({
             title: 'Payroll',
             href: can?.hr?.payroll?.view
                 ? '/hr/payroll'
@@ -2272,38 +2301,28 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: DollarSign,
         });
     }
-    if (can?.hr?.policies?.view) {
-        admin.items.push({
-            title: 'Policies',
-            href: '/hr/policies',
-            icon: FileText,
-        });
-    }
-    if (can?.hr?.cases?.view || can?.hr?.employees?.manage) {
-        admin.items.push({
-            title: 'Exit Interviews',
-            href: '/hr/exit-interviews',
-            icon: Users,
-        });
-    }
-    // Reports — Builder, Saved, Automations & Webhooks are now tabs within the
-    // Reports hub.
     if (can?.hr?.reports?.view) {
-        admin.items.push({
+        payrollAdmin.items.push({
             title: 'Reports',
             href: '/hr/reports',
             icon: FileText,
         });
     }
-    // Settings — Custom fields & Audit log are now tabs within the Settings hub.
+    if (can?.hr?.calendar?.view) {
+        payrollAdmin.items.push({
+            title: 'Calendar',
+            href: '/hr/calendar',
+            icon: CalendarDays,
+        });
+    }
     if (can?.hr?.settings?.manage) {
-        admin.items.push({
+        payrollAdmin.items.push({
             title: 'Settings',
             href: '/hr/settings/webhooks',
             icon: Settings,
         });
     }
-    if (admin.items.length > 0) groups.push(admin);
+    if (payrollAdmin.items.length > 0) groups.push(payrollAdmin);
 
     return groups;
 }
