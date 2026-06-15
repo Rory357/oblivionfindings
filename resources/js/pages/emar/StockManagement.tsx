@@ -1,7 +1,8 @@
 /* eslint-disable no-restricted-syntax -- stock list/order/reconciliation surfaces are custom-layout
    bordered tables and chip buttons (not Card/Button); all colours are semantic tokens. */
+import { StockDetailDialog, stockStatusPill, type OpenOrderSummary } from '@/components/emar/stock-detail-dialog';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -15,13 +16,14 @@ import {
     type StockRow,
 } from '@/pages/emar/_stock-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, Barcode, CalendarX2, Check, ClipboardCheck, Clock, Package, Pencil, Plus, Search, ShieldCheck, ShoppingCart, Snowflake, Truck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertOctagon, AlertTriangle, Barcode, CalendarX2, Check, ClipboardCheck, Clock, Eye, FileText, Package, Pencil, Plus, Search, ShieldCheck, ShoppingCart, Snowflake, Truck, User, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type ControlledRegisterRow = {
     id: number;
     medication_id: number;
     medication_name: string | null;
+    client_id: number | null;
     client_name: string;
     cd_class: string | null;
     register_balance: number;
@@ -33,6 +35,7 @@ type ControlledRegisterRow = {
 };
 type OrderRow = {
     id: number;
+    medication_id: number | null;
     client_name: string;
     medication_name: string | null;
     pharmacy_name: string | null;
@@ -60,6 +63,7 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    client_id: number | null;
 };
 
 type Modal =
@@ -67,23 +71,92 @@ type Modal =
     | { type: 'receive'; medId?: number }
     | { type: 'count'; medId?: number; controlledOnly?: boolean }
     | { type: 'adjust'; item: StockRow }
+    | { type: 'detail'; item: StockRow }
     | null;
 
+const STALE_ORDER_DAYS = 7;
 const STAGES = ['draft', 'submitted', 'confirmed', 'dispensed', 'delivered'];
 const STAGE_LABELS = ['Ordered', 'Submitted', 'Confirmed', 'Dispensed', 'Delivered'];
 const NEXT_LABEL: Record<string, string> = { draft: 'Submit to pharmacy', submitted: 'Mark confirmed', confirmed: 'Mark dispensed', dispensed: 'Receive stock' };
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—');
 const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, controlledRegister, pharmacyOrders, clients, activeMedications, witnesses, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, controlledRegister, pharmacyOrders, clients, activeMedications, witnesses, sites, active_site: activeSite, site_brand_colour: brandColour, client_id: activeClientId }: Props) {
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(activeClientId ?? null);
     const [chip, setChip] = useState<'all' | 'controlled' | 'cold_chain'>('all');
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>([]);
 
     const openOrders = pharmacyOrders.filter((o) => o.status !== 'delivered');
     const cdDiscrepancies = controlledRegister.filter((r) => r.discrepancy !== null && r.discrepancy !== 0).length;
+    const staleOrderCutoff = Date.now() - STALE_ORDER_DAYS * 86_400_000;
+    const overdueOrders = openOrders.filter((o) => o.ordered_at != null && new Date(o.ordered_at).getTime() < staleOrderCutoff).length;
+
+    // Stacked, dismissible alert strip — every count is already computed above.
+    const alerts = ([
+        { key: 'cd', tone: 'critical', icon: ShieldCheck, count: cdDiscrepancies, message: `${cdDiscrepancies} controlled-drug count${cdDiscrepancies === 1 ? '' : 's'} with an unreconciled balance — investigate before close of shift.`, tab: 'controlled' },
+        { key: 'expired', tone: 'critical', icon: CalendarX2, count: expiredCount, message: `${expiredCount} item${expiredCount === 1 ? '' : 's'} expired — quarantine and remove from use.`, tab: 'expired' },
+        { key: 'low', tone: 'warning', icon: AlertTriangle, count: lowStockCount, message: `${lowStockCount} item${lowStockCount === 1 ? '' : 's'} at or below reorder level — reorder now.`, tab: 'low' },
+        { key: 'orders', tone: 'warning', icon: Clock, count: overdueOrders, message: `${overdueOrders} pharmacy order${overdueOrders === 1 ? '' : 's'} waiting ${STALE_ORDER_DAYS}+ days — chase the pharmacy.`, tab: 'orders' },
+    ] as const).filter((a) => a.count > 0 && !dismissed.includes(a.key));
+
+    const stockByMed = useMemo(() => new Map(stockItems.map((s) => [s.medication_id, s])), [stockItems]);
+    const openOrderFor = (medId: number | null): OpenOrderSummary | null => {
+        if (medId == null) return null;
+        const o = openOrders.find((ord) => ord.medication_id === medId);
+        return o ? { status: o.status, pharmacy_name: o.pharmacy_name, order_type: o.order_type, quantity_ordered: o.quantity_ordered, ordered_at: o.ordered_at } : null;
+    };
+    const runCount = (s: StockRow) => setModal({ type: 'count', medId: s.medication_id, controlledOnly: s.controlled });
+
+    // Header tag colours for the row context menu — semantic tokens (CSS vars).
+    const ctxTagStyle = (s: StockRow) => {
+        if (s.is_expired) return { tag: 'Expired', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' };
+        if (s.is_low) return { tag: 'Low', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' };
+        if (s.is_expiring_soon) return { tag: 'Expiring', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' };
+        return { tag: 'OK', tagBg: 'var(--status-success-bg)', tagColor: 'var(--status-success)' };
+    };
+
+    const openStockCtx = (e: ReactMouseEvent, s: StockRow) => {
+        e.preventDefault();
+        const order = openOrderFor(s.medication_id);
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: `${s.medication_name ?? 'Stock'} · ${s.on_hand} ${s.unit}`, tone: 'primary', onClick: () => setModal({ type: 'detail', item: s }) },
+            { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Adjust stock', onClick: () => setModal({ type: 'adjust', item: s }) },
+            { icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: s.controlled ? 'Run CD balance check' : 'Run count', onClick: () => runCount(s) },
+            { icon: <ShoppingCart className="h-3.5 w-3.5" />, label: 'Order more', onClick: () => setModal({ type: 'order', clientId: s.client_id ?? undefined, medId: s.medication_id }) },
+            ...(order ? [{ icon: <Truck className="h-3.5 w-3.5" />, label: 'Receive against order', onClick: () => setModal({ type: 'receive', medId: s.medication_id }) } satisfies ShiftCtxItem] : []),
+            { sep: true },
+            ...(s.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${s.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            ...(s.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR', onClick: () => router.visit(s.mar_url!) } satisfies ShiftCtxItem] : []),
+            ...(s.is_expired ? [{ sep: true } satisfies ShiftCtxItem, { icon: <AlertOctagon className="h-3.5 w-3.5" />, label: 'Mark expired / quarantine', sub: 'Adjust out & record reason', tone: 'critical', onClick: () => setModal({ type: 'adjust', item: s }) } satisfies ShiftCtxItem] : []),
+        ];
+        const t = ctxTagStyle(s);
+        setCtx({ x: e.clientX, y: e.clientY, tag: t.tag, tagBg: t.tagBg, tagColor: t.tagColor, meta: `${s.client_name} · ${s.medication_name ?? '—'} · ${s.on_hand} ${s.unit}`, items });
+    };
+
+    const openCdCtx = (e: ReactMouseEvent, r: ControlledRegisterRow) => {
+        e.preventDefault();
+        const s = stockByMed.get(r.medication_id);
+        const reconciled = r.discrepancy === null || r.discrepancy === 0;
+        const items: ShiftCtxItem[] = [
+            ...(s ? [{ icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: `${r.medication_name ?? 'CD'} · ${r.register_balance} ${r.unit}`, tone: 'primary', onClick: () => setModal({ type: 'detail', item: s }) } satisfies ShiftCtxItem] : []),
+            { icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Record CD balance check', onClick: () => setModal({ type: 'count', medId: r.medication_id, controlledOnly: true }) },
+            ...(s ? [{ icon: <Pencil className="h-3.5 w-3.5" />, label: 'Adjust stock', onClick: () => setModal({ type: 'adjust', item: s }) } satisfies ShiftCtxItem] : []),
+            ...(s ? [{ icon: <ShoppingCart className="h-3.5 w-3.5" />, label: 'Order more', onClick: () => setModal({ type: 'order', clientId: r.client_id ?? undefined, medId: r.medication_id }) } satisfies ShiftCtxItem] : []),
+            { sep: true },
+            ...(r.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open CD register', onClick: () => router.visit('/emar/controlled') },
+            ...(!reconciled ? [{ sep: true } satisfies ShiftCtxItem, { icon: <AlertOctagon className="h-3.5 w-3.5" />, label: 'Investigate discrepancy', tone: 'critical', onClick: () => router.visit('/emar/controlled') } satisfies ShiftCtxItem] : []),
+        ];
+        const tag = reconciled
+            ? { tag: 'CD OK', tagBg: 'var(--status-success-bg)', tagColor: 'var(--status-success)' }
+            : { tag: 'CD discrepancy', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' };
+        setCtx({ x: e.clientX, y: e.clientY, tag: tag.tag, tagBg: tag.tagBg, tagColor: tag.tagColor, meta: `${r.client_name} · ${r.medication_name ?? 'CD'} · ${r.register_balance} ${r.unit}`, items });
+    };
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -109,7 +182,18 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
     }, [filtered]);
 
     const advance = (id: number) => router.post(`/emar/stock/pharmacy-orders/${id}/advance`, {}, { preserveScroll: true, only: ['pharmacyOrders', 'stockItems', 'lowStockCount', 'expiringCount', 'expiredCount'] });
-    const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/stock', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
+    // Site + Client round-trip to the server (the board is server-filtered on
+    // those two only); search/chip/tab stay client-side over the loaded rows.
+    const reload = (over: { site_id?: number | null; client_id?: number | null }) => {
+        const site = over.site_id !== undefined ? over.site_id : siteFilter;
+        const client = over.client_id !== undefined ? over.client_id : clientFilter;
+        const params: Record<string, number> = {};
+        if (site) params.site_id = site;
+        if (client) params.client_id = client;
+        router.get('/emar/stock', params, { preserveState: true, preserveScroll: true });
+    };
+    const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id }); };
+    const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id }); };
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All stock', icon: Package, tone: 'primary', badge: stockItems.length || undefined },
@@ -181,23 +265,48 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                 </Button>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medication, client or batch…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                <div className="relative w-full max-w-xs md:w-[260px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search medication, client or batch…"
+                                        aria-label="Search stock"
+                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                    />
+                                    {search ? (
+                                        <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
                                 </div>
                                 {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                                <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))} value={clientFilter} onChange={onClient} onDark />
                             </div>
                         </div>
                     }
                 />
 
-                {cdDiscrepancies > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-critical">
-                            <AlertTriangle className="h-4 w-4" />
-                            {cdDiscrepancies} controlled-drug count{cdDiscrepancies === 1 ? '' : 's'} with an unreconciled balance — investigate before close of shift.
-                        </span>
-                        <Button size="sm" variant="outline" onClick={() => setActiveTab('controlled')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => {
+                            const Icon = a.icon;
+                            const cls = a.tone === 'critical'
+                                ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+                                : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+                            return (
+                                <div key={a.key} className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${cls}`}>
+                                    <span className="flex items-center gap-2 text-sm font-medium">
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        {a.message}
+                                    </span>
+                                    <div className="flex shrink-0 items-center gap-1">
+                                        <Button size="sm" variant="outline" onClick={() => setActiveTab(a.tab)}>Review</Button>
+                                        <Button size="sm" variant="ghost" aria-label="Dismiss alert" onClick={() => setDismissed((d) => [...d, a.key])}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
@@ -205,19 +314,44 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
 
                 {['all', 'low', 'expiring', 'expired'].includes(activeTab) && (
                     byClient.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">No stock matches the current filters.</div>
+                        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card px-5 py-12 text-center">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground"><Package className="h-6 w-6" /></span>
+                            <div>
+                                <p className="text-sm font-medium">No stock matches the current filters</p>
+                                <p className="mt-0.5 text-sm text-muted-foreground">Receive a delivery or place a pharmacy order to start tracking stock here.</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                <Button size="sm" onClick={() => setModal({ type: 'receive' })}><Truck className="h-3.5 w-3.5" />Receive stock</Button>
+                                <Button size="sm" variant="outline" onClick={() => setModal({ type: 'order' })}><Plus className="h-3.5 w-3.5" />New order</Button>
+                            </div>
+                        </div>
                     ) : (
                         <div className="flex flex-col gap-4">
                             {byClient.map((g) => (
                                 <div key={g.client_id} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                                     <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(g.client_name)}</span>
-                                            <div>
-                                                <div className="text-sm font-semibold">{g.client_name}</div>
-                                                <div className="text-xs text-muted-foreground">{[g.site_name, `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</div>
+                                        {g.client_id ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => router.visit(`/operations/clients/${g.client_id}/care`)}
+                                                className="group flex items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                                title={`Open ${g.client_name}'s care profile`}
+                                            >
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(g.client_name)}</span>
+                                                <div>
+                                                    <div className="text-sm font-semibold group-hover:underline">{g.client_name}</div>
+                                                    <div className="text-xs text-muted-foreground">{[g.site_name, `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</div>
+                                                </div>
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(g.client_name)}</span>
+                                                <div>
+                                                    <div className="text-sm font-semibold">{g.client_name}</div>
+                                                    <div className="text-xs text-muted-foreground">{[g.site_name, `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                         <Button size="sm" variant="outline" onClick={() => setModal({ type: 'order', clientId: g.client_id })}><ShoppingCart className="h-3.5 w-3.5" />Order</Button>
                                     </div>
                                     <div className="overflow-x-auto">
@@ -233,7 +367,7 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {g.rows.map((s) => <StockRowView key={s.id} s={s} onCount={() => setModal(s.controlled ? { type: 'count', medId: s.medication_id } : { type: 'adjust', item: s })} onAdjust={() => setModal({ type: 'adjust', item: s })} />)}
+                                                {g.rows.map((s) => <StockRowView key={s.id} s={s} onView={() => setModal({ type: 'detail', item: s })} onCount={() => runCount(s)} onAdjust={() => setModal({ type: 'adjust', item: s })} onCtx={(e) => openStockCtx(e, s)} />)}
                                             </tbody>
                                         </table>
                                     </div>
@@ -268,8 +402,19 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                         <tbody>
                                             {controlledRegister.map((r) => {
                                                 const reconciled = r.discrepancy === null || r.discrepancy === 0;
+                                                const detail = stockByMed.get(r.medication_id);
+                                                const openDetail = () => detail && setModal({ type: 'detail', item: detail });
                                                 return (
-                                                    <tr key={r.id} className="border-b last:border-b-0">
+                                                    <tr
+                                                        key={r.id}
+                                                        onClick={openDetail}
+                                                        onContextMenu={(e) => openCdCtx(e, r)}
+                                                        onKeyDown={(e) => { if (detail && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail(); } }}
+                                                        tabIndex={detail ? 0 : undefined}
+                                                        role={detail ? 'button' : undefined}
+                                                        aria-label={detail ? `View ${r.medication_name ?? 'controlled drug'} details for ${r.client_name}` : undefined}
+                                                        className={`border-b transition-colors last:border-b-0 ${detail ? 'cursor-pointer hover:bg-muted/40 focus:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40' : ''}`}
+                                                    >
                                                         <td className="px-4 py-3 font-medium">{r.medication_name}{r.cd_class && <span className="ml-2 rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-semibold text-status-critical">Class {r.cd_class}</span>}</td>
                                                         <td className="px-4 py-3 text-muted-foreground">{r.client_name}</td>
                                                         <td className="px-4 py-3 font-mono font-semibold tabular-nums">{r.register_balance} {r.unit}</td>
@@ -277,8 +422,8 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                                         <td className="px-4 py-3">{reconciled ? <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[11px] font-semibold text-status-success">Reconciled</span> : <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">Discrepancy {r.discrepancy! > 0 ? '+' : ''}{r.discrepancy}</span>}</td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                <Button size="sm" variant="outline" onClick={() => setModal({ type: 'count', medId: r.medication_id, controlledOnly: true })}>Count</Button>
-                                                                {!reconciled && <a href="/emar/controlled" className="text-xs font-medium text-status-critical underline">Investigate</a>}
+                                                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setModal({ type: 'count', medId: r.medication_id, controlledOnly: true }); }}>Count</Button>
+                                                                {!reconciled && <a href="/emar/controlled" onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-status-critical underline">Investigate</a>}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -311,11 +456,23 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
             {modal?.type === 'receive' && <ReceiveStockDialog medications={activeMedications} defaultMedId={modal.medId} onClose={() => setModal(null)} />}
             {modal?.type === 'count' && <StockCountDialog medications={activeMedications} stockItems={stockItems} witnesses={witnesses} defaultMedId={modal.medId} controlledOnly={modal.controlledOnly} onClose={() => setModal(null)} />}
             {modal?.type === 'adjust' && <AdjustStockDialog item={modal.item} onClose={() => setModal(null)} />}
+            {modal?.type === 'detail' && (
+                <StockDetailDialog
+                    item={modal.item}
+                    openOrder={openOrderFor(modal.item.medication_id)}
+                    onClose={() => setModal(null)}
+                    onAdjust={() => setModal({ type: 'adjust', item: modal.item })}
+                    onCount={() => runCount(modal.item)}
+                    onOrder={() => setModal({ type: 'order', clientId: modal.item.client_id ?? undefined, medId: modal.item.medication_id })}
+                />
+            )}
+
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
 
-function StockRowView({ s, onCount, onAdjust }: { s: StockRow; onCount: () => void; onAdjust: () => void }) {
+function StockRowView({ s, onView, onCount, onAdjust, onCtx }: { s: StockRow; onView: () => void; onCount: () => void; onAdjust: () => void; onCtx: (e: ReactMouseEvent) => void }) {
     const reorder = s.reorder_level ?? 0;
     const ratio = reorder > 0 ? Math.min(100, (s.on_hand / (reorder * 2)) * 100) : 100;
     const barTone = s.is_low ? 'bg-status-critical' : s.on_hand <= reorder * 1.4 ? 'bg-status-warning' : 'bg-status-success';
@@ -328,7 +485,15 @@ function StockRowView({ s, onCount, onAdjust }: { s: StockRow; onCount: () => vo
             : { label: 'In stock', cls: 'bg-status-success-bg text-status-success' };
     const expiryTone = s.is_expired ? 'text-status-critical' : s.is_expiring_soon ? 'text-status-warning' : 'text-muted-foreground';
     return (
-        <tr className="border-b last:border-b-0">
+        <tr
+            onClick={onView}
+            onContextMenu={onCtx}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView(); } }}
+            tabIndex={0}
+            role="button"
+            aria-label={`View ${s.medication_name ?? 'stock item'} details for ${s.client_name}`}
+            className="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/40 focus:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        >
             <td className="px-4 py-3">
                 <div className="flex items-center gap-1.5 font-medium">
                     {s.medication_name}
@@ -349,8 +514,8 @@ function StockRowView({ s, onCount, onAdjust }: { s: StockRow; onCount: () => vo
             <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusPill.cls}`}>{statusPill.label}</span></td>
             <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={onCount} title="Record count"><ClipboardCheck className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="ghost" onClick={onAdjust} title="Adjust / edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onCount(); }} title="Record count"><ClipboardCheck className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onAdjust(); }} title="Adjust / edit"><Pencil className="h-3.5 w-3.5" /></Button>
                 </div>
             </td>
         </tr>
