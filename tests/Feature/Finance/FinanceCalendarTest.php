@@ -135,7 +135,7 @@ it('feeds events as JSON to a finance.dashboard user and 403s others', function 
         ->assertOk()
         ->assertJsonPath('events.0.source', 'invoice_due')
         ->assertJsonPath('events.0.direction', 'inflow')
-        ->assertJsonFragment(['sources' => ['invoice_due', 'bill_due', 'payment_run', 'gst_due']]);
+        ->assertJsonFragment(['sources' => ['invoice_due', 'bill_due', 'payment_run', 'gst_due', 'payroll', 'period_close']]);
 
     $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
     $this->actingAs($other)
@@ -154,7 +154,7 @@ it('renders the calendar page shell for a finance.dashboard user and 403s others
         ->assertInertia(fn (Assert $page) => $page
             ->component('finance/Calendar')
             ->has('eventsUrl')
-            ->where('sources', ['invoice_due', 'bill_due', 'payment_run', 'gst_due']),
+            ->where('sources', ['invoice_due', 'bill_due', 'payment_run', 'gst_due', 'payroll', 'period_close']),
         );
 
     $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
