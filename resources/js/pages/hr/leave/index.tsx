@@ -937,6 +937,7 @@ export default function LeaveIndex({
                                                                         .checked,
                                                                 )
                                                             }
+                                                            aria-label="Select all pending requests"
                                                             className="h-4 w-4 rounded"
                                                         />
                                                     </th>
@@ -979,6 +980,7 @@ export default function LeaveIndex({
                                                                             .checked,
                                                                     )
                                                                 }
+                                                                aria-label={`Select leave request for ${r.staff_name}`}
                                                                 className="h-4 w-4 rounded"
                                                             />
                                                         </td>

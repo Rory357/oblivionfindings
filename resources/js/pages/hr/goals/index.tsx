@@ -190,7 +190,12 @@ function ObjectiveRow({
                 onClick={() => setExpanded(!expanded)}
             >
                 {goal.key_results_count > 0 ? (
-                    <button className="shrink-0 text-muted-foreground hover:text-foreground">
+                    <button
+                        type="button"
+                        aria-label={expanded ? 'Collapse key results' : 'Expand key results'}
+                        aria-expanded={expanded}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
                         {expanded ? (
                             <ChevronDown className="h-4 w-4" />
                         ) : (

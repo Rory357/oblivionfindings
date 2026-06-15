@@ -682,7 +682,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                     {avgRating && (
                                         <div className="flex items-center gap-2">
                                             <div className="flex items-center gap-1 rounded-lg bg-status-warning-bg px-2.5 py-1">
-                                                <Star className="h-4 w-4 fill-amber-400 text-status-warning" />
+                                                <Star className="h-4 w-4 fill-amberx text-status-warning" />
                                                 <span className="text-sm font-bold">
                                                     {avgRating}
                                                 </span>

@@ -85,7 +85,7 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
             {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                     key={star}
-                    className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-status-warning' : 'text-muted-foreground'}`}
+                    className={`h-4 w-4 ${star <= rating ? 'fill-amberx text-status-warning' : 'text-muted-foreground'}`}
                 />
             ))}
         </div>

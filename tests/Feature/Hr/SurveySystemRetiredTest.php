@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Hr\Models\HrSurvey;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -33,17 +32,11 @@ test('the surveys create page redirects to the wellbeing hub', function () {
         ->assertRedirect('/hr/wellbeing');
 });
 
-test('a specific retired survey redirects to the wellbeing hub', function () {
-    $survey = HrSurvey::query()->create([
-        'tenant_id' => 1,
-        'title' => 'Legacy pulse',
-        'survey_type' => 'pulse',
-        'status' => 'active',
-        'created_by' => $this->hr->id,
-    ]);
-
+test('a specific retired survey route redirects to the wellbeing hub', function () {
+    // The route is a static Route::redirect, so it resolves without a real row
+    // (the HrSurvey model + tables were dropped once the system was fully retired).
     $this->actingAs($this->hr)
-        ->get("/hr/surveys/{$survey->id}")
+        ->get('/hr/surveys/999')
         ->assertRedirect('/hr/wellbeing');
 });
 

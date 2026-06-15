@@ -28,8 +28,6 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
-use App\Domain\Hr\Models\HrSurvey;
-use App\Domain\Hr\Models\HrSurveyQuestion;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\FeedService;
 use App\Models\User;
@@ -60,7 +58,7 @@ class HrDemoSeeder extends Seeder
         $this->seedPerformance($tenantId, $admin, $manager, $profiles);
         $this->seedAssets($tenantId, $manager, $profiles);
         $this->seedTraining($tenantId, $profiles);
-        $this->seedAnnouncementsAndSurveys($tenantId, $admin);
+        $this->seedAnnouncements($tenantId, $admin);
         $this->seedRecognitionFeed($tenantId, $admin, $manager, $profiles);
         $this->seedCompensationAndBenefits($tenantId, $admin, $manager, $profiles);
         $this->seedComplianceExtras($tenantId, $admin, $manager, $profiles);
@@ -863,7 +861,7 @@ class HrDemoSeeder extends Seeder
         }
     }
 
-    private function seedAnnouncementsAndSurveys(int $tenantId, User $admin): void
+    private function seedAnnouncements(int $tenantId, User $admin): void
     {
         $announcements = [
             ['title' => 'Roster updates for June', 'priority' => 'high', 'pinned' => true, 'ack' => true],
@@ -883,34 +881,6 @@ class HrDemoSeeder extends Seeder
                     'is_pinned' => $announcement['pinned'],
                     'requires_acknowledgement' => $announcement['ack'],
                     'created_by' => $admin->id,
-                ],
-            );
-        }
-
-        $survey = HrSurvey::updateOrCreate(
-            ['tenant_id' => $tenantId, 'title' => 'Winter wellbeing pulse'],
-            [
-                'description' => 'Short seeded pulse survey for HR engagement demo.',
-                'survey_type' => 'pulse',
-                'status' => 'active',
-                'is_anonymous' => true,
-                'starts_at' => Carbon::parse('2026-06-01 09:00:00'),
-                'ends_at' => Carbon::parse('2026-06-30 17:00:00'),
-                'created_by' => $admin->id,
-            ],
-        );
-
-        foreach ([
-            ['sort' => 1, 'text' => 'How manageable is your current workload?', 'type' => 'rating', 'options' => ['1', '2', '3', '4', '5']],
-            ['sort' => 2, 'text' => 'What support would help this month?', 'type' => 'text', 'options' => null],
-        ] as $question) {
-            HrSurveyQuestion::updateOrCreate(
-                ['survey_id' => $survey->id, 'sort_order' => $question['sort']],
-                [
-                    'question_text' => $question['text'],
-                    'question_type' => $question['type'],
-                    'options' => $question['options'],
-                    'is_required' => $question['sort'] === 1,
                 ],
             );
         }

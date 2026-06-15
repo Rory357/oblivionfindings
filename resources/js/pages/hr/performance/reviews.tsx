@@ -171,7 +171,7 @@ const renderRating = (rating: number | null) => {
         stars.push(
             <Star
                 key={i}
-                className={`h-4 w-4 ${i <= rating ? 'fill-amber-400 text-status-warning' : 'text-foreground'}`}
+                className={`h-4 w-4 ${i <= rating ? 'fill-amberx text-status-warning' : 'text-foreground'}`}
             />,
         );
     }

@@ -80,7 +80,7 @@ function RatingStars({ rating }: { rating: number | null }) {
             {Array.from({ length: 5 }, (_, i) => (
                 <Star
                     key={i}
-                    className={`h-4 w-4 ${i < rating ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground'}`}
+                    className={`h-4 w-4 ${i < rating ? 'fill-amberx text-status-warning' : 'text-muted-foreground'}`}
                 />
             ))}
         </div>

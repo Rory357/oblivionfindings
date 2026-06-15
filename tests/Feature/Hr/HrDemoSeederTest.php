@@ -59,8 +59,6 @@ test('hr demo seeder fills production-readiness demo workflows without duplicate
         'hr_courses' => 4,
         'hr_course_enrollments' => 4,
         'hr_announcements' => 2,
-        'hr_surveys' => 1,
-        'hr_survey_questions' => 2,
     ];
 
     foreach ($expectedCounts as $table => $count) {

@@ -79,7 +79,7 @@ function StarRating({
                     className="h-auto w-auto p-0 hover:scale-110 hover:bg-transparent"
                 >
                     <Star
-                        className={`${sizeClass} transition-colors ${star <= value ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20 hover:text-muted-foreground/50'}`}
+                        className={`${sizeClass} transition-colors ${star <= value ? 'fill-amberx text-status-warning' : 'text-muted-foreground/20 hover:text-muted-foreground/50'}`}
                     />
                 </Button>
             ))}

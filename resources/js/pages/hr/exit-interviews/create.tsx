@@ -266,7 +266,7 @@ export default function ExitInterviewCreate({
                                                     star <=
                                                     form.data
                                                         .overall_satisfaction
-                                                        ? 'fill-yellow-400 text-status-warning'
+                                                        ? 'fill-amberx text-status-warning'
                                                         : 'text-muted-foreground'
                                                 }`}
                                             />
