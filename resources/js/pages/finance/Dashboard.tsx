@@ -113,6 +113,15 @@ interface Props extends PageProps {
     expensesByMonth: MonthlyData[];
     topExpenseCategories: ExpenseCategory[];
     revenueByFundingStream?: { name: string; amount: number }[];
+    arAging?: {
+        current: number;
+        d1_30: number;
+        d31_60: number;
+        d61_90: number;
+        d90_plus: number;
+        over60: number;
+        total: number;
+    };
     upcomingBillsDue: UpcomingBill[];
     apDueWithin7?: { count: number; total: number };
     cashRunwayDays?: number | null;
@@ -187,14 +196,6 @@ const DONUT_UTILISATION: DonutSegment[] = [
     { key: 'delivered', label: 'Delivered, not yet claimed', value: 54, color: 'var(--status-warning)' },
     { key: 'writeoff', label: 'Unfunded / write-off risk', value: 33, color: 'var(--status-critical)' },
 ];
-// TODO(C): AR aging buckets computed from FinInvoice.
-const DONUT_AGING: DonutSegment[] = [
-    { key: 'current', label: 'Current', value: 198, color: 'var(--status-success)' },
-    { key: 'd3160', label: '31–60 days', value: 78, color: 'var(--chart-4)' },
-    { key: 'd6190', label: '61–90 days', value: 42, color: 'var(--chart-3)' },
-    { key: 'd90', label: '90+ days', value: 24.6, color: 'var(--status-critical)' },
-];
-
 // TODO(D): funding claims from the funding pipeline.
 const FUNDING_CLAIMS: { ref: string; funder: string; period: string; status: string; tone: StatusTone; amount: number }[] = [
     { ref: 'FC-3391', funder: 'MoH', period: 'May 2026', status: 'Awaiting remittance', tone: 'warning', amount: 214800 },
@@ -281,6 +282,7 @@ export default function FinanceDashboard({
     revenueByMonth,
     expensesByMonth,
     revenueByFundingStream = [],
+    arAging,
     upcomingBillsDue,
     apDueWithin7,
     cashRunwayDays,
@@ -309,7 +311,7 @@ export default function FinanceDashboard({
             only: [
                 'totalRevenue', 'totalExpenses', 'netProfit', 'cashBalance', 'accountsReceivable',
                 'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
-                'revenueByFundingStream', 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
+                'revenueByFundingStream', 'arAging', 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
                 'recentJournals', 'period', 'periodLabel',
             ],
             data: {
@@ -346,6 +348,22 @@ export default function FinanceDashboard({
               color: REVENUE_COLORS[i % REVENUE_COLORS.length],
           }))
         : [{ key: 'none', label: 'No revenue in period', value: 1, color: 'var(--border)' }];
+
+    // §5 donut 3 — real AR aging (point-in-time, live FinInvoice via the AR service).
+    const arAgingSegments: DonutSegment[] = (
+        arAging && arAging.total > 0
+            ? [
+                  { key: 'current', label: 'Current', value: arAging.current, color: 'var(--status-success)' },
+                  { key: 'd1_30', label: '1–30 days', value: arAging.d1_30, color: 'var(--chart-2)' },
+                  { key: 'd31_60', label: '31–60 days', value: arAging.d31_60, color: 'var(--chart-4)' },
+                  { key: 'd61_90', label: '61–90 days', value: arAging.d61_90, color: 'var(--chart-3)' },
+                  { key: 'd90_plus', label: '90+ days', value: arAging.d90_plus, color: 'var(--status-critical)' },
+              ].filter((s) => s.value > 0)
+            : []
+    );
+    const arAgingDonut: DonutSegment[] = arAgingSegments.length
+        ? arAgingSegments
+        : [{ key: 'none', label: 'No outstanding receivables', value: 1, color: 'var(--border)' }];
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -526,7 +544,7 @@ export default function FinanceDashboard({
                         value={formatMoneyCompact(accountsReceivable)}
                         icon={FileText}
                         tone="warning"
-                        sub="receivables outstanding"
+                        sub={arAging ? `${formatMoneyCompact(arAging.over60)} >60d` : 'receivables outstanding'}
                     />
                     <KpiCard
                         label="AP outstanding"
@@ -583,14 +601,14 @@ export default function FinanceDashboard({
                         tone="success"
                         title="Receivables aging"
                         subtitle="Outstanding by age bucket"
-                        segments={DONUT_AGING}
-                        centerValue="$343k"
+                        segments={arAgingDonut}
+                        centerValue={formatMoneyCompact(arAging?.total ?? 0)}
                         centerLabel="AR"
                         accentKeys={['current']}
                         active={false}
                         cta="View aged receivables"
-                        onClick={() => setModal(null)}
-                        formatValue={fmtK}
+                        onClick={() => router.visit('/finance/reports/aged-receivables')}
+                        formatValue={(v) => formatMoneyCompact(v)}
                         showPercent
                     />
                 </div>

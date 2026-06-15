@@ -6,7 +6,6 @@ use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
-use App\Models\Invoice;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +14,10 @@ class DashboardAggregatorService
 {
     /** @var array<int,string> */
     private const PERIODS = ['month', 'quarter', 'fy'];
+
+    public function __construct(
+        private AccountsReceivableService $arService,
+    ) {}
 
     /**
      * Get all dashboard data for the finance module, scoped to a period and
@@ -34,6 +37,9 @@ class DashboardAggregatorService
 
         $revenue = $this->getTotal($orgId, 'revenue', $start, $end, $costCentreIds, $fundingStreamIds);
         $expenses = $this->getTotal($orgId, 'expense', $start, $end, $costCentreIds, $fundingStreamIds);
+        // AR is a point-in-time balance (not period-scoped) read from the live
+        // FinInvoice table via the canonical AccountsReceivableService.
+        $arAging = $this->getArAging($orgId);
 
         return [
             'period' => $period,
@@ -42,9 +48,8 @@ class DashboardAggregatorService
             'totalExpenses' => $expenses,
             'netProfit' => round($revenue - $expenses, 2),
             'cashBalance' => $this->getCashBalance($orgId),
-            // TODO(3.1) Phase C: still reads the orphaned App\Models\Invoice
-            // write-orphan; repoint to FinInvoice and add AR aging buckets.
-            'accountsReceivable' => $this->getOutstandingReceivables($orgId),
+            'accountsReceivable' => $arAging['total'],
+            'arAging' => $arAging,
             'accountsPayable' => $this->getOutstandingPayables($orgId),
             'revenueByMonth' => $this->getMonthlyTotals($orgId, 'revenue', 6, $costCentreIds, $fundingStreamIds),
             'expensesByMonth' => $this->getMonthlyTotals($orgId, 'expense', 6, $costCentreIds, $fundingStreamIds),
@@ -153,12 +158,24 @@ class DashboardAggregatorService
             ->sum('current_balance');
     }
 
-    private function getOutstandingReceivables(?int $orgId): float
+    /**
+     * Accounts-receivable aging snapshot, sourced from the canonical
+     * AccountsReceivableService (live FinInvoice, net of FinPaymentAllocation).
+     * Buckets keyed for the frontend; `over60` = 61–90 + 90+ for the AR KPI.
+     */
+    private function getArAging(?int $orgId): array
     {
-        return (float) Invoice::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
-            ->where('status', 'sent')
-            ->sum('total_amount');
+        $totals = $this->arService->getAgedReceivables($orgId)['totals'];
+
+        return [
+            'current' => (float) $totals['current'],
+            'd1_30' => (float) $totals['1_30'],
+            'd31_60' => (float) $totals['31_60'],
+            'd61_90' => (float) $totals['61_90'],
+            'd90_plus' => (float) $totals['90_plus'],
+            'over60' => round((float) $totals['61_90'] + (float) $totals['90_plus'], 2),
+            'total' => (float) $totals['total'],
+        ];
     }
 
     private function getOutstandingPayables(?int $orgId): float

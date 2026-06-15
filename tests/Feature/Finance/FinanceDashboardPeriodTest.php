@@ -2,6 +2,7 @@
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFundingStream;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Services\DashboardAggregatorService;
@@ -123,4 +124,28 @@ it('breaks revenue down by funding stream for the period', function () {
 
     expect($byStream->firstWhere('name', 'MoH')['amount'])->toBe(1000.0)
         ->and($byStream->firstWhere('name', 'ACC')['amount'])->toBe(500.0);
+});
+
+it('sources AR and aging from the live FinInvoice table, not the legacy orphan (gap 3.1)', function () {
+    FinInvoice::create([
+        'organization_id' => 1, 'invoice_number' => 'INV-CUR', 'invoice_date' => '2026-06-01',
+        'due_date' => '2026-06-20', 'client_name' => 'Acme Trust', 'total_amount' => 1000, 'status' => 'sent',
+    ]);
+    FinInvoice::create([
+        'organization_id' => 1, 'invoice_number' => 'INV-OLD', 'invoice_date' => '2026-02-20',
+        'due_date' => '2026-03-01', 'client_name' => 'Acme Trust', 'total_amount' => 500, 'status' => 'sent',
+    ]);
+    // Paid + draft invoices must NOT count toward outstanding AR.
+    FinInvoice::create([
+        'organization_id' => 1, 'invoice_number' => 'INV-PAID', 'invoice_date' => '2026-06-01',
+        'due_date' => '2026-06-20', 'client_name' => 'Acme Trust', 'total_amount' => 9999, 'status' => 'paid',
+    ]);
+
+    $data = app(DashboardAggregatorService::class)->getDashboardData(1, 'month');
+
+    expect($data['accountsReceivable'])->toBe(1500.0)
+        ->and($data['arAging']['current'])->toBe(1000.0)
+        ->and($data['arAging']['d90_plus'])->toBe(500.0)
+        ->and($data['arAging']['over60'])->toBe(500.0)
+        ->and($data['arAging']['total'])->toBe(1500.0);
 });
