@@ -11,12 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrDevelopmentGoal extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',
         'employee_user_id',
         'manager_user_id',
+        'hr_goal_id',
         'title',
         'description',
         'category',
@@ -51,6 +52,12 @@ class HrDevelopmentGoal extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_user_id');
+    }
+
+    /** Optional OKR objective this development plan rolls up into. */
+    public function goal(): BelongsTo
+    {
+        return $this->belongsTo(HrGoal::class, 'hr_goal_id');
     }
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrGoalFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,11 +14,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrGoal extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrGoalFactory::new();
+        return HrGoalFactory::new();
     }
 
     protected $fillable = [
@@ -51,7 +52,7 @@ class HrGoal extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -89,8 +90,14 @@ class HrGoal extends Model
         return $this->belongsTo(HrPerformanceReview::class, 'performance_review_id');
     }
 
+    /** Development plans that roll up into this objective. */
+    public function developmentGoals(): HasMany
+    {
+        return $this->hasMany(HrDevelopmentGoal::class, 'hr_goal_id');
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

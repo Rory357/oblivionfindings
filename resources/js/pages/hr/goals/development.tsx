@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PerformanceTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Target } from 'lucide-react';
 import { FormEvent } from 'react';
 
@@ -39,6 +39,8 @@ type GoalRow = {
     completed_at: string | null;
     review_frequency: string | null;
     review_notes: string | null;
+    hr_goal_id: number | null;
+    goal: { id: number; title: string } | null;
     employee: { id: number; name: string; email: string } | null;
     manager: { id: number; name: string } | null;
 };
@@ -61,6 +63,7 @@ type PaginatedGoals = {
 type Props = {
     goals: PaginatedGoals;
     staff: Staff[];
+    objectives: Array<{ id: number; title: string }>;
     filters: { status: string | null };
     can: { manage: boolean };
 };
@@ -76,12 +79,14 @@ const statuses: Array<GoalRow['status']> = [
 export default function DevelopmentGoals({
     goals,
     staff,
+    objectives,
     filters,
     can,
 }: Props) {
     const createForm = useForm({
         employee_user_id: '',
         manager_user_id: '',
+        hr_goal_id: '',
         title: '',
         description: '',
         category: 'growth',
@@ -124,6 +129,13 @@ export default function DevelopmentGoals({
             review_notes: payload.review_notes ?? null,
         }));
 
+        updateForm.put(`/hr/goals/development/${goalId}`, {
+            preserveScroll: true,
+        });
+    }
+
+    function linkObjective(goalId: number, hrGoalId: number | null) {
+        updateForm.transform(() => ({ hr_goal_id: hrGoalId }));
         updateForm.put(`/hr/goals/development/${goalId}`, {
             preserveScroll: true,
         });
@@ -280,6 +292,41 @@ export default function DevelopmentGoals({
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Linked objective (optional)</Label>
+                                    <Select
+                                        value={
+                                            createForm.data.hr_goal_id ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(value) =>
+                                            createForm.setData(
+                                                'hr_goal_id',
+                                                value === '__none__'
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Roll up into an OKR objective" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">
+                                                No objective
+                                            </SelectItem>
+                                            {objectives.map((objective) => (
+                                                <SelectItem
+                                                    key={objective.id}
+                                                    value={String(objective.id)}
+                                                >
+                                                    {objective.title}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2">
@@ -488,6 +535,15 @@ export default function DevelopmentGoals({
                                                 ? ` · ${goal.competency_area}`
                                                 : ''}
                                         </p>
+                                        {goal.goal && (
+                                            <Link
+                                                href={`/hr/goals/${goal.goal.id}`}
+                                                className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                            >
+                                                <Target className="h-3 w-3" />
+                                                Part of: {goal.goal.title}
+                                            </Link>
+                                        )}
                                         {goal.description && (
                                             <p className="mt-2 text-sm">
                                                 {goal.description}
@@ -644,6 +700,48 @@ export default function DevelopmentGoals({
                                         }}
                                     />
                                 </div>
+
+                                {can.manage && (
+                                    <div className="mt-3 space-y-1">
+                                        <Label className="text-xs text-muted-foreground">
+                                            Linked objective
+                                        </Label>
+                                        <Select
+                                            value={
+                                                goal.hr_goal_id
+                                                    ? String(goal.hr_goal_id)
+                                                    : '__none__'
+                                            }
+                                            onValueChange={(value) =>
+                                                linkObjective(
+                                                    goal.id,
+                                                    value === '__none__'
+                                                        ? null
+                                                        : Number(value),
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Not linked" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">
+                                                    Not linked
+                                                </SelectItem>
+                                                {objectives.map((objective) => (
+                                                    <SelectItem
+                                                        key={objective.id}
+                                                        value={String(
+                                                            objective.id,
+                                                        )}
+                                                    >
+                                                        {objective.title}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     ))}

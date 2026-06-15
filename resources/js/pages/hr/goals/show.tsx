@@ -40,6 +40,7 @@ import {
     ListChecks,
     Pencil,
     Plus,
+    Sprout,
     Target,
     Trash2,
     TrendingUp,
@@ -93,6 +94,14 @@ interface GoalUpdate {
     created_at: string;
 }
 
+interface DevelopmentPlan {
+    id: number;
+    title: string;
+    status: string;
+    progress_percent: number;
+    employee: string | null;
+}
+
 interface Goal {
     id: number;
     title: string;
@@ -115,6 +124,7 @@ interface Goal {
     child_goals: ChildGoal[];
     key_results: KeyResult[];
     updates: GoalUpdate[];
+    development_goals: DevelopmentPlan[];
 }
 
 interface UserItem {
@@ -432,6 +442,10 @@ export default function GoalShow({
                         <TabsTrigger value="history" className="gap-1.5">
                             <History className="h-4 w-4" />
                             Progress History
+                        </TabsTrigger>
+                        <TabsTrigger value="dev-plans" className="gap-1.5">
+                            <Sprout className="h-4 w-4" />
+                            Development Plans
                         </TabsTrigger>
                     </TabsList>
 
@@ -952,6 +966,80 @@ export default function GoalShow({
                                             >
                                                 <Plus className="mr-1.5 h-4 w-4" />
                                                 Add First Child Goal
+                                            </Button>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* -------------------------------------------------------- */}
+                    {/*  TAB: Development Plans                                    */}
+                    {/* -------------------------------------------------------- */}
+                    <TabsContent value="dev-plans">
+                        <div className="space-y-4">
+                            {goal.development_goals.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {goal.development_goals.map((plan) => (
+                                        <Link
+                                            key={plan.id}
+                                            href="/hr/goals/development"
+                                            className="block"
+                                        >
+                                            <Card className="h-full transition-shadow hover:shadow-md">
+                                                <CardContent className="pt-5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <h3 className="text-sm leading-snug font-semibold">
+                                                            {plan.title}
+                                                        </h3>
+                                                        <Badge
+                                                            className={`shrink-0 px-1.5 py-0 text-[10px] ${statusColours[plan.status] ?? 'bg-muted text-foreground'}`}
+                                                        >
+                                                            {capitalize(
+                                                                plan.status.replace(
+                                                                    '_',
+                                                                    ' ',
+                                                                ),
+                                                            )}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <User className="h-3 w-3" />
+                                                            {plan.employee ??
+                                                                'Unassigned'}
+                                                        </span>
+                                                        <span>
+                                                            {
+                                                                plan.progress_percent
+                                                            }
+                                                            %
+                                                        </span>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <Card>
+                                    <CardContent className="py-10 text-center">
+                                        <Sprout className="mx-auto h-10 w-10 text-muted-foreground/40" />
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            No development plans roll up into this
+                                            objective yet.
+                                        </p>
+                                        {can.manage && (
+                                            <Button
+                                                size="sm"
+                                                className="mt-3"
+                                                asChild
+                                            >
+                                                <Link href="/hr/goals/development">
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Manage development plans
+                                                </Link>
                                             </Button>
                                         )}
                                     </CardContent>
