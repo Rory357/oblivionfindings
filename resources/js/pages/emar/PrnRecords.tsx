@@ -5,14 +5,15 @@ import { PrnEffectivenessDialog } from '@/components/emar/prn-effectiveness-dial
 import { PrnNearLimitDialog } from '@/components/emar/prn-near-limit-dialog';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
+import { Donut, DonutLegend, EntityFilter, MicroStats, ShiftContextMenu, TabStrip, type MicroStat, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type { ClientInfo, PrnFollowUp, PrnMedication } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Clock, Eye, FileText, Flag, Pill, Plus, Printer, RotateCcw, Search, Stethoscope, TrendingUp, User, X } from 'lucide-react';
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type Props = {
     administrations: PrnAdministration[];
@@ -88,6 +89,37 @@ const STATUS_FILTERS = [
     { id: 'partially_effective', label: 'Partial' },
     { id: 'not_effective', label: 'Not effective' },
 ];
+
+/** Bordered trends card with a title (no Card primitive — custom layout). */
+function TrendCard({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+    return (
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-baseline justify-between gap-2">
+                <div className="text-[15px] font-bold">{title}</div>
+                {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+            </div>
+            {children}
+        </div>
+    );
+}
+
+/** Horizontal token bar list (med / indication / resident rankings). */
+function TrendBars({ items, max, barClass = 'bg-primary', empty }: { items: [string, number][]; max: number; barClass?: string; empty: string }) {
+    if (items.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
+    return (
+        <ul className="flex flex-col gap-2.5">
+            {items.map(([name, count]) => (
+                <li key={name} className="flex items-center gap-3 text-sm">
+                    <span className="w-40 shrink-0 truncate">{name}</span>
+                    <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <span className={`block h-full rounded-full ${barClass}`} style={{ width: `${(count / max) * 100}%` }} />
+                    </span>
+                    <span className="w-8 text-right text-muted-foreground">{count}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
 
 export default function PrnRecords(props: Props) {
     const { administrations, pending_reviews: reviews, prn_medications: prnMeds, clients, witnesses, board_user: signer, date, today, is_today: isToday, range, sites, active_site: activeSite, site_brand_colour: brandColour } = props;
@@ -166,13 +198,71 @@ export default function PrnRecords(props: Props) {
 
     const trends = useMemo(() => {
         const byMed = new Map<string, number>();
-        for (const a of administrations) byMed.set(a.medication_name ?? '—', (byMed.get(a.medication_name ?? '—') ?? 0) + 1);
-        const ranked = [...byMed.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8);
-        const max = ranked[0]?.[1] ?? 1;
-        const reviewed = administrations.filter((a) => a.effectiveness);
-        const effPct = reviewed.length ? Math.round((reviewed.filter((a) => a.effectiveness === 'effective').length / reviewed.length) * 100) : 0;
-        return { ranked, max, total: administrations.length, effPct };
-    }, [administrations]);
+        const byInd = new Map<string, number>();
+        const byClient = new Map<string, number>();
+        const byDay = new Map<string, { count: number; ts: number }>();
+        const byHour = Array.from({ length: 24 }, () => 0);
+        let eff = 0;
+        let partial = 0;
+        let none = 0;
+        let due = 0;
+        let escalations = 0;
+
+        for (const a of administrations) {
+            byMed.set(a.medication_name ?? '—', (byMed.get(a.medication_name ?? '—') ?? 0) + 1);
+            const ind = (a.reason ?? a.indication ?? 'Unspecified').split(' (')[0].trim() || 'Unspecified';
+            byInd.set(ind, (byInd.get(ind) ?? 0) + 1);
+            byClient.set(a.client_name, (byClient.get(a.client_name) ?? 0) + 1);
+            if (a.given_date) {
+                const ts = a.administered_at ? new Date(a.administered_at).getTime() : 0;
+                const cur = byDay.get(a.given_date);
+                byDay.set(a.given_date, { count: (cur?.count ?? 0) + 1, ts: cur ? Math.min(cur.ts, ts) : ts });
+            }
+            if (a.given_time) {
+                const h = parseInt(a.given_time.split(':')[0]!, 10);
+                if (!Number.isNaN(h) && h >= 0 && h < 24) byHour[h] += 1;
+            }
+            if (a.effectiveness === 'effective') eff += 1;
+            else if (a.effectiveness === 'partially_effective') partial += 1;
+            else if (a.effectiveness === 'not_effective') none += 1;
+            else due += 1;
+            if (a.effectiveness_detail?.escalation_needed) escalations += 1;
+        }
+
+        const top = (m: Map<string, number>, n: number) => {
+            const ranked = [...m.entries()].sort((x, y) => y[1] - x[1]).slice(0, n);
+            return { ranked, max: ranked[0]?.[1] ?? 1 };
+        };
+
+        const days = [...byDay.entries()]
+            .map(([label, v]) => ({ label, count: v.count, ts: v.ts }))
+            .sort((x, y) => x.ts - y.ts)
+            .map(({ label, count }) => ({ label, count }));
+        const hours = byHour.map((count, h) => ({ label: String(h).padStart(2, '0'), count }));
+
+        const reviewed = eff + partial + none;
+        const effSegments = [
+            { key: 'effective', label: 'Effective', value: eff, color: 'var(--status-success)' },
+            { key: 'partial', label: 'Partial', value: partial, color: 'var(--status-warning)' },
+            { key: 'none', label: 'Not effective', value: none, color: 'var(--status-critical)' },
+            { key: 'due', label: 'Review due', value: due, color: 'var(--status-info)' },
+        ].filter((s) => s.value > 0);
+
+        return {
+            total: administrations.length,
+            meds: top(byMed, 8),
+            indications: top(byInd, 6),
+            residents: top(byClient, 6),
+            days,
+            hours,
+            reviewed,
+            effPct: reviewed ? Math.round((eff / reviewed) * 100) : 0,
+            effSegments,
+            escalations,
+            nearCount: prnMeds.filter((m) => m.near_limit && !m.over_limit).length,
+            overCount: prnMeds.filter((m) => m.over_limit).length,
+        };
+    }, [administrations, prnMeds]);
 
     return (
         <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'PRN Records', href: '/emar/prn' }]}>
@@ -364,27 +454,67 @@ export default function PrnRecords(props: Props) {
                 )}
 
                 {activeTab === 'trends' && (
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-                        <div className="rounded-2xl border bg-card p-5 shadow-sm">
-                            <div className="mb-3 text-[15px] font-bold">Most-used PRN medications</div>
-                            {trends.ranked.length === 0 ? <p className="text-sm text-muted-foreground">No PRN doses recorded.</p> : (
-                                <ul className="flex flex-col gap-2.5">
-                                    {trends.ranked.map(([name, count]) => (
-                                        <li key={name} className="flex items-center gap-3 text-sm">
-                                            <span className="w-40 shrink-0 truncate">{name}</span>
-                                            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${(count / trends.max) * 100}%` }} /></span>
-                                            <span className="w-8 text-right text-muted-foreground">{count}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
+                    administrations.length === 0 ? (
+                        <div className="rounded-2xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">No PRN doses recorded in this window — adjust the date, site or client filters above.</div>
+                    ) : (
                         <div className="flex flex-col gap-4">
-                            <div className="rounded-2xl border bg-card p-4 shadow-sm"><div className="text-xs uppercase tracking-wide text-muted-foreground">Total PRN doses</div><div className="text-2xl font-bold">{trends.total}</div></div>
-                            <div className="rounded-2xl border bg-card p-4 shadow-sm"><div className="text-xs uppercase tracking-wide text-muted-foreground">Reviewed effective</div><div className="text-2xl font-bold text-status-success">{trends.effPct}%</div></div>
-                            <div className="rounded-2xl border bg-card p-4 shadow-sm"><div className="text-xs uppercase tracking-wide text-muted-foreground">Near limit now</div><div className="text-2xl font-bold text-status-critical">{nearLimit.length}</div></div>
+                            <MicroStats
+                                stats={[
+                                    { label: 'Total PRN doses', value: trends.total, tone: 'info' },
+                                    { label: 'Reviewed effective', value: trends.effPct, suffix: '%', tone: 'ok' },
+                                    { label: 'Escalations raised', value: trends.escalations, tone: trends.escalations > 0 ? 'crit' : 'ok' },
+                                    { label: 'Near / over limit', value: trends.nearCount + trends.overCount, tone: trends.nearCount + trends.overCount > 0 ? 'warn' : 'ok' },
+                                ] satisfies MicroStat[]}
+                            />
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                <TrendCard title="Effectiveness distribution" hint={`${trends.reviewed} reviewed`}>
+                                    {trends.effSegments.length === 0 ? (
+                                        <p className="py-6 text-sm text-muted-foreground">No effectiveness reviews recorded yet.</p>
+                                    ) : (
+                                        <div className="flex items-center gap-5">
+                                            <Donut segments={trends.effSegments} centerValue={`${trends.effPct}%`} centerLabel="effective" ariaLabel="PRN effectiveness distribution" />
+                                            <DonutLegend className="flex-1" segments={trends.effSegments} showPercent accentKeys={['effective']} />
+                                        </div>
+                                    )}
+                                </TrendCard>
+                                <TrendCard title="Doses per day" hint={`to ${props.date_label}`}>
+                                    <div className="h-[180px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={trends.days} margin={{ top: 6, right: 6, left: -24, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
+                                                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                                                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                                                <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+                                                <Bar dataKey="count" fill="var(--primary)" radius={[3, 3, 0, 0]} name="Doses" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </TrendCard>
+                                <TrendCard title="Time-of-day pattern" hint="when PRNs are given">
+                                    <div className="h-[180px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={trends.hours} margin={{ top: 6, right: 6, left: -24, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
+                                                <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={2} />
+                                                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                                                <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} labelFormatter={(l) => `${l}:00`} />
+                                                <Bar dataKey="count" fill="var(--status-info)" radius={[3, 3, 0, 0]} name="Doses" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </TrendCard>
+                                <TrendCard title="By indication">
+                                    <TrendBars items={trends.indications.ranked} max={trends.indications.max} barClass="bg-status-info" empty="No indications recorded." />
+                                </TrendCard>
+                                <TrendCard title="Most-used PRN medications">
+                                    <TrendBars items={trends.meds.ranked} max={trends.meds.max} barClass="bg-primary" empty="No PRN doses recorded." />
+                                </TrendCard>
+                                <TrendCard title="Top PRN residents">
+                                    <TrendBars items={trends.residents.ranked} max={trends.residents.max} barClass="bg-status-warning" empty="No PRN doses recorded." />
+                                </TrendCard>
+                            </div>
                         </div>
-                    </div>
+                    )
                 )}
             </div>
 

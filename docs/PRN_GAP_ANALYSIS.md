@@ -99,10 +99,18 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 
 ## E. Trends — make it genuinely useful
 
-- [ ] **E11.** Expand beyond the most-used bar list + 3 stat cards, reusing `donut.tsx`/`donut-card.tsx`/
+- [x] **E11.** Expand beyond the most-used bar list + 3 stat cards, reusing `donut.tsx`/`donut-card.tsx`/
   `micro-stats.tsx`/recharts: effectiveness distribution (donut), doses-per-day over range (bar/
   sparkline), by-indication breakdown, time-of-day pattern, top PRN residents, near/over-limit
-  frequency. Respect hero date-range + site/client filters. Tokens only.
+  frequency. Respect hero date-range + site/client filters. Tokens only. — _done in `PrnRecords.tsx`:
+  rewrote the `trends` memo to derive everything from the already-filtered `administrations`+`prnMeds`
+  props, and the Trends panel now shows `MicroStats` (total/effective%/escalations/near-over), a rostering
+  `Donut`+`DonutLegend` effectiveness distribution, two `recharts` `BarChart`s (doses-per-day over the
+  range, time-of-day by hour — both token CSS-var fills, matching the eMAR Index/Reports convention), and
+  three token bar-lists (by-indication, most-used, top residents) via a new `TrendBars`/`TrendCard`
+  helper. Time-of-day buckets use `given_time` (worker-tz local hour), not UTC `administered_at`.
+  Escalation count reads `effectiveness_detail.escalation_needed`. All inherit the hero filters (data is
+  server-filtered)._
 
 ## F. History — new tab with filters
 
@@ -233,3 +241,10 @@ Missing for the drill-down (RESOLVED in pass 4 — added in `prn()`, derived, no
   `no-restricted-syntax` for the lower half of the page. Verified: scoped `tsc` clean, `eslint` clean
   (0 warnings), `php -l` clean. **Next pass:** Group E (Trends — donut/doses-per-day/by-indication/
   time-of-day/top-residents/near-over-limit charts via recharts + rostering donut/micro-stats).
+- _(pass 5)_ **Closed Group E (Trends).** Rewrote the `trends` memo + Trends panel in `PrnRecords.tsx`:
+  `MicroStats` summary, rostering `Donut`+`DonutLegend` effectiveness distribution, two `recharts`
+  `BarChart`s (doses-per-day, time-of-day) with token CSS-var fills, and `TrendBars`/`TrendCard` helper
+  bar-lists (by-indication, most-used, top residents). Frontend-only (data already server-filtered).
+  Verified: scoped `tsc` clean (no PrnRecords mentions), `eslint` clean. **Next pass (LAST):** Group F
+  (History tab — server-paginated archive + BK2; reuse `openRowCtx` + `PrnDetailDialog`; extract a shared
+  administration serializer in `prn()` so register + history share one row shape).
