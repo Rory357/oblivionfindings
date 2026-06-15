@@ -52,7 +52,7 @@ export function ComplianceTabs({ active }: { active: ComplianceTab }) {
             show: !!hr?.compliance?.manage,
         },
         {
-            item: { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'violet' },
+            item: { id: 'calendar', label: 'Renewals', icon: CalendarDays, tone: 'violet' },
             show: !!hr?.compliance?.view,
         },
         {

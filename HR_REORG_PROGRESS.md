@@ -56,7 +56,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S6 — Policies → Documents & Policies hub** ✅
 - [x] **S7 — Training hub (pull out of Compliance)** ✅
 - [x] **S8 — Goals consolidation** ✅ *(safe re-home; deeper data-merge deferred — see log)*
-- [ ] **S9 — Calendar hub (merge three calendars)**
+- [x] **S9 — Calendar hub (merge three calendars)** ✅
 - [ ] **S10 — Final regroup + group split** *(last)*
 
 ## Log
@@ -274,6 +274,28 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - **Gates:** wayfinder exit 0 · types 0 · lint baseline (no new in touched, no unrelated staged) · build exit 0 · vitest
   5/156 (baseline) · pest 2-fail/337-pass — the 2nd fail (ShiftPayrollBackboneIntegrationTest) is the PROVEN-environmental
   date-rollover fail (stash-verified on clean HEAD), NOT an S8 regression; my new /hr/goals/development render case passes.
+
+### S9 — DONE (frontend-only)
+- THREE calendar surfaces: (1) `/hr/calendar` (CalendarController — the company "Schedule" event calendar, FullCalendar
+  + event CRUD, gated hr.calendar.view); (2) `/hr/calendar/time-off` (TimeOffCalendarController — who's off, hand-rolled
+  grid, AUTH-ONLY `abort_unless($user)`); (3) `/hr/compliance/calendar` (ComplianceCalendarController — cert/vetting
+  RENEWAL dates, a tab in compliance-tabs gated hr.compliance.view).
+- **NO route/controller changes** — purely a nav/tab reorganisation (so no wayfinder regen; pest unaffected = baseline).
+- **New `components/hr/calendar-tabs.tsx`** (CalendarTabs): **Schedule** (/hr/calendar, gated hr.calendar.view) +
+  **Time Off** (/hr/calendar/time-off, always shown — the controller is auth-only). Exported from the barrel.
+  calendar/index.tsx renders `<CalendarTabs active="schedule">`; calendar/time-off.tsx renders `active="timeoff"`.
+- **Compliance hub**: renamed the compliance-tabs `calendar` tab LABEL "Calendar" → "**Renewals**" (same id/URL
+  /hr/compliance/calendar + same data — it's the cert/vetting renewal calendar; ComplianceCalendarController KEPT).
+- **Sidebar consolidation**: removed the standalone "Time Off Calendar" item (Time & Leave) AND the separate "Calendar"
+  item (was in the Payroll & Admin group); replaced with ONE "Calendar" entry **under Time & Leave** →
+  `can.hr.calendar.view ? /hr/calendar : /hr/calendar/time-off` (cross-gate href so a leave-only viewer still lands on
+  a page they can open). leave/index.tsx Quick-Link to /hr/calendar/time-off left as a valid cross-link.
+- **"Orphan" interpretation:** `/hr/calendar/time-off` legitimately REMAINS (the route + the Time Off hub-tab target +
+  the controller render path + the leave quick-link); what was removed is the standalone/duplicate NAV entry. Done.
+- **Files touched (6, frontend-only):** NEW calendar-tabs.tsx, components/hr/index.ts, compliance-tabs.tsx,
+  calendar/index.tsx, calendar/time-off.tsx, app-sidebar.tsx, tracker.
+- **Gates:** types 0 · lint 0-err (no new, no unrelated staged) · build exit 0 · vitest 5/156 (baseline) · pest NOT
+  re-run (ZERO PHP/route diff → provably at the 2-fail baseline). Hand-formatted (no prettier).
 
 ## Discovered (out of scope — do not fix here)
 - **S8 DEEPER MERGE:** HrDevelopmentGoal (dev plans) and HrGoal (OKRs) are distinct models/features sharing the

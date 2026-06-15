@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CalendarTabs } from '@/components/hr';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
@@ -271,6 +272,8 @@ export default function CalendarIndex({
                         )
                     }
                 />
+
+                <CalendarTabs active="schedule" />
 
                 {/* Legend */}
                 <div className="mb-4 flex flex-wrap items-center gap-3">

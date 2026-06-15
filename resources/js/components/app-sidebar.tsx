@@ -2117,10 +2117,16 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Clock,
         });
     }
-    if (can?.hr?.leave?.viewAny || can?.hr?.leave?.viewOwn) {
+    if (
+        can?.hr?.calendar?.view ||
+        can?.hr?.leave?.viewAny ||
+        can?.hr?.leave?.viewOwn
+    ) {
         timeAndLeave.items.push({
-            title: 'Time Off Calendar',
-            href: '/hr/calendar/time-off',
+            title: 'Calendar',
+            href: can?.hr?.calendar?.view
+                ? '/hr/calendar'
+                : '/hr/calendar/time-off',
             icon: CalendarDays,
         });
     }
@@ -2290,13 +2296,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Reports',
             href: '/hr/reports',
             icon: FileText,
-        });
-    }
-    if (can?.hr?.calendar?.view) {
-        payrollAdmin.items.push({
-            title: 'Calendar',
-            href: '/hr/calendar',
-            icon: CalendarDays,
         });
     }
     if (can?.hr?.settings?.manage) {

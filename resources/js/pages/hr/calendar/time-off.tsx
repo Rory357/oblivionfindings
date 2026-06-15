@@ -1,3 +1,4 @@
+import { CalendarTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,6 +162,8 @@ export default function TimeOffCalendar({
                     />
                 }
             >
+                <CalendarTabs active="timeoff" />
+
                 {/* Filters */}
                 <Card>
                     <CardHeader>
