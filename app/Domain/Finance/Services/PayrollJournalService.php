@@ -295,6 +295,31 @@ class PayrollJournalService
     }
 
     /**
+     * Gap 4.2: build a NZ direct-credit (bank batch) CSV from a run's payslip
+     * net pay + each employee's bank account, so the bank can pay employees.
+     * Mirrors the vendor payment-run bank file. Generated on demand (no storage).
+     */
+    public function buildNetPayDirectCreditCsv(HrPayrollRun $payrollRun): string
+    {
+        $payslips = HrPayslip::query()
+            ->where('payroll_run_id', $payrollRun->id)
+            ->with(['user:id,name', 'employeeProfile:id,bank_account'])
+            ->get();
+
+        $period = $payrollRun->period_start->format('d/m/Y').'-'.$payrollRun->period_end->format('d/m/Y');
+
+        $csv = "Employee Name,Bank Account Number,Amount,Reference\n";
+        foreach ($payslips as $slip) {
+            $name = str_replace(',', ' ', (string) ($slip->user?->name ?? 'Employee'));
+            $bankAccount = str_replace(',', ' ', (string) ($slip->employeeProfile?->bank_account ?? ''));
+            $amount = number_format((float) $slip->net_pay, 2, '.', '');
+            $csv .= "{$name},{$bankAccount},{$amount},Net pay {$period}\n";
+        }
+
+        return $csv;
+    }
+
+    /**
      * Resolve the GL account to credit for a net-pay disbursement: the org's
      * primary active bank account, else any active bank account.
      */

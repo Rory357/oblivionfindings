@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Finance\Services\IrdFilingService;
+use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
@@ -60,4 +61,34 @@ it('builds a payday filing from a posted payroll run with payslip totals', funct
     // A well-formed payday filing (valid IRD check digit) validates clean.
     expect($service->validateFiling($filing))->toBe([]);
     expect($filing->fresh()->status)->toBe('validated');
+});
+
+it('builds a net-pay direct-credit CSV from payslip net pay + employee bank accounts (gap 4.2)', function () {
+    $run = HrPayrollRun::create([
+        'tenant_id' => 1,
+        'period_start' => '2026-06-01',
+        'period_end' => '2026-06-14',
+        'status' => 'locked',
+        'journal_id' => 123,
+    ]);
+    $profile = HrEmployeeProfile::factory()->create(['tenant_id' => 1, 'bank_account' => '12-3456-7890123-00']);
+    HrPayslip::create([
+        'tenant_id' => 1,
+        'payroll_run_id' => $run->id,
+        'employee_profile_id' => $profile->id,
+        'user_id' => $profile->user_id,
+        'pay_period_start' => '2026-06-01',
+        'pay_period_end' => '2026-06-14',
+        'payment_date' => '2026-06-16',
+        'gross_pay' => 1000,
+        'paye' => 200,
+        'net_pay' => 800,
+        'status' => 'paid',
+    ]);
+
+    $csv = app(PayrollJournalService::class)->buildNetPayDirectCreditCsv($run);
+
+    expect($csv)->toContain('Employee Name,Bank Account Number,Amount,Reference')
+        ->and($csv)->toContain('12-3456-7890123-00')
+        ->and($csv)->toContain('800.00');
 });
