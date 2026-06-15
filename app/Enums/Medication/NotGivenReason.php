@@ -16,6 +16,7 @@ enum NotGivenReason: string
     case VomitOrNausea = 'vomit_or_nausea';
     case SelfAdministered = 'self_administered';
     case Withheld = 'withheld';
+    case OmittedInError = 'omitted_in_error';
     case Other = 'other';
 
     public function label(): string
@@ -33,6 +34,7 @@ enum NotGivenReason: string
             self::VomitOrNausea => 'Vomit or nausea',
             self::SelfAdministered => 'Self-administered',
             self::Withheld => 'Withheld',
+            self::OmittedInError => 'Omitted in error',
             self::Other => 'Other',
         };
     }

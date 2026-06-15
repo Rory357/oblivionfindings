@@ -12,6 +12,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -36,7 +37,7 @@ class WorkerMedsRecordDoseTest extends TestCase
         parent::setUp();
 
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->worker = $this->makeRoleUser('support_worker');
@@ -191,6 +192,33 @@ class WorkerMedsRecordDoseTest extends TestCase
         ]);
     }
 
+    public function test_withheld_dose_accepts_the_omitted_in_error_reason_code(): void
+    {
+        // A genuinely-missed dose is recorded as withheld with the structured
+        // "Omitted in error" reason (NotGivenReason::OmittedInError) — the code
+        // is validated against the enum, so this proves it is accepted end-to-end.
+        $medication = $this->scheduledMedication(['09:30']);
+        $scheduledFor = Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'));
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                'client_medication_id' => $medication->id,
+                'scheduled_for' => $scheduledFor->toIso8601String(),
+                'status' => 'withheld',
+                'reason_code' => 'omitted_in_error',
+                'reason' => 'Missed on the morning round — escalated to the RN, resident unaffected.',
+            ])
+            ->assertRedirect('/meds/today')
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_medication_id' => $medication->id,
+            'status' => 'withheld',
+            'reason_code' => 'omitted_in_error',
+        ]);
+    }
+
     public function test_controlled_dose_requires_witness_and_writes_register_entry(): void
     {
         $medication = $this->scheduledMedication(['09:30'], [
@@ -293,7 +321,10 @@ class WorkerMedsRecordDoseTest extends TestCase
             'reviewed_by' => $this->worker->id,
         ]);
 
-        // Recording it again is refused calmly, and the follow-up is cleared.
+        // Re-recording revises the single register entry (updateOrCreate keyed
+        // on the administration) rather than blocking or duplicating it — the
+        // eMAR "Re-record effectiveness" action. (Updated: the duplicate path now
+        // succeeds with a revise message instead of the old "warning" no-op.)
         $this->actingAs($this->worker)
             ->from('/meds/today')
             ->post('/meds/today/prn/effect', [
@@ -301,9 +332,14 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'effectiveness' => 'not_effective',
             ])
             ->assertRedirect('/meds/today')
-            ->assertSessionHas('warning');
+            ->assertSessionHas('success');
 
+        // Still one row — now updated to the revised effectiveness.
         $this->assertDatabaseCount('medication_prn_effectiveness', 1);
+        $this->assertDatabaseHas('medication_prn_effectiveness', [
+            'client_medication_administration_id' => $administration->id,
+            'effectiveness' => 'not_effective',
+        ]);
 
         $this->actingAs($this->worker)
             ->get('/meds/today')
@@ -347,13 +383,13 @@ class WorkerMedsRecordDoseTest extends TestCase
             'client_id' => $this->client->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $this->worker->id,
-            'starts_at' => Carbon::parse($tomorrow . ' 09:00', $timezone)->utc(),
-            'ends_at' => Carbon::parse($tomorrow . ' 17:00', $timezone)->utc(),
+            'starts_at' => Carbon::parse($tomorrow.' 09:00', $timezone)->utc(),
+            'ends_at' => Carbon::parse($tomorrow.' 17:00', $timezone)->utc(),
             'status' => 'scheduled',
         ]);
 
         $this->actingAs($this->worker)
-            ->get('/meds/today?date=' . $tomorrow)
+            ->get('/meds/today?date='.$tomorrow)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('is_today', false)
@@ -393,7 +429,7 @@ class WorkerMedsRecordDoseTest extends TestCase
     }
 
     /**
-     * @param array<int, string> $permissionKeys
+     * @param  array<int, string>  $permissionKeys
      */
     protected function grantPermissions(User $user, array $permissionKeys): void
     {

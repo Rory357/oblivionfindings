@@ -158,6 +158,7 @@ export default function MarGrid({ meds, schedule, onRecord, onContext }: Props) 
                                                     onClick={() => onRecord(row)}
                                                     onContextMenu={(event) => onContext(event, row)}
                                                     title={`${med.name} — ${cell.label} ${recordedTime}`}
+                                                    aria-label={`${med.name}, ${cell.label} at ${recordedTime} — record dose (right-click for quick actions)`}
                                                     className={cn(
                                                         'mx-auto flex h-[46px] w-[84px] flex-col items-center justify-center rounded-lg border text-[11px] font-semibold transition hover:ring-2 hover:ring-primary/30',
                                                         cell.className,
