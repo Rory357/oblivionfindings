@@ -15,9 +15,10 @@ use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
+use App\Models\RosterTemplate;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
-use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
 use App\Models\SiteCoverageRequirement;
@@ -44,6 +45,7 @@ use App\Support\NzRegions;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -217,8 +219,15 @@ class SiteController extends Controller
             'archived' => $archivedCount,
         ];
 
+        // Reference data for the Add Site modal (mounted on this index). Only
+        // computed for users who can create sites; everyone else gets empties.
+        $addSite = ($user?->canDo('sites.create') ?? false)
+            ? $this->addSiteReferenceData($allowedTypes, $accessibleSiteIds)
+            : $this->emptyAddSiteReferenceData();
+
         return inertia('sites/index', [
             'sites' => $sites,
+            'addSite' => $addSite,
             'filters' => [
                 'q' => $search !== '' ? $search : null,
                 'type' => $type,
@@ -1056,6 +1065,7 @@ class SiteController extends Controller
         $this->authorize('create', Site::class);
 
         $validated = $request->validated();
+        $user = $request->user();
 
         $contacts = $validated['contacts'] ?? [];
         $rooms = $validated['rooms'] ?? [];
@@ -1063,8 +1073,18 @@ class SiteController extends Controller
         $zones = $validated['zones'] ?? [];
         $assets = $validated['assets'] ?? [];
         $checklists = $validated['checklists'] ?? [];
+        // Rostering + geofence sub-payloads fanned out to their own models
+        // after the Site exists (see persist* helpers below).
+        $coverage = $validated['coverage'] ?? [];
+        $credentials = $validated['credentials'] ?? [];
+        $shiftTemplates = $validated['shift_templates'] ?? [];
+        $geofence = $validated['geofence'] ?? null;
         // Documents come from the multipart request with UploadedFile
         // instances; saveDocuments() reads them directly from $request.
+
+        // Finance: the UI collects weekly food budget in dollars; the column
+        // stores integer cents.
+        $validated['weekly_food_budget_cents'] = $this->dollarsToCents($validated['weekly_food_budget'] ?? null);
 
         unset(
             $validated['contacts'],
@@ -1074,26 +1094,227 @@ class SiteController extends Controller
             $validated['assets'],
             $validated['checklists'],
             $validated['documents'],
+            $validated['coverage'],
+            $validated['credentials'],
+            $validated['shift_templates'],
+            $validated['geofence'],
+            $validated['weekly_food_budget'],
         );
 
-        $site = Site::create($validated);
+        if ($validated['weekly_food_budget_cents'] === null) {
+            unset($validated['weekly_food_budget_cents']);
+        }
 
-        $this->syncContacts($site, $contacts);
-        $this->syncRooms($site, $rooms);
-        $this->syncResources($site, $resources);
-        $this->syncZones($site, $zones);
-        $this->assignAssets($site, $assets, $request->user()?->id);
-        $this->syncChecklists($site, $checklists);
-        $this->saveDocuments($site, $request, $request->user()?->id);
+        $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $shiftTemplates, $geofence, $request, $user) {
+            $site = Site::create($validated);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site', $site, null, [
+            $this->syncContacts($site, $contacts);
+            $this->syncRooms($site, $rooms);
+            $this->syncResources($site, $resources);
+            $this->syncZones($site, $zones);
+            $this->assignAssets($site, $assets, $user?->id);
+            $this->syncChecklists($site, $checklists);
+
+            // Rostering + geofence fan-out (all reuse existing models).
+            $this->persistCoverageRequirements($site, $coverage, $user);
+            $this->persistStaffRequirements($site, $credentials, $user);
+            $this->persistShiftTemplates($site, $shiftTemplates, $user);
+            $this->persistSiteGeofence($site, $geofence);
+
+            // Documents last so disk writes only happen once every DB op succeeds.
+            $this->saveDocuments($site, $request, $user?->id);
+
+            return $site;
+        });
+
+        app(NotificationService::class)->notifyCrud($user, 'created', 'site', $site, null, [
             'title' => "Site created: {$site->name}",
             'url' => url('/sites'),
         ]);
 
+        // The Add Site modal submits with `_modal` and stays open to show its
+        // success pane (linking to the new profile), so return back with the new
+        // id flashed. The full-page wizard keeps the redirect-to-profile flow.
+        if ($request->boolean('_modal')) {
+            return back()
+                ->with('created_site_id', $site->id)
+                ->with('success', 'Site created.');
+        }
+
         return redirect()
             ->route('sites.show', $site)
             ->with('success', 'Site created.');
+    }
+
+    /**
+     * Convert a dollar amount (string|numeric|null) to integer cents, or null
+     * when no value was provided.
+     */
+    private function dollarsToCents($dollars): ?int
+    {
+        if ($dollars === null || $dollars === '') {
+            return null;
+        }
+
+        return (int) round(((float) $dollars) * 100);
+    }
+
+    /**
+     * Coverage cards arrive with a multi-day `days[]`; the table stores one
+     * row per day (single `day_of_week`), matching the existing post-create
+     * path. So each card fans out to N rows. The role-mix map
+     * {caregiver,driver,med_competent} is converted to the [{key,minimum}]
+     * shape SiteCoverageRequirement expects, dropping zero counts.
+     *
+     * @param  array<int, array<string, mixed>>  $coverage
+     */
+    private function persistCoverageRequirements(Site $site, array $coverage, ?User $user): void
+    {
+        foreach ($coverage as $rule) {
+            $roleRequirements = $this->rolesMapToArray($rule['roles'] ?? []);
+
+            foreach ($rule['days'] ?? [] as $day) {
+                SiteCoverageRequirement::create([
+                    'organization_id' => $user?->organization_id,
+                    'site_id' => $site->id,
+                    'service_context_id' => $rule['service_context_id'] ?? null,
+                    'name' => $rule['name'],
+                    'coverage_type' => $rule['coverage_type'],
+                    'day_of_week' => $day,
+                    'starts_time' => $rule['starts_time'],
+                    'ends_time' => $rule['ends_time'],
+                    'minimum_staff' => (int) $rule['minimum_staff'],
+                    'role_requirements' => $roleRequirements,
+                    'allow_overstaffing' => (bool) ($rule['allow_overstaffing'] ?? true),
+                    'shift_type' => $rule['shift_type'] ?? null,
+                    'is_active' => true,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $roles
+     * @return array<int, array{key: string, minimum: int}>
+     */
+    private function rolesMapToArray(array $roles): array
+    {
+        $out = [];
+
+        foreach (['caregiver', 'driver', 'med_competent'] as $key) {
+            $count = (int) ($roles[$key] ?? 0);
+            if ($count > 0) {
+                $out[] = ['key' => $key, 'minimum' => $count];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Required staff credentials → SiteStaffRequirement. updateOrCreate honours
+     * the unique(site_id, requirement_name) constraint when the same credential
+     * is selected twice.
+     *
+     * @param  array<int, array<string, mixed>>  $credentials
+     */
+    private function persistStaffRequirements(Site $site, array $credentials, ?User $user): void
+    {
+        foreach ($credentials as $cred) {
+            $expiry = $cred['expiry_period_months'] ?? null;
+            $expiry = ($expiry !== null && (int) $expiry > 0) ? (int) $expiry : null;
+
+            SiteStaffRequirement::updateOrCreate(
+                ['site_id' => $site->id, 'requirement_name' => $cred['name']],
+                [
+                    'organization_id' => $user?->organization_id,
+                    'category' => $cred['category'],
+                    'certification_required' => ($cred['category'] ?? null) === 'mandatory',
+                    'expiry_period_months' => $expiry,
+                    'is_active' => true,
+                ],
+            );
+        }
+    }
+
+    /**
+     * Default shift templates → a per-site RosterTemplate "{Site} default week"
+     * (decision A). The lightweight {name,start,end} rows each expand to one
+     * template shift per weekday (day_of_week 0-6); identity FKs stay null
+     * (the request permits it) so nothing is fabricated.
+     *
+     * @param  array<int, array<string, mixed>>  $shiftTemplates
+     */
+    private function persistShiftTemplates(Site $site, array $shiftTemplates, ?User $user): void
+    {
+        if (empty($shiftTemplates)) {
+            return;
+        }
+
+        $template = RosterTemplate::create([
+            'organization_id' => $user?->organization_id,
+            'name' => "{$site->name} default week",
+            'description' => 'Created from the Add Site modal.',
+            'template_type' => 'weekly',
+            'is_active' => true,
+            'created_by' => $user?->id,
+        ]);
+
+        $rows = [];
+        foreach ($shiftTemplates as $tpl) {
+            for ($day = 0; $day <= 6; $day++) {
+                $rows[] = [
+                    'organization_id' => $user?->organization_id,
+                    'day_of_week' => $day,
+                    'start_time' => $tpl['starts_time'],
+                    'end_time' => $tpl['ends_time'],
+                    'shift_type' => 'standard',
+                    'notes' => $tpl['name'],
+                ];
+            }
+        }
+
+        $template->templateShifts()->createMany($rows);
+    }
+
+    /**
+     * Seed a circle geofence into the shared AssetGeofence (reusing the exact
+     * shape + scope contract from SiteGeofenceController). Skipped silently when
+     * the site has no coordinates. Asset assignment stays a post-create concern.
+     *
+     * @param  array<string, mixed>|null  $geofence
+     */
+    private function persistSiteGeofence(Site $site, ?array $geofence): void
+    {
+        if (! $geofence) {
+            return;
+        }
+
+        $lat = $site->latitude;
+        $lng = $site->longitude;
+        if ($lat === null || $lng === null) {
+            return;
+        }
+
+        AssetGeofence::create([
+            'asset_id' => null,
+            'site_id' => $site->id,
+            'name' => "{$site->name} Geofence",
+            'type' => 'circle',
+            'scope' => match ($site->type) {
+                'house', 'residential' => 'house',
+                'facility' => 'asset',
+                default => 'site',
+            },
+            'shape' => [
+                'center' => ['lat' => (float) $lat, 'lng' => (float) $lng],
+                'radius_m' => (int) ($geofence['radius_m'] ?? 120),
+            ],
+            'breach_type' => $geofence['breach_type'] ?? 'both',
+            'alert_config' => null,
+            'time_rules' => null,
+            'is_active' => (bool) ($geofence['is_active'] ?? true),
+        ]);
     }
 
     private function saveDocuments(Site $site, Request $request, ?int $userId): void
@@ -1257,6 +1478,17 @@ class SiteController extends Controller
         $assets = $validated['assets'] ?? [];
         $checklists = $validated['checklists'] ?? [];
 
+        // Finance: keep the dollars→cents conversion symmetric with store() so an
+        // edited weekly food budget actually persists.
+        $cents = $this->dollarsToCents($validated['weekly_food_budget'] ?? null);
+        if ($cents !== null) {
+            $validated['weekly_food_budget_cents'] = $cents;
+        }
+
+        // UpdateSiteRequest accepts the same rostering/geofence arrays as the
+        // store request (so the edit path can share the modal), but the
+        // edit-via-modal fan-out is a follow-up — drop them here explicitly
+        // rather than letting Eloquent silently discard the non-fillable keys.
         unset(
             $validated['contacts'],
             $validated['rooms'],
@@ -1264,6 +1496,11 @@ class SiteController extends Controller
             $validated['zones'],
             $validated['assets'],
             $validated['checklists'],
+            $validated['coverage'],
+            $validated['credentials'],
+            $validated['shift_templates'],
+            $validated['geofence'],
+            $validated['weekly_food_budget'],
         );
 
         $site->update($validated);
@@ -1325,6 +1562,96 @@ class SiteController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'description', 'applicable_to_type', 'frequency'])
             ->all();
+    }
+
+    /**
+     * Reference data the Add Site modal needs: site leads, checklist templates,
+     * assignable assets, NZ regions, service contexts, copyable sites (with
+     * their coverage + credential rows for the "copy a pattern" clone), the
+     * staff-credential catalogue and the coverage role keys.
+     *
+     * @param  array<int, string>  $allowedTypes
+     * @param  array<int, int>  $accessibleSiteIds
+     * @return array<string, mixed>
+     */
+    private function addSiteReferenceData(array $allowedTypes, array $accessibleSiteIds): array
+    {
+        $copyableSites = Site::query()
+            ->whereIn('type', $allowedTypes)
+            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds))
+            ->where('archived', false)
+            ->with([
+                'coverageRequirements' => fn ($q) => $q->where('is_active', true)
+                    ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
+                    ->orderBy('starts_time'),
+                'staffRequirements' => fn ($q) => $q->where('is_active', true),
+            ])
+            ->orderBy('name')
+            ->get(['id', 'name', 'type'])
+            ->map(fn (Site $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'type' => $s->type,
+                'coverage' => $s->coverageRequirements->map(fn ($r) => [
+                    'name' => $r->name,
+                    'coverage_type' => $r->coverage_type,
+                    'day_of_week' => $r->day_of_week,
+                    'starts_time' => $r->starts_time,
+                    'ends_time' => $r->ends_time,
+                    'minimum_staff' => (int) $r->minimum_staff,
+                    'role_requirements' => $r->role_requirements ?? [],
+                    'allow_overstaffing' => (bool) $r->allow_overstaffing,
+                    'shift_type' => $r->shift_type,
+                    'service_context_id' => $r->service_context_id,
+                ])->values(),
+                'credentials' => $s->staffRequirements->map(fn ($r) => [
+                    'name' => $r->requirement_name,
+                    'category' => $r->category,
+                    'expiry_period_months' => $r->expiry_period_months,
+                ])->values(),
+            ])
+            ->values();
+
+        $serviceContexts = ServiceContext::query()
+            ->where('is_active', true)
+            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
+            ->orderBy('name')
+            ->limit(200)
+            ->get(['id', 'name', 'type', 'site_id'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'type' => $c->type,
+            ])
+            ->values();
+
+        return [
+            'users' => User::select(['id', 'name'])->orderBy('name')->get(),
+            'checklistTemplates' => $this->checklistTemplatesPayload(),
+            'availableAssets' => $this->availableAssetsPayload(null),
+            'regionOptions' => NzRegions::REGIONS,
+            'serviceContexts' => $serviceContexts,
+            'copyableSites' => $copyableSites,
+            'credentialCatalogue' => config('site_credentials.catalogue', []),
+            'coverageRoleKeys' => config('site_credentials.coverage_role_keys', []),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyAddSiteReferenceData(): array
+    {
+        return [
+            'users' => [],
+            'checklistTemplates' => [],
+            'availableAssets' => [],
+            'regionOptions' => [],
+            'serviceContexts' => [],
+            'copyableSites' => [],
+            'credentialCatalogue' => [],
+            'coverageRoleKeys' => [],
+        ];
     }
 
     private function storeOnboardingContacts(Site $site, array $contacts): void

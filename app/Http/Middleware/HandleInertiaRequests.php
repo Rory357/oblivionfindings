@@ -227,6 +227,9 @@ class HandleInertiaRequests extends Middleware
                 // The Add Client wizard reads this after a successful create so
                 // its success pane can link straight to the new profile.
                 'created_client_id' => session('created_client_id'),
+                // The Add Site modal reads this after a successful create so its
+                // success pane can link straight to the new site profile.
+                'created_site_id' => session('created_site_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

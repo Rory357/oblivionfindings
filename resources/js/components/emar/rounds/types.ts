@@ -142,8 +142,23 @@ export interface GuidedRound {
 export interface ActivityItem {
     id: number;
     status: string;
+    medication_id: number | null;
     medication_name: string | null;
+    dose: string | null;
+    resident_id: number | null;
+    resident_name: string | null;
+    site_id: number | null;
+    site_name: string | null;
+    round_id: number | null;
+    round_name: string | null;
     staff: string | null;
+    witnessed_by: string | null;
+    blood_glucose_level: number | null;
+    pulse_bpm: number | null;
+    reason: string | null;
+    reason_code: string | null;
+    scheduled_for: string | null;
+    administered_at: string | null;
     time: string | null;
 }
 
