@@ -653,9 +653,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     Settings (webhooks·custom-fields·audit-log, gate hr.settings.manage), Compensation (bands·reviews·bonuses,
     hr.compensation.view), Reports (Reports·Builder·Saved·Automations·Webhooks, hr.reports.view). 3 tab components +
     barrel + 11 page injections. 11-page render test (HrHubTabsRenderTest) + types + eslint + build green.
-  - REMAINING hubs (per the recorded plan; one/tick, lowest-risk first):
-    - **Documents** (2 tabs Library·Templates) — ⚠️ Templates is hr.documents.manage-gated → gate that tab on `can.manage`
-      (both pages already receive `can.manage`); a view-only user must not see a 403 tab.
+  - ✅ **DONE — Documents + Performance (S36):** Documents (Library·Templates; DocumentsTabs takes a `canManage` prop and
+    only includes the manage-gated Templates tab when `can.manage`, so no view-only user sees a 403 tab). Performance (7:
+    Supervision·Reviews·Goals & OKRs·Competencies·360 Feedback·PIPs·Succession across performance/goals/feedback/succession
+    dirs, all under hr.performance.view; Succession uses tone `info` since `neutral` is not a valid RosterTabTone). 2 components
+    + barrel + 9 page injections. HrHubTabsRenderTest now covers all 20 hub pages (200 for hr role). types+eslint+build green.
+  - REMAINING hubs (per the recorded plan; one/tick):
     - **My-HR/ESS** (12 tabs Overview·Profile·Leave·Time·Expenses·Payslips·Reviews·Goals·Training·Documents·Policies·Surveys)
       — no per-tab gate (whole my.* group is any-authed-user); wide strip but all genuine peers.
     - **Compliance** (6 tabs Overview·Matrix·Calendar·Training·Vetting·Drivers — pages span sibling dirs training/vetting/drivers)

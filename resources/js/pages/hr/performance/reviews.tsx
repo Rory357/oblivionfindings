@@ -30,6 +30,7 @@ import {
     type ReviewTypeOption,
 } from '@/components/hr/performance/review-wizard-dialog';
 import { PageHero, PageLayout } from '@/components/page';
+import { PerformanceTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -283,6 +284,8 @@ export default function PerformanceReviews({
                     />
                 }
             >
+                <PerformanceTabs active="reviews" />
+
                 {/* KPI Cards */}
                 {stats && (
                     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

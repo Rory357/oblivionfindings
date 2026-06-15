@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero, PageLayout } from '@/components/page';
+import { DocumentsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -106,6 +107,8 @@ export default function DocumentTemplates({
                     />
                 }
             >
+                <DocumentsTabs active="templates" canManage={can.manage} />
+
                 <div className="flex flex-wrap items-center gap-3">
                     <Input
                         placeholder="Search templates..."

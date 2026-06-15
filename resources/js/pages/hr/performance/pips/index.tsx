@@ -1,3 +1,4 @@
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -143,6 +144,8 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                     />
                 }
             >
+                <PerformanceTabs active="pips" />
+
                 {/* KPI Cards + Chart */}
                 {stats && (
                     <div className="grid gap-4 lg:grid-cols-5">

@@ -1,3 +1,4 @@
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -156,6 +157,8 @@ export default function CompetencyIndex({
                     />
                 }
             >
+                <PerformanceTabs active="competencies" />
+
                 {showForm && (
                     <Card>
                         <CardHeader>

@@ -1,4 +1,5 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { DocumentsTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -188,6 +189,8 @@ export default function DocumentsIndex({
                     />
                 }
             >
+                <DocumentsTabs active="library" canManage={can.manage} />
+
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Input

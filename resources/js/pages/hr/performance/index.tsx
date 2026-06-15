@@ -1,5 +1,6 @@
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { PageHero, PageLayout } from '@/components/page';
+import { PerformanceTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -361,6 +362,8 @@ export default function PerformanceIndex({
                     />
                 }
             >
+                <PerformanceTabs active="overview" />
+
                 <div className="flex items-center gap-2">
                     <div className="w-40">
                         <Select

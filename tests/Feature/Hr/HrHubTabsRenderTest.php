@@ -40,4 +40,15 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/reports/saved',
     '/hr/reports/automations',
     '/hr/reports/webhooks',
+    // Documents hub
+    '/hr/documents',
+    '/hr/documents/templates',
+    // Performance hub
+    '/hr/performance',
+    '/hr/performance/reviews',
+    '/hr/goals',
+    '/hr/performance/competencies',
+    '/hr/feedback',
+    '/hr/performance/pips',
+    '/hr/succession',
 ]);

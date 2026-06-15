@@ -1,3 +1,4 @@
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -186,6 +187,8 @@ export default function FeedbackIndex({
                     />
                 }
             >
+                <PerformanceTabs active="feedback" />
+
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     {[
                         {

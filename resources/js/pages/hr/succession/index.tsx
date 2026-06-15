@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
+import { PerformanceTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Shield, Users } from 'lucide-react';
@@ -81,6 +82,8 @@ export default function SuccessionIndex({ plans, can }: Props) {
                 }
             />
             <PageShell>
+                <PerformanceTabs active="succession" />
+
                 {plans.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-12 text-center text-muted-foreground">

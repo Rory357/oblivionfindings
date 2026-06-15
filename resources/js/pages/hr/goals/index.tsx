@@ -3,6 +3,7 @@ import {
     type GoalOption,
     type ParentGoalOption,
 } from '@/components/hr/performance/goal-dialog';
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -425,6 +426,8 @@ export default function GoalsIndex({
                     />
                 }
             >
+                <PerformanceTabs active="goals" />
+
                 {/* Tabs */}
                 <Tabs defaultValue="all">
                     <TabsList className="flex h-auto w-full flex-wrap gap-1">
