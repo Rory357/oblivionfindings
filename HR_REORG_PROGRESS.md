@@ -37,9 +37,14 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
     test still expects /finance/billing·invoices·price-books; actual nav is Dashboard·Calendar·…). ⚠️ S10 edits
     this file's *HR* section only — do **not** fix the Finance assertion as part of HR work.
   - `my-day/index-audit-fixes.test.tsx` › 4 my-day/attendance wiring tests.
-- **pest (tests/Feature/Hr):** 1 failure — `RecruitmentJobPostingSyncTest` › "hr can sync and unpublish external
-  posting channels" (L67: `external_posting_status` stays `posted` after unpublish). **337 pass** (was 336; S7 added
-  a `/hr/training/catalog` render case to HrHubTabsRenderTest — the new baseline pass count is 337).
+- **pest (tests/Feature/Hr):** **2 failures** (as of 2026-06-16) —
+  (1) `RecruitmentJobPostingSyncTest` › "hr can sync and unpublish external posting channels" (L67:
+  `external_posting_status` stays `posted`) — the long-standing baseline fail.
+  (2) `ShiftPayrollBackboneIntegrationTest` › "attendance generated shift timesheet flows into payroll" (L142: pay-run
+  item null) — **DATE-DEPENDENT, appeared at the 2026-06-15→16 rollover**, NOT caused by this loop. PROVEN: it fails on
+  the clean S7 HEAD tree with S8 stashed. The test schedules a shift at `now()`, `travel(3)->hours()`, then runs payroll
+  for `[now()->subWeek(), now()->endOfDay()]` — a day-boundary desync. Unrelated to HR reorg; do NOT "fix" it.
+  Pass count ~337–338 (varies; S7 added /hr/training/catalog, S8 added /hr/goals/development render cases).
 
 ## Slices
 
@@ -50,7 +55,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S5 — Skills → Performance ▸ Competencies & Skills** ✅
 - [x] **S6 — Policies → Documents & Policies hub** ✅
 - [x] **S7 — Training hub (pull out of Compliance)** ✅
-- [ ] **S8 — Goals consolidation**
+- [x] **S8 — Goals consolidation** ✅ *(safe re-home; deeper data-merge deferred — see log)*
 - [ ] **S9 — Calendar hub (merge three calendars)**
 - [ ] **S10 — Final regroup + group split** *(last)*
 
@@ -242,7 +247,39 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - **Gates:** wayfinder exit 0 · types 0 · lint 0-err (no new, no unrelated staged) · build exit 0 · vitest 5/156
   (baseline) · pest 1-fail (baseline), 337 pass. Hand-formatted (no prettier).
 
+### S8 — DONE (safe re-home; deeper data-merge deferred)
+- THREE goals surfaces: (1) `/hr/goals` (GoalController → **HrGoal**, full OKR system: objectives + key-results +
+  parent goals + progress) = the canonical Performance ▸ Goals & OKRs tab; (2) `/hr/development/goals`
+  (DevelopmentGoalController → **HrDevelopmentGoal**, employee development plans: competency_area, target/current_level,
+  review_frequency, manager-assigned); (3) `/hr/my/goals` (personal — KEPT). Both admin gates = `hr.performance.view`/`manage`.
+- ⚠️ **GoalController (HrGoal/OKR) and DevelopmentGoalController (HrDevelopmentGoal) are GENUINELY DIFFERENT data
+  models.** A data-level merge would lose the dev-goal-specific fields and is unsafe for one slice. Per the loop's
+  explicit guidance, did the SAFE part: **re-homed `/hr/development/goals` → `/hr/goals/development`** (under the Goals
+  umbrella), kept both models + both controllers. **DEEPER MERGE DEFERRED** (see Discovered).
+- **Routes**: dev group re-prefixed `development` → `goals/development` (inner routes `/goals`→`/`), kept name
+  `development.`. The dev group registers at L499, BEFORE the GoalController `/{goal}` show route at L786, so GET
+  `/hr/goals/development` matches the dev route (no conflict with `/hr/goals/{goal}`). DevelopmentGoalController render
+  path re-homed.
+- **Page**: git mv `pages/hr/development/goals.tsx` → `pages/hr/goals/development.tsx` (R098); added
+  `<PerformanceTabs active="goals" />` + a "Goals & OKRs" breadcrumb parent so it sits under the Performance hub.
+- **References re-homed**: DevelopmentGoalAssignedNotification URL, goals/show.tsx backHref, performance/index.tsx link,
+  HrGoalsTest + DevelopmentGoalWorkflowTest. Added `/hr/goals/development` to HrHubTabsRenderTest (renders 200).
+- **`/hr/my/goals` UNTOUCHED**; the canonical `/hr/goals` OKR system UNTOUCHED (allowed to remain per done-criterion).
+- **Orphan grep:** `hr/development/goals` → 0 (incl. the wayfinder-generated TS after regen — RE-GREP after regen was
+  essential, the stale generated files showed the old URL pre-regen). `hr/goals\b` matches only the canonical /hr/goals
+  + the new /hr/goals/development (both the Goals umbrella) + /hr/my/goals isn't matched (the `my/` segment).
+- **Files touched (9):** routes/hr.php, DevelopmentGoalController.php, DevelopmentGoalAssignedNotification.php, moved
+  pages/hr/goals/development.tsx, goals/show.tsx, performance/index.tsx, HrGoalsTest.php, DevelopmentGoalWorkflowTest.php,
+  HrHubTabsRenderTest.php, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint baseline (no new in touched, no unrelated staged) · build exit 0 · vitest
+  5/156 (baseline) · pest 2-fail/337-pass — the 2nd fail (ShiftPayrollBackboneIntegrationTest) is the PROVEN-environmental
+  date-rollover fail (stash-verified on clean HEAD), NOT an S8 regression; my new /hr/goals/development render case passes.
+
 ## Discovered (out of scope — do not fix here)
+- **S8 DEEPER MERGE:** HrDevelopmentGoal (dev plans) and HrGoal (OKRs) are distinct models/features sharing the
+  hr.performance.view gate. Truly unifying them (one model/UI for "Goals") is a product+migration decision that would
+  drop dev-goal fields (competency_area, target/current_level, review_frequency) — needs design sign-off, not a reorg
+  slice. Re-homed under /hr/goals/development; left as two surfaces under one umbrella.
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.
 - `reports.tsx` inner content tabs remain Radix (see S2 decision above) — revisit only if a global "content
   sub-tabs → HrTabs" convention is adopted.

@@ -394,7 +394,7 @@ export default function GoalShow({
                     return (
                         <PageHero category="hr"
                             icon={Target}
-                            backHref="/hr/development/goals"
+                            backHref="/hr/goals/development"
                             title={goal.title}
                             description={goal.description ?? undefined}
                             meta={heroMeta}

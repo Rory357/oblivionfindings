@@ -493,15 +493,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Development Goals
+    | Development Goals (folded under the Goals & OKRs hub at /hr/goals/development)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('development')->name('development.')->group(function () {
-        Route::get('/goals', [DevelopmentGoalController::class, 'index'])->name('goals.index');
-        Route::put('/goals/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
+    Route::prefix('goals/development')->name('development.')->group(function () {
+        Route::get('/', [DevelopmentGoalController::class, 'index'])->name('goals.index');
+        Route::put('/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
-            Route::post('/goals', [DevelopmentGoalController::class, 'store'])->name('goals.store');
+            Route::post('/', [DevelopmentGoalController::class, 'store'])->name('goals.store');
         });
     });
 

@@ -46,7 +46,7 @@ class DevelopmentGoalAssignedNotification extends Notification
             ->subject('New Development Goal Assigned')
             ->line('A new development goal has been assigned to you.')
             ->line('Goal: ' . $this->goal->title)
-            ->action('View Goal', url('/hr/development/goals'));
+            ->action('View Goal', url('/hr/goals/development'));
     }
 
     public function toArray(object $notifiable): array
@@ -55,7 +55,7 @@ class DevelopmentGoalAssignedNotification extends Notification
             'type' => 'hr_development_goal_assigned',
             'title' => "Development Goal: {$this->goal->title}",
             'message' => 'A new development goal has been assigned to you.',
-            'url' => '/hr/development/goals',
+            'url' => '/hr/goals/development',
             'context' => [
                 'Goal' => $this->goal->title,
                 'Due date' => optional($this->goal->due_date)->toDateString() ?? 'Not set',

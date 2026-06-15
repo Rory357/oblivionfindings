@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -101,7 +102,7 @@ export default function DevelopmentGoals({
 
     function submitCreate(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        createForm.post('/hr/development/goals', {
+        createForm.post('/hr/goals/development', {
             preserveScroll: true,
             onSuccess: () => createForm.reset(),
         });
@@ -123,14 +124,14 @@ export default function DevelopmentGoals({
             review_notes: payload.review_notes ?? null,
         }));
 
-        updateForm.put(`/hr/development/goals/${goalId}`, {
+        updateForm.put(`/hr/goals/development/${goalId}`, {
             preserveScroll: true,
         });
     }
 
     function applyStatusFilter(status: string | null) {
         router.get(
-            '/hr/development/goals',
+            '/hr/goals/development',
             { status: status || undefined },
             { preserveState: true, replace: true },
         );
@@ -140,7 +141,8 @@ export default function DevelopmentGoals({
         <AppLayout
             breadcrumbs={[
                 { title: 'HR', href: '/hr' },
-                { title: 'Development Goals', href: '/hr/development/goals' },
+                { title: 'Goals & OKRs', href: '/hr/goals' },
+                { title: 'Development Goals', href: '/hr/goals/development' },
             ]}
         >
             <Head title="Development Goals" />
@@ -165,6 +167,8 @@ export default function DevelopmentGoals({
                         },
                     ]}
                 />
+
+                <PerformanceTabs active="goals" />
 
                 <div className="flex items-center gap-2">
                     <Label>Status</Label>
