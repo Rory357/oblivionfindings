@@ -253,13 +253,13 @@ test('hr my page loads', function () {
     });
 });
 
-test('hr reports automations page loads', function () {
+test('hr settings automations page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/reports/automations')
+            ->visit('/hr/settings/automations')
             ->waitForText('Automation', 10)
-            ->assertPathBeginsWith('/hr/reports');
+            ->assertPathBeginsWith('/hr/settings');
     });
 });
 
@@ -293,13 +293,13 @@ test('hr reports saved page loads', function () {
     });
 });
 
-test('hr reports webhooks page loads', function () {
+test('hr settings webhooks page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/reports/webhooks')
+            ->visit('/hr/settings/webhooks')
             ->waitForText('Webhook', 10)
-            ->assertPathBeginsWith('/hr/reports');
+            ->assertPathBeginsWith('/hr/settings');
     });
 });
 
