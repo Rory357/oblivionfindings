@@ -274,6 +274,14 @@ export default function ControlledDrugs(props: Props) {
         { label: 'Loss investigations', value: openLosses.length, tone: openLosses.length > 0 ? 'critical' : 'neutral' },
     ];
 
+    // Per-tab primary create actions (Add-Client style) — reused in each panel
+    // header and its empty-state CTA.
+    const btnEntry = <Button size="sm" onClick={() => setModal({ type: 'entry' })}><Plus className="h-4 w-4" />Record CD entry</Button>;
+    const btnBalance = <Button size="sm" onClick={() => setModal({ type: 'balance' })}><ClipboardCheck className="h-4 w-4" />Balance check</Button>;
+    const btnReportDisc = <Button size="sm" onClick={() => setModal({ type: 'balance' })}><AlertTriangle className="h-4 w-4" />Report discrepancy</Button>;
+    const btnDestruction = <Button size="sm" onClick={() => setModal({ type: 'destruction' })}><Trash2 className="h-4 w-4" />Record destruction</Button>;
+    const btnLoss = <Button size="sm" onClick={() => setModal({ type: 'loss' })}><FileWarning className="h-4 w-4" />Report loss</Button>;
+
     return (
         <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Controlled Drugs', href: '/emar/controlled' }]}>
             <Head title="Controlled Drug Register" />
@@ -397,7 +405,7 @@ export default function ControlledDrugs(props: Props) {
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Controlled drug views" />
 
                 {activeTab === 'register' && (
-                    <TableCard head={['Client', 'Medication', 'On hand', 'Last checked', '']} empty={medsF.length === 0 ? (medications.length === 0 ? 'No active controlled drugs.' : 'No controlled drugs match your search.') : null}>
+                    <TableCard head={['Client', 'Medication', 'On hand', 'Last checked', '']} title="Active controlled drugs" count={medications.length} action={btnEntry} cta={medications.length === 0 ? btnEntry : undefined} empty={medsF.length === 0 ? (medications.length === 0 ? 'No active controlled drugs.' : 'No controlled drugs match your search.') : null}>
                         {medsF.map((m) => {
                             const rec = reconciliation.find((r) => r.med.id === m.id);
                             return (
@@ -414,7 +422,7 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'recent' && (
-                    <TableCard head={['Date', 'Client', 'Medication', 'Type', 'Qty', 'Balance', 'Recorded by', 'Witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No register movements on ${props.date_label}.` : 'No movements match your search.') : null}>
+                    <TableCard head={['Date', 'Client', 'Medication', 'Type', 'Qty', 'Balance', 'Recorded by', 'Witness']} title={`Movements · ${props.date_label}`} count={recentEntries.length} action={btnEntry} cta={recentEntries.length === 0 ? btnEntry : undefined} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No register movements on ${props.date_label}.` : 'No movements match your search.') : null}>
                         {entriesF.map((e) => (
                             <tr key={e.id} {...rowProps({ kind: 'entry', entry: e, med: medForEntry(e) })}>
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
@@ -431,7 +439,7 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'reconciliation' && (
-                    <TableCard head={['Client', 'Medication', 'On hand', 'Last balance check', 'Status']} empty={reconciliation.length === 0 ? (medications.length === 0 ? 'No controlled drugs to reconcile.' : 'No controlled drugs match your search.') : null}>
+                    <TableCard head={['Client', 'Medication', 'On hand', 'Last balance check', 'Status']} title="Stock reconciliation" count={medications.length} action={btnBalance} cta={medications.length === 0 ? btnBalance : undefined} empty={reconciliation.length === 0 ? (medications.length === 0 ? 'No controlled drugs to reconcile.' : 'No controlled drugs match your search.') : null}>
                         {reconciliation.map((r) => (
                             <tr key={r.med.id} {...rowProps({ kind: 'medication', med: r.med })}>
                                 <td className="px-4 py-3">{r.med.client_name}</td>
@@ -445,9 +453,12 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'discrepancies' && (
-                    discF.length === 0 ? <EmptyCard text={discrepancies.length === 0 ? 'No open discrepancies.' : 'No discrepancies match your search.'} /> : (
-                        <div className="flex flex-col gap-3">
-                            {discF.map((d) => (
+                    <div className="flex flex-col gap-3">
+                        <TabHeader title="Open discrepancies" count={discrepancies.length} action={btnReportDisc} />
+                        {discF.length === 0 ? (
+                            <EmptyCard text={discrepancies.length === 0 ? 'No open discrepancies.' : 'No discrepancies match your search.'} cta={discrepancies.length === 0 ? btnReportDisc : undefined} />
+                        ) : (
+                            discF.map((d) => (
                                 <div key={d.id} {...interactive({ kind: 'discrepancy', disc: d })} className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                     <div>
                                         <div className="font-medium">{d.medication?.name ?? 'CD'} <span className="text-sm text-muted-foreground">· {d.client ? `${d.client.first_name} ${d.client.last_name}` : ''}</span></div>
@@ -458,17 +469,14 @@ export default function ControlledDrugs(props: Props) {
                                         <Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'resolveDisc', disc: d }); }}>Resolve</Button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )
+                            ))
+                        )}
+                    </div>
                 )}
 
                 {activeTab === 'destructions' && (
                     <div className="flex flex-col gap-3">
-                        <div className="flex justify-end">
-                            <Button size="sm" onClick={() => setModal({ type: 'destruction' })}><Trash2 className="h-4 w-4" />Record destruction</Button>
-                        </div>
-                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
+                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} title={`CD destructions · ${props.date_label}`} count={destructions.length} action={btnDestruction} cta={destructions.length === 0 ? btnDestruction : undefined} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
                             {destF.map((d) => (
                                 <tr key={d.id} {...rowProps({ kind: 'destruction', destruction: d })}>
                                     <td className="px-4 py-3 text-muted-foreground">{d.destroyed_at ? new Date(d.destroyed_at).toLocaleDateString('en-NZ') : '—'}</td>
@@ -485,9 +493,12 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'loss' && (
-                    lossF.length === 0 ? <EmptyCard text={lossReports.length === 0 ? 'No loss reports.' : 'No loss reports match your search.'} /> : (
-                        <div className="flex flex-col gap-3">
-                            {lossF.map((l) => (
+                    <div className="flex flex-col gap-3">
+                        <TabHeader title="Loss reports" count={lossReports.length} action={btnLoss} />
+                        {lossF.length === 0 ? (
+                            <EmptyCard text={lossReports.length === 0 ? 'No loss reports.' : 'No loss reports match your search.'} cta={lossReports.length === 0 ? btnLoss : undefined} />
+                        ) : (
+                            lossF.map((l) => (
                                 <div key={l.id} {...interactive({ kind: 'loss', loss: l })} className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                     <div>
                                         <div className="font-medium">{l.medication_name} <span className="text-sm text-muted-foreground">· {l.quantity_lost} {l.unit} lost</span></div>
@@ -499,13 +510,13 @@ export default function ControlledDrugs(props: Props) {
                                         {l.investigation_status !== 'resolved' && <Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'lossAction', report: l, action: 'resolve' }); }}>Resolve</Button>}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )
+                            ))
+                        )}
+                    </div>
                 )}
 
                 {activeTab === 'audit' && (
-                    <TableCard head={['When', 'Medication', 'Movement', 'Balance', 'By · witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No audit entries on ${props.date_label}.` : 'No audit entries match your search.') : null}>
+                    <TableCard head={['When', 'Medication', 'Movement', 'Balance', 'By · witness']} title={`Audit trail · ${props.date_label}`} count={recentEntries.length} action={btnEntry} cta={recentEntries.length === 0 ? btnEntry : undefined} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No audit entries on ${props.date_label}.` : 'No audit entries match your search.') : null}>
                         {entriesF.map((e) => (
                             <tr key={e.id} {...rowProps({ kind: 'entry', entry: e, med: medForEntry(e) }, true)}>
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
@@ -541,11 +552,39 @@ export default function ControlledDrugs(props: Props) {
     );
 }
 
-function TableCard({ head, empty, children }: { head: string[]; empty: string | null; children: React.ReactNode }) {
+/** Panel header above a tab's content — title (+ optional count) and a primary
+ * create action, Add-Client style. Mirrors the destructions header idiom. */
+function TabHeader({ title, count, action }: { title: string; count?: number; action: React.ReactNode }) {
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold">
+                {title}
+                {count != null ? <span className="ml-2 text-xs font-normal text-muted-foreground">{count}</span> : null}
+            </span>
+            {action}
+        </div>
+    );
+}
+
+function TableCard({ head, empty, title, count, action, cta, children }: { head: string[]; empty: string | null; title?: string; count?: number; action?: React.ReactNode; cta?: React.ReactNode; children: React.ReactNode }) {
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            {title || action ? (
+                <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
+                    {title ? (
+                        <span className="text-sm font-semibold">
+                            {title}
+                            {count != null ? <span className="ml-2 text-xs font-normal text-muted-foreground">{count}</span> : null}
+                        </span>
+                    ) : null}
+                    {action ? <span className="ml-auto">{action}</span> : null}
+                </div>
+            ) : null}
             {empty ? (
-                <div className="px-5 py-12 text-center text-sm text-muted-foreground">{empty}</div>
+                <div className="flex flex-col items-center gap-4 px-5 py-12 text-center">
+                    <p className="text-sm text-muted-foreground">{empty}</p>
+                    {cta}
+                </div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[720px] text-sm">
@@ -564,8 +603,13 @@ function TableCard({ head, empty, children }: { head: string[]; empty: string | 
     );
 }
 
-function EmptyCard({ text }: { text: string }) {
-    return <div className="rounded-2xl border bg-card px-5 py-12 text-center text-sm text-muted-foreground">{text}</div>;
+function EmptyCard({ text, cta }: { text: string; cta?: React.ReactNode }) {
+    return (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border bg-card px-5 py-12 text-center">
+            <p className="text-sm text-muted-foreground">{text}</p>
+            {cta}
+        </div>
+    );
 }
 
 /** One row of the hero alert strip — icon + message + Review jump + per-session dismiss. */
