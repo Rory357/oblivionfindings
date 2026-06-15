@@ -1899,7 +1899,7 @@ class EmarController extends Controller
         // Flat order list — the redesigned page filters by tab/search/status
         // client-side with live facet counts.
         $orders = MedicationPrescriberOrder::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name', 'receivedByUser:id,name', 'countersignedByUser:id,name', 'dispensedByUser:id,name'])
+            ->with(['client:id,first_name,last_name,site_id,room_id', 'client.site:id,name', 'client.room:id,name', 'medication:id,name', 'receivedByUser:id,name', 'countersignedByUser:id,name', 'dispensedByUser:id,name'])
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->latest('order_date')
             ->get()
@@ -1910,6 +1910,8 @@ class EmarController extends Controller
                     'id' => $o->id,
                     'client_id' => $o->client_id,
                     'client_name' => $o->client ? trim($o->client->first_name.' '.$o->client->last_name) : 'Unknown',
+                    'client_room' => $o->client?->room?->name,
+                    'client_site' => $o->client?->site?->name,
                     'client_medication_id' => $o->client_medication_id,
                     'order_type' => $o->order_type,
                     'status' => $o->status,
@@ -1973,7 +1975,8 @@ class EmarController extends Controller
         return Inertia::render('emar/Prescriptions', [
             'orders' => $orders,
             'covert' => $covert,
-            'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
+            'clients' => Client::query()->with('site:id,name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'site_id'])
+                ->map(fn (Client $c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'site_name' => $c->site?->name])->values(),
             'staff' => $this->getStaffList(),
             'medications' => ClientMedication::current()->orderBy('name')->get(['id', 'name', 'client_id'])
                 ->map(fn (ClientMedication $m) => ['id' => $m->id, 'name' => $m->name, 'client_id' => $m->client_id])->all(),
