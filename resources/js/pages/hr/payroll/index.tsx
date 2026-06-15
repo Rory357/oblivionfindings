@@ -1,3 +1,4 @@
+import { PayrollTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -357,6 +358,7 @@ export default function PayrollIndex({
                     />
                 }
             >
+                <PayrollTabs active="runs" />
                 <div className="text-xs text-muted-foreground">
                     Tip: use the Create Run button to enter period dates and
                     generate draft payroll items.
