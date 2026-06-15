@@ -16,7 +16,7 @@ import {
     type StockRow,
 } from '@/pages/emar/_stock-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { AlertOctagon, AlertTriangle, Barcode, CalendarX2, Check, ClipboardCheck, Clock, Eye, FileText, Package, Pencil, Plus, Search, ShieldCheck, ShoppingCart, Snowflake, Truck, User } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, Barcode, CalendarX2, Check, ClipboardCheck, Clock, Eye, FileText, Package, Pencil, Plus, Search, ShieldCheck, ShoppingCart, Snowflake, Truck, User, X } from 'lucide-react';
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type ControlledRegisterRow = {
@@ -63,6 +63,7 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    client_id: number | null;
 };
 
 type Modal =
@@ -73,22 +74,35 @@ type Modal =
     | { type: 'detail'; item: StockRow }
     | null;
 
+const STALE_ORDER_DAYS = 7;
 const STAGES = ['draft', 'submitted', 'confirmed', 'dispensed', 'delivered'];
 const STAGE_LABELS = ['Ordered', 'Submitted', 'Confirmed', 'Dispensed', 'Delivered'];
 const NEXT_LABEL: Record<string, string> = { draft: 'Submit to pharmacy', submitted: 'Mark confirmed', confirmed: 'Mark dispensed', dispensed: 'Receive stock' };
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—');
 const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, controlledRegister, pharmacyOrders, clients, activeMedications, witnesses, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, controlledRegister, pharmacyOrders, clients, activeMedications, witnesses, sites, active_site: activeSite, site_brand_colour: brandColour, client_id: activeClientId }: Props) {
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(activeClientId ?? null);
     const [chip, setChip] = useState<'all' | 'controlled' | 'cold_chain'>('all');
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>([]);
 
     const openOrders = pharmacyOrders.filter((o) => o.status !== 'delivered');
     const cdDiscrepancies = controlledRegister.filter((r) => r.discrepancy !== null && r.discrepancy !== 0).length;
+    const staleOrderCutoff = Date.now() - STALE_ORDER_DAYS * 86_400_000;
+    const overdueOrders = openOrders.filter((o) => o.ordered_at != null && new Date(o.ordered_at).getTime() < staleOrderCutoff).length;
+
+    // Stacked, dismissible alert strip — every count is already computed above.
+    const alerts = ([
+        { key: 'cd', tone: 'critical', icon: ShieldCheck, count: cdDiscrepancies, message: `${cdDiscrepancies} controlled-drug count${cdDiscrepancies === 1 ? '' : 's'} with an unreconciled balance — investigate before close of shift.`, tab: 'controlled' },
+        { key: 'expired', tone: 'critical', icon: CalendarX2, count: expiredCount, message: `${expiredCount} item${expiredCount === 1 ? '' : 's'} expired — quarantine and remove from use.`, tab: 'expired' },
+        { key: 'low', tone: 'warning', icon: AlertTriangle, count: lowStockCount, message: `${lowStockCount} item${lowStockCount === 1 ? '' : 's'} at or below reorder level — reorder now.`, tab: 'low' },
+        { key: 'orders', tone: 'warning', icon: Clock, count: overdueOrders, message: `${overdueOrders} pharmacy order${overdueOrders === 1 ? '' : 's'} waiting ${STALE_ORDER_DAYS}+ days — chase the pharmacy.`, tab: 'orders' },
+    ] as const).filter((a) => a.count > 0 && !dismissed.includes(a.key));
 
     const stockByMed = useMemo(() => new Map(stockItems.map((s) => [s.medication_id, s])), [stockItems]);
     const openOrderFor = (medId: number | null): OpenOrderSummary | null => {
@@ -168,7 +182,18 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
     }, [filtered]);
 
     const advance = (id: number) => router.post(`/emar/stock/pharmacy-orders/${id}/advance`, {}, { preserveScroll: true, only: ['pharmacyOrders', 'stockItems', 'lowStockCount', 'expiringCount', 'expiredCount'] });
-    const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/stock', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
+    // Site + Client round-trip to the server (the board is server-filtered on
+    // those two only); search/chip/tab stay client-side over the loaded rows.
+    const reload = (over: { site_id?: number | null; client_id?: number | null }) => {
+        const site = over.site_id !== undefined ? over.site_id : siteFilter;
+        const client = over.client_id !== undefined ? over.client_id : clientFilter;
+        const params: Record<string, number> = {};
+        if (site) params.site_id = site;
+        if (client) params.client_id = client;
+        router.get('/emar/stock', params, { preserveState: true, preserveScroll: true });
+    };
+    const onSite = (id: number | null) => { setSiteFilter(id); reload({ site_id: id }); };
+    const onClient = (id: number | null) => { setClientFilter(id); reload({ client_id: id }); };
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All stock', icon: Package, tone: 'primary', badge: stockItems.length || undefined },
@@ -240,23 +265,48 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                 </Button>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medication, client or batch…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                <div className="relative w-full max-w-xs md:w-[260px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search medication, client or batch…"
+                                        aria-label="Search stock"
+                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                    />
+                                    {search ? (
+                                        <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
                                 </div>
                                 {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                                <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))} value={clientFilter} onChange={onClient} onDark />
                             </div>
                         </div>
                     }
                 />
 
-                {cdDiscrepancies > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-critical">
-                            <AlertTriangle className="h-4 w-4" />
-                            {cdDiscrepancies} controlled-drug count{cdDiscrepancies === 1 ? '' : 's'} with an unreconciled balance — investigate before close of shift.
-                        </span>
-                        <Button size="sm" variant="outline" onClick={() => setActiveTab('controlled')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => {
+                            const Icon = a.icon;
+                            const cls = a.tone === 'critical'
+                                ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+                                : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+                            return (
+                                <div key={a.key} className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${cls}`}>
+                                    <span className="flex items-center gap-2 text-sm font-medium">
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        {a.message}
+                                    </span>
+                                    <div className="flex shrink-0 items-center gap-1">
+                                        <Button size="sm" variant="outline" onClick={() => setActiveTab(a.tab)}>Review</Button>
+                                        <Button size="sm" variant="ghost" aria-label="Dismiss alert" onClick={() => setDismissed((d) => [...d, a.key])}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
@@ -264,7 +314,17 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
 
                 {['all', 'low', 'expiring', 'expired'].includes(activeTab) && (
                     byClient.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">No stock matches the current filters.</div>
+                        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card px-5 py-12 text-center">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground"><Package className="h-6 w-6" /></span>
+                            <div>
+                                <p className="text-sm font-medium">No stock matches the current filters</p>
+                                <p className="mt-0.5 text-sm text-muted-foreground">Receive a delivery or place a pharmacy order to start tracking stock here.</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                <Button size="sm" onClick={() => setModal({ type: 'receive' })}><Truck className="h-3.5 w-3.5" />Receive stock</Button>
+                                <Button size="sm" variant="outline" onClick={() => setModal({ type: 'order' })}><Plus className="h-3.5 w-3.5" />New order</Button>
+                            </div>
+                        </div>
                     ) : (
                         <div className="flex flex-col gap-4">
                             {byClient.map((g) => (

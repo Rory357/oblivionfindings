@@ -1823,6 +1823,7 @@ class EmarController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+            'client_id' => $clientFilter,
         ]);
     }
 

@@ -36,15 +36,15 @@ search pill from PRN footer; `MedsWizardDialog`/`SummaryRow` (`@/components/meds
 - [x] C4 — Client group header is now a button → `/operations/clients/{id}/care`; View client wired in both context menus and the detail modal footer. Off-page nav only for View client / Open on MAR; all stock actions open modals in place. (StockManagement.tsx)
 
 ## D. Client filter in the footer
-- [ ] D5 — `Client` `EntityFilter` (allLabel="All clients", onDark) in the hero footer next to Site, built from payload clients; wire to `client_id` on `stock()` via `router.get('/emar/stock', …, { preserveState, preserveScroll })`. Search/chip/tab stay client-side.
+- [x] D5 — `Client` `EntityFilter` (allLabel="All clients", onDark) added beside Site, built from payload `clients`. Unified `reload()` helper round-trips `site_id` + `client_id` together (preserveState/preserveScroll); state inits from echoed `props.client_id`. Search/chip/tab stay client-side. (StockManagement.tsx + stock() echoes client_id.)
 - [x] D6 — Day-picker: intentionally NOT added (Stock is a live board; daily stepper is the wrong metaphor). Adding Client completes footer layout parity. Optional later: as-at date view — TODO(G-asat), not built now.
 
 ## E. Stacked alert strip
-- [ ] E7 — Replace single CD banner with a stacked, dismissible alert strip (mirror `/emar/controlled`) from already-computed data: CD counts unreconciled (critical → Controlled tab), N expired — quarantine (critical → Expired tab), N low — reorder (warning → Low tab), N pharmacy orders overdue (warning → Orders tab). Each: icon + count + one-line message + "Review" → sets `activeTab`.
+- [x] E7 — Single CD banner replaced with a stacked, dismissible strip: CD unreconciled (critical → Controlled), N expired (critical → Expired), N low (warning → Low), N pharmacy orders waiting `STALE_ORDER_DAYS`(7)+ days (warning → Orders). Each: icon + message + Review (sets `activeTab`) + ✕ dismiss. NOTE: orders have no ETA column, so "overdue" is honestly derived as open-order age ≥7d from `ordered_at` (no invented SLA field). (StockManagement.tsx)
 
 ## F. Polish for parity
-- [ ] F8a — Align hand-rolled footer search to the shared PRN/meds-today pill (clear-✕ affordance + matching classes).
-- [ ] F8b — Replace grey empty state with the standard pattern: icon + message + CTA (Receive stock / New order). Semantic tokens only.
+- [x] F8a — Footer search rebuilt on the shared PRN/meds-today pill: absolute leading Search icon, `h-8 rounded-full` pill classes, focus ring, and a clear-✕ button when non-empty. (StockManagement.tsx)
+- [x] F8b — Empty state replaced with the standard pattern: muted icon chip + heading + sub-line + CTA buttons (Receive stock / New order). Semantic tokens only. (StockManagement.tsx)
 
 ## Backend (`stock()` — minimal; NO speculative migrations)
 - [x] BE-client — `stock()` now accepts `client_id` (filters stock/orders/active-meds by `medication.client_id`); `site_id` retained. (EmarController@stock)
