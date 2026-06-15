@@ -49,15 +49,23 @@ export interface CdDiscrepancy {
     client: { id: number; first_name: string; last_name: string } | null;
     medication: { id: number; name: string } | null;
     difference: number | string | null;
+    on_hand_before?: number | string | null;
+    on_hand_after?: number | string | null;
     reason: string | null;
     notes: string | null;
     status: string;
     reported_at: string | null;
+    reported_by_name?: string | null;
+    witnessed_by_name?: string | null;
+    resolved_at?: string | null;
+    resolved_by_name?: string | null;
+    resolution_notes?: string | null;
     attachments: unknown[];
 }
 
 export interface CdDestruction {
     id: number;
+    client_id?: number;
     client_name: string;
     medication_name: string | null;
     quantity: number | string | null;
@@ -67,6 +75,8 @@ export interface CdDestruction {
     destroyed_at: string | null;
     destroyed_by_name: string | null;
     witness_name: string | null;
+    witness_2_name?: string | null;
+    authorised_by_name?: string | null;
     notes: string | null;
 }
 
@@ -82,6 +92,7 @@ export interface CdLossReport {
     reported_to_pharmacy: boolean;
     pharmacy_name: string | null;
     discovered_at: string | null;
+    discovered_by_name?: string | null;
     investigation_status: string;
     investigation_notes: string | null;
     resolution_outcome: string | null;

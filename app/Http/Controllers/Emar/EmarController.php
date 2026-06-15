@@ -1450,6 +1450,9 @@ class EmarController extends Controller
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,name',
+                'reportedBy:id,name',
+                'witnessedBy:id,name',
+                'resolvedBy:id,name',
                 'attachments.uploadedBy:id,name',
             ])
             ->latest()
@@ -1460,7 +1463,7 @@ class EmarController extends Controller
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->whereBetween('destroyed_at', [$dayStart, $dayEnd])
-            ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name', 'witness1:id,name'])
+            ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name'])
             ->latest('destroyed_at')
             ->limit(50)
             ->get();
@@ -1541,10 +1544,17 @@ class EmarController extends Controller
                     'name' => $discrepancy->medication->name,
                 ] : null,
                 'difference' => $discrepancy->difference,
+                'on_hand_before' => $discrepancy->on_hand_before,
+                'on_hand_after' => $discrepancy->on_hand_after,
                 'reason' => $discrepancy->reason,
                 'notes' => $discrepancy->notes,
                 'status' => $discrepancy->status,
                 'reported_at' => $discrepancy->reported_at?->toIso8601String(),
+                'reported_by_name' => $discrepancy->reportedBy?->name,
+                'witnessed_by_name' => $discrepancy->witnessedBy?->name,
+                'resolved_at' => $discrepancy->resolved_at instanceof \DateTimeInterface ? $discrepancy->resolved_at->toIso8601String() : null,
+                'resolved_by_name' => $discrepancy->resolvedBy?->name,
+                'resolution_notes' => $discrepancy->resolution_notes,
                 'attachments' => $discrepancy->attachments
                     ->map(fn ($attachment) => $this->serializeSupportingAttachment(
                         $attachment,
@@ -1555,6 +1565,7 @@ class EmarController extends Controller
             ])->values(),
             'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
                 'id' => $d->id,
+                'client_id' => $d->client_id,
                 'client_name' => $d->client ? trim($d->client->first_name.' '.$d->client->last_name) : 'Unknown',
                 'medication_name' => $d->medication_name,
                 'quantity' => $d->quantity,
@@ -1564,6 +1575,8 @@ class EmarController extends Controller
                 'destroyed_at' => $d->destroyed_at instanceof \DateTimeInterface ? $d->destroyed_at->toIso8601String() : null,
                 'destroyed_by_name' => $d->destroyedByUser?->name,
                 'witness_name' => $d->witness1?->name,
+                'witness_2_name' => $d->witness2?->name,
+                'authorised_by_name' => $d->authorised_by_name,
                 'notes' => $d->notes,
             ])->values(),
             'lossReports' => $lossReports->map(fn (ControlledDrugLossReport $report) => [
@@ -1582,6 +1595,7 @@ class EmarController extends Controller
                 'reported_to_pharmacy' => (bool) $report->reported_to_pharmacy,
                 'pharmacy_name' => $report->pharmacy_name,
                 'discovered_at' => $report->discovered_at?->toIso8601String(),
+                'discovered_by_name' => $report->discoveredBy?->name,
                 'investigation_status' => $report->investigation_status,
                 'investigation_notes' => $report->investigation_notes,
                 'resolution_outcome' => $report->resolution_outcome,
@@ -1604,6 +1618,7 @@ class EmarController extends Controller
             'date_label' => $anchor->isoFormat('ddd D MMM'),
             'client_id' => $clientFilter,
             'q' => $search,
+            'current_user' => $request->user() ? ['id' => $request->user()->id, 'name' => $request->user()->name] : null,
             'can' => [
                 'manage_evidence' => (bool) $request->user() && (
                     $request->user()->canDo('medications.controlled.record')

@@ -1,24 +1,23 @@
 /* eslint-disable no-restricted-syntax -- CD register tab tables/cards are custom-layout
    bordered surfaces (not Card/Button); all colours are semantic tokens. */
-import { statusTone, type CdDiscrepancy, type CdEntry, type CdLossReport, type CdMedication, type ClientOption, type StaffOption } from '@/components/emar/controlled/types';
+import { statusTone, type CdDestruction, type CdDiscrepancy, type CdEntry, type CdLossReport, type CdMedication, type ClientOption, type StaffOption } from '@/components/emar/controlled/types';
+import { CdDetailDialog, type CdDetailSubject } from '@/components/emar/cd-detail-dialog';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { BalanceCheckDialog, CdPill, LossActionDialog, RecordCdEntryDialog, RecordDestructionDialog, ReportLossDialog, ResolveDiscrepancyDialog } from '@/pages/emar/_cd-dialogs';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, FileWarning, Lock, Package, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-
-type CdDestructionRow = { id: number; client_name: string; medication_name: string | null; quantity: number | string | null; unit: string | null; reason: string | null; destroyed_at: string | null; destroyed_by_name: string | null; witness_name: string | null };
+import { Activity, AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, Eye, FileWarning, Lock, Package, Plus, Printer, Search, ShieldCheck, Trash2, User, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
     medications: CdMedication[];
     recentEntries: CdEntry[];
     discrepancies: CdDiscrepancy[];
-    destructions: CdDestructionRow[];
+    destructions: CdDestruction[];
     lossReports: CdLossReport[];
     staff: StaffOption[];
     clients: ClientOption[];
@@ -38,7 +37,17 @@ type Modal =
     | { type: 'balanceMed'; medId: number }
     | { type: 'resolveDisc'; disc: CdDiscrepancy }
     | { type: 'lossAction'; report: CdLossReport; action: 'investigate' | 'resolve' }
+    | { type: 'detail'; subject: CdDetailSubject }
     | null;
+
+/** Context-menu tag colours (semantic token CSS vars), keyed by tone. */
+const CTX_TAG: Record<'critical' | 'warning' | 'info' | 'success' | 'muted', { bg: string; color: string }> = {
+    critical: { bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' },
+    warning: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
+    info: { bg: 'var(--status-info-bg)', color: 'var(--status-info)' },
+    success: { bg: 'var(--status-success-bg)', color: 'var(--status-success)' },
+    muted: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+};
 
 /** Case-insensitive match of a query against a row's text fields. */
 function matchq(q: string, ...parts: (string | null | undefined)[]): boolean {
@@ -80,6 +89,7 @@ export default function ControlledDrugs(props: Props) {
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [clientFilter, setClientFilter] = useState<number | null>(props.client_id ?? null);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     // Calendar + Site + Client round-trip to the server (the movement lists are
     // server-windowed to the selected day); the text search stays client-side over
@@ -156,6 +166,96 @@ export default function ControlledDrugs(props: Props) {
         overdueChecks > 0 && { kind: 'overdue', tone: 'warning' as const, icon: ShieldCheck, message: `${overdueChecks} controlled drug${overdueChecks === 1 ? '' : 's'} overdue a balance check (≥ 7 days).`, tab: 'reconciliation' },
         stockRisks.length > 0 && { kind: 'stock', tone: 'warning' as const, icon: Package, message: `${stockRisks.length} controlled drug${stockRisks.length === 1 ? '' : 's'} at/below reorder level or expiring within 30 days.`, tab: 'register' },
     ].filter((a): a is CdAlert => Boolean(a) && !dismissed.includes((a as CdAlert).kind));
+
+    // ── Row interactions (parity with PRN): click → read-only detail, right-click
+    // → ShiftContextMenu, View client → care page. Shared across all 7 tabs. ──
+    const medForEntry = (e: CdEntry) => medications.find((m) => m.client_id === e.client_id && m.name === e.medication_name);
+    const openDetail = (subject: CdDetailSubject) => setModal({ type: 'detail', subject });
+    const viewClient = (id: number | null | undefined) => id && router.visit(`/operations/clients/${id}/care`);
+    const exportRegister = () => window.open('/emar/pdf/controlled-register', '_blank');
+
+    /** Build + open the right-click menu for a row. `readOnly` (Audit tab) shows only
+     * view/navigate actions — no record/resolve. */
+    const openRowCtx = (event: ReactMouseEvent, subject: CdDetailSubject, readOnly = false) => {
+        event.preventDefault();
+        const clientId =
+            subject.kind === 'medication' ? subject.med.client_id
+            : subject.kind === 'entry' ? subject.entry.client_id
+            : subject.kind === 'discrepancy' ? subject.disc.client?.id ?? null
+            : subject.kind === 'destruction' ? subject.destruction.client_id ?? null
+            : subject.loss.client?.id ?? null;
+        const view: ShiftCtxItem = { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', tone: 'primary', onClick: () => openDetail(subject) };
+        const nav: ShiftCtxItem[] = [
+            { sep: true },
+            ...(clientId ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => viewClient(clientId) } satisfies ShiftCtxItem] : []),
+            { icon: <Printer className="h-3.5 w-3.5" />, label: 'Export CD register', sub: 'PDF', onClick: exportRegister },
+        ];
+
+        let tone: keyof typeof CTX_TAG = 'muted';
+        let tag = 'CD';
+        let meta = '';
+        const actions: ShiftCtxItem[] = [];
+        const critical: ShiftCtxItem[] = [];
+
+        if (subject.kind === 'medication' || subject.kind === 'entry') {
+            const med = subject.kind === 'medication' ? subject.med : medForEntry(subject.entry);
+            const drug = subject.kind === 'medication' ? subject.med.name : subject.entry.medication_name ?? 'CD';
+            const client = subject.kind === 'medication' ? subject.med.client_name : subject.entry.client_name;
+            if (subject.kind === 'medication') {
+                tone = subject.med.overdue_check ? 'warning' : 'muted';
+                tag = subject.med.controlled_drug ? 'CD' : 'MED';
+                meta = `${client} · ${drug}${subject.med.stock ? ` · ${subject.med.stock.on_hand ?? '—'} ${subject.med.stock.unit ?? ''}`.trimEnd() : ''}`;
+            } else {
+                tone = 'info';
+                tag = subject.entry.entry_type.replace(/_/g, ' ');
+                meta = `${client} · ${drug} · ${subject.entry.on_hand_before ?? '—'}→${subject.entry.on_hand_after ?? '—'}`;
+            }
+            if (med) actions.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Check balance', onClick: () => setModal({ type: 'balanceMed', medId: med.id }) });
+            actions.push({ icon: <Package className="h-3.5 w-3.5" />, label: 'Record movement', onClick: () => setModal({ type: 'entry' }) });
+            actions.push({ icon: <Lock className="h-3.5 w-3.5" />, label: 'View full register for this CD', onClick: () => { setSearch(drug); setActiveTab('recent'); } });
+            critical.push({ icon: <AlertTriangle className="h-3.5 w-3.5" />, label: 'Report discrepancy', tone: 'critical', onClick: () => setModal(med ? { type: 'balanceMed', medId: med.id } : { type: 'balance' }) });
+            critical.push({ icon: <FileWarning className="h-3.5 w-3.5" />, label: 'Report loss', tone: 'critical', onClick: () => setModal({ type: 'loss' }) });
+        } else if (subject.kind === 'discrepancy') {
+            const d = subject.disc;
+            tone = 'critical';
+            tag = d.status;
+            meta = `${d.client ? `${d.client.first_name} ${d.client.last_name}` : ''} · ${d.medication?.name ?? 'CD'} · diff ${d.difference ?? '—'}`;
+            if (d.status !== 'closed' && d.status !== 'resolved') actions.push({ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Resolve discrepancy', onClick: () => setModal({ type: 'resolveDisc', disc: d }) });
+        } else if (subject.kind === 'destruction') {
+            const d = subject.destruction;
+            tone = 'warning';
+            tag = 'Destroyed';
+            meta = `${d.client_name} · ${d.medication_name ?? 'CD'} · ${d.quantity ?? '—'} ${d.unit ?? ''}`.trimEnd();
+            actions.push({ icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Record destruction', onClick: () => setModal({ type: 'destruction' }) });
+        } else {
+            const l = subject.loss;
+            tone = 'critical';
+            tag = l.investigation_status;
+            meta = `${l.client ? `${l.client.first_name} ${l.client.last_name}` : ''} · ${l.medication_name ?? 'CD'} · ${l.quantity_lost ?? '—'} lost`;
+            if (l.investigation_status === 'reported') actions.push({ icon: <FileWarning className="h-3.5 w-3.5" />, label: 'Investigate', onClick: () => setModal({ type: 'lossAction', report: l, action: 'investigate' }) });
+            if (l.investigation_status !== 'resolved') actions.push({ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Resolve', onClick: () => setModal({ type: 'lossAction', report: l, action: 'resolve' }) });
+        }
+
+        const items: ShiftCtxItem[] = readOnly
+            ? [view, ...nav]
+            : [view, ...actions, ...nav, ...(critical.length ? [{ sep: true } as ShiftCtxItem, ...critical] : [])];
+        const t = CTX_TAG[tone];
+        setCtx({ x: event.clientX, y: event.clientY, tag: tag.toUpperCase(), tagBg: t.bg, tagColor: t.color, meta, items });
+    };
+
+    // Shared interactivity (click → detail, right-click → menu, keyboard-focusable);
+    // table rows add row chrome, cards supply their own.
+    const interactive = (subject: CdDetailSubject, readOnly = false) => ({
+        tabIndex: 0,
+        role: 'button' as const,
+        onClick: () => openDetail(subject),
+        onContextMenu: (e: ReactMouseEvent) => openRowCtx(e, subject, readOnly),
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(subject); } },
+    });
+    const rowProps = (subject: CdDetailSubject, readOnly = false) => ({
+        ...interactive(subject, readOnly),
+        className: 'cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/40 focus:bg-muted/40 focus:outline-none',
+    });
 
     const TABS: RosterTabItem[] = [
         { id: 'register', label: 'Register', icon: Lock, tone: 'primary', badge: medications.length || undefined },
@@ -301,12 +401,12 @@ export default function ControlledDrugs(props: Props) {
                         {medsF.map((m) => {
                             const rec = reconciliation.find((r) => r.med.id === m.id);
                             return (
-                                <tr key={m.id} className="border-b last:border-b-0">
+                                <tr key={m.id} {...rowProps({ kind: 'medication', med: m })}>
                                     <td className="px-4 py-3">{m.client_name}</td>
                                     <td className="px-4 py-3 font-medium">{m.name}</td>
                                     <td className="px-4 py-3 tabular-nums">{m.stock ? `${m.stock.on_hand ?? '—'} ${m.stock.unit ?? ''}` : '—'}</td>
                                     <td className="px-4 py-3">{rec?.overdue ? <span className="text-status-warning">{rec.days === null ? 'Never' : `${rec.days}d ago`}</span> : <span className="text-muted-foreground">{rec?.days}d ago</span>}</td>
-                                    <td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => setModal({ type: 'balanceMed', medId: m.id })}><ClipboardCheck className="h-3.5 w-3.5" />Check balance</Button></td>
+                                    <td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setModal({ type: 'balanceMed', medId: m.id }); }}><ClipboardCheck className="h-3.5 w-3.5" />Check balance</Button></td>
                                 </tr>
                             );
                         })}
@@ -316,7 +416,7 @@ export default function ControlledDrugs(props: Props) {
                 {activeTab === 'recent' && (
                     <TableCard head={['Date', 'Client', 'Medication', 'Type', 'Qty', 'Balance', 'Recorded by', 'Witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No register movements on ${props.date_label}.` : 'No movements match your search.') : null}>
                         {entriesF.map((e) => (
-                            <tr key={e.id} className="border-b last:border-b-0">
+                            <tr key={e.id} {...rowProps({ kind: 'entry', entry: e, med: medForEntry(e) })}>
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-3">{e.client_name}</td>
                                 <td className="px-4 py-3 font-medium">{e.medication_name}</td>
@@ -333,7 +433,7 @@ export default function ControlledDrugs(props: Props) {
                 {activeTab === 'reconciliation' && (
                     <TableCard head={['Client', 'Medication', 'On hand', 'Last balance check', 'Status']} empty={reconciliation.length === 0 ? (medications.length === 0 ? 'No controlled drugs to reconcile.' : 'No controlled drugs match your search.') : null}>
                         {reconciliation.map((r) => (
-                            <tr key={r.med.id} className="border-b last:border-b-0">
+                            <tr key={r.med.id} {...rowProps({ kind: 'medication', med: r.med })}>
                                 <td className="px-4 py-3">{r.med.client_name}</td>
                                 <td className="px-4 py-3 font-medium">{r.med.name}</td>
                                 <td className="px-4 py-3 tabular-nums">{r.med.stock ? `${r.med.stock.on_hand ?? '—'} ${r.med.stock.unit ?? ''}` : '—'}</td>
@@ -348,14 +448,14 @@ export default function ControlledDrugs(props: Props) {
                     discF.length === 0 ? <EmptyCard text={discrepancies.length === 0 ? 'No open discrepancies.' : 'No discrepancies match your search.'} /> : (
                         <div className="flex flex-col gap-3">
                             {discF.map((d) => (
-                                <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+                                <div key={d.id} {...interactive({ kind: 'discrepancy', disc: d })} className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                     <div>
                                         <div className="font-medium">{d.medication?.name ?? 'CD'} <span className="text-sm text-muted-foreground">· {d.client ? `${d.client.first_name} ${d.client.last_name}` : ''}</span></div>
                                         <div className="text-xs text-muted-foreground">Difference {d.difference} · {d.reason} · reported {d.reported_at ? new Date(d.reported_at).toLocaleDateString('en-NZ') : ''}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <CdPill label={d.status} tone={statusTone(d.status)} />
-                                        <Button size="sm" onClick={() => setModal({ type: 'resolveDisc', disc: d })}>Resolve</Button>
+                                        <Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'resolveDisc', disc: d }); }}>Resolve</Button>
                                     </div>
                                 </div>
                             ))}
@@ -370,7 +470,7 @@ export default function ControlledDrugs(props: Props) {
                         </div>
                         <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
                             {destF.map((d) => (
-                                <tr key={d.id} className="border-b last:border-b-0">
+                                <tr key={d.id} {...rowProps({ kind: 'destruction', destruction: d })}>
                                     <td className="px-4 py-3 text-muted-foreground">{d.destroyed_at ? new Date(d.destroyed_at).toLocaleDateString('en-NZ') : '—'}</td>
                                     <td className="px-4 py-3">{d.client_name}</td>
                                     <td className="px-4 py-3 font-medium">{d.medication_name}</td>
@@ -388,15 +488,15 @@ export default function ControlledDrugs(props: Props) {
                     lossF.length === 0 ? <EmptyCard text={lossReports.length === 0 ? 'No loss reports.' : 'No loss reports match your search.'} /> : (
                         <div className="flex flex-col gap-3">
                             {lossF.map((l) => (
-                                <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+                                <div key={l.id} {...interactive({ kind: 'loss', loss: l })} className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                     <div>
                                         <div className="font-medium">{l.medication_name} <span className="text-sm text-muted-foreground">· {l.quantity_lost} {l.unit} lost</span></div>
                                         <div className="text-xs text-muted-foreground">{l.circumstances}{l.reported_to_police ? ` · Police ${l.police_reference ?? 'ref'}` : ''}</div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <CdPill label={l.investigation_status} tone={statusTone(l.investigation_status)} />
-                                        {l.investigation_status === 'reported' && <Button size="sm" variant="outline" onClick={() => setModal({ type: 'lossAction', report: l, action: 'investigate' })}>Investigate</Button>}
-                                        {l.investigation_status !== 'resolved' && <Button size="sm" onClick={() => setModal({ type: 'lossAction', report: l, action: 'resolve' })}>Resolve</Button>}
+                                        {l.investigation_status === 'reported' && <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setModal({ type: 'lossAction', report: l, action: 'investigate' }); }}>Investigate</Button>}
+                                        {l.investigation_status !== 'resolved' && <Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'lossAction', report: l, action: 'resolve' }); }}>Resolve</Button>}
                                     </div>
                                 </div>
                             ))}
@@ -407,7 +507,7 @@ export default function ControlledDrugs(props: Props) {
                 {activeTab === 'audit' && (
                     <TableCard head={['When', 'Medication', 'Movement', 'Balance', 'By · witness']} empty={entriesF.length === 0 ? (recentEntries.length === 0 ? `No audit entries on ${props.date_label}.` : 'No audit entries match your search.') : null}>
                         {entriesF.map((e) => (
-                            <tr key={e.id} className="border-b last:border-b-0">
+                            <tr key={e.id} {...rowProps({ kind: 'entry', entry: e, med: medForEntry(e) }, true)}>
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-3 font-medium">{e.medication_name}</td>
                                 <td className="px-4 py-3 capitalize text-muted-foreground">{e.entry_type.replace('_', ' ')} {e.quantity}</td>
@@ -426,6 +526,17 @@ export default function ControlledDrugs(props: Props) {
             {modal?.type === 'destruction' && <RecordDestructionDialog medications={medications} staff={staff} onClose={() => setModal(null)} />}
             {modal?.type === 'resolveDisc' && <ResolveDiscrepancyDialog discrepancy={modal.disc} onClose={() => setModal(null)} />}
             {modal?.type === 'lossAction' && <LossActionDialog report={modal.report} action={modal.action} onClose={() => setModal(null)} />}
+            {modal?.type === 'detail' && (
+                <CdDetailDialog
+                    subject={modal.subject}
+                    onClose={() => setModal(null)}
+                    onCheckBalance={(medId) => setModal({ type: 'balanceMed', medId })}
+                    onRecordMovement={() => setModal({ type: 'entry' })}
+                    onResolveDiscrepancy={(disc) => setModal({ type: 'resolveDisc', disc })}
+                    onLossAction={(report, action) => setModal({ type: 'lossAction', report, action })}
+                />
+            )}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
