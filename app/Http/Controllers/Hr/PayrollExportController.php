@@ -213,6 +213,29 @@ class PayrollExportController extends Controller
     }
 
     /**
+     * Download the net-pay direct-credit (bank batch) CSV for a disbursed run.
+     */
+    public function downloadNetPayFile(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        if ($run->tenant_id !== $tenantId) {
+            abort(404);
+        }
+
+        abort_unless($run->net_paid_at !== null, 404, 'Net pay has not been disbursed for this run.');
+
+        $csv = $this->payrollJournalService->buildNetPayDirectCreditCsv($run);
+
+        return response()->streamDownload(
+            fn () => print($csv),
+            "net-pay-run-{$run->id}.csv",
+            ['Content-Type' => 'text/csv'],
+        );
+    }
+
+    /**
      * Export a locked payroll run as CSV.
      */
     public function export(Request $request, HrPayrollRun $run)

@@ -340,3 +340,48 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
     expect($timesheet->status)->toBe('paid');
     expect($timesheet->payroll_reference)->toBe("hr-payroll-run:{$run->id}");
 });
+
+// Gap 4.1 guard: locking a run must generate payslips so the GL journal posted
+// right after (PostPayrollJournalJob) has payslips to read — otherwise the run
+// stays locked with a null journal_id and the job dies to failed_jobs.
+test('locking a run generates payslips so the GL journal has data to read', function () {
+    $client = Client::factory()->create();
+
+    HrPayRateRule::query()->create([
+        'tenant_id' => 1,
+        'name' => 'Default Support Rule',
+        'is_active' => true,
+        'priority' => 100,
+        'position_role' => 'support_worker',
+        'regular_multiplier' => 1.00,
+        'overtime_multiplier' => 1.50,
+        'public_holiday_multiplier' => 1.50,
+        'sleepover_flat_rate' => 0,
+        'on_call_hourly_rate' => 0,
+        'created_by' => $this->hr->id,
+    ]);
+
+    Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'starts_at' => now()->subDay()->setTime(9, 0),
+        'ends_at' => now()->subDay()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    $service = app(PayrollExportService::class);
+    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+
+    expect($run->fresh()->payslips()->count())->toBe(0);
+
+    $service->lockRun($run->fresh(), $this->hr->id);
+
+    expect($run->fresh()->payslips()->count())->toBeGreaterThan(0);
+});

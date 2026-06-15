@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Http\Controllers;
 use App\Domain\Finance\Models\FinGstReturn;
 use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Services\IrdFilingService;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -46,9 +47,25 @@ class IrdFilingController extends Controller
             ->orderByDesc('period_end')
             ->get(['id', 'period_start', 'period_end', 'gst_payable', 'status', 'ird_period']);
 
+        // Posted payroll runs (GL journal posted) that don't yet have a payday
+        // filing. Tenant resolves to the org id in this app (see ResolvesHrTenant).
+        $filedRunIds = FinIrdFiling::forOrganization($orgId)
+            ->ofType('payday')
+            ->whereNotNull('payroll_run_id')
+            ->pluck('payroll_run_id');
+
+        $availablePayrollRuns = HrPayrollRun::query()
+            ->where('tenant_id', $orgId)
+            ->whereNotNull('journal_id')
+            ->whereNotIn('id', $filedRunIds)
+            ->orderByDesc('period_end')
+            ->limit(12)
+            ->get(['id', 'period_start', 'period_end', 'total_gross', 'status']);
+
         return Inertia::render('finance/IrdFilings/Index', [
             'filings' => $filings,
             'availableGstReturns' => $availableGstReturns,
+            'availablePayrollRuns' => $availablePayrollRuns,
             'filters' => $request->only(['filing_type', 'status']),
         ]);
     }
@@ -72,6 +89,33 @@ class IrdFilingController extends Controller
 
         return redirect()->route('finance.ird-filings.show', $filing)
             ->with('success', 'IRD filing created from GST return.');
+    }
+
+    /**
+     * Create a payday (Employment Information) filing from a posted payroll run.
+     */
+    public function createFromPayrollRun(Request $request, HrPayrollRun $run)
+    {
+        $validated = $request->validate([
+            'ird_number' => ['required', 'string', 'min:8', 'max:11'],
+        ]);
+
+        abort_unless(
+            $run->journal_id !== null,
+            422,
+            'Payroll run must be posted to the GL before a payday filing can be created.',
+        );
+
+        $orgId = $request->user()->organization_id;
+
+        $filing = $this->irdFilingService->createPaydayFiling(
+            $orgId,
+            $run,
+            $validated['ird_number'],
+        );
+
+        return redirect()->route('finance.ird-filings.show', $filing)
+            ->with('success', 'Payday filing created from payroll run.');
     }
 
     /**

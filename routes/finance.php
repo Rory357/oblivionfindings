@@ -580,6 +580,7 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::middleware('permission:finance.tax.manage')->group(function () {
         Route::get('/ird-filings', [IrdFilingController::class, 'index'])->name('ird-filings.index');
         Route::post('/ird-filings/from-gst/{gstReturn}', [IrdFilingController::class, 'createFromGst'])->name('ird-filings.from-gst');
+        Route::post('/ird-filings/from-payroll/{run}', [IrdFilingController::class, 'createFromPayrollRun'])->name('ird-filings.from-payroll');
         Route::get('/ird-filings/{filing}', [IrdFilingController::class, 'show'])->name('ird-filings.show');
         Route::post('/ird-filings/{filing}/validate', [IrdFilingController::class, 'validateFiling'])->name('ird-filings.validate');
         Route::post('/ird-filings/{filing}/submit', [IrdFilingController::class, 'submit'])->name('ird-filings.submit');

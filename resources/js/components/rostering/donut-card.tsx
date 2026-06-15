@@ -18,6 +18,10 @@ export type DonutCardProps = {
     cta: string;
     onClick: () => void;
     ariaControls?: string;
+    /** Optional per-row value formatter (e.g. money), forwarded to DonutLegend. */
+    formatValue?: (value: number) => ReactNode;
+    /** Show each legend row's share of the total as a percent. */
+    showPercent?: boolean;
 };
 
 const TONE_STYLES: Record<
@@ -57,6 +61,8 @@ export function DonutCard({
     cta,
     onClick,
     ariaControls,
+    formatValue,
+    showPercent,
 }: DonutCardProps): ReactNode {
     const t = TONE_STYLES[tone];
     return (
@@ -99,7 +105,12 @@ export function DonutCard({
                     <div className="mb-2 text-xs text-muted-foreground/70">
                         {subtitle}
                     </div>
-                    <DonutLegend segments={segments} accentKeys={accentKeys} />
+                    <DonutLegend
+                        segments={segments}
+                        accentKeys={accentKeys}
+                        formatValue={formatValue}
+                        showPercent={showPercent}
+                    />
                     <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
                         <span>{cta}</span>
                         <span

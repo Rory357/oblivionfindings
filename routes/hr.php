@@ -518,6 +518,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/pay', [PayrollExportController::class, 'payNet'])->name('payroll.runs.pay');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::get('/payroll/runs/{run}/net-pay-file', [PayrollExportController::class, 'downloadNetPayFile'])->name('payroll.runs.net-pay-file');
             Route::post('/payroll/export-profiles', [PayrollExportController::class, 'storeProfile'])->name('payroll.profiles.store');
             Route::put('/payroll/export-profiles/{profile}', [PayrollExportController::class, 'updateProfile'])->name('payroll.profiles.update');
             Route::post('/payroll/export-profiles/{profile}/set-default', [PayrollExportController::class, 'setDefaultProfile'])->name('payroll.profiles.set-default');

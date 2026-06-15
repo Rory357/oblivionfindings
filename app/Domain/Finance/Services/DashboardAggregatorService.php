@@ -2,51 +2,193 @@
 
 namespace App\Domain\Finance\Services;
 
-use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
-use App\Models\Invoice;
+use App\Domain\Finance\Services\Calendar\FinanceCalendarAggregator;
+use App\Domain\Hr\Models\HrPayrollRun;
+use App\Models\BillingEntry;
+use App\Models\FundingClaim;
+use App\Models\ServiceAgreement;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DashboardAggregatorService
 {
+    /** @var array<int,string> */
+    private const PERIODS = ['month', 'quarter', 'fy'];
+
+    public function __construct(
+        private AccountsReceivableService $arService,
+        private FinanceCalendarAggregator $calendarAggregator,
+    ) {}
+
     /**
-     * Get all dashboard data for the finance module.
+     * Get all dashboard data for the finance module, scoped to a period and
+     * optional cost-centre (site) / funding-stream (funder) filters.
+     *
+     * @param  list<int>  $costCentreIds  Cost-centre ids to scope GL aggregates to (empty = all).
+     * @param  list<int>  $fundingStreamIds  Funding-stream ids to scope GL aggregates to (empty = all).
      */
-    public function getDashboardData(?int $orgId): array
-    {
-        $now = Carbon::now();
-        $monthStart = $now->copy()->startOfMonth()->toDateString();
-        $monthEnd = $now->copy()->endOfMonth()->toDateString();
+    public function getDashboardData(
+        ?int $orgId,
+        string $period = 'month',
+        array $costCentreIds = [],
+        array $fundingStreamIds = [],
+    ): array {
+        $period = in_array($period, self::PERIODS, true) ? $period : 'month';
+        [$start, $end] = $this->periodRange($period);
+
+        $revenue = $this->getTotal($orgId, 'revenue', $start, $end, $costCentreIds, $fundingStreamIds);
+        $expenses = $this->getTotal($orgId, 'expense', $start, $end, $costCentreIds, $fundingStreamIds);
+        // AR is a point-in-time balance (not period-scoped) read from the live
+        // FinInvoice table via the canonical AccountsReceivableService.
+        $arAging = $this->getArAging($orgId);
+        $fundedResidents = $this->getFundedResidentCount($orgId);
 
         return [
-            'totalRevenue' => $this->getCurrentMonthTotal($orgId, 'revenue', $monthStart, $monthEnd),
-            'totalExpenses' => $this->getCurrentMonthTotal($orgId, 'expense', $monthStart, $monthEnd),
-            'netProfit' => $this->getCurrentMonthTotal($orgId, 'revenue', $monthStart, $monthEnd)
-                - $this->getCurrentMonthTotal($orgId, 'expense', $monthStart, $monthEnd),
+            'period' => $period,
+            'periodLabel' => $this->periodLabel($period),
+            'totalRevenue' => $revenue,
+            'totalExpenses' => $expenses,
+            'netProfit' => round($revenue - $expenses, 2),
+            'fundedResidents' => $fundedResidents,
+            'revenuePerResident' => $fundedResidents > 0 ? round($revenue / $fundedResidents, 2) : 0.0,
+            'gstDue' => $this->getGstDueAttention($orgId),
             'cashBalance' => $this->getCashBalance($orgId),
-            'accountsReceivable' => $this->getOutstandingReceivables($orgId),
+            'accountsReceivable' => $arAging['total'],
+            'arAging' => $arAging,
             'accountsPayable' => $this->getOutstandingPayables($orgId),
-            'revenueByMonth' => $this->getMonthlyTotals($orgId, 'revenue', 6),
-            'expensesByMonth' => $this->getMonthlyTotals($orgId, 'expense', 6),
-            'topExpenseCategories' => $this->getTopExpenseCategories($orgId, $monthStart, $monthEnd),
+            'revenueByMonth' => $this->getMonthlyTotals($orgId, 'revenue', 6, $costCentreIds, $fundingStreamIds),
+            'expensesByMonth' => $this->getMonthlyTotals($orgId, 'expense', 6, $costCentreIds, $fundingStreamIds),
+            'topExpenseCategories' => $this->getTopExpenseCategories($orgId, $start, $end, $costCentreIds, $fundingStreamIds),
+            'revenueByFundingStream' => $this->getRevenueByFundingStream($orgId, $start, $end, $costCentreIds, $fundingStreamIds),
+            'fundingClaims' => $this->getFundingClaims($orgId),
+            'fundingUtilisation' => $this->getFundingUtilisation($orgId),
             'upcomingBillsDue' => $this->getUpcomingBills($orgId),
+            'apDueWithin7' => $this->getApDueWithin7($orgId),
+            'cashRunwayDays' => $this->getCashRunwayDays($orgId),
+            'payrollAwaitingApproval' => $this->getPayrollAwaitingApproval($orgId),
+            'paydayFilingDue' => $this->getPaydayFilingDue($orgId),
             'recentJournals' => $this->getRecentJournals($orgId),
         ];
     }
 
-    private function getCurrentMonthTotal(?int $orgId, string $accountType, string $startDate, string $endDate): float
+    /**
+     * Payroll runs not yet posted to the GL (draft, or locked but unposted) —
+     * "awaiting approval/processing". Tenant resolves to the org id here.
+     */
+    private function getPayrollAwaitingApproval(?int $orgId): array
     {
-        $result = FinJournalLine::query()
-            ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')
-            ->join('fin_accounts', 'fin_journal_lines.account_id', '=', 'fin_accounts.id')
+        $rows = HrPayrollRun::query()
+            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+            ->whereIn('status', ['draft', 'locked'])
+            ->whereNull('journal_id')
+            ->get(['total_gross']);
+
+        return [
+            'count' => $rows->count(),
+            'total_gross' => round((float) $rows->sum(fn ($r) => (float) $r->total_gross), 2),
+        ];
+    }
+
+    /**
+     * Posted payroll runs that still owe an IRD payday filing (no payday
+     * FinIrdFiling links back to them).
+     */
+    private function getPaydayFilingDue(?int $orgId): array
+    {
+        $postedRunIds = HrPayrollRun::query()
+            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+            ->whereNotNull('journal_id')
+            ->pluck('id');
+
+        $filedRunIds = FinIrdFiling::forOrganization($orgId)
+            ->ofType('payday')
+            ->whereNotNull('payroll_run_id')
+            ->pluck('payroll_run_id');
+
+        return ['count' => $postedRunIds->diff($filedRunIds)->count()];
+    }
+
+    /** @return array{0:string,1:string} [startDate, endDate] for the period. */
+    private function periodRange(string $period): array
+    {
+        $now = Carbon::now();
+
+        return match ($period) {
+            'quarter' => [
+                $now->copy()->firstOfQuarter()->toDateString(),
+                $now->copy()->lastOfQuarter()->toDateString(),
+            ],
+            'fy' => $this->financialYearRange($now),
+            default => [
+                $now->copy()->startOfMonth()->toDateString(),
+                $now->copy()->endOfMonth()->toDateString(),
+            ],
+        };
+    }
+
+    /** NZ financial year: 1 Apr – 31 Mar. */
+    private function financialYearRange(Carbon $now): array
+    {
+        $startYear = $now->month >= 4 ? $now->year : $now->year - 1;
+
+        return [
+            Carbon::create($startYear, 4, 1)->toDateString(),
+            Carbon::create($startYear + 1, 3, 31)->toDateString(),
+        ];
+    }
+
+    private function periodLabel(string $period): string
+    {
+        $now = Carbon::now();
+
+        return match ($period) {
+            'quarter' => 'Q'.$now->quarter.' '.$now->year,
+            'fy' => 'FY'.($now->month >= 4 ? $now->year + 1 : $now->year),
+            default => $now->format('F Y'),
+        };
+    }
+
+    /**
+     * Apply the org / cost-centre / funding-stream filters that are common to
+     * every posted-GL aggregate query.
+     *
+     * @param  list<int>  $costCentreIds
+     * @param  list<int>  $fundingStreamIds
+     */
+    private function applyFilters(
+        QueryBuilder $query,
+        ?int $orgId,
+        array $costCentreIds,
+        array $fundingStreamIds,
+    ): QueryBuilder {
+        return $query
             ->when($orgId, fn ($q) => $q->where('fin_journals.organization_id', $orgId))
             ->where('fin_journals.status', 'posted')
+            ->when($costCentreIds, fn ($q) => $q->whereIn('fin_journal_lines.cost_centre_id', $costCentreIds))
+            ->when($fundingStreamIds, fn ($q) => $q->whereIn('fin_journal_lines.funding_stream_id', $fundingStreamIds));
+    }
+
+    private function getTotal(
+        ?int $orgId,
+        string $accountType,
+        string $startDate,
+        string $endDate,
+        array $costCentreIds = [],
+        array $fundingStreamIds = [],
+    ): float {
+        $query = DB::table('fin_journal_lines')
+            ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')
+            ->join('fin_accounts', 'fin_journal_lines.account_id', '=', 'fin_accounts.id')
             ->whereBetween('fin_journals.journal_date', [$startDate, $endDate])
-            ->where('fin_accounts.type', $accountType)
+            ->where('fin_accounts.type', $accountType);
+
+        $result = $this->applyFilters($query, $orgId, $costCentreIds, $fundingStreamIds)
             ->select(
                 DB::raw('COALESCE(SUM(fin_journal_lines.debit), 0) as total_debits'),
                 DB::raw('COALESCE(SUM(fin_journal_lines.credit), 0) as total_credits'),
@@ -68,12 +210,24 @@ class DashboardAggregatorService
             ->sum('current_balance');
     }
 
-    private function getOutstandingReceivables(?int $orgId): float
+    /**
+     * Accounts-receivable aging snapshot, sourced from the canonical
+     * AccountsReceivableService (live FinInvoice, net of FinPaymentAllocation).
+     * Buckets keyed for the frontend; `over60` = 61–90 + 90+ for the AR KPI.
+     */
+    private function getArAging(?int $orgId): array
     {
-        return (float) Invoice::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
-            ->where('status', 'sent')
-            ->sum('total_amount');
+        $totals = $this->arService->getAgedReceivables($orgId)['totals'];
+
+        return [
+            'current' => (float) $totals['current'],
+            'd1_30' => (float) $totals['1_30'],
+            'd31_60' => (float) $totals['31_60'],
+            'd61_90' => (float) $totals['61_90'],
+            'd90_plus' => (float) $totals['90_plus'],
+            'over60' => round((float) $totals['61_90'] + (float) $totals['90_plus'], 2),
+            'total' => (float) $totals['total'],
+        ];
     }
 
     private function getOutstandingPayables(?int $orgId): float
@@ -85,8 +239,13 @@ class DashboardAggregatorService
             ->value('total_outstanding');
     }
 
-    private function getMonthlyTotals(?int $orgId, string $accountType, int $months): array
-    {
+    private function getMonthlyTotals(
+        ?int $orgId,
+        string $accountType,
+        int $months,
+        array $costCentreIds = [],
+        array $fundingStreamIds = [],
+    ): array {
         $result = [];
         $now = Carbon::now();
 
@@ -95,26 +254,29 @@ class DashboardAggregatorService
             $start = $month->copy()->startOfMonth()->toDateString();
             $end = $month->copy()->endOfMonth()->toDateString();
 
-            $total = $this->getCurrentMonthTotal($orgId, $accountType, $start, $end);
-
             $result[] = [
                 'month' => $month->format('M Y'),
-                'amount' => $total,
+                'amount' => $this->getTotal($orgId, $accountType, $start, $end, $costCentreIds, $fundingStreamIds),
             ];
         }
 
         return $result;
     }
 
-    private function getTopExpenseCategories(?int $orgId, string $startDate, string $endDate): array
-    {
-        return FinJournalLine::query()
+    private function getTopExpenseCategories(
+        ?int $orgId,
+        string $startDate,
+        string $endDate,
+        array $costCentreIds = [],
+        array $fundingStreamIds = [],
+    ): array {
+        $query = DB::table('fin_journal_lines')
             ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')
             ->join('fin_accounts', 'fin_journal_lines.account_id', '=', 'fin_accounts.id')
-            ->when($orgId, fn ($q) => $q->where('fin_journals.organization_id', $orgId))
-            ->where('fin_journals.status', 'posted')
             ->whereBetween('fin_journals.journal_date', [$startDate, $endDate])
-            ->where('fin_accounts.type', 'expense')
+            ->where('fin_accounts.type', 'expense');
+
+        return $this->applyFilters($query, $orgId, $costCentreIds, $fundingStreamIds)
             ->select(
                 'fin_accounts.name as account_name',
                 DB::raw('SUM(fin_journal_lines.debit) - SUM(fin_journal_lines.credit) as total'),
@@ -128,6 +290,146 @@ class DashboardAggregatorService
                 'amount' => round((float) $row->total, 2),
             ])
             ->toArray();
+    }
+
+    /**
+     * Revenue grouped by funding stream (real GL — lines tagged with
+     * funding_stream_id), period-scoped. Untagged revenue → "Unassigned".
+     */
+    private function getRevenueByFundingStream(
+        ?int $orgId,
+        string $startDate,
+        string $endDate,
+        array $costCentreIds = [],
+        array $fundingStreamIds = [],
+    ): array {
+        $query = DB::table('fin_journal_lines')
+            ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')
+            ->join('fin_accounts', 'fin_journal_lines.account_id', '=', 'fin_accounts.id')
+            ->leftJoin('fin_funding_streams', 'fin_journal_lines.funding_stream_id', '=', 'fin_funding_streams.id')
+            ->whereBetween('fin_journals.journal_date', [$startDate, $endDate])
+            ->where('fin_accounts.type', 'revenue');
+
+        return $this->applyFilters($query, $orgId, $costCentreIds, $fundingStreamIds)
+            ->select(
+                DB::raw("COALESCE(fin_funding_streams.name, 'Unassigned') as stream_name"),
+                DB::raw('SUM(fin_journal_lines.credit) - SUM(fin_journal_lines.debit) as total'),
+            )
+            ->groupBy('fin_funding_streams.id', 'fin_funding_streams.name')
+            ->havingRaw('SUM(fin_journal_lines.credit) - SUM(fin_journal_lines.debit) <> 0')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->stream_name,
+                'amount' => round((float) $row->total, 2),
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Recent funding claims for the dashboard table. Funder name comes from the
+     * linked service agreement's funding_body. Org-scoped snapshot (claims have
+     * no GL funding-stream dimension, so the funder filter doesn't apply here).
+     */
+    private function getFundingClaims(?int $orgId): array
+    {
+        return FundingClaim::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->with('serviceAgreement:id,funding_body')
+            ->orderByDesc('period_end')
+            ->limit(6)
+            ->get()
+            ->map(fn (FundingClaim $claim) => [
+                'reference' => $claim->claim_reference ?: ('FC-'.$claim->id),
+                'funder' => $claim->serviceAgreement?->funding_body ?: 'Unassigned',
+                'period' => $claim->period_end?->format('M Y') ?? '—',
+                'status' => $claim->status,
+                'amount' => (float) $claim->total_amount,
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Funding-claim utilisation buckets (point-in-time snapshot from existing
+     * data, no invented figures):
+     *  - claimed & paid: FundingClaim status=paid
+     *  - awaiting remittance: claimed but unpaid (status submitted/approved)
+     *  - delivered, not yet claimed: pending BillingEntry within the last 90 days
+     *  - write-off risk: pending BillingEntry older than 90 days
+     * utilisation_pct = claimed value ÷ total deliverable value.
+     */
+    private function getFundingUtilisation(?int $orgId): array
+    {
+        $byStatus = FundingClaim::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->selectRaw('status, COALESCE(SUM(total_amount), 0) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $paid = (float) ($byStatus['paid'] ?? 0);
+        $awaiting = (float) ($byStatus['submitted'] ?? 0) + (float) ($byStatus['approved'] ?? 0);
+
+        $cutoff = Carbon::now()->subDays(90)->toDateString();
+        $deliveredUnclaimed = (float) BillingEntry::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'pending')
+            ->where('service_date', '>=', $cutoff)
+            ->sum('amount');
+        $writeOffRisk = (float) BillingEntry::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'pending')
+            ->where('service_date', '<', $cutoff)
+            ->sum('amount');
+
+        $claimed = $paid + $awaiting;
+        $unclaimed = $deliveredUnclaimed + $writeOffRisk;
+        $deliverable = $claimed + $unclaimed;
+
+        return [
+            'claimed_paid' => round($paid, 2),
+            'awaiting_remittance' => round($awaiting, 2),
+            'delivered_unclaimed' => round($deliveredUnclaimed, 2),
+            'write_off_risk' => round($writeOffRisk, 2),
+            'unclaimed_total' => round($unclaimed, 2),
+            'utilisation_pct' => $deliverable > 0 ? (int) round(($claimed / $deliverable) * 100) : 0,
+        ];
+    }
+
+    /** Distinct residents (clients) on active service agreements — the funded population. */
+    private function getFundedResidentCount(?int $orgId): int
+    {
+        return (int) ServiceAgreement::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'active')
+            ->distinct()
+            ->count('client_id');
+    }
+
+    /**
+     * The next unsettled GST obligation within ~45 days, from the finance
+     * calendar's GST provider (computed IRD deadlines). Null when none is due.
+     */
+    private function getGstDueAttention(?int $orgId): ?array
+    {
+        $items = $this->calendarAggregator->itemsForRange(
+            $orgId,
+            Carbon::today(),
+            Carbon::today()->addDays(45),
+            ['sources' => ['gst_due']],
+        );
+
+        foreach ($items as $item) {
+            if (in_array($item->status, ['due', 'overdue'], true)) {
+                return [
+                    'due' => $item->start,
+                    'amount' => $item->amount,
+                    'status' => $item->status,
+                    'ref' => $item->ref,
+                ];
+            }
+        }
+
+        return null;
     }
 
     private function getUpcomingBills(?int $orgId): array
@@ -149,6 +451,45 @@ class DashboardAggregatorService
                 'amount_due' => $bill->getAmountDue(),
             ])
             ->toArray();
+    }
+
+    /** AP falling due within the next 7 days — count + outstanding total. */
+    private function getApDueWithin7(?int $orgId): array
+    {
+        $rows = FinBill::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->whereIn('status', ['approved', 'partially_paid'])
+            ->whereColumn('amount_paid', '<', 'total_amount')
+            ->whereBetween('due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+            ->get(['total_amount', 'amount_paid']);
+
+        return [
+            'count' => $rows->count(),
+            'total' => round($rows->sum(fn ($b) => (float) $b->total_amount - (float) $b->amount_paid), 2),
+        ];
+    }
+
+    /**
+     * Cash runway estimate: cash on hand ÷ average daily expense over the
+     * trailing 90 days. Null when there is no recent expense to project from.
+     */
+    private function getCashRunwayDays(?int $orgId): ?int
+    {
+        $cash = $this->getCashBalance($orgId);
+        $expenses = $this->getTotal(
+            $orgId,
+            'expense',
+            Carbon::now()->subDays(90)->toDateString(),
+            Carbon::now()->toDateString(),
+        );
+
+        if ($expenses <= 0) {
+            return null;
+        }
+
+        $perDay = $expenses / 90;
+
+        return $perDay > 0 ? (int) round($cash / $perDay) : null;
     }
 
     private function getRecentJournals(?int $orgId): array

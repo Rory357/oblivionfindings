@@ -7,6 +7,8 @@ use App\Domain\Finance\Services\Calendar\Providers\BillDueProvider;
 use App\Domain\Finance\Services\Calendar\Providers\GstReturnProvider;
 use App\Domain\Finance\Services\Calendar\Providers\InvoiceDueProvider;
 use App\Domain\Finance\Services\Calendar\Providers\PaymentRunProvider;
+use App\Domain\Finance\Services\Calendar\Providers\PayrollObligationProvider;
+use App\Domain\Finance\Services\Calendar\Providers\PeriodCloseProvider;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use Illuminate\Support\Carbon;
 
@@ -46,6 +48,8 @@ class FinanceCalendarAggregator
             new BillDueProvider,
             new PaymentRunProvider,
             new GstReturnProvider,
+            new PayrollObligationProvider,
+            new PeriodCloseProvider,
         ];
     }
 
