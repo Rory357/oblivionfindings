@@ -67,6 +67,16 @@ run_app php artisan storage:link 2>/dev/null || true
 echo "▶ php artisan optimize:clear"
 run_app php artisan optimize:clear
 
+# Demo data for the redesigned /emar/rounds page. Opt-in (set SEED_DEMO_DATA=true
+# in .env on demo/test servers) so we never inject fake residents into a real
+# deployment. Idempotent + date-relative, so every deploy refreshes TODAY's rounds.
+# Non-fatal: a seeding hiccup must never fail the deploy.
+if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
+    echo "▶ php artisan db:seed MedicationRoundsDemoSeeder (SEED_DEMO_DATA=true)"
+    run_app php artisan db:seed --class='Database\Seeders\MedicationRoundsDemoSeeder' --force \
+        || echo "  ⚠ demo round seed failed (non-fatal) — run manually if needed."
+fi
+
 if [ "$SKIP_NOMINATIM" -eq 1 ]; then
     echo "▶ skipping geocoder health check (--skip-nominatim)"
 elif [ "$INSTALL_NOMINATIM" -eq 1 ]; then
