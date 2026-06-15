@@ -72,6 +72,56 @@ class UpdateSiteRequest extends FormRequest
             'checklists.*.enabled' => ['nullable', 'boolean'],
             'checklists.*.frequency' => ['nullable', 'string', 'max:30'],
             'checklists.*.assigned_to_user_id' => ['nullable', 'exists:users,id'],
+
+            // Site capacity (column already exists on sites)
+            'total_capacity' => ['nullable', 'integer', 'min:0'],
+
+            // Rostering — coverage rules (each card fans out to one
+            // SiteCoverageRequirement row per selected day on store).
+            'coverage' => ['nullable', 'array'],
+            'coverage.*.name' => ['required_with:coverage', 'string', 'max:255'],
+            'coverage.*.coverage_type' => ['required_with:coverage', 'in:day,evening,overnight,custom'],
+            'coverage.*.days' => ['required_with:coverage', 'array', 'min:1'],
+            'coverage.*.days.*' => ['in:mon,tue,wed,thu,fri,sat,sun'],
+            'coverage.*.starts_time' => ['required_with:coverage', 'date_format:H:i'],
+            'coverage.*.ends_time' => ['required_with:coverage', 'date_format:H:i'],
+            'coverage.*.minimum_staff' => ['required_with:coverage', 'integer', 'min:1', 'max:12'],
+            'coverage.*.shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
+            'coverage.*.allow_overstaffing' => ['nullable', 'boolean'],
+            'coverage.*.service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
+            'coverage.*.roles' => ['nullable', 'array'],
+            'coverage.*.roles.caregiver' => ['nullable', 'integer', 'min:0', 'max:12'],
+            'coverage.*.roles.driver' => ['nullable', 'integer', 'min:0', 'max:12'],
+            'coverage.*.roles.med_competent' => ['nullable', 'integer', 'min:0', 'max:12'],
+
+            // Rostering — required staff credentials → SiteStaffRequirement
+            'credentials' => ['nullable', 'array'],
+            'credentials.*.key' => ['required_with:credentials', 'string', 'max:50'],
+            'credentials.*.name' => ['required_with:credentials', 'string', 'max:255'],
+            'credentials.*.category' => ['required_with:credentials', 'in:mandatory,recommended'],
+            'credentials.*.expiry_period_months' => ['nullable', 'integer', 'min:0', 'max:120'],
+
+            // Rostering — default shift templates (optional) → RosterTemplate
+            'shift_templates' => ['nullable', 'array'],
+            'shift_templates.*.name' => ['required_with:shift_templates', 'string', 'max:255'],
+            'shift_templates.*.starts_time' => ['required_with:shift_templates', 'date_format:H:i'],
+            'shift_templates.*.ends_time' => ['required_with:shift_templates', 'date_format:H:i'],
+
+            // Geofence — circle seeded into the shared AssetGeofence
+            'geofence' => ['nullable', 'array'],
+            'geofence.mode' => ['nullable', 'in:radius,draw'],
+            'geofence.radius_m' => ['nullable', 'integer', 'min:25', 'max:2000'],
+            'geofence.breach_type' => ['nullable', 'in:enter,exit,both'],
+            'geofence.is_active' => ['nullable', 'boolean'],
+
+            // Property & finance (weekly_food_budget dollars → cents on store)
+            'rent_amount' => ['nullable', 'numeric', 'min:0'],
+            'rent_frequency' => ['nullable', 'in:weekly,fortnightly,monthly,annually'],
+            'lease_start_date' => ['nullable', 'date'],
+            'lease_end_date' => ['nullable', 'date', 'after_or_equal:lease_start_date'],
+            'landlord_name' => ['nullable', 'string', 'max:255'],
+            'landlord_contact' => ['nullable', 'string', 'max:255'],
+            'weekly_food_budget' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

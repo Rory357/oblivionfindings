@@ -9,8 +9,10 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   default week" (identity FKs nullable, so no fabrication); (3) `coverage.days[]` **fans out** to one
   SiteCoverageRequirement row per (card×day). Branch `feat/sites-add-site-modal` off origin/main.
   **PAUSED for approval (interactive).**
-- [ ] **S1 — Validation foundation.** New rules in StoreSiteRequest + UpdateSiteRequest
-  (coverage/credentials/shift_templates/geofence/finance/total_capacity). No migration. Unit tests.
+- [x] **S1 — Validation foundation.** Added coverage/credentials/shift_templates/geofence/finance/
+  total_capacity rule blocks to StoreSiteRequest + UpdateSiteRequest (no migration — cols already
+  exist). `tests/Feature/Sites/AddSiteModalValidationTest.php` (14 tests/29 assertions, green); Pint
+  clean. Commit `<s1>`.
 - [ ] **S2 — Controller fan-out + index props.** Transactional store fan-out (coverage rows,
   credentials, shift templates, finance cents, circle AssetGeofence) + index reference props +
   config/site_credentials.php. Feature tests.
