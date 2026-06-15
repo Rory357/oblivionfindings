@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 type ActiveAccess = { id: number; client_id: number; client_name: string; site_name: string | null; reason: string; reason_category: string | null; cosign_label: string | null; granted_by: string | null; created_at: string | null; expires_at: string | null; can_revoke: boolean };
-type AuditRow = { id: number; client_id: number; staff: string; client_name: string; site_name: string | null; reason: string; reason_category: string | null; minutes: number | null; created_at: string | null; expires_at: string | null; status: string; revoked_by: string | null; review_outcome: string | null; reviewed_by: string | null };
+type AuditRow = { id: number; client_id: number; staff: string; client_name: string; site_name: string | null; reason: string; reason_category: string | null; minutes: number | null; created_at: string | null; expires_at: string | null; status: string; revoked_by: string | null; review_outcome: string | null; reviewed_by: string | null; incident_report_id: number | null; events: { action: string; detail: string | null; at: string | null }[] };
 type Flagged = { type: string; key: string; severity: string; title: string; detail: string };
 type Policy = { default_minutes: number; max_minutes: number; extend_minutes: number; auto_revoke: boolean; reason_required: boolean; repeat_threshold_count: number; repeat_window_days: number };
 type Stats = { active: number; granted_week: number; awaiting_review: number; flagged: number };
@@ -35,6 +35,7 @@ type Props = {
     site_brand_colour: string | null;
     request_client: ClientLite | null;
     can_edit_policy: boolean;
+    incidents_by_client: Record<number, { id: number; label: string; date: string | null }[]>;
 };
 
 const fmtLeft = (ms: number) => {
@@ -56,7 +57,7 @@ function exportCsv(rows: AuditRow[]) {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `break-glass-audit-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
-export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour, request_client: requestClient, can_edit_policy: canEditPolicy }: Props) {
+export default function EmergencyAccess({ query, results, activeAccesses, auditLog, flaggedSignals, approvers, can_review: canReview, policy, stats, sites, active_site: activeSite, site_brand_colour: brandColour, request_client: requestClient, can_edit_policy: canEditPolicy, incidents_by_client: incidentsByClient }: Props) {
     const [tab, setTab] = useState('active');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     // Auto-open the wizard when deep-linked for a client that has no live grant yet.
@@ -266,7 +267,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
             </div>
 
             {wizardOpen && <RequestAccessDialog results={results} query={query} approvers={approvers} prefillClient={requestClient} onSearch={onSearch} onClose={() => setWizardOpen(false)} />}
-            {reviewRecord && <ReviewDialog record={reviewRecord} onClose={() => setReviewRecord(null)} />}
+            {reviewRecord && <ReviewDialog record={reviewRecord} incidents={incidentsByClient[reviewRecord.client_id] ?? []} onClose={() => setReviewRecord(null)} />}
             <Dialog open={!!dismissTarget} onOpenChange={(o) => { if (!o) { setDismissTarget(null); setDismissReason(''); } }}>
                 <DialogContent>
                     <DialogHeader>

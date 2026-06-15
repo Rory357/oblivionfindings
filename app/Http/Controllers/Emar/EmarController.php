@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -791,6 +792,8 @@ class EmarController extends Controller
             $marData = $this->buildMarData($selectedClient, $scheduleDate);
             $clientContext = $this->buildClientMedicationContext($selectedClient);
             $breakGlassAccess = $this->getBreakGlassState($selectedClient);
+            // Access-scope log: record a break-glass user opening this client's MAR.
+            BreakGlassAccessEvent::recordFor($request->user(), $selectedClient, 'viewed_mar', null, 5);
             $pendingCorrections = $this->getPendingCorrections($selectedClient);
             $alerts = $this->getClientAlerts($selectedClient);
             $controlledDiscrepancies = $this->getOpenControlledDiscrepancies($selectedClient);

@@ -20,14 +20,18 @@ export type ReviewRecord = {
     minutes: number | null;
     created_at: string | null;
     review_outcome: string | null;
+    incident_report_id: number | null;
+    events: { action: string; detail: string | null; at: string | null }[];
 };
+
+type IncidentOption = { id: number; label: string; date: string | null };
 
 const fmtDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 
-export function ReviewDialog({ record, onClose }: { record: ReviewRecord; onClose: () => void }) {
+export function ReviewDialog({ record, incidents, onClose }: { record: ReviewRecord; incidents: IncidentOption[]; onClose: () => void }) {
     const [outcome, setOutcome] = useState<'justified' | 'not_justified' | ''>(record.review_outcome === 'justified' || record.review_outcome === 'not_justified' ? record.review_outcome : '');
     const [notes, setNotes] = useState('');
-    const [incidentLinked, setIncidentLinked] = useState(false);
+    const [incidentId, setIncidentId] = useState<number | null>(record.incident_report_id);
     const [busy, setBusy] = useState(false);
 
     const save = () => {
@@ -36,7 +40,7 @@ export function ReviewDialog({ record, onClose }: { record: ReviewRecord; onClos
         router.post(`/emar/clients/${record.client_id}/break-glass/${record.id}/review`, {
             review_outcome: outcome,
             review_notes: notes.trim() || null,
-            incident_report_linked: incidentLinked,
+            incident_report_id: incidentId,
         }, {
             preserveScroll: true,
             onSuccess: () => { toast.success(`Review saved — marked ${outcome === 'justified' ? 'justified' : 'not justified'}`); onClose(); },
@@ -73,10 +77,35 @@ export function ReviewDialog({ record, onClose }: { record: ReviewRecord; onClos
 
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reviewer notes (optional)…" className="min-h-16" />
 
-                <label className="flex items-center gap-2.5 rounded-lg border border-border p-3 text-sm">
-                    <input type="checkbox" checked={incidentLinked} onChange={(e) => setIncidentLinked(e.target.checked)} className="h-4 w-4 rounded border-border" />
-                    Incident report has been linked
-                </label>
+                <div className="rounded-lg border">
+                    <div className="border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accessed during this window</div>
+                    {record.events.length === 0 ? (
+                        <p className="px-3 py-2.5 text-sm text-muted-foreground">No medication activity was recorded under this grant.</p>
+                    ) : (
+                        <ul className="max-h-40 divide-y overflow-y-auto text-sm">
+                            {record.events.map((e, i) => (
+                                <li key={i} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                                    <span>{e.action === 'viewed_mar' ? 'Viewed MAR chart' : e.action === 'recorded_dose' ? 'Recorded dose' : e.action}{e.detail ? ` — ${e.detail}` : ''}</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">{fmtDateTime(e.at)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div>
+                    <div className="mb-1.5 text-sm font-medium">Link incident report</div>
+                    {incidents.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No incident reports recorded for this client.</p>
+                    ) : (
+                        <select value={incidentId ?? ''} onChange={(e) => setIncidentId(e.target.value ? Number(e.target.value) : null)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <option value="">— None —</option>
+                            {incidents.map((inc) => (
+                                <option key={inc.id} value={inc.id}>{inc.label}{inc.date ? ` · ${inc.date}` : ''}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
 
                 <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>

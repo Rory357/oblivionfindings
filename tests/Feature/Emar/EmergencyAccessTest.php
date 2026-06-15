@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Models\BreakGlassAccessEvent;
 use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientIncident;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -170,7 +172,6 @@ class EmergencyAccessTest extends TestCase
             ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
                 'review_outcome' => 'justified',
                 'review_notes' => 'Appropriate emergency use',
-                'incident_report_linked' => true,
             ])
             ->assertSessionHasNoErrors();
 
@@ -178,7 +179,6 @@ class EmergencyAccessTest extends TestCase
         $this->assertSame('justified', $access->review_outcome);
         $this->assertSame($user->id, $access->reviewed_by);
         $this->assertNotNull($access->reviewed_at);
-        $this->assertTrue($access->incident_report_linked);
     }
 
     public function test_review_is_denied_without_audit_permission(): void
@@ -374,6 +374,67 @@ class EmergencyAccessTest extends TestCase
 
         $this->assertContains($response->status(), [403, 404]);
         $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
+    }
+
+    public function test_review_links_a_real_incident_report(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        $access->forceFill(['expires_at' => now()->subMinutes(5)])->save();
+        $incident = ClientIncident::factory()->create(['client_id' => $client->id]);
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
+                'review_outcome' => 'justified',
+                'incident_report_id' => $incident->id,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $access->refresh();
+        $this->assertSame($incident->id, $access->incident_report_id);
+        $this->assertTrue((bool) $access->incident_report_linked);
+    }
+
+    public function test_review_rejects_incident_from_another_client(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        $other = Client::factory()->create(['site_id' => $client->site_id, 'status' => 'active']);
+        $foreignIncident = ClientIncident::factory()->create(['client_id' => $other->id]);
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
+                'review_outcome' => 'justified',
+                'incident_report_id' => $foreignIncident->id,
+            ])
+            ->assertSessionHasErrors('incident_report_id');
+    }
+
+    public function test_access_scope_event_is_recorded_and_surfaced(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+
+        BreakGlassAccessEvent::recordFor($user, $client, 'viewed_mar');
+        BreakGlassAccessEvent::recordFor($user, $client, 'recorded_dose', 'Paracetamol · given');
+
+        $this->assertDatabaseHas('break_glass_access_events', ['break_glass_access_id' => $access->id, 'action' => 'viewed_mar']);
+        $this->assertDatabaseHas('break_glass_access_events', ['break_glass_access_id' => $access->id, 'action' => 'recorded_dose', 'detail' => 'Paracetamol · given']);
+
+        // Surfaced on the audit row for the review modal.
+        $this->actingAs($user)
+            ->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->has('auditLog.0.events', 2));
+    }
+
+    public function test_access_scope_record_is_noop_without_active_grant(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        $other = Client::factory()->create(['site_id' => $client->site_id, 'status' => 'active']);
+
+        // No grant for this user on $other → nothing recorded.
+        BreakGlassAccessEvent::recordFor($user, $other, 'viewed_mar');
+
+        $this->assertDatabaseCount('break_glass_access_events', 0);
     }
 
     protected function makeRoleUser(string $roleName): User
