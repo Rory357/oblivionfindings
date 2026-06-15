@@ -10,6 +10,7 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientDocument;
+use App\Models\ClientIncident;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -1195,10 +1196,64 @@ class EmarController extends Controller
             : $siteClientIds;
         $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
+        // BK3 — enrich near/over-limit PRN meds with today's per-dose timeline
+        // (derived; no schema) and, for over-limit meds, any incident already
+        // raised by MedicationIncidentIntegrationService (matched on its
+        // deterministic title so the lookup is schema-robust).
+        $boardPrn = $this->boardPayload->prnMedications($dataClientIds, $now);
+        $riskMedIds = array_values(array_filter(array_map(
+            fn ($m) => ($m['near_limit'] || $m['over_limit']) ? $m['id'] : null,
+            $boardPrn,
+        )));
+        $dosesByMed = [];
+        if (! empty($riskMedIds)) {
+            ClientMedicationAdministration::query()
+                ->whereIn('client_medication_id', $riskMedIds)
+                ->where('status', 'given')
+                ->where('administered_at', '>=', $now->copy()->subDay()->utc())
+                ->with(['administeredBy:id,name', 'prnEffectiveness'])
+                ->orderBy('administered_at')
+                ->get()
+                ->each(function (ClientMedicationAdministration $d) use (&$dosesByMed, $timezone) {
+                    $at = $d->getRawOriginal('administered_at') ? $this->boardPayload->rawUtcInstant($d, 'administered_at') : null;
+                    $dosesByMed[$d->client_medication_id][] = [
+                        'id' => $d->id,
+                        'time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
+                        'date_label' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
+                        'dose' => $d->dose_given,
+                        'given_by' => $d->administeredBy?->name,
+                        'effectiveness' => $d->prnEffectiveness?->effectiveness,
+                        'effectiveness_label' => $d->prnEffectiveness?->effectiveness_label,
+                    ];
+                });
+        }
+        $boardPrn = array_map(function (array $m) use ($dosesByMed, $now) {
+            $m['today_doses'] = $dosesByMed[$m['id']] ?? [];
+            $m['over_limit_incident'] = null;
+            if ($m['over_limit']) {
+                $incident = ClientIncident::query()
+                    ->where('client_id', $m['client_id'])
+                    ->where('title', 'PRN limit exceeded: '.$m['name'])
+                    ->where('created_at', '>=', $now->copy()->subDays(30))
+                    ->latest('occurred_at')
+                    ->first();
+                if ($incident) {
+                    $m['over_limit_incident'] = [
+                        'id' => $incident->id,
+                        'status' => $incident->status,
+                        'occurred_label' => $incident->occurred_at?->format('j M'),
+                        'url' => '/clients/'.$m['client_id'].'/incidents',
+                    ];
+                }
+            }
+
+            return $m;
+        }, $boardPrn);
+
         return Inertia::render('emar/PrnRecords', [
             'administrations' => $administrations,
             'pending_reviews' => $pendingReviews,
-            'prn_medications' => $this->boardPayload->prnMedications($dataClientIds, $now),
+            'prn_medications' => $boardPrn,
             'clients' => $this->boardPayload->clientsPayload($siteClientIds),
             'witnesses' => $this->boardPayload->witnesses($user),
             'board_user' => $this->boardPayload->boardUser($user),

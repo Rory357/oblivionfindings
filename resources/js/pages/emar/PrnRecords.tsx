@@ -2,6 +2,7 @@
    custom-layout bordered panels (not Card/Button); all colours are semantic tokens. */
 import { PrnDetailDialog, type PrnAdministration } from '@/components/emar/prn-detail-dialog';
 import { PrnEffectivenessDialog } from '@/components/emar/prn-effectiveness-dialog';
+import { PrnNearLimitDialog } from '@/components/emar/prn-near-limit-dialog';
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
@@ -36,6 +37,7 @@ type Modal =
     | { type: 'record'; initialMedId?: number | null }
     | { type: 'effect'; followUp: PrnFollowUp }
     | { type: 'detail'; admin: PrnAdministration }
+    | { type: 'near'; med: PrnMedication }
     | null;
 
 /** Map a register administration to the PrnFollowUp shape the effect wizard takes. */
@@ -234,7 +236,6 @@ export default function PrnRecords(props: Props) {
                                         Back to today
                                     </button>
                                 ) : null}
-                                {/* eslint-enable no-restricted-syntax */}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
                                 <div className="relative w-full max-w-xs md:w-[260px]">
@@ -346,7 +347,7 @@ export default function PrnRecords(props: Props) {
                             {nearLimit.map((m) => {
                                 const pct = m.max_per_day ? Math.min(100, Math.round((m.given_last_24h / m.max_per_day) * 100)) : 0;
                                 return (
-                                    <div key={m.id} className="flex flex-col gap-2 rounded-2xl border bg-card p-4 shadow-sm">
+                                    <button key={m.id} type="button" onClick={() => setModal({ type: 'near', med: m })} className="flex flex-col gap-2 rounded-2xl border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                         <div className="flex items-center justify-between">
                                             <span className="font-semibold">{m.name}</span>
                                             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${m.over_limit ? 'bg-status-critical-bg text-status-critical' : 'bg-status-warning-bg text-status-warning'}`}>{m.over_limit ? 'At limit' : `${m.remaining_today ?? 0} left`}</span>
@@ -355,7 +356,7 @@ export default function PrnRecords(props: Props) {
                                         <div className="text-xs">{m.given_last_24h} of {m.max_per_day} doses · {m.remaining_today ?? 0} remaining</div>
                                         <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${m.over_limit ? 'bg-status-critical' : 'bg-status-warning'}`} style={{ width: `${pct}%` }} /></div>
                                         <div className="text-[11px] text-muted-foreground">{m.last_given_label ? `Last given ${m.last_given_label}` : 'None today'}{m.min_hours_between ? ` · min ${m.min_hours_between}h between` : ''}</div>
-                                    </div>
+                                    </button>
                                 );
                             })}
                         </div>
@@ -400,6 +401,15 @@ export default function PrnRecords(props: Props) {
                     onClose={() => setModal(null)}
                     onRecordEffectiveness={() => setModal({ type: 'effect', followUp: adminToFollowUp(modal.admin) })}
                     onReRecordDose={() => setModal({ type: 'record', initialMedId: modal.admin.client_medication_id })}
+                />
+            )}
+            {modal?.type === 'near' && (
+                <PrnNearLimitDialog
+                    med={modal.med}
+                    client={clientsMap.get(modal.med.client_id)}
+                    onClose={() => setModal(null)}
+                    onRecordDose={() => setModal({ type: 'record', initialMedId: modal.med.id })}
+                    onRecordEffectiveness={(followUp) => setModal({ type: 'effect', followUp })}
                 />
             )}
             {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}

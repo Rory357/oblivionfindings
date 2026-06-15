@@ -72,6 +72,25 @@ export interface SiteInfo {
     name: string;
 }
 
+/** One given PRN dose in the near-limit drill-down timeline (eMAR PRN page). */
+export interface PrnDose {
+    id: number;
+    time: string | null;
+    date_label: string | null;
+    dose: string | null;
+    given_by: string | null;
+    effectiveness: string | null;
+    effectiveness_label: string | null;
+}
+
+/** Over-limit incident reference attached to an over-limit PRN med (eMAR). */
+export interface PrnOverLimitIncident {
+    id: number;
+    status: string | null;
+    occurred_label: string | null;
+    url: string;
+}
+
 export interface PrnMedication {
     id: number;
     client_id: number;
@@ -95,6 +114,9 @@ export interface PrnMedication {
     next_allowed_at: string | null;
     next_allowed_label: string | null;
     interval_blocked: boolean;
+    /** eMAR PRN near-limit drill-down enrichment (absent on the worker board). */
+    today_doses?: PrnDose[];
+    over_limit_incident?: PrnOverLimitIncident | null;
 }
 
 export interface PrnFollowUp {

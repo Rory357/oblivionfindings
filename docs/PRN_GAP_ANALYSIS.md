@@ -81,13 +81,21 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 
 ## D. Near limit — drill-down modal
 
-- [ ] **D9.** Each Near-limit card opens a detail modal (`WizardShell` chrome): full med detail (name,
+- [x] **D9.** Each Near-limit card opens a detail modal (`WizardShell` chrome): full med detail (name,
   CD lock, route, dose, indication), max/day + min hours between, today's dose timeline (time, dose,
   given-by, effectiveness), client/room/site, remaining + earliest next-allowable time, any over-limit
   incident. Footer Options: Record PRN dose (pre-filled) · Record effectiveness (last dose) ·
-  View client/MAR · Notify clinical lead/Flag · Print.
-- [ ] **D10.** Near-limit gap analysis (see below) — add per-dose timeline + next-allowable + incident
-  link to the `prn()` payload (derive where possible; `TODO(Gx)` where schema is needed).
+  View client/MAR · Notify clinical lead/Flag · Print. — _done: new
+  `resources/js/components/emar/prn-near-limit-dialog.tsx` (`PrnNearLimitDialog`) on `WizardShell`, two
+  sections (Limit & status with gauge + over-limit incident card / Today's doses timeline). Near-limit
+  cards converted to clickable `<button>`s. Footer Options open record/effectiveness wizards in place
+  (Effectiveness disabled when no doses); MAR → `/emar/mar?client_id`, Notify/flag → client incidents._
+- [x] **D10.** Near-limit gap analysis (see below) — add per-dose timeline + next-allowable + incident
+  link to the `prn()` payload (derive where possible; `TODO(Gx)` where schema is needed). — _done:
+  per-dose timeline derived from `ClientMedicationAdministration`+`prnEffectiveness` (no schema);
+  next-allowable already present; **over-limit incident IS available** (not a TODO) —
+  `MedicationIncidentIntegrationService::handlePrnOverLimit` raises a `ClientIncident` titled
+  "PRN limit exceeded: {med}", matched by title (schema-robust). See backend table update below._
 
 ## E. Trends — make it genuinely useful
 
@@ -115,8 +123,13 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
   added `today`/`is_today`/`date_label`/`range`/`client_id`/`q` props._
 - [ ] **BK2.** History: a paginated, server-filtered PRN administration query keyed off the params
   (not the 200-row cap). Return `{ data, meta }`.
-- [ ] **BK3.** Near-limit detail: extend each near-limit med with today's per-dose timeline (time,
-  dose, given-by, effectiveness), next-allowable-time, over-limit incident reference.
+- [x] **BK3.** Near-limit detail: extend each near-limit med with today's per-dose timeline (time,
+  dose, given-by, effectiveness), next-allowable-time, over-limit incident reference. — _done in
+  `EmarController@prn`: near/over-limit meds get `today_doses[]` (last-24h doses, derived) and over-limit
+  meds get `over_limit_incident` (matched on the deterministic ClientIncident title; `{id,status,
+  occurred_label,url}` or null). next-allowable already in `prnMedications()`. Added
+  `use App\Models\ClientIncident`; added `PrnDose`/`PrnOverLimitIncident` + optional `today_doses`/
+  `over_limit_incident` to the shared `PrnMedication` type (non-breaking; worker board ignores them)._
 - [x] **BK4.** Effectiveness extra fields: add only schema-supported fields to the payload; stub the
   rest as `TODO(Gx)`. — _done: `recordPrnEffect` now accepts the explicit `review_minutes_after` chip
   (nullable; derives from elapsed time when omitted so the worker board is unaffected) and
@@ -163,11 +176,13 @@ ShiftContextMenu/ShiftCtxItem/ShiftCtxState/Donut/DonutCard/MicroStats`; `@/comp
 `next_allowed_label`** (✓ next-allowable), `interval_blocked`, `is_controlled`, `requires_witness`,
 `dose`, `route`, `prn_reason`.
 
-Missing for the drill-down (to add in `prn()` near-limit list, derive — no schema):
-- **Per-dose timeline today** — each given dose: time, dose, given-by, effectiveness (from
-  `ClientMedicationAdministration` + `prnEffectiveness`). `TODO`: add to payload.
-- **Over-limit incident reference** — confirm whether over-limit raises a linked incident; if no FK
-  link exists, this is `TODO(G8)` (don't invent a table).
+Missing for the drill-down (RESOLVED in pass 4 — added in `prn()`, derived, no schema):
+- **Per-dose timeline today** — ✅ each given dose (last 24h): time, dose, given-by, effectiveness
+  (from `ClientMedicationAdministration` + `prnEffectiveness`).
+- **Over-limit incident reference** — ✅ over-limit DOES raise a `ClientIncident`
+  (`MedicationIncidentIntegrationService::handlePrnOverLimit`, title "PRN limit exceeded: {med}",
+  metadata `medication_id`). Matched by title (schema-robust; avoids the optional metadata JSON column).
+  **G8 is NOT needed** — no invented table.
 
 ---
 
@@ -207,3 +222,14 @@ Missing for the drill-down (to add in `prn()` near-limit list, derive — no sch
   `PrnRecords.tsx`, `WorkerMedsController.php`. Verified: scoped `tsc` clean (no touched-file mentions),
   `eslint` clean, `php -l` clean. **Next pass:** Group D (Near-limit drill-down modal + BK3 payload —
   per-dose timeline, next-allowable, over-limit incident).
+- _(pass 4)_ **Closed Group D + BK3.** New `components/emar/prn-near-limit-dialog.tsx`
+  (`PrnNearLimitDialog`, 2-section `WizardShell`: limit gauge + status + over-limit incident card /
+  today's dose timeline); near-limit cards are now clickable buttons opening it; footer Options open the
+  record/effectiveness wizards in place. Backend BK3: `prn()` enriches near/over-limit meds with
+  `today_doses[]` (derived) and over-limit meds with a real `over_limit_incident` (ClientIncident matched
+  by title). Found the over-limit incident source so **G8 was unnecessary**. Files:
+  `prn-near-limit-dialog.tsx`, `PrnRecords.tsx`, `EmarController.php`, `meds/today/types.ts`. Also
+  removed a stray `eslint-enable` left in the hero footer (pass 1) that had re-enabled
+  `no-restricted-syntax` for the lower half of the page. Verified: scoped `tsc` clean, `eslint` clean
+  (0 warnings), `php -l` clean. **Next pass:** Group E (Trends — donut/doses-per-day/by-indication/
+  time-of-day/top-residents/near-over-limit charts via recharts + rostering donut/micro-stats).
