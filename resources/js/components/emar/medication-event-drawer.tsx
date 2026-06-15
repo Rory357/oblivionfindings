@@ -181,7 +181,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
         setActive(key);
         setFlash(key);
         if (flashTimer.current) clearTimeout(flashTimer.current);
-        flashTimer.current = setTimeout(() => setFlash(null), 1000);
+        flashTimer.current = setTimeout(() => setFlash(null), 1300);
     };
 
     const onFlag = () => {
@@ -390,7 +390,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
 
 function Section({ title, refCb, flash, children }: { title: string; refCb: (el: HTMLDivElement | null) => void; flash?: boolean; children: React.ReactNode }) {
     return (
-        <div ref={refCb} className={cn('scroll-mt-4 border-t border-border/60 pt-5 transition-colors duration-300 first:border-0 first:pt-0', flash && '-mx-3 rounded-lg bg-primary/[0.06] px-3')}>
+        <div ref={refCb} className={cn('scroll-mt-4 border-t border-border/60 pt-5 transition-all duration-300 first:border-0 first:pt-0', flash && '-mx-3 rounded-lg bg-primary/10 px-3 ring-1 ring-primary/40 ring-inset')}>
             <div className={cn('mb-2 text-xs font-semibold uppercase tracking-wide transition-colors', flash ? 'text-primary' : 'text-muted-foreground')}>{title}</div>
             {children}
         </div>
