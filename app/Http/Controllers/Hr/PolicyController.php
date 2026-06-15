@@ -41,7 +41,7 @@ class PolicyController extends Controller
             ->values()
             ->toArray();
 
-        return Inertia::render('hr/policies/index', [
+        return Inertia::render('hr/documents/policies/index', [
             'policies' => $policies,
             'categories' => $categories,
             'filters' => [
@@ -70,7 +70,7 @@ class PolicyController extends Controller
             ->filter()
             ->values();
 
-        return Inertia::render('hr/policies/create', [
+        return Inertia::render('hr/documents/policies/create', [
             'existingCategories' => $existingCategories,
             'defaultCategories' => [
                 ['value' => 'employment', 'label' => 'Employment'],
@@ -103,7 +103,7 @@ class PolicyController extends Controller
             ->filter()
             ->values();
 
-        return Inertia::render('hr/policies/edit', [
+        return Inertia::render('hr/documents/policies/edit', [
             'policy' => $policy,
             'existingCategories' => $existingCategories,
             'defaultCategories' => [
@@ -141,7 +141,7 @@ class PolicyController extends Controller
             'requires' => $policy->requires_attestation,
         ];
 
-        return Inertia::render('hr/policies/show', [
+        return Inertia::render('hr/documents/policies/show', [
             'policy' => $policy,
             'attestationStats' => $attestationStats,
             'can' => [

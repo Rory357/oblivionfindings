@@ -75,6 +75,7 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/performance',
     '/hr/performance/reviews',
     '/hr/goals',
+    '/hr/goals/development',
     '/hr/performance/competencies',
     '/hr/feedback',
     '/hr/performance/pips',
@@ -96,7 +97,9 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/compliance',
     '/hr/compliance/matrix',
     '/hr/compliance/calendar',
-    '/hr/compliance/training',
     '/hr/compliance/vetting',
     '/hr/compliance/drivers',
+    // Training hub (pulled out of Compliance in S7)
+    '/hr/training',
+    '/hr/training/catalog',
 ]);

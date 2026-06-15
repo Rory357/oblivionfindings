@@ -32,7 +32,7 @@ class ExpenseSubmittedNotification extends Notification implements ShouldQueue
             ->line("**Employee:** {$employeeName}")
             ->line("**Claim:** {$this->claim->claim_number} - {$this->claim->title}")
             ->line("**Amount:** \${$this->claim->total_amount} {$this->claim->currency}")
-            ->action('Review Claim', url("/hr/expenses/{$this->claim->id}"));
+            ->action('Review Claim', url("/hr/compensation/expenses/{$this->claim->id}"));
     }
 
     public function toArray(object $notifiable): array
@@ -44,7 +44,7 @@ class ExpenseSubmittedNotification extends Notification implements ShouldQueue
             'title'        => $this->claim->title,
             'amount'       => (float) $this->claim->total_amount,
             'user_name'    => $this->claim->user?->name,
-            'action_url'   => "/hr/expenses/{$this->claim->id}",
+            'action_url'   => "/hr/compensation/expenses/{$this->claim->id}",
         ];
     }
 }

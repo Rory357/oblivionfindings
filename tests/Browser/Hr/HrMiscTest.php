@@ -37,9 +37,9 @@ test('hr skills page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/skills')
+            ->visit('/hr/performance/skills')
             ->waitForText('Skill', 10)
-            ->assertPathIs('/hr/skills');
+            ->assertPathIs('/hr/performance/skills');
     });
 });
 
@@ -47,9 +47,9 @@ test('hr skills matrix page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/skills/matrix')
+            ->visit('/hr/performance/skills/matrix')
             ->waitForText('Matrix', 10)
-            ->assertPathIs('/hr/skills/matrix');
+            ->assertPathIs('/hr/performance/skills/matrix');
     });
 });
 

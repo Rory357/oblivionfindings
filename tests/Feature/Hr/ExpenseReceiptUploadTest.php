@@ -36,7 +36,7 @@ test('an uploaded receipt is stored on the private disk and recorded on the item
     Storage::fake('private');
 
     $this->actingAs($this->hr)
-        ->post('/hr/expenses', [
+        ->post('/hr/compensation/expenses', [
             'title' => 'March Client Visit',
             'items' => [
                 baseExpenseItem([
@@ -58,7 +58,7 @@ test('a claim with no receipt leaves receipt_path null', function () {
     Storage::fake('private');
 
     $this->actingAs($this->hr)
-        ->post('/hr/expenses', [
+        ->post('/hr/compensation/expenses', [
             'title' => 'No Receipt Claim',
             'items' => [baseExpenseItem()],
         ])
@@ -77,7 +77,7 @@ test('a receipt with a disallowed mime type is rejected', function () {
     Storage::fake('private');
 
     $this->actingAs($this->hr)
-        ->post('/hr/expenses', [
+        ->post('/hr/compensation/expenses', [
             'title' => 'Bad Mime Claim',
             'items' => [
                 baseExpenseItem([
@@ -94,7 +94,7 @@ test('a receipt larger than the size limit is rejected', function () {
     Storage::fake('private');
 
     $this->actingAs($this->hr)
-        ->post('/hr/expenses', [
+        ->post('/hr/compensation/expenses', [
             'title' => 'Oversize Claim',
             'items' => [
                 baseExpenseItem([

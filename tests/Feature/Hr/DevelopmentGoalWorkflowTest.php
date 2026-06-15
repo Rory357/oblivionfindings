@@ -36,7 +36,7 @@ beforeEach(function () {
 
 test('hr can assign development goal and employee can update own progress', function () {
     $this->actingAs($this->hr)
-        ->post('/hr/development/goals', [
+        ->post('/hr/goals/development', [
             'employee_user_id' => $this->staff->id,
             'manager_user_id' => $this->hr->id,
             'title' => 'Improve communication in family meetings',
@@ -56,7 +56,7 @@ test('hr can assign development goal and employee can update own progress', func
     expect($goal?->status)->toBe('not_started');
 
     $this->actingAs($this->staff)
-        ->put("/hr/development/goals/{$goal->id}", [
+        ->put("/hr/goals/development/{$goal->id}", [
             'status' => 'in_progress',
             'progress_percent' => 45,
             'current_level' => 3,
@@ -84,7 +84,7 @@ test('employee cannot update another employees development goal', function () {
     ]);
 
     $this->actingAs($this->other)
-        ->put("/hr/development/goals/{$goal->id}", [
+        ->put("/hr/goals/development/{$goal->id}", [
             'status' => 'completed',
             'progress_percent' => 100,
         ])

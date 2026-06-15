@@ -33,8 +33,8 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Expenses', href: '/hr/expenses' },
-    { title: 'New Claim', href: '/hr/expenses/create' },
+    { title: 'Expenses', href: '/hr/compensation/expenses' },
+    { title: 'New Claim', href: '/hr/compensation/expenses/create' },
 ];
 
 const categoryLabels: Record<string, string> = {
@@ -99,7 +99,7 @@ export default function CreateExpense({ categories }: Props) {
         setProcessing(true);
 
         router.post(
-            '/hr/expenses',
+            '/hr/compensation/expenses',
             {
                 title,
                 notes: notes || null,
@@ -128,7 +128,7 @@ export default function CreateExpense({ categories }: Props) {
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/expenses"
+                        backHref="/hr/compensation/expenses"
                         title="New Expense Claim"
                     />
                 }
@@ -435,7 +435,7 @@ export default function CreateExpense({ categories }: Props) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => router.get('/hr/expenses')}
+                            onClick={() => router.get('/hr/compensation/expenses')}
                         >
                             Cancel
                         </Button>

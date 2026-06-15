@@ -1,3 +1,4 @@
+import { DocumentsTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,7 +55,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Policies', href: '/hr/policies' },
+    { title: 'Policies', href: '/hr/documents/policies' },
 ];
 
 const formatDate = (value?: string | null) => {
@@ -96,7 +97,7 @@ export default function PoliciesIndex({
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/policies',
+            '/hr/documents/policies',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -122,14 +123,14 @@ export default function PoliciesIndex({
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
-                                <Link href="/hr/policies/attestations">
+                                <Link href="/hr/documents/policies/attestations">
                                     <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                                         <ShieldCheck className="mr-1.5 h-4 w-4" />
                                         Attestations
                                     </Button>
                                 </Link>
                                 {can.manage && (
-                                    <Link href="/hr/policies/create">
+                                    <Link href="/hr/documents/policies/create">
                                         <Button size="sm">
                                             <Plus className="mr-1.5 h-4 w-4" />
                                             Create Policy
@@ -141,6 +142,8 @@ export default function PoliciesIndex({
                     />
                 }
             >
+                <DocumentsTabs active="policies" />
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -309,7 +312,7 @@ export default function PoliciesIndex({
                                         </TableCell>
                                         <TableCell>
                                             <Link
-                                                href={`/hr/policies/${policy.id}`}
+                                                href={`/hr/documents/policies/${policy.id}`}
                                                 className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
                                             >
                                                 View

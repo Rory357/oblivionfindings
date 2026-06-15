@@ -774,7 +774,7 @@ export default function PerformanceIndex({
                                             <Target className="h-4 w-4 text-status-warning" />
                                             Competency Gaps
                                         </CardTitle>
-                                        <Link href="/hr/development/goals">
+                                        <Link href="/hr/goals/development">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

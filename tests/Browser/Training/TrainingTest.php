@@ -30,8 +30,8 @@ test('training matrix page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/training/matrix')
-            ->waitForLocation('/hr/compliance/training')
+            ->waitForLocation('/hr/training')
             ->waitForText('Training Dashboard', 10)
-            ->assertPathIs('/hr/compliance/training');
+            ->assertPathIs('/hr/training');
     });
 });

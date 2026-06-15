@@ -45,7 +45,7 @@ class SkillsController extends Controller
 
         $skillGaps = $this->skillsService->getSkillGaps($tenantId);
 
-        return Inertia::render('hr/skills/index', [
+        return Inertia::render('hr/performance/skills/index', [
             'skills' => $skills,
             'categories' => $categories,
             'skillGaps' => $skillGaps,
@@ -73,7 +73,7 @@ class SkillsController extends Controller
 
         $matrixData = $this->skillsService->getSkillsMatrix($tenantId);
 
-        return Inertia::render('hr/skills/matrix', [
+        return Inertia::render('hr/performance/skills/matrix', [
             'employees' => $matrixData['employees'],
             'skills' => $matrixData['skills'],
             'proficiencyLevels' => SkillsMatrixService::PROFICIENCY_LEVELS,

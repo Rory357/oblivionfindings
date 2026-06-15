@@ -55,7 +55,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Expenses', href: '/hr/expenses' },
+    { title: 'Expenses', href: '/hr/compensation/expenses' },
     { title: 'Claim Detail', href: '#' },
 ];
 
@@ -113,7 +113,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/expenses"
+                        backHref="/hr/compensation/expenses"
                         title={claim.title}
                         description={
                             <span className="flex items-center gap-2">
@@ -143,7 +143,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         size="sm"
                                         onClick={() =>
                                             router.post(
-                                                `/hr/expenses/${claim.id}/submit`,
+                                                `/hr/compensation/expenses/${claim.id}/submit`,
                                             )
                                         }
                                     >
@@ -157,7 +157,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                                             size="sm"
                                             onClick={() =>
                                                 router.post(
-                                                    `/hr/expenses/${claim.id}/approve`,
+                                                    `/hr/compensation/expenses/${claim.id}/approve`,
                                                 )
                                             }
                                         >
@@ -181,7 +181,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         size="sm"
                                         onClick={() =>
                                             router.post(
-                                                `/hr/expenses/${claim.id}/pay`,
+                                                `/hr/compensation/expenses/${claim.id}/pay`,
                                             )
                                         }
                                     >
@@ -215,7 +215,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         disabled={!rejectionReason.trim()}
                                         onClick={() =>
                                             router.post(
-                                                `/hr/expenses/${claim.id}/reject`,
+                                                `/hr/compensation/expenses/${claim.id}/reject`,
                                                 {
                                                     rejection_reason:
                                                         rejectionReason,

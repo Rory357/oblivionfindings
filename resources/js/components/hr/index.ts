@@ -1,5 +1,6 @@
 // Shared HR design-spine primitives. Import from '@/components/hr'.
 export * from './add-employee-dialog';
+export * from './calendar-tabs';
 export * from './compensation-tabs';
 export * from './compliance-tabs';
 export * from './department-dialog';
@@ -9,6 +10,7 @@ export * from './documents-tabs';
 export * from './hr-hero';
 export * from './hr-tabs';
 export * from './leave-request-dialog';
+export * from './leave-tabs';
 export * from './my-hr-tabs';
 export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
@@ -25,4 +27,5 @@ export * from './recruitment-tabs';
 export * from './reports-tabs';
 export * from './settings-tabs';
 export * from './status-badge';
+export * from './training-tabs';
 export * from './wizard';

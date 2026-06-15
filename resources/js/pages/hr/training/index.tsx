@@ -1,5 +1,5 @@
 import { PageHero } from '@/components/page';
-import { ComplianceTabs } from '@/components/hr';
+import { TrainingTabs } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,7 +83,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Training Dashboard', href: '/hr/compliance/training' },
+    { title: 'Training Dashboard', href: '/hr/training' },
 ];
 
 function formatDate(value?: string | null): string {
@@ -115,7 +115,7 @@ export default function TrainingIndex({
 }: Props) {
     function applyFilter(key: string, value: string | null) {
         router.get(
-            '/hr/compliance/training',
+            '/hr/training',
             { ...filters, [key]: value || undefined },
             { preserveState: true, replace: true },
         );
@@ -169,7 +169,7 @@ export default function TrainingIndex({
                         </>
                     }
                 />
-                <ComplianceTabs active="training" />
+                <TrainingTabs active="dashboard" />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

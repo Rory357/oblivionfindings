@@ -1,3 +1,4 @@
+import { LeaveTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -159,6 +160,8 @@ export default function LeaveReports({
                     />
                 }
             >
+                <LeaveTabs active="reports" />
+
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList>
                         <TabsTrigger value="absenteeism">

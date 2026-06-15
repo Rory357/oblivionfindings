@@ -1,9 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import {
-    BookOpen,
     CalendarDays,
     Car,
-    GraduationCap,
     LayoutGrid,
     ShieldCheck,
     UserCheck,
@@ -15,8 +13,6 @@ export type ComplianceTab =
     | 'overview'
     | 'matrix'
     | 'calendar'
-    | 'training'
-    | 'catalog'
     | 'vetting'
     | 'drivers';
 
@@ -24,25 +20,23 @@ const TAB_URLS: Record<ComplianceTab, string> = {
     overview: '/hr/compliance',
     matrix: '/hr/compliance/matrix',
     calendar: '/hr/compliance/calendar',
-    training: '/hr/compliance/training',
-    catalog: '/hr/training/catalog',
     vetting: '/hr/compliance/vetting',
     drivers: '/hr/compliance/drivers',
 };
 
 type HrCan = {
     compliance?: { view?: boolean; manage?: boolean };
-    training?: { view?: boolean };
     vetting?: { view?: boolean };
     driver?: { view?: boolean };
 };
 
 /**
- * Section-level tab strip shared across the Compliance pages (which span the
- * compliance/, training/, vetting/ and drivers/ clusters). The six surfaces sit
- * behind DIFFERENT permission gates, so tabs are filtered by the shared
- * auth.can flags — a user only sees the views they can open (no 403-on-click).
- * The active tab is always shown so the current page never hides its own tab.
+ * Section-level tab strip shared across the Compliance pages (compliance/,
+ * vetting/ and drivers/ clusters). The surfaces sit behind DIFFERENT permission
+ * gates, so tabs are filtered by the shared auth.can flags — a user only sees
+ * the views they can open (no 403-on-click). The active tab is always shown so
+ * the current page never hides its own tab. (Training + Catalog moved out to the
+ * standalone Training hub in S7.)
  */
 export function ComplianceTabs({ active }: { active: ComplianceTab }) {
     const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
@@ -58,16 +52,8 @@ export function ComplianceTabs({ active }: { active: ComplianceTab }) {
             show: !!hr?.compliance?.manage,
         },
         {
-            item: { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'violet' },
+            item: { id: 'calendar', label: 'Renewals', icon: CalendarDays, tone: 'violet' },
             show: !!hr?.compliance?.view,
-        },
-        {
-            item: { id: 'training', label: 'Training', icon: GraduationCap, tone: 'success' },
-            show: !!hr?.training?.view,
-        },
-        {
-            item: { id: 'catalog', label: 'Catalog', icon: BookOpen, tone: 'info' },
-            show: !!hr?.training?.view,
         },
         {
             item: { id: 'vetting', label: 'Vetting', icon: UserCheck, tone: 'warning' },

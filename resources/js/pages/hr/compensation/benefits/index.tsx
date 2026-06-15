@@ -1,3 +1,4 @@
+import { CompensationTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,8 +86,8 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Benefits', href: '/hr/benefits' },
-    { title: 'Enrollments', href: '/hr/benefits' },
+    { title: 'Benefits', href: '/hr/compensation/benefits' },
+    { title: 'Enrollments', href: '/hr/compensation/benefits' },
 ];
 
 const statusColors: Record<string, string> = {
@@ -168,7 +169,7 @@ export default function BenefitsIndex({
     const submitEdit = (e: FormEvent) => {
         e.preventDefault();
         if (editId === null) return;
-        router.put(`/hr/benefits/enrollments/${editId}`, editForm, {
+        router.put(`/hr/compensation/benefits/enrollments/${editId}`, editForm, {
             preserveScroll: true,
             onSuccess: () => setEditId(null),
         });
@@ -176,7 +177,7 @@ export default function BenefitsIndex({
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/benefits',
+            '/hr/compensation/benefits',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -184,7 +185,7 @@ export default function BenefitsIndex({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        router.post('/hr/benefits/enroll', form, {
+        router.post('/hr/compensation/benefits/enroll', form, {
             onSuccess: () => {
                 setOpen(false);
                 setForm(emptyEnrollForm);
@@ -229,6 +230,8 @@ export default function BenefitsIndex({
                     />
                 }
             >
+                <CompensationTabs active="benefits" />
+
                 {/* Summary Cards */}
                 {Object.keys(summary).length > 0 && (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

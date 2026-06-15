@@ -26,6 +26,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { CompensationTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -58,8 +59,8 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Benefits', href: '/hr/benefits' },
-    { title: 'Plans', href: '/hr/benefits/plans' },
+    { title: 'Benefits', href: '/hr/compensation/benefits' },
+    { title: 'Plans', href: '/hr/compensation/benefits/plans' },
 ];
 
 const typeLabels: Record<string, string> = {
@@ -89,7 +90,7 @@ export default function BenefitPlans({
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/benefits/plans',
+            '/hr/compensation/benefits/plans',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -97,7 +98,7 @@ export default function BenefitPlans({
 
     const togglePlanActive = (plan: BenefitPlan) => {
         router.put(
-            `/hr/benefits/plans/${plan.id}`,
+            `/hr/compensation/benefits/plans/${plan.id}`,
             { is_active: !plan.is_active },
             { preserveScroll: true },
         );
@@ -105,7 +106,7 @@ export default function BenefitPlans({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        router.post('/hr/benefits/plans', form, {
+        router.post('/hr/compensation/benefits/plans', form, {
             onSuccess: () => {
                 setOpen(false);
                 setForm(emptyForm);
@@ -147,6 +148,8 @@ export default function BenefitPlans({
                     />
                 }
             >
+                <CompensationTabs active="benefits" />
+
                 {/* Filters */}
                 <Card>
                     <CardHeader>

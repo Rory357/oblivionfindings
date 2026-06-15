@@ -236,7 +236,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
-        Route::get('/compliance/training', [TrainingDashboardController::class, 'index'])->name('training.index');
+        Route::get('/training', [TrainingDashboardController::class, 'index'])->name('training.index');
     });
 
     /*
@@ -407,7 +407,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Policies & Attestations
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.policies.view')->prefix('policies')->name('policies.')->group(function () {
+    Route::middleware('permission:hr.policies.view')->prefix('documents/policies')->name('policies.')->group(function () {
         Route::get('/', [PolicyController::class, 'index'])->name('index');
         Route::get('/attestations', [PolicyAttestationController::class, 'index'])->name('attestations.index');
 
@@ -493,15 +493,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Development Goals
+    | Development Goals (folded under the Goals & OKRs hub at /hr/goals/development)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('development')->name('development.')->group(function () {
-        Route::get('/goals', [DevelopmentGoalController::class, 'index'])->name('goals.index');
-        Route::put('/goals/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
+    Route::prefix('goals/development')->name('development.')->group(function () {
+        Route::get('/', [DevelopmentGoalController::class, 'index'])->name('goals.index');
+        Route::put('/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
-            Route::post('/goals', [DevelopmentGoalController::class, 'store'])->name('goals.store');
+            Route::post('/', [DevelopmentGoalController::class, 'store'])->name('goals.store');
         });
     });
 
@@ -543,11 +543,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/reports/subscriptions/{subscription}/toggle-active', [HrReportController::class, 'toggleSubscription'])->name('reports.subscriptions.toggleActive');
         });
     });
-
-    // Automations + Webhooks moved out of Reports into the Settings hub
-    // (re-gated hr.settings.manage). Old URLs 301-redirect to the new homes.
-    Route::redirect('/reports/automations', '/hr/settings/automations', 301);
-    Route::redirect('/reports/webhooks', '/hr/settings/webhooks', 301);
 
     /*
     |--------------------------------------------------------------------------
@@ -652,10 +647,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Benefits
+    | Benefits (folded into the Compensation & Benefits hub)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.benefits.view')->prefix('benefits')->name('benefits.')->group(function () {
+    Route::middleware('permission:hr.benefits.view')->prefix('compensation/benefits')->name('compensation.benefits.')->group(function () {
         Route::get('/', [BenefitsController::class, 'index'])->name('index');
         Route::get('/plans', [BenefitsController::class, 'plans'])->name('plans');
 
@@ -669,10 +664,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Expenses
+    | Expenses (folded into the Compensation & Benefits hub)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.expenses.view')->prefix('expenses')->name('expenses.')->group(function () {
+    Route::middleware('permission:hr.expenses.view')->prefix('compensation/expenses')->name('compensation.expenses.')->group(function () {
         Route::get('/', [ExpenseController::class, 'index'])->name('index');
 
         Route::middleware('permission:hr.expenses.manage')->group(function () {
@@ -846,7 +841,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Skills Matrix
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.performance.view')->prefix('skills')->name('skills.')->group(function () {
+    Route::middleware('permission:hr.performance.view')->prefix('performance/skills')->name('performance.skills.')->group(function () {
         Route::get('/', [SkillsController::class, 'index'])->name('index');
         Route::get('/matrix', [SkillsController::class, 'matrix'])->name('matrix');
 

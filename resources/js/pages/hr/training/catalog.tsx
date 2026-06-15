@@ -1,4 +1,4 @@
-import { ComplianceTabs } from '@/components/hr';
+import { TrainingTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -87,7 +87,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Training', href: '/hr/compliance/training' },
+    { title: 'Training', href: '/hr/training' },
     { title: 'Course Catalog', href: '/hr/training/catalog' },
 ];
 
@@ -214,7 +214,7 @@ export default function TrainingCatalog({
                                 className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 asChild
                             >
-                                <Link href="/hr/compliance/training">
+                                <Link href="/hr/training">
                                     <BarChart3 className="h-4 w-4" />
                                     Dashboard
                                 </Link>
@@ -236,7 +236,7 @@ export default function TrainingCatalog({
                     }
                 />
 
-                <ComplianceTabs active="catalog" />
+                <TrainingTabs active="catalog" />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

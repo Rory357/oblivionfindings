@@ -12,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { LeaveTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -160,6 +161,8 @@ export default function Holidays({ holidays, year, can }: Props) {
                     />
                 }
             >
+                <LeaveTabs active="holidays" />
+
                 {/* Add Holiday Form */}
                 {showForm && can.manage && (
                     <Card>

@@ -27,8 +27,8 @@ test('hr development goals page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/development/goals')
+            ->visit('/hr/goals/development')
             ->waitForText('Development', 10)
-            ->assertPathIs('/hr/development/goals');
+            ->assertPathIs('/hr/goals/development');
     });
 });

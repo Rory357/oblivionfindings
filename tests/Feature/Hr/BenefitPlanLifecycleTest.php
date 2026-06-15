@@ -34,13 +34,13 @@ test('a benefit plan can be deactivated and reactivated', function () {
     $plan = makeBenefitPlan();
 
     $this->actingAs($this->hr)
-        ->put("/hr/benefits/plans/{$plan->id}", ['is_active' => false])
+        ->put("/hr/compensation/benefits/plans/{$plan->id}", ['is_active' => false])
         ->assertRedirect()
         ->assertSessionHas('success');
     expect($plan->fresh()->is_active)->toBeFalse();
 
     $this->actingAs($this->hr)
-        ->put("/hr/benefits/plans/{$plan->id}", ['is_active' => true])
+        ->put("/hr/compensation/benefits/plans/{$plan->id}", ['is_active' => true])
         ->assertSessionHas('success');
     expect($plan->fresh()->is_active)->toBeTrue();
 });
@@ -49,7 +49,7 @@ test('deactivating a plan does not remove it (existing enrollments keep referenc
     $plan = makeBenefitPlan();
 
     $this->actingAs($this->hr)
-        ->put("/hr/benefits/plans/{$plan->id}", ['is_active' => false]);
+        ->put("/hr/compensation/benefits/plans/{$plan->id}", ['is_active' => false]);
 
     $this->assertDatabaseHas('hr_benefit_plans', [
         'id' => $plan->id,
@@ -66,7 +66,7 @@ test('a user without hr.benefits.manage cannot toggle a plan', function () {
     ]);
 
     $this->actingAs($worker)
-        ->put("/hr/benefits/plans/{$plan->id}", ['is_active' => false])
+        ->put("/hr/compensation/benefits/plans/{$plan->id}", ['is_active' => false])
         ->assertForbidden();
 
     expect($plan->fresh()->is_active)->toBeTrue();

@@ -48,9 +48,9 @@ test('hr compliance training page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/compliance/training')
+            ->visit('/hr/training')
             ->waitForText('Training', 10)
-            ->assertPathIs('/hr/compliance/training');
+            ->assertPathIs('/hr/training');
     });
 });
 

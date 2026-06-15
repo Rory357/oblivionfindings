@@ -49,7 +49,7 @@ class BenefitsController extends Controller
 
         $summary = $this->benefitsService->getEnrollmentSummary($tenantId);
 
-        return Inertia::render('hr/benefits/index', [
+        return Inertia::render('hr/compensation/benefits/index', [
             'enrollments' => $enrollments,
             'plans' => $plans,
             'employees' => $employees,
@@ -80,7 +80,7 @@ class BenefitsController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('hr/benefits/plans', [
+        return Inertia::render('hr/compensation/benefits/plans', [
             'plans' => $plans,
             'filters' => [
                 'type' => $request->query('type'),

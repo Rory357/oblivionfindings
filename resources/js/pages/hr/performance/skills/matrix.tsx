@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -45,8 +46,8 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Skills', href: '/hr/skills' },
-    { title: 'Matrix', href: '/hr/skills/matrix' },
+    { title: 'Skills', href: '/hr/performance/skills' },
+    { title: 'Matrix', href: '/hr/performance/skills/matrix' },
 ];
 
 const proficiencyColors: Record<string, string> = {
@@ -112,7 +113,7 @@ export default function SkillsMatrix({
         e.preventDefault();
         setProcessing(true);
         router.post(
-            '/hr/skills/assess',
+            '/hr/performance/skills/assess',
             {
                 employee_profile_id: assessData.employee_profile_id,
                 skill_id: assessData.skill_id,
@@ -142,6 +143,8 @@ export default function SkillsMatrix({
                     />
                 }
             >
+                <PerformanceTabs active="competencies" />
+
                 {/* Legend */}
                 <div className="flex flex-wrap gap-3">
                     {proficiencyLevels.map((level) => (

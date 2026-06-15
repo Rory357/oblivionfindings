@@ -66,7 +66,7 @@ class DevelopmentGoalController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        return Inertia::render('hr/development/goals', [
+        return Inertia::render('hr/goals/development', [
             'goals' => $goals,
             'staff' => $staff,
             'filters' => [

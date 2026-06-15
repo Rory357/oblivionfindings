@@ -7,9 +7,9 @@ test('hr expenses index loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/expenses')
+            ->visit('/hr/compensation/expenses')
             ->waitForText('Expense', 10)
-            ->assertPathIs('/hr/expenses');
+            ->assertPathIs('/hr/compensation/expenses');
     });
 });
 
@@ -17,8 +17,8 @@ test('hr expenses create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/expenses/create')
+            ->visit('/hr/compensation/expenses/create')
             ->waitForText('Expense', 10)
-            ->assertPathIs('/hr/expenses/create');
+            ->assertPathIs('/hr/compensation/expenses/create');
     });
 });

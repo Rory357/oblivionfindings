@@ -29,18 +29,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
     LeaveRequestDialog,
     type LeaveStaff,
     type LeaveTypeOption,
 } from '@/components/hr/leave-request-dialog';
+import { LeaveTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -52,8 +47,6 @@ import {
     CalendarOff,
     CheckCircle2,
     Clock,
-    LayoutDashboard,
-    List,
     Loader2,
     MapPin,
     Plus,
@@ -463,33 +456,11 @@ export default function LeaveIndex({
                     />
                 </div>
 
-                {/* Tabs */}
-                <Tabs defaultValue="dashboard" className="space-y-4">
-                    <TabsList className="flex h-auto flex-wrap gap-1">
-                        <TabsTrigger value="dashboard">
-                            <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Dashboard
-                        </TabsTrigger>
-                        <TabsTrigger value="requests" className="relative">
-                            <List className="mr-1.5 h-3.5 w-3.5" /> Requests
-                            {sla.pending_total > 0 && (
-                                <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-status-warning px-1.5 text-[10px] text-white">
-                                    {sla.pending_total}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger value="balances">
-                            <BarChart3 className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Balances
-                        </TabsTrigger>
-                        <TabsTrigger value="reports">
-                            <TrendingDown className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Reports
-                        </TabsTrigger>
-                    </TabsList>
+                {/* Leave & Rosters hub tabs */}
+                <LeaveTabs active="requests" />
 
-                    {/* ===== Dashboard Tab ===== */}
-                    <TabsContent value="dashboard" className="space-y-4">
+                <div className="space-y-4">
+                    {/* ===== Overview ===== */}
                         <div className="grid gap-6 lg:grid-cols-3">
                             <div className="space-y-4 lg:col-span-2">
                                 {/* Monthly Leave Trend */}
@@ -872,11 +843,9 @@ export default function LeaveIndex({
                                 </Card>
                             </div>
                         </div>
-                    </TabsContent>
 
-                    {/* ===== Requests Tab ===== */}
-                    <TabsContent value="requests" className="space-y-4">
-                        {/* Pending Approval Section */}
+                    {/* ===== Requests ===== */}
+                    {/* Pending Approval Section */}
                         {can.approve && pendingRequests.length > 0 && (
                             <Card className="border-status-warning/20 bg-status-warning-bg">
                                 <CardHeader>
@@ -1325,46 +1294,7 @@ export default function LeaveIndex({
                                 <LaravelPagination links={requests.links} />
                             </div>
                         )}
-                    </TabsContent>
-
-                    {/* ===== Balances Tab ===== */}
-                    <TabsContent value="balances" className="space-y-4">
-                        <div className="py-8 text-center">
-                            <BarChart3 className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-                            <p className="font-medium text-muted-foreground">
-                                Balance Management
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                View and manage staff leave balances,
-                                entitlements, and usage.
-                            </p>
-                            <Button className="mt-4" asChild>
-                                <Link href="/hr/leave/balances">
-                                    Open Balances
-                                </Link>
-                            </Button>
-                        </div>
-                    </TabsContent>
-
-                    {/* ===== Reports Tab ===== */}
-                    <TabsContent value="reports" className="space-y-4">
-                        <div className="py-8 text-center">
-                            <TrendingDown className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-                            <p className="font-medium text-muted-foreground">
-                                Absence Reports & Analytics
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Absenteeism trends, Bradford Factor analysis,
-                                and leave utilisation reports.
-                            </p>
-                            <Button className="mt-4" asChild>
-                                <Link href="/hr/leave/reports">
-                                    Open Reports
-                                </Link>
-                            </Button>
-                        </div>
-                    </TabsContent>
-                </Tabs>
+                </div>
             </PageShell>
 
             {/* Bulk Approve Confirmation */}
