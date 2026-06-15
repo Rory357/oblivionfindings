@@ -197,7 +197,8 @@ export default function MarCharts(props: Props) {
     const onRecord = (row: ScheduleRow) => setRecordRow(row);
     const onGivePrn = (med: PrnMedication) => setPrnMedId(med.id);
 
-    // ── No resident selected: prompt to pick one ───────────────────────────
+    // ── No viewable resident with active meds: the server defaults onto a chart
+    // whenever one exists, so this is the genuinely-empty state (not a picker).
     if (!info) {
         return (
             <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'MAR Charts', href: '/emar/mar' }]}>
@@ -208,25 +209,10 @@ export default function MarCharts(props: Props) {
                         category="ops"
                         icon={Pill}
                         title="MAR Charts"
-                        description="Select a resident to open their medication administration record."
+                        description="No residents with active medications to chart yet."
                     />
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {clients.map((client) => (
-                            // eslint-disable-next-line no-restricted-syntax -- resident picker card (custom layout, not a <Button>)
-                            <button
-                                key={client.id}
-                                type="button"
-                                onClick={() => switchClient(client.id)}
-                                className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm"
-                            >
-                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                                    {initials(`${client.first_name} ${client.last_name}`)}
-                                </span>
-                                <span className="font-medium">
-                                    {client.first_name} {client.last_name}
-                                </span>
-                            </button>
-                        ))}
+                    <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                        Once a resident has active medication orders, their medication administration record opens here automatically.
                     </div>
                 </div>
             </AppLayout>

@@ -50,7 +50,9 @@ use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -777,19 +779,34 @@ class EmarController extends Controller
         $selectedClientInfo = null;
         $siteBrandColour = null;
 
-        if ($request->filled('client_id')) {
-            $selectedClient = Client::with([
-                'site:id,name,brand_colour',
-                'medications' => fn ($q) => $q->active()->orderBy('name'),
-                'medications.stock',
-                'medications.administrations' => fn ($q) => $q->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
-                    $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
-                        ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]);
-                }),
-                'medications.administrations.attachments.uploadedBy:id,name',
-            ])->findOrFail($request->client_id);
+        $marWith = [
+            'site:id,name,brand_colour',
+            'medications' => fn ($q) => $q->active()->orderBy('name'),
+            'medications.stock',
+            'medications.administrations' => fn ($q) => $q->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
+                $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
+                    ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]);
+            }),
+            'medications.administrations.attachments.uploadedBy:id,name',
+        ];
 
+        // Default the resident server-side so the MAR chart opens straight onto a
+        // chart instead of a two-step picker. An explicit ?client_id (deep-link or
+        // the hero EntityFilter) wins and enforces access (403 on denial); with no
+        // client_id we fall back to the last chart this user viewed, else the first
+        // resident they may view — never throwing for an auto-pick.
+        if ($request->filled('client_id')) {
+            $selectedClient = Client::with($marWith)->findOrFail($request->client_id);
             $this->authorize('viewMedications', $selectedClient);
+        } else {
+            $defaultClientId = $this->defaultMarClientId($request, $clients);
+            $selectedClient = $defaultClientId ? Client::with($marWith)->find($defaultClientId) : null;
+        }
+
+        if ($selectedClient) {
+            // Remember the most-recently-opened chart so the next bare /emar/mar
+            // visit reopens it (session-scoped, no schema needed).
+            $request->session()->put('emar.mar.last_client_id', $selectedClient->id);
 
             $marData = $this->buildMarData($selectedClient, $scheduleDate);
             $clientContext = $this->buildClientMedicationContext($selectedClient);
@@ -842,6 +859,38 @@ class EmarController extends Controller
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'board_user' => $this->boardPayload->boardUser($request->user()),
         ]);
+    }
+
+    /**
+     * Resolve the resident to open by default when no ?client_id is supplied:
+     * the last MAR chart this user viewed (if still selectable + viewable),
+     * otherwise the first resident they may view. Null = no viewable residents.
+     *
+     * @param  Collection<int, Client>  $clients
+     */
+    private function defaultMarClientId(Request $request, $clients): ?int
+    {
+        if ($clients->isEmpty()) {
+            return null;
+        }
+
+        $user = $request->user();
+        $lastViewed = (int) ($request->session()->get('emar.mar.last_client_id') ?? 0);
+
+        if ($lastViewed) {
+            $prior = $clients->firstWhere('id', $lastViewed);
+            if ($prior && Gate::forUser($user)->allows('viewMedications', $prior)) {
+                return $lastViewed;
+            }
+        }
+
+        foreach ($clients as $client) {
+            if (Gate::forUser($user)->allows('viewMedications', $client)) {
+                return $client->id;
+            }
+        }
+
+        return null;
     }
 
     private function buildMarData(Client $client, Carbon $date): array
