@@ -4,10 +4,25 @@
 export interface CdMedication {
     id: number;
     name: string;
+    form?: string | null;
+    strength?: string | null;
     controlled_drug: boolean;
     client_id: number;
     client_name: string;
-    stock: { on_hand: number | string | null; unit: string | null; last_counted_at: string | null } | null;
+    /** Server-computed reconciliation state (always current, never day-scoped). */
+    last_balance_check_at?: string | null;
+    days_since_check?: number | null;
+    overdue_check?: boolean;
+    /** CD schedule (2/3/4) — currently always null (no column). TODO(G-F). */
+    schedule?: number | null;
+    stock: {
+        on_hand: number | string | null;
+        unit: string | null;
+        last_counted_at: string | null;
+        expiry_date?: string | null;
+        batch_number?: string | null;
+        reorder_level?: number | string | null;
+    } | null;
 }
 
 export interface CdEntry {
@@ -15,12 +30,14 @@ export interface CdEntry {
     client_id: number;
     client_name: string;
     medication_name: string | null;
+    controlled_drug?: boolean;
     entry_type: string;
     quantity: number | string | null;
     unit: string | null;
     on_hand_before: number | string | null;
     on_hand_after: number | string | null;
     batch_number: string | null;
+    expiry_date?: string | null;
     notes: string | null;
     recorded_at: string | null;
     recorded_by_name: string | null;
@@ -32,15 +49,23 @@ export interface CdDiscrepancy {
     client: { id: number; first_name: string; last_name: string } | null;
     medication: { id: number; name: string } | null;
     difference: number | string | null;
+    on_hand_before?: number | string | null;
+    on_hand_after?: number | string | null;
     reason: string | null;
     notes: string | null;
     status: string;
     reported_at: string | null;
+    reported_by_name?: string | null;
+    witnessed_by_name?: string | null;
+    resolved_at?: string | null;
+    resolved_by_name?: string | null;
+    resolution_notes?: string | null;
     attachments: unknown[];
 }
 
 export interface CdDestruction {
     id: number;
+    client_id?: number;
     client_name: string;
     medication_name: string | null;
     quantity: number | string | null;
@@ -50,6 +75,8 @@ export interface CdDestruction {
     destroyed_at: string | null;
     destroyed_by_name: string | null;
     witness_name: string | null;
+    witness_2_name?: string | null;
+    authorised_by_name?: string | null;
     notes: string | null;
 }
 
@@ -65,6 +92,7 @@ export interface CdLossReport {
     reported_to_pharmacy: boolean;
     pharmacy_name: string | null;
     discovered_at: string | null;
+    discovered_by_name?: string | null;
     investigation_status: string;
     investigation_notes: string | null;
     resolution_outcome: string | null;

@@ -15,8 +15,16 @@ function medOptions(meds: CdMedication[]) {
     return meds.map((m) => ({ value: String(m.id), label: `${m.name} · ${m.client_name}` }));
 }
 
+/** Witness <SelectInput> options excluding the recorder (and any already-chosen
+ * witness) — mirrors the server `different:auth id` rule so a user cannot
+ * self-witness a controlled-drug transaction. */
+function witnessOptions(staff: StaffOption[], exclude: (number | null | undefined)[]) {
+    const skip = new Set(exclude.filter((id): id is number => typeof id === 'number'));
+    return staff.filter((s) => !skip.has(s.id)).map((s) => ({ value: String(s.id), label: s.name }));
+}
+
 // ── Record CD entry (3-step) ─────────────────────────────────────────────────
-export function RecordCdEntryDialog({ medications, staff, onClose }: { medications: CdMedication[]; staff: StaffOption[]; onClose: () => void }) {
+export function RecordCdEntryDialog({ medications, staff, currentUserId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; currentUserId?: number | null; onClose: () => void }) {
     const [step, setStep] = useState(0);
     const form = useForm({
         medication_id: '',
@@ -28,9 +36,11 @@ export function RecordCdEntryDialog({ medications, staff, onClose }: { medicatio
         on_hand_before: '',
         on_hand_after: '',
         batch_number: '',
+        expiry_date: '',
         witnessed_by: '',
         notes: '',
     });
+    const isReceipt = form.data.entry_type === 'receipt';
     const med = medications.find((m) => String(m.id) === form.data.medication_id);
     const dir = entryDirection(form.data.entry_type);
     const expectedAfter = useMemo(() => {
@@ -64,7 +74,11 @@ export function RecordCdEntryDialog({ medications, staff, onClose }: { medicatio
         });
     };
 
-    const valid = [!!form.data.medication_id && !!form.data.quantity, !!form.data.on_hand_after && !!form.data.witnessed_by, true];
+    const valid = [
+        !!form.data.medication_id && !!form.data.quantity,
+        !!form.data.on_hand_after && !!form.data.witnessed_by && (!isReceipt || (!!form.data.batch_number && !!form.data.expiry_date)),
+        true,
+    ];
 
     return (
         <MedsWizardDialog
@@ -144,15 +158,19 @@ export function RecordCdEntryDialog({ medications, staff, onClose }: { medicatio
                     )}
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Witnessed by" required error={form.errors.witnessed_by}>
-                            <SelectInput value={form.data.witnessed_by} onChange={(v) => form.setData('witnessed_by', v)} placeholder="Second signatory…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                            <SelectInput value={form.data.witnessed_by} onChange={(v) => form.setData('witnessed_by', v)} placeholder="Second signatory…" options={witnessOptions(staff, [currentUserId])} />
                         </Field>
-                        <Field label="Batch number">
+                        <Field label={isReceipt ? 'Batch number (receipt)' : 'Batch number'} required={isReceipt} error={form.errors.batch_number}>
                             <Input value={form.data.batch_number} onChange={(e) => form.setData('batch_number', e.target.value)} />
+                        </Field>
+                        <Field label={isReceipt ? 'Expiry date (receipt)' : 'Expiry date'} required={isReceipt} error={form.errors.expiry_date}>
+                            <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
                         </Field>
                         <Field label="Notes" span>
                             <Input value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} />
                         </Field>
                     </div>
+                    {isReceipt ? <p className="mt-2 text-xs text-muted-foreground">Receipts require a batch number and expiry date for the new stock.</p> : null}
                 </>
             )}
 
@@ -172,7 +190,7 @@ export function RecordCdEntryDialog({ medications, staff, onClose }: { medicatio
 }
 
 // ── Balance check (quick) ────────────────────────────────────────────────────
-export function BalanceCheckDialog({ medications, staff, presetMedId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; presetMedId?: number | null; onClose: () => void }) {
+export function BalanceCheckDialog({ medications, staff, currentUserId, presetMedId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; currentUserId?: number | null; presetMedId?: number | null; onClose: () => void }) {
     const preset = presetMedId ? medications.find((m) => m.id === presetMedId) : undefined;
     const form = useForm({
         medication_id: preset ? String(preset.id) : '',
@@ -202,6 +220,14 @@ export function BalanceCheckDialog({ medications, staff, presetMedId, onClose }:
             <Field label="Controlled drug" required span>
                 <SelectInput value={form.data.medication_id} onChange={pickMed} placeholder="Select CD…" options={medOptions(medications)} />
             </Field>
+            {med ? (
+                <p className={cn('mt-2 text-xs', med.overdue_check ? 'text-status-warning' : 'text-muted-foreground')}>
+                    {med.days_since_check == null
+                        ? 'No balance check on record yet.'
+                        : `Last balance check ${med.days_since_check === 0 ? 'today' : `${med.days_since_check} day${med.days_since_check === 1 ? '' : 's'} ago`}.`}
+                    {med.overdue_check ? ' Overdue — checks are due at least weekly.' : ''}
+                </p>
+            ) : null}
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Expected (register)" required>
                     <Input type="number" step="0.5" value={form.data.expected_balance} onChange={(e) => form.setData('expected_balance', e.target.value)} />
@@ -210,7 +236,7 @@ export function BalanceCheckDialog({ medications, staff, presetMedId, onClose }:
                     <Input type="number" step="0.5" value={form.data.actual_balance} onChange={(e) => form.setData('actual_balance', e.target.value)} />
                 </Field>
                 <Field label="Witnessed by" required span error={form.errors.witnessed_by}>
-                    <SelectInput value={form.data.witnessed_by} onChange={(v) => form.setData('witnessed_by', v)} placeholder="Second signatory…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                    <SelectInput value={form.data.witnessed_by} onChange={(v) => form.setData('witnessed_by', v)} placeholder="Second signatory…" options={witnessOptions(staff, [currentUserId])} />
                 </Field>
             </div>
             {mismatch && (
@@ -355,7 +381,7 @@ const DISPOSAL_METHODS = [
  * become required only when the picked medication is a controlled drug). When a
  * `sites` list is supplied the site is collected explicitly (gap 6).
  */
-export function RecordDestructionDialog({ medications, staff, sites, defaultSiteId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; sites?: { id: number; name: string }[]; defaultSiteId?: number | null; onClose: () => void }) {
+export function RecordDestructionDialog({ medications, staff, sites, defaultSiteId, currentUserId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; sites?: { id: number; name: string }[]; defaultSiteId?: number | null; currentUserId?: number | null; onClose: () => void }) {
     const [step, setStep] = useState(0);
     const form = useForm({
         medication_id: '',
@@ -370,6 +396,7 @@ export function RecordDestructionDialog({ medications, staff, sites, defaultSite
         witness_1_id: '',
         witness_2_id: '',
         authorised_by_name: '',
+        denaturing_confirmed: false,
         notes: '',
     });
     const isCd = form.data.is_controlled_drug;
@@ -388,7 +415,7 @@ export function RecordDestructionDialog({ medications, staff, sites, defaultSite
     };
     const valid = [
         !!form.data.medication_name && !!form.data.quantity && !!form.data.unit && !!form.data.reason,
-        !!form.data.disposal_method && !!form.data.witness_1_id && (!isCd || (!!form.data.witness_2_id && !!form.data.authorised_by_name)),
+        !!form.data.disposal_method && !!form.data.witness_1_id && (!isCd || (!!form.data.witness_2_id && !!form.data.authorised_by_name && form.data.denaturing_confirmed)),
         true,
     ];
     return (
@@ -426,17 +453,23 @@ export function RecordDestructionDialog({ medications, staff, sites, defaultSite
                             <SelectInput value={form.data.disposal_method} onChange={(v) => form.setData('disposal_method', v)} placeholder="How disposed…" options={DISPOSAL_METHODS} />
                         </Field>
                         <Field label="Witness 1" required error={form.errors.witness_1_id}>
-                            <SelectInput value={form.data.witness_1_id} onChange={(v) => form.setData('witness_1_id', v)} placeholder="First witness…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                            <SelectInput value={form.data.witness_1_id} onChange={(v) => form.setData('witness_1_id', v)} placeholder="First witness…" options={witnessOptions(staff, [currentUserId])} />
                         </Field>
                         {isCd && (
                             <Field label="Witness 2" required error={form.errors.witness_2_id}>
-                                <SelectInput value={form.data.witness_2_id} onChange={(v) => form.setData('witness_2_id', v)} placeholder="Second witness…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                                <SelectInput value={form.data.witness_2_id} onChange={(v) => form.setData('witness_2_id', v)} placeholder="Second witness…" options={witnessOptions(staff, [currentUserId, form.data.witness_1_id ? Number(form.data.witness_1_id) : null])} />
                             </Field>
                         )}
                         {isCd && (
                             <Field label="Authorised by" required span error={form.errors.authorised_by_name}>
                                 <Input value={form.data.authorised_by_name} onChange={(e) => form.setData('authorised_by_name', e.target.value)} placeholder="Authorising person" />
                             </Field>
+                        )}
+                        {isCd && (
+                            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                                <input type="checkbox" className="h-4 w-4" checked={form.data.denaturing_confirmed} onChange={(e) => form.setData('denaturing_confirmed', e.target.checked)} />
+                                Denaturing kit used — the controlled drug was rendered irretrievable before disposal.
+                            </label>
                         )}
                     </div>
                 </>

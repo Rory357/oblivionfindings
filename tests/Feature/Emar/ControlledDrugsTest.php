@@ -98,6 +98,60 @@ class ControlledDrugsTest extends TestCase
             );
     }
 
+    public function test_page_exposes_reconciliation_fields_filters_and_current_user(): void
+    {
+        ['user' => $user] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->get('/emar/controlled')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/ControlledDrugs')
+                ->has('medications.0', fn (Assert $m) => $m
+                    ->where('controlled_drug', true)
+                    ->where('overdue_check', true)
+                    ->has('last_balance_check_at')
+                    ->has('days_since_check')
+                    ->has('stock')
+                    ->etc()
+                )
+                ->where('current_user.id', $user->id)
+                ->has('date')
+                ->has('today')
+                ->where('is_today', true)
+                ->has('client_id')
+                ->has('q')
+            );
+    }
+
+    public function test_client_filter_scopes_medications(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->setupCd();
+        $other = Client::factory()->create(['site_id' => $client->site_id, 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->get('/emar/controlled?client_id='.$other->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('medications', 0)
+                ->where('client_id', $other->id)
+            );
+    }
+
+    public function test_date_param_scopes_movements_window(): void
+    {
+        ['user' => $user] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->get('/emar/controlled?date=2020-01-01')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('date', '2020-01-01')
+                ->where('is_today', false)
+                ->has('recentEntries', 0)
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);
