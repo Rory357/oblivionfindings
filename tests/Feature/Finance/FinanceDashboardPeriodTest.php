@@ -3,9 +3,11 @@
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Services\DashboardAggregatorService;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\BillingEntry;
 use App\Models\FundingClaim;
 use App\Models\ServiceAgreement;
@@ -193,4 +195,25 @@ it('aggregates funding-claim utilisation buckets and the claims table (Phase D)'
     $claims = collect($data['fundingClaims']);
     expect($claims->firstWhere('reference', 'FC-1')['funder'])->toBe('MoH Disability')
         ->and($claims->firstWhere('reference', 'FC-1')['status'])->toBe('paid');
+});
+
+it('reports payroll-awaiting-approval and payday-filing-due attention metrics (Phase E)', function () {
+    // Unposted runs (draft + locked-but-unposted) → awaiting approval.
+    HrPayrollRun::create(['tenant_id' => 1, 'period_start' => '2026-06-01', 'period_end' => '2026-06-14', 'status' => 'draft', 'total_gross' => 5000]);
+    HrPayrollRun::create(['tenant_id' => 1, 'period_start' => '2026-05-18', 'period_end' => '2026-05-31', 'status' => 'locked', 'journal_id' => null, 'total_gross' => 3000]);
+    // Posted run WITHOUT a payday filing → filing due.
+    HrPayrollRun::create(['tenant_id' => 1, 'period_start' => '2026-05-04', 'period_end' => '2026-05-17', 'status' => 'locked', 'journal_id' => 777, 'total_gross' => 4000]);
+    // Posted run WITH a payday filing → not due.
+    $filed = HrPayrollRun::create(['tenant_id' => 1, 'period_start' => '2026-04-20', 'period_end' => '2026-05-03', 'status' => 'exported', 'journal_id' => 888, 'total_gross' => 4000]);
+    FinIrdFiling::create([
+        'organization_id' => 1, 'ird_number' => '49091850', 'filing_type' => 'payday',
+        'period_from' => '2026-04-20', 'period_to' => '2026-05-03', 'payroll_run_id' => $filed->id,
+        'filing_data' => ['total_paye' => '100.00'], 'total_amount' => 100, 'status' => 'draft',
+    ]);
+
+    $data = app(DashboardAggregatorService::class)->getDashboardData(1, 'month');
+
+    expect($data['payrollAwaitingApproval']['count'])->toBe(2)
+        ->and($data['payrollAwaitingApproval']['total_gross'])->toBe(8000.0)
+        ->and($data['paydayFilingDue']['count'])->toBe(1);
 });

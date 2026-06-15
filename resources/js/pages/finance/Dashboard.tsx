@@ -134,6 +134,8 @@ interface Props extends PageProps {
     upcomingBillsDue: UpcomingBill[];
     apDueWithin7?: { count: number; total: number };
     cashRunwayDays?: number | null;
+    payrollAwaitingApproval?: { count: number; total_gross: number };
+    paydayFilingDue?: { count: number };
     recentJournals: RecentJournal[];
     period?: Period;
     periodLabel?: string;
@@ -198,21 +200,6 @@ function computeTrend(data: MonthlyData[]): { percent: number } | null {
     if (previous === 0) return null;
     return { percent: ((current - previous) / Math.abs(previous)) * 100 };
 }
-
-// ---------------------------------------------------------------------------
-// Placeholder data — clearly marked. Replaced by real props in later phases.
-// ---------------------------------------------------------------------------
-
-// TODO(B/D/F): attention items from real queries (AR aging, remittances, bills
-// due, payroll state, GST calendar, delivered-unclaimed).
-const ATTENTION_ITEMS: AttentionItem[] = [
-    { id: 'ar90', severity: 'critical', icon: FileText, title: 'AR overdue 90+ days', body: 'Receivables aged past 90 days need chasing.', tag: '$24.6k · 90+ days' },
-    { id: 'remit', severity: 'warning', icon: Coins, title: 'Funder remittances to reconcile', body: 'Payments received not yet matched to claims.', tag: '3 · $88k' },
-    { id: 'bills7', severity: 'warning', icon: CreditCard, title: 'Bills due within 7 days', body: 'Approved bills falling due this week.', tag: '5 · $128k' },
-    { id: 'payroll', severity: 'info', icon: Clock, title: 'Payroll run awaiting approval', body: 'Fortnightly run ready to lock & post.', tag: '$186.4k' },
-    { id: 'gst', severity: 'warning', icon: Percent, title: 'GST return due', body: 'Period GST return filing deadline approaching.', tag: 'due 28 Jun' },
-    { id: 'unclaimed', severity: 'warning', icon: Coins, title: 'Delivered hours not yet claimed', body: 'Service delivered without a funding claim raised.', tag: '$54k unclaimed' },
-];
 
 function PulseDot() {
     return (
@@ -286,6 +273,8 @@ export default function FinanceDashboard({
     upcomingBillsDue,
     apDueWithin7,
     cashRunwayDays,
+    payrollAwaitingApproval,
+    paydayFilingDue,
     recentJournals,
     accounts = [],
     costCentres = [],
@@ -313,6 +302,7 @@ export default function FinanceDashboard({
                 'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
                 'revenueByFundingStream', 'fundingClaims', 'fundingUtilisation', 'arAging',
                 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
+                'payrollAwaitingApproval', 'paydayFilingDue',
                 'recentJournals', 'period', 'periodLabel',
             ],
             data: {
@@ -378,6 +368,45 @@ export default function FinanceDashboard({
     const utilDonut: DonutSegment[] = utilSegmentsRaw.length
         ? utilSegmentsRaw
         : [{ key: 'none', label: 'No funding activity', value: 1, color: 'var(--border)' }];
+
+    // §3 Needs-attention — built from REAL data; an item only appears when its
+    // metric is live. GST-due + funder-remittances are added in Phase F.
+    const attentionItems: AttentionItem[] = [];
+    if (arAging && arAging.d90_plus > 0) {
+        attentionItems.push({
+            id: 'ar90', severity: 'critical', icon: FileText, title: 'AR overdue 90+ days',
+            body: 'Receivables aged past 90 days need chasing.',
+            tag: `${formatMoneyCompact(arAging.d90_plus)} · 90+ days`, href: '/finance/reports/aged-receivables',
+        });
+    }
+    if (apDueWithin7 && apDueWithin7.count > 0) {
+        attentionItems.push({
+            id: 'bills7', severity: 'warning', icon: CreditCard, title: 'Bills due within 7 days',
+            body: 'Approved bills falling due this week.',
+            tag: `${apDueWithin7.count} · ${formatMoneyCompact(apDueWithin7.total)}`, href: '/finance/bills',
+        });
+    }
+    if (payrollAwaitingApproval && payrollAwaitingApproval.count > 0) {
+        attentionItems.push({
+            id: 'payroll', severity: 'info', icon: Clock, title: 'Payroll run awaiting approval',
+            body: `${payrollAwaitingApproval.count} run(s) not yet posted to the ledger.`,
+            tag: formatMoneyCompact(payrollAwaitingApproval.total_gross),
+        });
+    }
+    if (paydayFilingDue && paydayFilingDue.count > 0) {
+        attentionItems.push({
+            id: 'payday', severity: 'warning', icon: Percent, title: 'IRD payday filing due',
+            body: 'Posted payroll runs still owe an Employment Information filing.',
+            tag: `${paydayFilingDue.count} run(s)`, href: '/finance/ird-filings',
+        });
+    }
+    if (fundingUtilisation && fundingUtilisation.unclaimed_total > 0) {
+        attentionItems.push({
+            id: 'unclaimed', severity: 'warning', icon: Coins, title: 'Delivered hours not yet claimed',
+            body: 'Service delivered without a funding claim raised.',
+            tag: `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`, href: '/finance/funding-streams',
+        });
+    }
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -523,8 +552,8 @@ export default function FinanceDashboard({
 
                 {/* §3 Needs attention */}
                 <NeedsAttentionStrip
-                    items={ATTENTION_ITEMS}
-                    subtitle="6 items due this week · bills, claims, payroll & GST"
+                    items={attentionItems}
+                    subtitle={`${attentionItems.length} item${attentionItems.length === 1 ? '' : 's'} need attention · AR, bills, payroll & claims`}
                     viewAllHref="/finance/reports"
                 />
 

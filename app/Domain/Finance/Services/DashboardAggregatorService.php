@@ -4,8 +4,10 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\BillingEntry;
 use App\Models\FundingClaim;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -62,8 +64,47 @@ class DashboardAggregatorService
             'upcomingBillsDue' => $this->getUpcomingBills($orgId),
             'apDueWithin7' => $this->getApDueWithin7($orgId),
             'cashRunwayDays' => $this->getCashRunwayDays($orgId),
+            'payrollAwaitingApproval' => $this->getPayrollAwaitingApproval($orgId),
+            'paydayFilingDue' => $this->getPaydayFilingDue($orgId),
             'recentJournals' => $this->getRecentJournals($orgId),
         ];
+    }
+
+    /**
+     * Payroll runs not yet posted to the GL (draft, or locked but unposted) —
+     * "awaiting approval/processing". Tenant resolves to the org id here.
+     */
+    private function getPayrollAwaitingApproval(?int $orgId): array
+    {
+        $rows = HrPayrollRun::query()
+            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+            ->whereIn('status', ['draft', 'locked'])
+            ->whereNull('journal_id')
+            ->get(['total_gross']);
+
+        return [
+            'count' => $rows->count(),
+            'total_gross' => round((float) $rows->sum(fn ($r) => (float) $r->total_gross), 2),
+        ];
+    }
+
+    /**
+     * Posted payroll runs that still owe an IRD payday filing (no payday
+     * FinIrdFiling links back to them).
+     */
+    private function getPaydayFilingDue(?int $orgId): array
+    {
+        $postedRunIds = HrPayrollRun::query()
+            ->when($orgId, fn ($q) => $q->where('tenant_id', $orgId))
+            ->whereNotNull('journal_id')
+            ->pluck('id');
+
+        $filedRunIds = FinIrdFiling::forOrganization($orgId)
+            ->ofType('payday')
+            ->whereNotNull('payroll_run_id')
+            ->pluck('payroll_run_id');
+
+        return ['count' => $postedRunIds->diff($filedRunIds)->count()];
     }
 
     /** @return array{0:string,1:string} [startDate, endDate] for the period. */
