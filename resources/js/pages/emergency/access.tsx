@@ -275,6 +275,7 @@ export default function EmergencyAccess({ query, results, activeAccesses, auditL
                         <DialogDescription>{dismissTarget?.detail}</DialogDescription>
                     </DialogHeader>
                     <textarea
+                        aria-label="Reason for acknowledging this signal"
                         value={dismissReason}
                         onChange={(e) => setDismissReason(e.target.value)}
                         rows={3}
@@ -319,7 +320,7 @@ function NumberField({ label, hint, value, onChange, disabled, suffix }: { label
                 {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
-                <Input type="number" min={1} value={value} disabled={disabled} onChange={(e) => onChange(Math.max(0, Math.round(Number(e.target.value) || 0)))} className="h-8 w-20 text-right tabular-nums" />
+                <Input type="number" aria-label={label} min={1} value={value} disabled={disabled} onChange={(e) => onChange(Math.max(0, Math.round(Number(e.target.value) || 0)))} className="h-8 w-20 text-right tabular-nums" />
                 {suffix && <span className="w-9 text-xs text-muted-foreground">{suffix}</span>}
             </span>
         </label>

@@ -70,12 +70,12 @@ export function ReviewDialog({ record, incidents, onClose }: { record: ReviewRec
                 <div>
                     <div className="mb-1.5 text-sm font-medium">Outcome</div>
                     <div className="flex gap-2">
-                        <button type="button" onClick={() => setOutcome('justified')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'justified' ? 'border-status-success bg-status-success-bg text-status-success' : 'border-border hover:bg-muted'}`}><Check className="h-4 w-4" />Justified</button>
-                        <button type="button" onClick={() => setOutcome('not_justified')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'not_justified' ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border hover:bg-muted'}`}><Ban className="h-4 w-4" />Not justified</button>
+                        <button type="button" aria-pressed={outcome === 'justified'} onClick={() => setOutcome('justified')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'justified' ? 'border-status-success bg-status-success-bg text-status-success' : 'border-border hover:bg-muted'}`}><Check className="h-4 w-4" />Justified</button>
+                        <button type="button" aria-pressed={outcome === 'not_justified'} onClick={() => setOutcome('not_justified')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'not_justified' ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border hover:bg-muted'}`}><Ban className="h-4 w-4" />Not justified</button>
                     </div>
                 </div>
 
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reviewer notes (optional)…" className="min-h-16" />
+                <Textarea aria-label="Reviewer notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Reviewer notes (optional)…" className="min-h-16" />
 
                 <div className="rounded-lg border">
                     <div className="border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accessed during this window</div>
@@ -98,7 +98,7 @@ export function ReviewDialog({ record, incidents, onClose }: { record: ReviewRec
                     {incidents.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No incident reports recorded for this client.</p>
                     ) : (
-                        <select value={incidentId ?? ''} onChange={(e) => setIncidentId(e.target.value ? Number(e.target.value) : null)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <select aria-label="Link incident report" value={incidentId ?? ''} onChange={(e) => setIncidentId(e.target.value ? Number(e.target.value) : null)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">— None —</option>
                             {incidents.map((inc) => (
                                 <option key={inc.id} value={inc.id}>{inc.label}{inc.date ? ` · ${inc.date}` : ''}</option>
