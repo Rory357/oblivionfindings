@@ -43,9 +43,15 @@ gate it (§7), commit, tick it. Plan: [PLAN.md](PLAN.md).
   **allow_overstaffing toggle**, optional service_context select), required-credentials catalogue chips
   (each → Mandatory/Recommended segmented + expiry months), optional shift-template rows. Produces
   exactly the payload S2 persists (covered by AddSiteModalStoreTest). Gate: tsc/lint/build green.
-  Commit `<s4>`.
-- [ ] **S5 — Location & geofence step.** AddressAutocomplete (/sites/geocode/search) + GeofenceDrawMap
-  radius/draw + 50–500m slider + breach type + access instructions. Circle-only at create.
+  Commit `1b75d913`.
+- [x] **S5 — Location & geofence step.** Rebuilt `StepLocation` as 2-col: left = `AddressAutocomplete`
+  (endpoint `/sites/geocode/search`) autofilling line1/suburb/city/postcode/country/region(+derive) +
+  lat/lng, manual address_line_2, NZ region select, access instructions; right = reused
+  `GeofenceDrawMap` (circle seeded from lat/lng + radius_m) + 50–500m radius slider (default 120, live
+  readout, remounts map on release via mapKey) + breach-type Segmented (enter/exit/both, default both)
+  + active Switch; empty-state when no coords. onShapeChange syncs circle centre/radius back to the
+  form; circle-only per guardrail (polygon stays a post-create concern). Gate: tsc/lint/build green.
+  Commit `<s5>`.
 - [ ] **S6 — Property & finance + Review & safety steps.** Finance step + review summary/risk/notes +
   Save & add another + success pane.
 - [ ] **S7 — Full audit, tests, cutover.** E2E + visual parity + full gate + deprecate /sites/create +

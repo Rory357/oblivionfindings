@@ -3,6 +3,13 @@
  * via the shared WizardShell, and uses the shared wizard primitives for tile
  * pickers, chips and segmented controls. Every colour is a semantic design token
  * (never hardcoded hex), per docs/DESIGN_TOKENS.md. */
+import {
+    AddressAutocomplete,
+    type GeocodeResult,
+} from '@/components/address-autocomplete';
+import GeofenceDrawMap, {
+    type GeofenceShape,
+} from '@/components/geofence-draw-map';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -750,8 +757,23 @@ function StepBasics({ ctx }: { ctx: SiteStepCtx }) {
 /*  Step: Location (S3 shell — geofence + autocomplete land in S5)     */
 /* ------------------------------------------------------------------ */
 
+const BREACH_OPTIONS = [
+    { value: 'enter', label: 'Enter' },
+    { value: 'exit', label: 'Exit' },
+    { value: 'both', label: 'Both' },
+];
+
 function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
-    const { data, set, err } = ctx;
+    const { data, set, setMany, err } = ctx;
+    // Bumped only when the centre changes (address pick) or the radius slider is
+    // released — so the map remounts then, not on every keystroke/drag tick.
+    const [mapKey, setMapKey] = useState(0);
+
+    const lat = data.latitude ? Number(data.latitude) : null;
+    const lng = data.longitude ? Number(data.longitude) : null;
+    const hasCoords =
+        lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng);
+
     const updateCity = (city: string) => {
         const prev = deriveNzRegion(data.city);
         const nextRegion = deriveNzRegion(city);
@@ -759,69 +781,181 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
         if (nextRegion && (!data.region || data.region === prev))
             set('region', nextRegion);
     };
+
+    const onGeocode = (r: GeocodeResult) => {
+        const patch: Partial<SiteWizardForm> = {};
+        if (r.address_line_1) patch.address_line_1 = r.address_line_1;
+        if (r.suburb) patch.suburb = r.suburb;
+        if (r.city) patch.city = r.city;
+        if (r.postcode) patch.postcode = r.postcode;
+        if (r.country) patch.country = r.country;
+        const region = r.region || (r.city ? deriveNzRegion(r.city) : null);
+        if (region) patch.region = region;
+        if (r.lat != null) patch.latitude = String(r.lat);
+        if (r.lng != null) patch.longitude = String(r.lng);
+        setMany(patch);
+        setMapKey((k) => k + 1);
+    };
+
+    const onShapeChange = (shape: GeofenceShape | null) => {
+        if (!shape || shape.type !== 'circle') return;
+        const patch: Partial<SiteWizardForm> = {};
+        if (shape.center) {
+            patch.latitude = String(shape.center.lat);
+            patch.longitude = String(shape.center.lng);
+        }
+        if (shape.radius_m)
+            patch.geofence = { ...data.geofence, radius_m: Math.round(shape.radius_m) };
+        setMany(patch);
+    };
+
+    const setRadius = (radius: number) =>
+        set('geofence', { ...data.geofence, radius_m: radius });
+
     return (
         <div>
             <StepHead
                 icon={MapPin}
                 title="Where is this site?"
-                blurb="The address powers the map pin and the geofence boundary."
+                blurb="Search the address to drop a pin, then size the geofence boundary."
             />
-            <div className="grid gap-4">
-                <SubHead icon={MapPin}>Address</SubHead>
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Address line 1" error={err('address_line_1')} span>
-                        <Input
+            <div className="grid gap-5 lg:grid-cols-2">
+                {/* Address */}
+                <div className="grid gap-4">
+                    <SubHead icon={MapPin}>Address</SubHead>
+                    <Field
+                        label="Find address"
+                        hint="type to search — powered by OpenStreetMap"
+                        error={err('address_line_1')}
+                    >
+                        <AddressAutocomplete
                             value={data.address_line_1}
-                            onChange={(e) => set('address_line_1', e.target.value)}
-                            placeholder="123 Example Street"
+                            onChange={(v) => set('address_line_1', v)}
+                            onSelect={onGeocode}
+                            endpoint="/sites/geocode/search"
+                            placeholder="Start typing an address…"
                         />
                     </Field>
-                    <Field label="Address line 2" span>
+                    <Field label="Address line 2">
                         <Input
                             value={data.address_line_2}
                             onChange={(e) => set('address_line_2', e.target.value)}
                             placeholder="Apartment, unit (optional)"
                         />
                     </Field>
-                    <Field label="Suburb">
-                        <Input
-                            value={data.suburb}
-                            onChange={(e) => set('suburb', e.target.value)}
-                        />
-                    </Field>
-                    <Field label="City">
-                        <Input
-                            value={data.city}
-                            onChange={(e) => updateCity(e.target.value)}
-                            placeholder="e.g. Auckland"
-                        />
-                    </Field>
-                    <Field label="Postcode">
-                        <Input
-                            value={data.postcode}
-                            onChange={(e) =>
-                                set('postcode', e.target.value.replace(/\D/g, '').slice(0, 4))
-                            }
-                            placeholder="1010"
-                        />
-                    </Field>
-                    <Field label="Region">
-                        <SelectInput
-                            value={data.region}
-                            onChange={(v) => set('region', v)}
-                            placeholder="Select region"
-                            options={NZ_REGION_OPTIONS.map((r) => ({ value: r, label: r }))}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Suburb">
+                            <Input
+                                value={data.suburb}
+                                onChange={(e) => set('suburb', e.target.value)}
+                            />
+                        </Field>
+                        <Field label="City">
+                            <Input
+                                value={data.city}
+                                onChange={(e) => updateCity(e.target.value)}
+                                placeholder="e.g. Auckland"
+                            />
+                        </Field>
+                        <Field label="Postcode">
+                            <Input
+                                value={data.postcode}
+                                onChange={(e) =>
+                                    set('postcode', e.target.value.replace(/\D/g, '').slice(0, 4))
+                                }
+                                placeholder="1010"
+                            />
+                        </Field>
+                        <Field label="Region">
+                            <SelectInput
+                                value={data.region}
+                                onChange={(v) => set('region', v)}
+                                placeholder="Select region"
+                                options={NZ_REGION_OPTIONS.map((r) => ({ value: r, label: r }))}
+                            />
+                        </Field>
+                    </div>
+                    <Field label="Access instructions">
+                        <Textarea
+                            rows={2}
+                            value={data.access_instructions}
+                            onChange={(e) => set('access_instructions', e.target.value)}
+                            placeholder="Lockbox code, parking, gate access…"
                         />
                     </Field>
                 </div>
-                <Field label="Access instructions" span>
-                    <Textarea
-                        rows={2}
-                        value={data.access_instructions}
-                        onChange={(e) => set('access_instructions', e.target.value)}
-                        placeholder="Lockbox code, parking, gate access…"
-                    />
-                </Field>
+
+                {/* Map + geofence */}
+                <div className="grid content-start gap-3">
+                    <SubHead icon={Shield}>Geofence</SubHead>
+                    {hasCoords ? (
+                        <>
+                            <div className="overflow-hidden rounded-xl border border-border">
+                                <GeofenceDrawMap
+                                    key={mapKey}
+                                    center={{ lat: lat as number, lng: lng as number }}
+                                    zoom={16}
+                                    height={240}
+                                    initialShape={{
+                                        type: 'circle',
+                                        center: { lat: lat as number, lng: lng as number },
+                                        radius_m: data.geofence.radius_m,
+                                    }}
+                                    onShapeChange={onShapeChange}
+                                />
+                            </div>
+                            <div className="rounded-lg border border-border bg-card/60 p-3">
+                                <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                                    <span className="font-medium text-muted-foreground">
+                                        Radius
+                                    </span>
+                                    <span className="font-semibold text-primary">
+                                        {data.geofence.radius_m} m
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={50}
+                                    max={500}
+                                    step={10}
+                                    value={data.geofence.radius_m}
+                                    onChange={(e) => setRadius(Number(e.target.value))}
+                                    onPointerUp={() => setMapKey((k) => k + 1)}
+                                    onKeyUp={() => setMapKey((k) => k + 1)}
+                                    className="w-full accent-primary"
+                                    aria-label="Geofence radius in metres"
+                                />
+                            </div>
+                            <Field label="Breach alerts">
+                                <Segmented
+                                    value={data.geofence.breach_type}
+                                    onChange={(v) =>
+                                        set('geofence', {
+                                            ...data.geofence,
+                                            breach_type: v as GeofenceForm['breach_type'],
+                                        })
+                                    }
+                                    options={BREACH_OPTIONS}
+                                />
+                            </Field>
+                            <label className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 p-3">
+                                <Switch
+                                    checked={data.geofence.is_active}
+                                    onCheckedChange={(v) =>
+                                        set('geofence', { ...data.geofence, is_active: v })
+                                    }
+                                />
+                                <span className="text-[13px] text-muted-foreground">
+                                    Geofence active (feeds breach alerts &amp; readiness)
+                                </span>
+                            </label>
+                        </>
+                    ) : (
+                        <div className="grid h-[240px] place-items-center rounded-xl border border-dashed border-border bg-muted/30 px-6 text-center text-[13px] text-muted-foreground">
+                            Search an address to drop a pin and draw the geofence here.
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
