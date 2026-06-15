@@ -2242,16 +2242,13 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: CalendarDays,
         });
     }
+    // Onboarding hub — Checklists (/hr/onboarding) and Emails
+    // (/hr/onboarding/emails) are now tabs of the Onboarding hub.
     if (can?.hr?.onboarding?.view) {
         admin.items.push({
             title: 'Onboarding',
             href: '/hr/onboarding',
             icon: ClipboardCheck,
-        });
-        admin.items.push({
-            title: 'Onboarding Emails',
-            href: '/hr/onboarding/emails',
-            icon: MessageSquareText,
         });
     }
     if (can?.hr?.documents?.view) {

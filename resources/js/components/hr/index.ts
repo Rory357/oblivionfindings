@@ -12,6 +12,7 @@ export * from './leave-request-dialog';
 export * from './my-hr-tabs';
 export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
+export * from './onboarding-tabs';
 export * from './onboarding-wizard-dialog';
 export * from './payroll-tabs';
 export * from './people-picker';
