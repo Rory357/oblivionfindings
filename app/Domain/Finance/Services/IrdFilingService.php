@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinGstReturn;
 use App\Domain\Finance\Models\FinIrdFiling;
+use App\Domain\Hr\Models\HrPayrollRun;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -26,6 +27,60 @@ class IrdFilingService
             'gst_return_id' => $gstReturn->id,
             'filing_data' => $filingData,
             'total_amount' => $gstReturn->gst_payable,
+            'status' => 'draft',
+            'created_by' => Auth::id(),
+        ]);
+    }
+
+    /**
+     * Create a payday (Employment Information / EI) filing from a POSTED payroll
+     * run. Totals are summed from the run's payslips; the filing is the amount of
+     * PAYE payable to IRD. Caller must ensure the run's payroll journal is posted.
+     */
+    public function createPaydayFiling(?int $orgId, HrPayrollRun $run, string $irdNumber): FinIrdFiling
+    {
+        $run->loadMissing('payslips');
+        $payslips = $run->payslips;
+
+        $sum = fn (string $field): string => (string) $payslips->reduce(
+            fn (string $total, $slip) => bcadd($total, (string) ($slip->{$field} ?? 0), 2),
+            '0',
+        );
+
+        $payrollData = [
+            'period_start' => $run->period_start?->format('Y-m-d'),
+            'period_end' => $run->period_end?->format('Y-m-d'),
+            'payday' => optional($payslips->first()?->payment_date)->format('Y-m-d')
+                ?? $run->period_end?->format('Y-m-d'),
+            'employees' => $payslips->map(fn ($slip) => [
+                'employee_profile_id' => $slip->employee_profile_id,
+                'gross' => (string) $slip->gross_pay,
+                'paye' => (string) $slip->paye,
+                'kiwisaver_employee' => (string) $slip->kiwisaver_employee,
+                'kiwisaver_employer' => (string) $slip->kiwisaver_employer,
+                'student_loan' => (string) $slip->student_loan,
+            ])->values()->all(),
+            'total_gross' => $sum('gross_pay'),
+            'total_paye' => $sum('paye'),
+            'total_student_loan' => $sum('student_loan'),
+            'total_kiwisaver_employee' => $sum('kiwisaver_employee'),
+            'total_kiwisaver_employer' => $sum('kiwisaver_employer'),
+            // ESCT isn't separately tracked on the payslip yet.
+            'total_esct' => '0.00',
+        ];
+
+        $payload = $this->buildPaydayFilingPayload($payrollData);
+        $payload['payroll_run_id'] = $run->id;
+
+        return FinIrdFiling::create([
+            'organization_id' => $orgId,
+            'ird_number' => $irdNumber,
+            'filing_type' => 'payday',
+            'period_from' => $run->period_start,
+            'period_to' => $run->period_end,
+            'payroll_run_id' => $run->id,
+            'filing_data' => $payload,
+            'total_amount' => $payload['total_paye'],
             'status' => 'draft',
             'created_by' => Auth::id(),
         ]);
@@ -82,6 +137,16 @@ class IrdFilingService
             // Validate amounts are numeric
             foreach (['total_sales', 'total_purchases', 'gst_collected', 'gst_paid'] as $field) {
                 if (isset($data[$field]) && ! is_numeric($data[$field])) {
+                    $errors[] = "Field {$field} must be a numeric value.";
+                }
+            }
+        }
+
+        if ($filing->filing_type === 'payday') {
+            foreach (['total_gross', 'total_paye'] as $field) {
+                if (! isset($data[$field])) {
+                    $errors[] = "Missing required field: {$field}";
+                } elseif (! is_numeric($data[$field])) {
                     $errors[] = "Field {$field} must be a numeric value.";
                 }
             }
@@ -179,8 +244,7 @@ class IrdFilingService
     }
 
     /**
-     * Build a payday filing payload.
-     * Placeholder for future implementation.
+     * Build a payday (Employment Information) filing payload in the IRD format.
      */
     protected function buildPaydayFilingPayload(array $payrollData): array
     {

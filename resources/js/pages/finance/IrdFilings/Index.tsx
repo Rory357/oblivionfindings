@@ -42,9 +42,18 @@ type PaginatedData = {
     last_page: number;
 };
 
+type PayrollRun = {
+    id: number;
+    period_start: string;
+    period_end: string;
+    total_gross: string | null;
+    status: string;
+};
+
 type PageProps = {
     filings: PaginatedData;
     availableGstReturns: GstReturn[];
+    availablePayrollRuns: PayrollRun[];
     filters: {
         filing_type?: string;
         status?: string;
@@ -91,11 +100,15 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
-export default function IrdFilingsIndex({ filings, availableGstReturns, filters }: PageProps) {
+export default function IrdFilingsIndex({ filings, availableGstReturns, availablePayrollRuns, filters }: PageProps) {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [selectedGstReturn, setSelectedGstReturn] = useState<string>('');
+    const [selectedPayrollRun, setSelectedPayrollRun] = useState<string>('');
 
     const createForm = useForm({
+        ird_number: '',
+    });
+    const paydayForm = useForm({
         ird_number: '',
     });
 
@@ -121,6 +134,12 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
         e.preventDefault();
         if (!selectedGstReturn) return;
         createForm.post(`/finance/ird-filings/from-gst/${selectedGstReturn}`);
+    }
+
+    function handleCreatePaydayFiling(e: React.FormEvent) {
+        e.preventDefault();
+        if (!selectedPayrollRun) return;
+        paydayForm.post(`/finance/ird-filings/from-payroll/${selectedPayrollRun}`);
     }
 
     return (
@@ -249,6 +268,60 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                             <p className="text-center text-muted-foreground">
                                 No GST returns available for filing. Prepare a GST return first.
                             </p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Create Payday Filing Form */}
+                {showCreateForm && availablePayrollRuns.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Create Payday Filing from Payroll Run</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleCreatePaydayFiling} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Payroll Run</Label>
+                                        <Select value={selectedPayrollRun} onValueChange={setSelectedPayrollRun}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a posted payroll run" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availablePayrollRuns.map((run) => (
+                                                    <SelectItem key={run.id} value={String(run.id)}>
+                                                        {formatDate(run.period_start)} &ndash; {formatDate(run.period_end)}
+                                                        {run.total_gross != null
+                                                            ? ` (${formatCurrency(Number(run.total_gross))})`
+                                                            : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="payday_ird_number">IRD Number</Label>
+                                        <Input
+                                            id="payday_ird_number"
+                                            value={paydayForm.data.ird_number}
+                                            onChange={(e) => paydayForm.setData('ird_number', e.target.value)}
+                                            placeholder="e.g. 12-345-678"
+                                            maxLength={11}
+                                        />
+                                        {paydayForm.errors.ird_number && (
+                                            <p className="text-sm text-destructive">{paydayForm.errors.ird_number}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3">
+                                    <Button
+                                        type="submit"
+                                        disabled={!selectedPayrollRun || !paydayForm.data.ird_number || paydayForm.processing}
+                                    >
+                                        Create Payday Filing
+                                    </Button>
+                                </div>
+                            </form>
                         </CardContent>
                     </Card>
                 )}

@@ -21,6 +21,7 @@ class FinIrdFiling extends Model
         'period_from',
         'period_to',
         'gst_return_id',
+        'payroll_run_id',
         'filing_data',
         'total_amount',
         'status',
