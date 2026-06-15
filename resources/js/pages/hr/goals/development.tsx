@@ -14,9 +14,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { PerformanceTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
+import { ConfirmAction } from '@/pages/sites/_confirm-action';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Target } from 'lucide-react';
+import { Target, Trash2 } from 'lucide-react';
 import { FormEvent } from 'react';
 
 type GoalRow = {
@@ -137,6 +138,12 @@ export default function DevelopmentGoals({
     function linkObjective(goalId: number, hrGoalId: number | null) {
         updateForm.transform(() => ({ hr_goal_id: hrGoalId }));
         updateForm.put(`/hr/goals/development/${goalId}`, {
+            preserveScroll: true,
+        });
+    }
+
+    function deleteGoal(goalId: number) {
+        router.delete(`/hr/goals/development/${goalId}`, {
             preserveScroll: true,
         });
     }
@@ -554,15 +561,35 @@ export default function DevelopmentGoals({
                                             Due {goal.due_date ?? 'Not set'}
                                         </p>
                                     </div>
-                                    <Badge
-                                        variant={
-                                            goal.status === 'completed'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {goal.status.replace('_', ' ')}
-                                    </Badge>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <Badge
+                                            variant={
+                                                goal.status === 'completed'
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                        >
+                                            {goal.status.replace('_', ' ')}
+                                        </Badge>
+                                        {can.manage && (
+                                            <ConfirmAction
+                                                title="Delete development goal?"
+                                                description={`Delete "${goal.title}"? This removes it from the development plans list. The record is kept and can be restored by an administrator.`}
+                                                confirmLabel="Delete goal"
+                                                onConfirm={() =>
+                                                    deleteGoal(goal.id)
+                                                }
+                                            >
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </ConfirmAction>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="mt-3 grid gap-3 md:grid-cols-3">

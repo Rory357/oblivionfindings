@@ -502,6 +502,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
             Route::post('/', [DevelopmentGoalController::class, 'store'])->name('goals.store');
+            Route::delete('/{goal}', [DevelopmentGoalController::class, 'destroy'])->name('goals.destroy');
         });
     });
 
@@ -776,6 +777,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/create', [GoalController::class, 'create'])->name('create');
             Route::post('/', [GoalController::class, 'store'])->name('store');
             Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
+            Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
             Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
 
             // Key Results

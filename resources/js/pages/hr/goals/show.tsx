@@ -29,6 +29,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmAction } from '@/pages/sites/_confirm-action';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -315,6 +316,10 @@ export default function GoalShow({
         }
     }
 
+    function deleteGoal() {
+        router.delete(`/hr/goals/${goal.id}`);
+    }
+
     function submitProgress(e: FormEvent) {
         e.preventDefault();
         router.post(
@@ -413,13 +418,30 @@ export default function GoalShow({
                             stats={heroStats}
                             actions={
                                 can.manage ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setEditOpen(true)}
-                                    >
-                                        <Pencil className="mr-1.5 h-4 w-4" />
-                                        Edit goal
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setEditOpen(true)}
+                                        >
+                                            <Pencil className="mr-1.5 h-4 w-4" />
+                                            Edit goal
+                                        </Button>
+                                        <ConfirmAction
+                                            title="Delete objective?"
+                                            description={`Delete "${goal.title}"? This removes it from the goals list. Key results and history are kept and the objective can be restored by an administrator.`}
+                                            confirmLabel="Delete objective"
+                                            onConfirm={deleteGoal}
+                                        >
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            >
+                                                <Trash2 className="mr-1.5 h-4 w-4" />
+                                                Delete
+                                            </Button>
+                                        </ConfirmAction>
+                                    </div>
                                 ) : undefined
                             }
                         />

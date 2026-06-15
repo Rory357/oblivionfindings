@@ -185,4 +185,18 @@ class DevelopmentGoalController extends Controller
 
         return redirect()->back()->with('success', 'Development goal updated.');
     }
+
+    public function destroy(Request $request, HrDevelopmentGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
+
+        abort_unless($user->canDo('hr.performance.manage'), 403);
+
+        $goal->delete();
+
+        return redirect()->back()->with('success', 'Development goal deleted.');
+    }
 }

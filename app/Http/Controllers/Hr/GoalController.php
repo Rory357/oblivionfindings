@@ -281,6 +281,20 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Destroy */
+    /* ------------------------------------------------------------------ */
+
+    public function destroy(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+
+        $goal->delete();
+
+        return redirect()->route('hr.goals.index')->with('success', 'Objective deleted.');
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Update Progress */
     /* ------------------------------------------------------------------ */
 
