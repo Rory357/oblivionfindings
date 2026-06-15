@@ -46,10 +46,15 @@ class PrescriptionsPageTest extends TestCase
                 ->has('orders', 1)
                 ->where('orders.0.medication_name', 'Warfarin')
                 ->where('orders.0.client_name', 'Aroha Ngata')
+                // Detail-modal enrichment: site (room is null here) is serialised.
+                ->where('orders.0.client_site', $site->name)
+                ->has('orders.0.client_room')
                 ->has('medications', 1)
                 ->where('medications.0.id', $med->id)
                 ->has('covert')
                 ->has('clients')
+                // Client EntityFilter description is driven by site_name.
+                ->where('clients.0.site_name', $site->name)
             );
     }
 
