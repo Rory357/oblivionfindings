@@ -80,6 +80,136 @@ class EmergencyAccessTest extends TestCase
             );
     }
 
+    public function test_grant_persists_structured_fields_and_cosign(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        $cosigner = User::factory()->create(['organization_id' => $user->organization_id, 'approved_at' => now()]);
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/clients/{$client->id}/break-glass", [
+                'reason' => 'Covering sick leave; 16:00 meds due',
+                'reason_category' => 'Staff absence / cover',
+                'minutes' => 120,
+                'authorization_mode' => 'co_sign',
+                'co_signed_by' => $cosigner->id,
+                'acknowledged_min_necessary' => true,
+                'acknowledged_incident_report' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('client_break_glass_accesses', [
+            'client_id' => $client->id,
+            'reason_category' => 'Staff absence / cover',
+            'authorization_mode' => 'co_sign',
+            'co_signed_by' => $cosigner->id,
+            'acknowledged_min_necessary' => true,
+            'acknowledged_incident_report' => true,
+        ]);
+    }
+
+    public function test_cosign_must_be_a_different_person(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/clients/{$client->id}/break-glass", [
+                'reason' => 'x', 'authorization_mode' => 'co_sign', 'co_signed_by' => $user->id,
+            ])
+            ->assertSessionHasErrors('co_signed_by');
+    }
+
+    public function test_grant_duration_is_capped_at_policy_max(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/clients/{$client->id}/break-glass", ['reason' => 'x', 'minutes' => 5000])
+            ->assertSessionHasErrors('minutes');
+    }
+
+    public function test_extend_adds_time_within_cap(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        $original = $access->expires_at;
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend")
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($access->refresh()->expires_at->greaterThan($original));
+    }
+
+    public function test_extend_refuses_past_the_maximum_window(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        // Push the window out to the policy cap (created_at + max).
+        $access->forceFill(['expires_at' => $access->created_at->copy()->addMinutes(ClientBreakGlassAccess::MAX_MINUTES)])->save();
+        $capped = $access->refresh()->expires_at;
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend")
+            ->assertSessionHas('error');
+
+        $this->assertSame($capped->timestamp, $access->refresh()->expires_at->timestamp);
+    }
+
+    public function test_review_records_outcome_and_reviewer(): void
+    {
+        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        $access->forceFill(['expires_at' => now()->subMinutes(5)])->save(); // completed activation
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
+                'review_outcome' => 'justified',
+                'review_notes' => 'Appropriate emergency use',
+                'incident_report_linked' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $access->refresh();
+        $this->assertSame('justified', $access->review_outcome);
+        $this->assertSame($user->id, $access->reviewed_by);
+        $this->assertNotNull($access->reviewed_at);
+        $this->assertTrue($access->incident_report_linked);
+    }
+
+    public function test_review_is_denied_without_audit_permission(): void
+    {
+        ['client' => $client, 'access' => $access] = $this->seedAccess();
+        $plain = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->grantPermissions($plain, ['medications.breakglass']);
+
+        // Reviewer must hold medications.audit.view (route-gated). A break-glass-only
+        // user is blocked, so the activation is never marked reviewed.
+        $response = $this->actingAs($plain)
+            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", ['review_outcome' => 'justified']);
+
+        $this->assertContains($response->status(), [403, 404]);
+        $this->assertNull($access->refresh()->review_outcome);
+    }
+
+    public function test_page_serves_approvers_and_awaiting_review(): void
+    {
+        ['user' => $user, 'site' => $site, 'access' => $access] = $this->seedAccess();
+        User::factory()->create(['organization_id' => $user->organization_id, 'approved_at' => now()]);
+        $access->forceFill(['expires_at' => now()->subMinutes(5)])->save(); // expired, unreviewed
+
+        $this->actingAs($user)
+            ->get('/emar/emergency-access?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('can_review', true)
+                ->has('approvers')
+                ->where('stats.awaiting_review', 1)
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);

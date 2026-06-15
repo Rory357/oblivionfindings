@@ -281,6 +281,16 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.breakglass|medications.audit.view')
         ->name('emar.clients.break_glass.destroy');
 
+    // Extend a live grant (+30 min, capped at the policy max)
+    Route::post('/clients/{client}/break-glass/{access}/extend', [BreakGlassController::class, 'extend'])
+        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->name('emar.clients.break_glass.extend');
+
+    // Post-event review (oversight sign-off): justified / not justified
+    Route::post('/clients/{client}/break-glass/{access}/review', [BreakGlassController::class, 'review'])
+        ->middleware('permission:medications.audit.view')
+        ->name('emar.clients.break_glass.review');
+
     // Correction approval workflow
     Route::post('/corrections/{correction}/approve', [MedicationAdministrationCorrectionController::class, 'approve'])
         ->middleware('permission:medications.administer.correct')
