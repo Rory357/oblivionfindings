@@ -1,5 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the audit timeline/table/gaps surfaces + hero footer are
    custom-layout bordered rows / chip buttons (not Card/Button); all colours are semantic tokens. */
+/* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
+   deliberate deviations, and a fidelity checklist for reviewing this page's design. */
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
 import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
