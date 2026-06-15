@@ -76,7 +76,7 @@ function Stars({ count, max = 5 }: { count: number; max?: number }) {
             {Array.from({ length: max }, (_, i) => (
                 <Star
                     key={i}
-                    className={`h-4 w-4 ${i < count ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20'}`}
+                    className={`h-4 w-4 ${i < count ? 'fill-amberx text-status-warning' : 'text-muted-foreground/20'}`}
                 />
             ))}
         </div>

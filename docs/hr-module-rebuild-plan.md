@@ -637,10 +637,13 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     hr.surveys.* redirect routes + can.surveys exposure. 10 tests (HrSurveyTablesDroppedTest + SurveySystemRetiredTest +
     RetiredRoutesRedirectTest + HrDemoSeederTest) green. REMAINING orphans (LEAVE — dead *relationships on LIVE parents*,
     future scope): HrEmployeeProfileVersion/HrEmployeeStatusChange + HrCompensationReviewItem.
-  - *Static a11y/token (build+eslint-verifiable):* ✅ **same-token contrast killers DONE (S28)** — was actually 162
-    instances across 44 files (not ~15); all swapped `bg-status-X`→`bg-status-X-bg`. REMAINING: raw-palette
-    `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls
-    (leave select checkboxes ×2, goals chevron toggle).
+  - *Static a11y/token (build+eslint-verifiable):* ✅ **CATEGORY D COMPLETE.** ✅ same-token contrast killers (S28 — 162
+    instances/44 files, `bg-status-X`→`bg-status-X-bg`). ✅ **a11y remainder DONE (S34):** swapped 14 raw-palette star fills
+    `fill-amber-400`/`fill-yellow-400`→`fill-amberx` (the design token; verified `--amberx` exists in app.css light+dark)
+    across 13 files via an LF-safe Node script (kept the paired token `text-status-warning`); + added accessible names to the
+    3 unlabelled controls — leave/index select-all checkbox (`aria-label="Select all pending requests"`) + per-row checkbox
+    (`aria-label="Select leave request for {staff_name}"`) + goals/index chevron toggle (`type="button"` +
+    `aria-label` expand/collapse + `aria-expanded`). 0 raw fills remain. types + eslint + build green (no Pest — className/aria).
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
   hero/tabs/modals visually match; no dead buttons; DoD met.
 

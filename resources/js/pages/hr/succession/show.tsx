@@ -192,7 +192,7 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                                                         (s) => (
                                                             <Star
                                                                 key={s}
-                                                                className={`h-4 w-4 ${s <= c.overall_rating! ? 'fill-yellow-400 text-status-warning' : 'text-muted-foreground'}`}
+                                                                className={`h-4 w-4 ${s <= c.overall_rating! ? 'fill-amberx text-status-warning' : 'text-muted-foreground'}`}
                                                             />
                                                         ),
                                                     )}

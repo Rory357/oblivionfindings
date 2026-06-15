@@ -1439,7 +1439,7 @@ export default function CandidateShow({
                                                                                             }
                                                                                             className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs"
                                                                                         >
-                                                                                            <Star className="h-3 w-3 fill-amber-400 text-status-warning" />
+                                                                                            <Star className="h-3 w-3 fill-amberx text-status-warning" />
                                                                                             <span>
                                                                                                 {score.overall_score ??
                                                                                                     '-'}

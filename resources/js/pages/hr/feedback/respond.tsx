@@ -85,7 +85,7 @@ function StarRating({
                         className="group/star h-8 w-8"
                     >
                         <Star
-                            className={`size-7 transition-all ${star <= value ? 'scale-110 fill-amber-400 text-status-warning' : 'text-muted-foreground/20 group-hover/star:scale-110 hover:text-status-warning'}`}
+                            className={`size-7 transition-all ${star <= value ? 'scale-110 fill-amberx text-status-warning' : 'text-muted-foreground/20 group-hover/star:scale-110 hover:text-status-warning'}`}
                         />
                     </Button>
                 ))}

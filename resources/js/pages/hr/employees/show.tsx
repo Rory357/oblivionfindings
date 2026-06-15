@@ -1223,7 +1223,7 @@ export default function EmployeeShow({
                                                 (_, i) => (
                                                     <Star
                                                         key={i}
-                                                        className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amber-400 text-status-warning' : 'text-status-warning'}`}
+                                                        className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amberx text-status-warning' : 'text-status-warning'}`}
                                                     />
                                                 ),
                                             )}
@@ -1383,7 +1383,7 @@ export default function EmployeeShow({
                                                                                 key={
                                                                                     i
                                                                                 }
-                                                                                className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20'}`}
+                                                                                className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amberx text-status-warning' : 'text-muted-foreground/20'}`}
                                                                             />
                                                                         ),
                                                                     )}
