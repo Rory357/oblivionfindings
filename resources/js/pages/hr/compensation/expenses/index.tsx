@@ -1,3 +1,4 @@
+import { CompensationTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Expenses', href: '/hr/expenses' },
+    { title: 'Expenses', href: '/hr/compensation/expenses' },
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
@@ -81,7 +82,7 @@ const formatCurrency = (amount: number, currency = 'NZD') => {
 export default function ExpenseIndex({ claims, filters, can }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/expenses',
+            '/hr/compensation/expenses',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -117,7 +118,7 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                         actions={
                             can.create && (
                                 <Button asChild size="sm">
-                                    <Link href="/hr/expenses/create">
+                                    <Link href="/hr/compensation/expenses/create">
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         New Claim
                                     </Link>
@@ -127,6 +128,8 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                     />
                 }
             >
+                <CompensationTabs active="expenses" />
+
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
                     {[
@@ -228,7 +231,7 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                                                     asChild
                                                 >
                                                     <Link
-                                                        href={`/hr/expenses/${claim.id}`}
+                                                        href={`/hr/compensation/expenses/${claim.id}`}
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Link>

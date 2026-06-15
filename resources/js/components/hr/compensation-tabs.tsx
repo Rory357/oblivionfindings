@@ -1,29 +1,36 @@
 import { router, usePage } from '@inertiajs/react';
-import { Banknote, ClipboardCheck, Heart, Layers } from 'lucide-react';
+import { Banknote, ClipboardCheck, Heart, Layers, Receipt } from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type CompensationTab = 'bands' | 'reviews' | 'bonuses' | 'benefits';
+export type CompensationTab =
+    | 'bands'
+    | 'reviews'
+    | 'bonuses'
+    | 'benefits'
+    | 'expenses';
 
 const TAB_URLS: Record<CompensationTab, string> = {
     bands: '/hr/compensation/bands',
     reviews: '/hr/compensation/reviews',
     bonuses: '/hr/compensation/bonuses',
     benefits: '/hr/compensation/benefits',
+    expenses: '/hr/compensation/expenses',
 };
 
 type HrCan = {
     compensation?: { view?: boolean };
     benefits?: { view?: boolean };
+    expenses?: { view?: boolean };
 };
 
 /**
  * Section-level tab strip shared across the Compensation & Benefits hub pages.
- * The Benefits tab sits behind a DIFFERENT gate (hr.benefits.view) from the
- * Salary bands / Pay reviews / Bonuses surfaces (hr.compensation.view), so tabs
- * are filtered by the shared auth.can flags — a user only sees the views they can
- * open (no 403-on-click). The active tab is always shown so the current page
- * never hides its own tab.
+ * The Benefits + Expenses tabs sit behind DIFFERENT gates (hr.benefits.view /
+ * hr.expenses.view) from the Salary bands / Pay reviews / Bonuses surfaces
+ * (hr.compensation.view), so tabs are filtered by the shared auth.can flags — a
+ * user only sees the views they can open (no 403-on-click). The active tab is
+ * always shown so the current page never hides its own tab.
  */
 export function CompensationTabs({ active }: { active: CompensationTab }) {
     const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
@@ -45,6 +52,10 @@ export function CompensationTabs({ active }: { active: CompensationTab }) {
         {
             item: { id: 'benefits', label: 'Benefits', icon: Heart, tone: 'violet' },
             show: !!hr?.benefits?.view,
+        },
+        {
+            item: { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },
+            show: !!hr?.expenses?.view,
         },
     ];
 

@@ -663,10 +663,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Expenses
+    | Expenses (folded into the Compensation & Benefits hub)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.expenses.view')->prefix('expenses')->name('expenses.')->group(function () {
+    Route::middleware('permission:hr.expenses.view')->prefix('compensation/expenses')->name('compensation.expenses.')->group(function () {
         Route::get('/', [ExpenseController::class, 'index'])->name('index');
 
         Route::middleware('permission:hr.expenses.manage')->group(function () {

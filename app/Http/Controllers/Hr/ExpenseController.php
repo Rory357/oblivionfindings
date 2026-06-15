@@ -57,7 +57,7 @@ class ExpenseController extends Controller
             'created_at' => $claim->created_at?->toDateString(),
         ]);
 
-        return Inertia::render('hr/expenses/index', [
+        return Inertia::render('hr/compensation/expenses/index', [
             'claims' => $claims,
             'filters' => [
                 'status' => $status,
@@ -79,7 +79,7 @@ class ExpenseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
 
-        return Inertia::render('hr/expenses/create', [
+        return Inertia::render('hr/compensation/expenses/create', [
             'categories' => ExpenseService::CATEGORIES,
         ]);
     }
@@ -113,7 +113,7 @@ class ExpenseController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        return redirect("/hr/expenses/{$claim->id}")->with('success', 'Expense claim created.');
+        return redirect("/hr/compensation/expenses/{$claim->id}")->with('success', 'Expense claim created.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -127,7 +127,7 @@ class ExpenseController extends Controller
 
         $expenseClaim->load(['user:id,name,email', 'items', 'approver:id,name']);
 
-        return Inertia::render('hr/expenses/show', [
+        return Inertia::render('hr/compensation/expenses/show', [
             'claim' => [
                 'id' => $expenseClaim->id,
                 'claim_number' => $expenseClaim->claim_number,

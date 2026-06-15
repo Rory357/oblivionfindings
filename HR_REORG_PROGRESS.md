@@ -28,8 +28,10 @@ The base branch is already red on three gates, in modules unrelated to the HR re
 it adds **no new** failures beyond this baseline (and ideally clears any it legitimately touches). Re-confirmed
 on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - **types:** clean (0).
-- **lint:** 1 error + 532 warnings. Error = `resources/js/components/checklists/primitives.tsx:274:14`
-  "Cannot create components during render". Warnings = `no-restricted-syntax` style nags in sites pages.
+- **lint:** 0–1 error (NON-DETERMINISTIC) + ~532 warnings. The lone error = `checklists/primitives.tsx:274:14`
+  "Cannot create components during render" — it intermittently reads 0 even with that file UNMODIFIED (observed in
+  S4), so treat the lint gate as "no NEW error in touched files + no unrelated file swept into the commit", not an
+  exact count. Warnings = `no-restricted-syntax` style nags in sites pages.
 - **vitest:** 5 failures in 2 files —
   - `app-sidebar.test.ts` › "moves billing navigation into Finance" (stale after the **Finance** hub rebuild —
     test still expects /finance/billing·invoices·price-books; actual nav is Dashboard·Calendar·…). ⚠️ S10 edits
@@ -43,7 +45,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S1 — Webhooks → Settings only** *(half-done before loop)* ✅
 - [x] **S2 — Leave Reports → Leave & Rosters tab** ✅
 - [x] **S3 — Benefits → Compensation & Benefits tab** ✅
-- [ ] **S4 — Expenses (admin) → Comp & Benefits tab**
+- [x] **S4 — Expenses (admin) → Comp & Benefits tab** ✅
 - [ ] **S5 — Skills → Performance ▸ Competencies & Skills**
 - [ ] **S6 — Policies → Documents & Policies hub**
 - [ ] **S7 — Training hub (pull out of Compliance)**
@@ -125,6 +127,35 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   · pest 1-fail (baseline RecruitmentJobPostingSyncTest), 336 pass (benefits tests pass at new URLs). Hand-formatted.
 - **Discovered:** the Benefits *Plans* page had no UI link from the Enrollments page (reachable only by URL) — a
   pre-existing nav gap, preserved as-is (not adding sub-nav = no scope creep).
+
+### S4 — DONE
+- Admin Expenses was a mini-hub: `/hr/expenses` (index) + `/create` + `/{claim}` (show) + submit/approve/reject/pay,
+  gated `hr.expenses.view`/`manage`/`approve`. **Re-homed** to `/hr/compensation/expenses` exactly like S3 (clean cut,
+  no redirect), for a coherent Comp & Benefits hub (all tabs now under /hr/compensation/*).
+- **Routes** (`routes/hr.php`): re-prefixed `expenses` → `compensation/expenses`, renamed `hr.expenses.*` →
+  `hr.compensation.expenses.*`, KEEPING the `permission:hr.expenses.view`/`manage`/`approve` gates frozen.
+- **Pages**: `git mv` `pages/hr/expenses/{index,create,show}.tsx` → `pages/hr/compensation/expenses/` (renames
+  R097/R098). `<CompensationTabs active="expenses" />` added to **index only** (the tab landing); create/show are
+  claim form/detail sub-pages with their own back-nav (URL re-homed, no strip — analogous to S3). Controller render
+  paths + the post-store redirect re-homed (`hr/expense-receipts` storage path correctly NOT matched).
+- **CompensationTabs**: added the **Expenses** tab gated `hr.expenses.view` (now 5 tabs; benefits+expenses cross-gate).
+- **Notifications**: ExpenseApproved/SubmittedNotification action URLs `/hr/expenses/{id}` → `/hr/compensation/expenses/{id}`
+  (the show page moved). [Discovered: those notify links point at the admin show page (hr.expenses.view) even for the
+  worker claimant — pre-existing, preserved.]
+- **Sidebar**: removed the standalone "Expenses" item; the "Compensation & Benefits" hub entry now shows for
+  compensation OR benefits OR **expenses** view, with a nested-ternary href landing each user on their first
+  accessible tab (no access lost for an expenses-only user).
+- **Tests**: re-homed `/hr/expenses` → `/hr/compensation/expenses` in ExpensePaymentTest + ExpenseReceiptUploadTest
+  (Feature) + HrExpensesTest (Browser). **`/hr/my/expenses` (MyHrController) untouched** (personal lens; not matched
+  by the `hr/expenses` grep).
+- **Orphan grep (resources/ app/ tests/ routes/):** `hr/expenses` → 0, `expenses.index` → 0; remaining `hr.expenses.`
+  matches are exclusively the FROZEN permission keys (view/manage/approve).
+- **Files touched:** routes/hr.php, ExpenseController.php, 2 notification classes, compensation-tabs.tsx, app-sidebar.tsx,
+  moved pages/hr/compensation/expenses/{index,create,show}.tsx, 3 test files, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint 0-err (≤ baseline — the checklists/primitives.tsx baseline error read
+  as 0 this run with that file UNMODIFIED, i.e. it's non-deterministic; no NEW errors in touched files, no unrelated
+  files swept into the commit) · build exit 0 · vitest 5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass
+  (expense tests pass at new URLs). Hand-formatted (no prettier).
 
 ## Discovered (out of scope — do not fix here)
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.

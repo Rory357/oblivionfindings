@@ -48,7 +48,7 @@ test('an approved, GL-posted claim can be marked paid', function () {
     $claim = makeExpenseClaimForPayment($this->worker->id);
 
     $this->actingAs($this->hr)
-        ->post("/hr/expenses/{$claim->id}/pay")
+        ->post("/hr/compensation/expenses/{$claim->id}/pay")
         ->assertSessionHas('success');
 
     $claim->refresh();
@@ -63,7 +63,7 @@ test('a claim not yet posted to the GL cannot be marked paid', function () {
     ]);
 
     $this->actingAs($this->hr)
-        ->post("/hr/expenses/{$claim->id}/pay")
+        ->post("/hr/compensation/expenses/{$claim->id}/pay")
         ->assertSessionHas('error');
 
     expect($claim->fresh()->status)->toBe('approved');
@@ -73,7 +73,7 @@ test('a user without hr.expenses.approve cannot mark a claim paid', function () 
     $claim = makeExpenseClaimForPayment($this->worker->id);
 
     $this->actingAs($this->worker)
-        ->post("/hr/expenses/{$claim->id}/pay")
+        ->post("/hr/compensation/expenses/{$claim->id}/pay")
         ->assertForbidden();
 
     expect($claim->fresh()->status)->toBe('approved');
@@ -82,7 +82,7 @@ test('a user without hr.expenses.approve cannot mark a claim paid', function () 
 test('the claim detail surfaces GL posting state and the pay action', function () {
     $claim = makeExpenseClaimForPayment($this->worker->id);
 
-    $response = $this->actingAs($this->hr)->get("/hr/expenses/{$claim->id}");
+    $response = $this->actingAs($this->hr)->get("/hr/compensation/expenses/{$claim->id}");
     $response->assertOk();
 
     expect($response->inertiaProps('claim.gl_posted_at'))->not->toBeNull();
@@ -93,7 +93,7 @@ test('the claim detail surfaces GL posting state and the pay action', function (
 test('the expenses index lists tenant claims (regression: was whereNull)', function () {
     $claim = makeExpenseClaimForPayment($this->worker->id, ['status' => 'submitted']);
 
-    $response = $this->actingAs($this->hr)->get('/hr/expenses');
+    $response = $this->actingAs($this->hr)->get('/hr/compensation/expenses');
     $response->assertOk();
 
     $ids = collect($response->inertiaProps('claims.data'))->pluck('id')->all();
