@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -283,6 +284,35 @@ class AuditTrailTest extends TestCase
             'status' => 'reported',
             'error_type' => 'documentation',
         ]);
+    }
+
+    public function test_weekly_stats_use_the_worker_timezone_boundary(): void
+    {
+        $tz = config('app.worker_timezone', 'Pacific/Auckland');
+        // Freeze "now" mid-week (Wednesday) so the week boundary is unambiguous.
+        Carbon::setTestNow(Carbon::parse('2026-06-17 10:00:00', $tz));
+
+        try {
+            ['user' => $user, 'client' => $client] = $this->seedAudit();
+            $med = ClientMedication::query()->create([
+                'client_id' => $client->id, 'name' => 'Aspirin', 'dosage' => '75mg', 'frequency' => 'PRN',
+                'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+            ]);
+            // A dose at Monday 00:30 NZT (this week) is Sunday 12:30 UTC (last UTC week);
+            // it must still count as "this week" once the boundary is worker-tz.
+            $mondayEarly = Carbon::parse('2026-06-15 00:30:00', $tz)->utc();
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $user->id,
+                'status' => 'given', 'dose_given' => '75mg', 'administered_at' => $mondayEarly, 'scheduled_for' => $mondayEarly,
+            ]);
+
+            $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('stats.this_week', fn ($n) => $n >= 1)
+                ->where('stats.this_month', fn ($n) => $n >= 1)
+            );
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     protected function makeRoleUser(string $roleName): User

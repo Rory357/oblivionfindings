@@ -559,8 +559,11 @@ class AuditLogController extends Controller
         // Sort by timestamp descending
         $sorted = $events->sortByDesc('timestamp')->values();
 
-        // Stats
-        $now = Carbon::now();
+        // Stats — anchor the week/month boundaries to the worker timezone so they
+        // match how the timeline groups days: a dose at 09:00 NZT is "today" even
+        // though it is stored as the previous day in UTC. Carbon compares absolute
+        // instants, so only the boundary's timezone needs to be right.
+        $now = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'));
         $weekStart = $now->copy()->startOfWeek();
         $monthStart = $now->copy()->startOfMonth();
         $isGap = fn ($e) => ! empty(array_intersect($e['flags'] ?? [], ['missing_witness', 'omission']));
