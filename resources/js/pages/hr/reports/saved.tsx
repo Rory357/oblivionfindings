@@ -11,6 +11,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BarChart3, Download, Play, Plus, Trash2 } from 'lucide-react';
@@ -130,6 +131,8 @@ export default function SavedReports({ reports, sources }: Props) {
                     />
                 }
             >
+                <ReportsTabs active="saved" />
+
                 <Card>
                     <CardContent className="p-0">
                         <Table>

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -318,6 +319,8 @@ export default function HrAutomationsPage({
                     />
                 }
             >
+                <ReportsTabs active="automations" />
+
                 {can.manage && (
                     <Card>
                         <CardHeader>

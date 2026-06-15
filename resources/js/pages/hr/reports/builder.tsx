@@ -19,6 +19,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Eye, BarChart3, Plus, Save, Trash2 } from 'lucide-react';
@@ -196,6 +197,7 @@ export default function ReportBuilder({ sources }: Props) {
                     />
                 }
             >
+                <ReportsTabs active="builder" />
 
                 {/* Step 1: Select Report Type */}
                 <Card>
