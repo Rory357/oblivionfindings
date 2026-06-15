@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Services\GoalService;
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,7 +18,7 @@ class GoalController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — Dashboard + List                                           */
+    /*  Index — Dashboard + List */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -83,7 +83,7 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Create                                                             */
+    /*  Create */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -130,7 +130,7 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store                                                              */
+    /*  Store */
     /* ------------------------------------------------------------------ */
 
     public function store(Request $request)
@@ -163,7 +163,7 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show — Objective Detail                                            */
+    /*  Show — Objective Detail */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrGoal $goal)
@@ -178,6 +178,7 @@ class GoalController extends Controller
             'childGoals' => fn ($q) => $q->with('user:id,name', 'keyResults')->orderBy('priority', 'desc'),
             'keyResults.owner:id,name',
             'updates' => fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(20),
+            'developmentGoals' => fn ($q) => $q->with('employee:id,name')->orderByDesc('updated_at'),
         ]);
 
         $users = User::orderBy('name')->get(['id', 'name']);
@@ -232,6 +233,13 @@ class GoalController extends Controller
                     'comment' => $u->comment,
                     'created_at' => $u->created_at?->diffForHumans(),
                 ])->values(),
+                'development_goals' => $goal->developmentGoals->map(fn ($d) => [
+                    'id' => $d->id,
+                    'title' => $d->title,
+                    'status' => $d->status,
+                    'progress_percent' => (int) $d->progress_percent,
+                    'employee' => $d->employee?->name,
+                ])->values(),
             ],
             'users' => $users,
             'goalTypes' => $this->goalTypeOptions(),
@@ -245,7 +253,7 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Update                                                             */
+    /*  Update */
     /* ------------------------------------------------------------------ */
 
     public function update(Request $request, HrGoal $goal)
@@ -273,7 +281,7 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Update Progress                                                    */
+    /*  Update Progress */
     /* ------------------------------------------------------------------ */
 
     public function updateProgress(Request $request, HrGoal $goal)
@@ -299,7 +307,7 @@ class GoalController extends Controller
     }
 
     /* ================================================================== */
-    /*  KEY RESULTS CRUD                                                   */
+    /*  KEY RESULTS CRUD */
     /* ================================================================== */
 
     public function storeKeyResult(Request $request, HrGoal $goal)

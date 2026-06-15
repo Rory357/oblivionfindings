@@ -1200,7 +1200,7 @@ export default function EmployeeShow({
                                         </Button>
                                     </Link>
                                     <Link
-                                        href={`/hr/goals/create?employee=${p.user.id}`}
+                                        href="/hr/goals"
                                     >
                                         <Button
                                             variant="outline"
@@ -1460,7 +1460,7 @@ export default function EmployeeShow({
                                     <div className="flex items-center gap-3">
                                         {developmentGoals.length > 0 && (
                                             <Link
-                                                href={`/hr/goals?employee=${p.user.id}`}
+                                                href="/hr/goals/development"
                                                 className="text-xs text-primary hover:underline"
                                             >
                                                 View All
@@ -1468,7 +1468,7 @@ export default function EmployeeShow({
                                         )}
                                         {can.manage && (
                                             <Link
-                                                href={`/hr/goals/create?employee=${p.user.id}`}
+                                                href="/hr/goals/development"
                                             >
                                                 <Button
                                                     variant="outline"

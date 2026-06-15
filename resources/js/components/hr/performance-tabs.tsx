@@ -5,6 +5,7 @@ import {
     Gauge,
     GitBranch,
     MessageSquare,
+    Sprout,
     Target,
     TrendingUp,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ export type PerformanceTab =
     | 'overview'
     | 'reviews'
     | 'goals'
+    | 'development'
     | 'competencies'
     | 'feedback'
     | 'pips'
@@ -24,6 +26,7 @@ const TAB_URLS: Record<PerformanceTab, string> = {
     overview: '/hr/performance',
     reviews: '/hr/performance/reviews',
     goals: '/hr/goals',
+    development: '/hr/goals/development',
     competencies: '/hr/performance/competencies',
     feedback: '/hr/feedback',
     pips: '/hr/performance/pips',
@@ -34,6 +37,7 @@ const ITEMS: HrTabItem[] = [
     { id: 'overview', label: 'Supervision', icon: ClipboardCheck, tone: 'primary' },
     { id: 'reviews', label: 'Reviews', icon: Award, tone: 'info' },
     { id: 'goals', label: 'Goals & OKRs', icon: Target, tone: 'success' },
+    { id: 'development', label: 'Development', icon: Sprout, tone: 'info' },
     { id: 'competencies', label: 'Competencies & Skills', icon: Gauge, tone: 'violet' },
     { id: 'feedback', label: '360 Feedback', icon: MessageSquare, tone: 'warning' },
     { id: 'pips', label: 'PIPs', icon: TrendingUp, tone: 'critical' },

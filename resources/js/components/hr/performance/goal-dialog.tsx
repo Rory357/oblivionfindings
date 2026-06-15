@@ -43,6 +43,7 @@ export interface ExistingGoal {
     title: string;
     description?: string | null;
     goal_type: string;
+    category?: string | null;
     priority: string;
     parent_goal_id?: number | null;
     target_value?: number | string | null;
@@ -72,6 +73,8 @@ export function GoalDialog({
     priorities,
     parentGoals,
     goal,
+    prefillOwnerId,
+    prefillParentId,
 }: {
     open: boolean;
     onClose: () => void;
@@ -80,6 +83,8 @@ export function GoalDialog({
     priorities: GoalOption[];
     parentGoals: ParentGoalOption[];
     goal?: ExistingGoal | null;
+    prefillOwnerId?: number | null;
+    prefillParentId?: number | null;
 }) {
     const isEdit = !!goal;
     const wizard = useWizard(STEPS.length);
@@ -88,6 +93,7 @@ export function GoalDialog({
         title: string;
         description: string;
         goal_type: string;
+        category: string;
         priority: string;
         parent_goal_id: string;
         target_value: string;
@@ -95,12 +101,21 @@ export function GoalDialog({
         start_date: string;
         due_date: string;
     }>({
-        user_id: goal?.user?.id ? String(goal.user.id) : '',
+        user_id: goal?.user?.id
+            ? String(goal.user.id)
+            : prefillOwnerId
+              ? String(prefillOwnerId)
+              : '',
         title: goal?.title ?? '',
         description: goal?.description ?? '',
         goal_type: goal?.goal_type ?? '',
+        category: goal?.category ?? '',
         priority: goal?.priority ?? 'medium',
-        parent_goal_id: goal?.parent_goal_id ? String(goal.parent_goal_id) : '',
+        parent_goal_id: goal?.parent_goal_id
+            ? String(goal.parent_goal_id)
+            : prefillParentId
+              ? String(prefillParentId)
+              : '',
         target_value: goal?.target_value != null ? String(goal.target_value) : '',
         unit: goal?.unit ?? '',
         start_date: goal?.start_date ?? '',
@@ -155,6 +170,7 @@ export function GoalDialog({
     const submit = () => {
         form.transform((data) => ({
             ...data,
+            category: data.category.trim() === '' ? null : data.category.trim(),
             target_value: data.target_value === '' ? null : data.target_value,
             parent_goal_id:
                 data.parent_goal_id === '' || data.parent_goal_id === NO_PARENT
@@ -321,6 +337,19 @@ export function GoalDialog({
                             />
                         </Field>
                         <Field
+                            label="Category"
+                            hint="optional"
+                            error={form.errors.category}
+                        >
+                            <Input
+                                value={form.data.category}
+                                onChange={(e) =>
+                                    form.setData('category', e.target.value)
+                                }
+                                placeholder="e.g. Quality, Safety, Growth"
+                            />
+                        </Field>
+                        <Field
                             label="Parent goal"
                             hint="optional"
                             span
@@ -424,6 +453,10 @@ export function GoalDialog({
                         <ReviewRow label="Owner" value={ownerName} />
                         <ReviewRow label="Title" value={form.data.title} />
                         <ReviewRow label="Type" value={typeLabel} />
+                        <ReviewRow
+                            label="Category"
+                            value={form.data.category || undefined}
+                        />
                         <ReviewRow label="Priority" value={priorityLabel} />
                         <ReviewRow
                             label="Target"

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Notifications\DevelopmentGoalAssignedNotification;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -26,7 +27,7 @@ class DevelopmentGoalController extends Controller
         $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $goals = HrDevelopmentGoal::query()
-            ->with(['employee:id,name,email', 'manager:id,name'])
+            ->with(['employee:id,name,email', 'manager:id,name', 'goal:id,title'])
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->when($status, fn ($query, $value) => $query->where('status', $value))
             ->when(! $canManage, fn ($query) => $query->where('employee_user_id', $user->id))
@@ -58,6 +59,11 @@ class DevelopmentGoalController extends Controller
                     'id' => $goal->manager->id,
                     'name' => $goal->manager->name,
                 ] : null,
+                'hr_goal_id' => $goal->hr_goal_id,
+                'goal' => $goal->goal ? [
+                    'id' => $goal->goal->id,
+                    'title' => $goal->goal->title,
+                ] : null,
             ]);
 
         $staff = User::query()
@@ -66,9 +72,15 @@ class DevelopmentGoalController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        $objectives = HrGoal::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->orderBy('title')
+            ->get(['id', 'title']);
+
         return Inertia::render('hr/goals/development', [
             'goals' => $goals,
             'staff' => $staff,
+            'objectives' => $objectives,
             'filters' => [
                 'status' => $status,
             ],
@@ -87,10 +99,15 @@ class DevelopmentGoalController extends Controller
         $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
         $employeeRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
         $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
+        $goalRule = Rule::exists('hr_goals', 'id');
+        if ($tenantId !== null) {
+            $goalRule->where('tenant_id', $tenantId);
+        }
 
         $validated = $request->validate([
             'employee_user_id' => ['required', 'integer', $employeeRule],
             'manager_user_id' => ['nullable', 'integer', $managerRule],
+            'hr_goal_id' => ['nullable', 'integer', $goalRule],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
@@ -133,8 +150,14 @@ class DevelopmentGoalController extends Controller
         $isGoalOwner = $goal->employee_user_id === $user->id;
         abort_unless($canManage || $isGoalOwner, 403);
 
+        $goalRule = Rule::exists('hr_goals', 'id');
+        if ($tenantId !== null) {
+            $goalRule->where('tenant_id', $tenantId);
+        }
+
         $validated = $request->validate([
             'title' => [$canManage ? 'sometimes' : 'prohibited', 'string', 'max:255'],
+            'hr_goal_id' => [$canManage ? 'nullable' : 'prohibited', 'integer', $goalRule],
             'description' => [$canManage ? 'nullable' : 'prohibited', 'string', 'max:5000'],
             'category' => [$canManage ? 'sometimes' : 'prohibited', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
             'competency_area' => ['nullable', 'string', 'max:255'],

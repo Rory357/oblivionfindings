@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrGoal;
 use App\Models\Role;
 use App\Models\User;
@@ -79,4 +80,39 @@ test('the page-based goals create route redirects to the hub', function () {
     $this->actingAs($this->hr)
         ->get('/hr/goals/create')
         ->assertRedirect(route('hr.goals.index'));
+});
+
+test('a development plan can roll up into an OKR objective and surfaces on it', function () {
+    $objective = HrGoal::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $this->owner->id,
+        'created_by' => $this->hr->id,
+        'title' => 'Quarterly capability objective',
+        'goal_type' => 'individual',
+        'priority' => 'medium',
+        'status' => 'active',
+        'start_date' => '2026-01-01',
+        'due_date' => '2026-06-30',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/goals/development', [
+            'employee_user_id' => $this->owner->id,
+            'title' => 'Grow medication competency',
+            'category' => 'capability',
+            'hr_goal_id' => $objective->id,
+        ])
+        ->assertRedirect();
+
+    $plan = HrDevelopmentGoal::query()
+        ->where('title', 'Grow medication competency')
+        ->first();
+    expect($plan)->not->toBeNull();
+    expect($plan->hr_goal_id)->toBe($objective->id);
+
+    // the objective detail page surfaces the linked development plan
+    $response = $this->actingAs($this->hr)->get("/hr/goals/{$objective->id}");
+    $response->assertOk();
+    expect(collect($response->inertiaProps('goal')['development_goals'])->pluck('title'))
+        ->toContain('Grow medication competency');
 });

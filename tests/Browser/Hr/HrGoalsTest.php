@@ -13,13 +13,13 @@ test('hr goals index loads', function () {
     });
 });
 
-test('hr goals create page loads', function () {
+test('hr goals create route redirects to the hub', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/hr/goals/create')
             ->waitForText('Goal', 10)
-            ->assertPathIs('/hr/goals/create');
+            ->assertPathIs('/hr/goals');
     });
 });
 
