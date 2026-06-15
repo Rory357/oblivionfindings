@@ -72,6 +72,31 @@ function Flag({ label, tone }: { label: string; tone: string }) {
     return <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide ${tone}`}>{label}</span>;
 }
 
+/** Dismissible hero alert row — mirrors the /emar/controlled strip. The Review
+ *  action jumps to the relevant tab/filter; the ✕ hides it for the session. */
+function AlertStripRow({ tone, icon: Icon, message, onReview, onDismiss }: { tone: 'warning' | 'critical'; icon: typeof Layers; message: string; onReview: () => void; onDismiss: () => void }) {
+    const toneClass =
+        tone === 'critical'
+            ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+            : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${toneClass}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4" />
+                {message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>
+                    Review
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Dismiss alert" onClick={onDismiss}>
+                    <X className="h-4 w-4" />
+                </Button>
+            </span>
+        </div>
+    );
+}
+
 export default function Medications(props: Props) {
     const { medications, clients, sites, active_site: activeSite, site_brand_colour: brandColour, can } = props;
 
@@ -80,8 +105,11 @@ export default function Medications(props: Props) {
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [sort, setSort] = useState<'medication' | 'client' | 'stock'>('medication');
+    const [lowStockOnly, setLowStockOnly] = useState(false);
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    // Per-session dismissal of the hero alert strip (resets on reload).
+    const [alertDismissed, setAlertDismissed] = useState<{ awaiting: boolean; lowStock: boolean }>({ awaiting: false, lowStock: false });
 
     const counts = useMemo(
         () => ({
@@ -100,6 +128,7 @@ export default function Medications(props: Props) {
         const list = medications.filter((m) => {
             if (!matchesTab(m, activeTab)) return false;
             if (clientFilter != null && m.client_id !== clientFilter) return false;
+            if (lowStockOnly && !m.stock?.low) return false;
             if (q && !`${m.name} ${m.brand_name ?? ''} ${m.client_name}`.toLowerCase().includes(q)) return false;
             return true;
         });
@@ -109,7 +138,7 @@ export default function Medications(props: Props) {
             return a.name.localeCompare(b.name);
         });
         return list;
-    }, [medications, activeTab, clientFilter, search, sort]);
+    }, [medications, activeTab, clientFilter, search, sort, lowStockOnly]);
 
     const TABS: RosterTabItem[] = MED_TABS.map((t) => ({
         id: t.id,
@@ -266,6 +295,33 @@ export default function Medications(props: Props) {
                     }
                 />
 
+                {(counts.awaiting > 0 && !alertDismissed.awaiting) || (counts.lowStock > 0 && !alertDismissed.lowStock) ? (
+                    <div className="flex flex-col gap-2">
+                        {counts.awaiting > 0 && !alertDismissed.awaiting && (
+                            <AlertStripRow
+                                tone="warning"
+                                icon={BadgeCheck}
+                                message={`${counts.awaiting} order${counts.awaiting === 1 ? '' : 's'} awaiting prescriber verification.`}
+                                onReview={() => setActiveTab('awaiting')}
+                                onDismiss={() => setAlertDismissed((d) => ({ ...d, awaiting: true }))}
+                            />
+                        )}
+                        {counts.lowStock > 0 && !alertDismissed.lowStock && (
+                            <AlertStripRow
+                                tone="critical"
+                                icon={AlertTriangle}
+                                message={`${counts.lowStock} medication${counts.lowStock === 1 ? '' : 's'} low or out of stock.`}
+                                onReview={() => {
+                                    setLowStockOnly(true);
+                                    setSort('stock');
+                                    setActiveTab('all');
+                                }}
+                                onDismiss={() => setAlertDismissed((d) => ({ ...d, lowStock: true }))}
+                            />
+                        )}
+                    </div>
+                ) : null}
+
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Medication register views" />
 
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -281,6 +337,17 @@ export default function Medications(props: Props) {
                                 <SelectItem value="stock">Sort: Stock (low first)</SelectItem>
                             </SelectContent>
                         </Select>
+                        {lowStockOnly && (
+                            <button
+                                type="button"
+                                onClick={() => setLowStockOnly(false)}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-status-critical/40 bg-status-critical-bg px-3 py-1 text-xs font-semibold text-status-critical transition-colors hover:bg-status-critical-bg/70"
+                                aria-label="Clear low-stock filter"
+                            >
+                                Low / out of stock
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
                         <div className="ml-auto flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
                                 {visible.length} of {medications.length}

@@ -35,7 +35,7 @@ Status legend: `[ ]` open · `[x]` done (with one-line note + files touched).
 - [~] **C6** Context-menu "View client" wired (`router.visit('/operations/clients/{id}/care')`). Detail-modal Options-bar "View client" lands with **E8**. In-page actions stay modal; only View client / Open on MAR navigate. _(Medications.tsx — menu half done)_
 
 ## D. Alert banner strip
-- [ ] **D7** Dismissible alert strip under the hero (mirror `/emar/controlled`): `counts.awaiting` awaiting verification (warning → switch to **Awaiting** tab) and `counts.lowStock` low/out of stock (critical → set the **stock** filter/sort). Icon + count + message + "Review" button. Dismissible per session.
+- [x] **D7** Dismissible alert strip under the hero (new `AlertStripRow` helper mirroring `/emar/controlled`): **Awaiting** (warning) → "Review" sets `activeTab='awaiting'`; **Low/out of stock** (critical) → "Review" sets a new `lowStockOnly` client-side filter + `sort='stock'` + `activeTab='all'`. Each row has a ✕ that hides it per session (`alertDismissed` state). Added a clearable "Low / out of stock ✕" chip in the table toolbar so the filter is removable. _(Medications.tsx)_
 
 ## E. Detail modal parity + enrichment
 - [ ] **E8** Align `MedicationDetailDialog` footer to the standard Options action bar (like `prn-detail-dialog.tsx`): Edit · Verify/Reject (when pending) · View client · Open on MAR · Print. Keep existing recent-administrations / order summary.
@@ -54,3 +54,4 @@ Status legend: `[ ]` open · `[x]` done (with one-line note + files touched).
 
 ## Pass log
 - **Pass 1** (Group A + B + menu-half of C, plus F keyboard-focus): hero footer standardised to the shared eMAR control row; raw client `Select` replaced by Client `EntityFilter`; right-click `ShiftContextMenu` on every row; inline action buttons folded into the menu; rows keyboard-activatable. Gates: `tsc` clean (whole project), `eslint` clean, full vite bundle build ✓. Files: `resources/js/pages/emar/Medications.tsx`, `docs/MEDICATIONS_GAP_ANALYSIS.md`.
+- **Pass 2** (Group D): dismissible hero alert strip (`AlertStripRow`) for awaiting-verification (→ Awaiting tab) and low/out-of-stock (→ `lowStockOnly` filter + stock sort), per-session dismiss ✕, plus a clearable low-stock chip in the toolbar. Gates: `tsc` clean, `eslint` clean, full vite bundle build ✓. Files: `resources/js/pages/emar/Medications.tsx`.
