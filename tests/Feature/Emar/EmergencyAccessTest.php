@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Models\BreakGlassFlagDismissal;
+use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\Permission;
@@ -222,6 +224,156 @@ class EmergencyAccessTest extends TestCase
                 ->where('request_client.first_name', $client->first_name)
                 ->where('request_client.last_name', $client->last_name)
             );
+    }
+
+    public function test_policy_payload_falls_back_to_constant_defaults(): void
+    {
+        ['user' => $user, 'site' => $site] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->get('/emar/emergency-access?site_id='.$site->id)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('policy.default_minutes', ClientBreakGlassAccess::DEFAULT_MINUTES)
+                ->where('policy.max_minutes', ClientBreakGlassAccess::MAX_MINUTES)
+                ->where('policy.repeat_threshold_count', 4)
+                ->where('policy.repeat_window_days', 7)
+                ->where('can_edit_policy', true)
+            );
+    }
+
+    public function test_admin_updates_org_policy_and_it_is_served_and_enforced(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->put('/emar/break-glass-policy', [
+                'default_minutes' => 45,
+                'max_minutes' => 90,
+                'extend_minutes' => 15,
+                'reason_required' => true,
+                'repeat_threshold_count' => 2,
+                'repeat_window_days' => 3,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('break_glass_policies', [
+            'organization_id' => $user->organization_id,
+            'default_minutes' => 45,
+            'max_minutes' => 90,
+            'repeat_threshold_count' => 2,
+        ]);
+
+        // Enforced: a grant beyond the new max is rejected by validation.
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/clients/{$client->id}/break-glass", ['reason' => 'x', 'minutes' => 200])
+            ->assertSessionHasErrors('minutes');
+
+        // Served back to the page.
+        $this->actingAs($user)
+            ->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->where('policy.max_minutes', 90));
+    }
+
+    public function test_policy_update_is_denied_for_non_admin(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $worker->roles()->syncWithoutDetaching([Role::query()->where('name', 'support_worker')->first()->id]);
+        $this->grantPermissions($worker, ['medications.breakglass']);
+
+        $this->actingAs($worker)
+            ->put('/emar/break-glass-policy', [
+                'default_minutes' => 45, 'max_minutes' => 90, 'extend_minutes' => 15,
+                'reason_required' => true, 'repeat_threshold_count' => 2, 'repeat_window_days' => 3,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('break_glass_policies', 0);
+    }
+
+    public function test_repeat_threshold_from_policy_drives_the_flag(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
+            'organization_id' => $user->organization_id,
+            'repeat_threshold_count' => 2,
+        ]));
+        // seedAccess already created one grant by $user; a second crosses the lowered threshold.
+        ClientBreakGlassAccess::query()->create([
+            'client_id' => $client->id, 'user_id' => $user->id,
+            'reason' => 'second activation', 'expires_at' => now()->addHour(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('flaggedSignals', 1)
+                ->where('flaggedSignals.0.type', 'repeat')
+            );
+    }
+
+    public function test_reviewer_can_acknowledge_repeat_signal_and_it_is_suppressed(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
+            'organization_id' => $user->organization_id, 'repeat_threshold_count' => 2,
+        ]));
+        ClientBreakGlassAccess::query()->create([
+            'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'second', 'expires_at' => now()->addHour(),
+        ]);
+
+        // Repeat signal present.
+        $this->actingAs($user)->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 1)->where('flaggedSignals.0.type', 'repeat'));
+
+        // Acknowledge it.
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post('/emar/break-glass-flags/dismiss', ['type' => 'repeat', 'key' => (string) $user->id, 'reason' => 'Genuine cover'])
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('break_glass_flag_dismissals', [
+            'signal_type' => 'repeat', 'signal_key' => (string) $user->id, 'dismissed_by' => $user->id,
+        ]);
+
+        // Now suppressed.
+        $this->actingAs($user)->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 0));
+    }
+
+    public function test_acknowledged_signal_resurfaces_when_newer_activity_exists(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
+            'organization_id' => $user->organization_id, 'repeat_threshold_count' => 2,
+        ]));
+        ClientBreakGlassAccess::query()->create([
+            'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'second', 'expires_at' => now()->addHour(),
+        ]);
+
+        // A stale acknowledgement (before the latest activity) must NOT suppress the signal.
+        BreakGlassFlagDismissal::query()->create([
+            'organization_id' => $user->organization_id, 'signal_type' => 'repeat', 'signal_key' => (string) $user->id,
+            'dismissed_by' => $user->id, 'dismissed_through' => now()->subMinutes(30),
+        ]);
+
+        $this->actingAs($user)->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 1)->where('flaggedSignals.0.type', 'repeat'));
+    }
+
+    public function test_flag_dismissal_requires_audit_permission(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $worker->roles()->syncWithoutDetaching([Role::query()->where('name', 'support_worker')->first()->id]);
+        $this->grantPermissions($worker, ['medications.breakglass']);
+
+        $response = $this->actingAs($worker)
+            ->post('/emar/break-glass-flags/dismiss', ['type' => 'repeat', 'key' => '1']);
+
+        $this->assertContains($response->status(), [403, 404]);
+        $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
     }
 
     protected function makeRoleUser(string $roleName): User
