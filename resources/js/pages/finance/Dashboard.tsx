@@ -23,6 +23,7 @@ import {
     DollarSign,
     FileText,
     Gauge,
+    Landmark,
     LayoutDashboard,
     MapPin,
     Percent,
@@ -137,6 +138,12 @@ interface Props extends PageProps {
     payrollAwaitingApproval?: { count: number; total_gross: number };
     paydayFilingDue?: { count: number };
     recentJournals: RecentJournal[];
+    fundedResidents?: number;
+    revenuePerResident?: number;
+    gstDue?: { due: string; amount: number | null; status: string; ref: string | null } | null;
+    openPeriodLabel?: string | null;
+    siteCount?: number;
+    regionCount?: number;
     period?: Period;
     periodLabel?: string;
     // Reference data for the quick-action wizard modals. Supplied by the
@@ -276,6 +283,12 @@ export default function FinanceDashboard({
     payrollAwaitingApproval,
     paydayFilingDue,
     recentJournals,
+    fundedResidents,
+    revenuePerResident,
+    gstDue,
+    openPeriodLabel,
+    siteCount,
+    regionCount,
     accounts = [],
     costCentres = [],
     fundingStreams = [],
@@ -302,7 +315,7 @@ export default function FinanceDashboard({
                 'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
                 'revenueByFundingStream', 'fundingClaims', 'fundingUtilisation', 'arAging',
                 'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
-                'payrollAwaitingApproval', 'paydayFilingDue',
+                'payrollAwaitingApproval', 'paydayFilingDue', 'fundedResidents', 'revenuePerResident', 'gstDue',
                 'recentJournals', 'period', 'periodLabel',
             ],
             data: {
@@ -327,8 +340,7 @@ export default function FinanceDashboard({
         reload({ funder: v });
     };
 
-    // §5 donut 1 — real revenue-by-funding-stream (dollars). Donuts 2 & 3 stay
-    // placeholder (thousands) until Phases D / C.
+    // §5 donut 1 — real revenue-by-funding-stream (dollars).
     const REVENUE_COLORS = ['var(--chart-1)', 'var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-3)'];
     const revenueStreamTotal = revenueByFundingStream.reduce((sum, s) => sum + s.amount, 0);
     const revenueStreamSegments: DonutSegment[] = revenueByFundingStream.length
@@ -407,6 +419,14 @@ export default function FinanceDashboard({
             tag: `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`, href: '/finance/funding-streams',
         });
     }
+    if (gstDue) {
+        const dueLabel = new Date(gstDue.due).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
+        attentionItems.push({
+            id: 'gst', severity: gstDue.status === 'overdue' ? 'critical' : 'warning', icon: Landmark,
+            title: 'GST return due', body: 'Period GST return filing deadline approaching.',
+            tag: `due ${dueLabel}`, href: '/finance/gst-returns',
+        });
+    }
 
     const chartData = revenueByMonth.map((rev, i) => ({
         month: rev.month,
@@ -453,10 +473,9 @@ export default function FinanceDashboard({
                             </span>
                         }
                         meta={[
-                            // TODO(B): drive from real org/period props.
-                            { icon: Calendar, label: 'FY2026 · open period Jun' },
-                            { icon: MapPin, label: '14 sites · 6 regions' },
-                            { icon: Users, label: '77 residents funded' },
+                            { icon: Calendar, label: openPeriodLabel ? `Open period ${openPeriodLabel}` : (periodLabel ?? PERIOD_LABEL[period]) },
+                            { icon: MapPin, label: `${siteCount ?? 0} sites · ${regionCount ?? 0} regions` },
+                            { icon: Users, label: `${fundedResidents ?? 0} residents funded` },
                         ]}
                         stats={[
                             { label: 'Revenue', value: formatMoneyCompact(totalRevenue) },
@@ -615,8 +634,13 @@ export default function FinanceDashboard({
                                 : 'claimed vs delivered'
                         }
                     />
-                    {/* TODO(A): real prop in Phase B */}
-                    <KpiCard label="Revenue / resident" value="$6,340" icon={Users} tone="success" sub="77 funded · benchmark $6.2k" />
+                    <KpiCard
+                        label="Revenue / resident"
+                        value={revenuePerResident != null ? formatMoneyCompact(revenuePerResident) : '—'}
+                        icon={Users}
+                        tone="success"
+                        sub={`${fundedResidents ?? 0} funded · benchmark $6.2k`}
+                    />
                 </div>
 
                 {/* §5 Donut row */}

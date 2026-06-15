@@ -2,6 +2,7 @@
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFundingStream;
+use App\Domain\Finance\Models\FinGstReturn;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
@@ -216,4 +217,40 @@ it('reports payroll-awaiting-approval and payday-filing-due attention metrics (P
     expect($data['payrollAwaitingApproval']['count'])->toBe(2)
         ->and($data['payrollAwaitingApproval']['total_gross'])->toBe(8000.0)
         ->and($data['paydayFilingDue']['count'])->toBe(1);
+});
+
+it('computes funded residents and revenue per resident (Phase F)', function () {
+    // Two active agreements = two distinct funded clients; an expired one is excluded.
+    ServiceAgreement::factory()->create(['organization_id' => 1, 'status' => 'active']);
+    ServiceAgreement::factory()->create(['organization_id' => 1, 'status' => 'active']);
+    ServiceAgreement::factory()->create(['organization_id' => 1, 'status' => 'expired']);
+
+    $rev = fdAccount('4000', 'revenue');
+    fdPostRevenue($rev, '2026-06-10', 1000, null);
+
+    $data = app(DashboardAggregatorService::class)->getDashboardData(1, 'month');
+
+    expect($data['fundedResidents'])->toBe(2)
+        ->and($data['revenuePerResident'])->toBe(500.0);
+});
+
+it('surfaces the next GST obligation as a dashboard attention metric (Phase F)', function () {
+    // Draft two-monthly return ending 31 May → IRD deadline 28 Jun 2026 (within 45d
+    // of the frozen 15 Jun) → an unsettled 'due' obligation.
+    FinGstReturn::create([
+        'organization_id' => 1,
+        'period_start' => '2026-04-01',
+        'period_end' => '2026-05-31',
+        'filing_frequency' => 'two_monthly',
+        'basis' => 'invoice',
+        'status' => 'draft',
+        'gst_payable' => 1234.50,
+        'ird_period' => '05/2026',
+    ]);
+
+    $data = app(DashboardAggregatorService::class)->getDashboardData(1, 'month');
+
+    expect($data['gstDue'])->not->toBeNull()
+        ->and($data['gstDue']['due'])->toBe('2026-06-28')
+        ->and($data['gstDue']['status'])->toBe('due');
 });

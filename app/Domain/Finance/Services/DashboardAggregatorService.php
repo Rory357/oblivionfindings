@@ -7,9 +7,11 @@ use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
+use App\Domain\Finance\Services\Calendar\FinanceCalendarAggregator;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\BillingEntry;
 use App\Models\FundingClaim;
+use App\Models\ServiceAgreement;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,7 @@ class DashboardAggregatorService
 
     public function __construct(
         private AccountsReceivableService $arService,
+        private FinanceCalendarAggregator $calendarAggregator,
     ) {}
 
     /**
@@ -44,6 +47,7 @@ class DashboardAggregatorService
         // AR is a point-in-time balance (not period-scoped) read from the live
         // FinInvoice table via the canonical AccountsReceivableService.
         $arAging = $this->getArAging($orgId);
+        $fundedResidents = $this->getFundedResidentCount($orgId);
 
         return [
             'period' => $period,
@@ -51,6 +55,9 @@ class DashboardAggregatorService
             'totalRevenue' => $revenue,
             'totalExpenses' => $expenses,
             'netProfit' => round($revenue - $expenses, 2),
+            'fundedResidents' => $fundedResidents,
+            'revenuePerResident' => $fundedResidents > 0 ? round($revenue / $fundedResidents, 2) : 0.0,
+            'gstDue' => $this->getGstDueAttention($orgId),
             'cashBalance' => $this->getCashBalance($orgId),
             'accountsReceivable' => $arAging['total'],
             'arAging' => $arAging,
@@ -386,6 +393,43 @@ class DashboardAggregatorService
             'unclaimed_total' => round($unclaimed, 2),
             'utilisation_pct' => $deliverable > 0 ? (int) round(($claimed / $deliverable) * 100) : 0,
         ];
+    }
+
+    /** Distinct residents (clients) on active service agreements — the funded population. */
+    private function getFundedResidentCount(?int $orgId): int
+    {
+        return (int) ServiceAgreement::query()
+            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+            ->where('status', 'active')
+            ->distinct()
+            ->count('client_id');
+    }
+
+    /**
+     * The next unsettled GST obligation within ~45 days, from the finance
+     * calendar's GST provider (computed IRD deadlines). Null when none is due.
+     */
+    private function getGstDueAttention(?int $orgId): ?array
+    {
+        $items = $this->calendarAggregator->itemsForRange(
+            $orgId,
+            Carbon::today(),
+            Carbon::today()->addDays(45),
+            ['sources' => ['gst_due']],
+        );
+
+        foreach ($items as $item) {
+            if (in_array($item->status, ['due', 'overdue'], true)) {
+                return [
+                    'due' => $item->start,
+                    'amount' => $item->amount,
+                    'status' => $item->status,
+                    'ref' => $item->ref,
+                ];
+            }
+        }
+
+        return null;
     }
 
     private function getUpcomingBills(?int $orgId): array
