@@ -2287,16 +2287,17 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     }
-    if (can?.hr?.payroll?.view) {
+    // Payroll hub — Runs (/hr/payroll, hr.payroll.view) and Payslips
+    // (/hr/payroll/payslips, hr.payslips.view) are now tabs of the Payroll hub.
+    // Show the single entry if the user can open either tab; deep-link to the
+    // first page they can actually open (no 403-on-click).
+    if (can?.hr?.payroll?.view || can?.hr?.payslips?.view) {
         admin.items.push({
             title: 'Payroll',
-            href: '/hr/payroll',
+            href: can?.hr?.payroll?.view
+                ? '/hr/payroll'
+                : '/hr/payroll/payslips',
             icon: DollarSign,
-        });
-        admin.items.push({
-            title: 'Payslips',
-            href: '/hr/payroll/payslips',
-            icon: FileText,
         });
     }
     if (can?.hr?.policies?.view) {

@@ -59,6 +59,9 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     // Documents hub
     '/hr/documents',
     '/hr/documents/templates',
+    // Payroll hub
+    '/hr/payroll',
+    '/hr/payroll/payslips',
     // Performance hub
     '/hr/performance',
     '/hr/performance/reviews',

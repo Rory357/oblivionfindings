@@ -1,3 +1,4 @@
+import { PayrollTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -148,6 +149,7 @@ export default function PayslipsIndex({
                     />
                 }
             >
+                <PayrollTabs active="payslips" />
                 {/* Generate Form */}
                 {showGenerate && (
                     <Card>

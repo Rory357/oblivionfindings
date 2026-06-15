@@ -13,6 +13,7 @@ export * from './my-hr-tabs';
 export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
 export * from './onboarding-wizard-dialog';
+export * from './payroll-tabs';
 export * from './people-picker';
 export * from './people/org-chart-pane';
 export * from './performance-tabs';
