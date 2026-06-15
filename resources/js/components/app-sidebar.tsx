@@ -2229,13 +2229,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Package,
         });
     }
-    if (can?.hr?.skills?.view) {
-        records.items.push({
-            title: 'Skills',
-            href: '/hr/skills',
-            icon: Target,
-        });
-    }
     if (records.items.length > 0) groups.push(records);
 
     // Employee Lifecycle — joiners, casework, leavers and approvals.

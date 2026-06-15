@@ -1,3 +1,4 @@
+import { PerformanceTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Skills', href: '/hr/skills' },
+    { title: 'Skills', href: '/hr/performance/skills' },
 ];
 
 export default function SkillsIndex({
@@ -80,7 +81,7 @@ export default function SkillsIndex({
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
-            '/hr/skills',
+            '/hr/performance/skills',
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
@@ -89,7 +90,7 @@ export default function SkillsIndex({
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         setProcessing(true);
-        router.post('/hr/skills', form, {
+        router.post('/hr/performance/skills', form, {
             onSuccess: () => {
                 setOpen(false);
                 setForm({ name: '', category: '', description: '' });
@@ -121,7 +122,17 @@ export default function SkillsIndex({
                                     asChild
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <Link href="/hr/skills/matrix">
+                                    <Link href="/hr/performance/competencies">
+                                        Competencies
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/performance/skills/matrix">
                                         <Grid3X3 className="mr-1.5 h-4 w-4" />
                                         Skills Matrix
                                     </Link>
@@ -137,6 +148,8 @@ export default function SkillsIndex({
                     />
                 }
             >
+                <PerformanceTabs active="competencies" />
+
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
                     <Button

@@ -34,7 +34,7 @@ const ITEMS: HrTabItem[] = [
     { id: 'overview', label: 'Supervision', icon: ClipboardCheck, tone: 'primary' },
     { id: 'reviews', label: 'Reviews', icon: Award, tone: 'info' },
     { id: 'goals', label: 'Goals & OKRs', icon: Target, tone: 'success' },
-    { id: 'competencies', label: 'Competencies', icon: Gauge, tone: 'violet' },
+    { id: 'competencies', label: 'Competencies & Skills', icon: Gauge, tone: 'violet' },
     { id: 'feedback', label: '360 Feedback', icon: MessageSquare, tone: 'warning' },
     { id: 'pips', label: 'PIPs', icon: TrendingUp, tone: 'critical' },
     { id: 'succession', label: 'Succession', icon: GitBranch, tone: 'info' },

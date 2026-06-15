@@ -138,6 +138,11 @@ export default function CompetencyIndex({
                                         Dashboard
                                     </Button>
                                 </Link>
+                                <Link href="/hr/performance/skills">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        Skills
+                                    </Button>
+                                </Link>
                                 {can.manage && (
                                     <>
                                         <Button size="sm" asChild variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">

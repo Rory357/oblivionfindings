@@ -840,7 +840,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Skills Matrix
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.performance.view')->prefix('skills')->name('skills.')->group(function () {
+    Route::middleware('permission:hr.performance.view')->prefix('performance/skills')->name('performance.skills.')->group(function () {
         Route::get('/', [SkillsController::class, 'index'])->name('index');
         Route::get('/matrix', [SkillsController::class, 'matrix'])->name('matrix');
 

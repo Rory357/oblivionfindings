@@ -46,7 +46,7 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
 - [x] **S2 — Leave Reports → Leave & Rosters tab** ✅
 - [x] **S3 — Benefits → Compensation & Benefits tab** ✅
 - [x] **S4 — Expenses (admin) → Comp & Benefits tab** ✅
-- [ ] **S5 — Skills → Performance ▸ Competencies & Skills**
+- [x] **S5 — Skills → Performance ▸ Competencies & Skills** ✅
 - [ ] **S6 — Policies → Documents & Policies hub**
 - [ ] **S7 — Training hub (pull out of Compliance)**
 - [ ] **S8 — Goals consolidation**
@@ -156,6 +156,33 @@ on a clean fresh-regenerated workbench (not a stale-TS artifact).
   as 0 this run with that file UNMODIFIED, i.e. it's non-deterministic; no NEW errors in touched files, no unrelated
   files swept into the commit) · build exit 0 · vitest 5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass
   (expense tests pass at new URLs). Hand-formatted (no prettier).
+
+### S5 — DONE
+- Skills was a standalone mini-hub (`/hr/skills` index + `/hr/skills/matrix` + store/assess) gated
+  `hr.performance.view`/`manage` at the ROUTE, but its sidebar item was gated `hr.skills.view` (a separate perm) and
+  lived in the "records" group. Competencies (`/hr/performance/competencies`) is already a Performance-hub tab.
+- **Re-homed** Skills under the Performance hub (clean cut, no redirect): routes group `skills` →
+  `performance/skills`, names `skills.*` → `performance.skills.*` (gates kept). `git mv` pages →
+  `pages/hr/performance/skills/` (renames R093/R098); SkillsController render paths re-homed; URLs re-homed in both
+  pages + HrMiscTest (Browser).
+- **Merged into the Competencies tab:** renamed the PerformanceTabs `competencies` tab label
+  "Competencies" → "**Competencies & Skills**". Both skills pages now render `<PerformanceTabs active="competencies" />`
+  so they sit inside the hub under that tab. Bridged the two page-sets with hero links: competencies index → "Skills";
+  skills index → "Competencies" (+ its existing "Skills Matrix"). (Re: the active-tab is a no-op when you're already
+  on a skills page — the hero links are the intra-section bridge; the strip is the outer Performance-hub nav.)
+- **Sidebar:** removed the standalone "Skills" item (was gated `hr.skills.view` in the records group). No real access
+  lost — the skills ROUTE already required `hr.performance.view`, so a skills.view-only user got 403 there before too;
+  performance.view users reach Skills via the hub. `Target` import still used (6 other uses).
+- **Permissions frozen:** route gate stays `hr.performance.view`/`manage`; SkillsController still accepts
+  `hr.skills.*` OR `hr.performance.*` (untouched).
+- **Orphan grep (resources/ app/ tests/ routes/):** `hr/skills` → 0, `skills.index|skills.matrix` → 0. Remaining
+  `hr.skills.` matches are exclusively the FROZEN permission keys in SkillsController::canView/canManage.
+- **Files touched:** routes/hr.php, SkillsController.php, performance-tabs.tsx, competencies/index.tsx, app-sidebar.tsx,
+  moved pages/hr/performance/skills/{index,matrix}.tsx, HrMiscTest.php, tracker.
+- **Gates:** wayfinder exit 0 · types 0 · lint 0-err (no new in touched files, no unrelated staged file) · build exit 0
+  · vitest 5/156 (baseline, run alone) · pest 1-fail (baseline), 336 pass. NB: no skills-specific pest Feature test
+  exists, so the re-homed route resolution is covered by types/build/wayfinder + the Browser HrMiscTest, not pest.
+  Hand-formatted (no prettier).
 
 ## Discovered (out of scope — do not fix here)
 - Leave page breadcrumbs are inconsistent (`Leave` vs `Leave Balances` vs `Leave & Rosters`); not touched.
