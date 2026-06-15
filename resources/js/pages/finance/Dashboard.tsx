@@ -1,11 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
     AreaChart,
     Area,
     BarChart,
     Bar,
     CartesianGrid,
+    LabelList,
     Legend,
     ResponsiveContainer,
     Tooltip,
@@ -57,7 +58,6 @@ import {
 } from '@/components/finance';
 import { FinanceHubsBar } from '@/components/finance/finance-hubs-bar';
 import { NeedsAttentionStrip, type AttentionItem } from '@/components/finance/needs-attention-strip';
-import { FinanceDashboardFooter } from '@/components/finance/finance-dashboard-footer';
 import { cn } from '@/lib/utils';
 
 interface MonthlyData {
@@ -446,6 +446,19 @@ export default function FinanceDashboard({
     const margin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
     const billsDueTotal = upcomingBillsDue.reduce((sum, b) => sum + b.amount_due, 0);
 
+    // Chart helpers — match the design: short-month x labels + a value label on
+    // the net-profit line's final point.
+    const shortMonth = (m: string) => String(m).split(' ')[0];
+    const lastProfitIdx = profitData.length - 1;
+    const renderLastProfitLabel = (props: { x?: number; y?: number; value?: number; index?: number }) => {
+        if (props.index !== lastProfitIdx || props.x == null || props.y == null) return null;
+        return (
+            <text x={props.x} y={props.y - 12} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--primary)">
+                {formatMoneyCompact(props.value ?? 0)}
+            </text>
+        );
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Finance Dashboard" />
@@ -566,6 +579,7 @@ export default function FinanceDashboard({
                     />
                 }
             >
+                <div className="flex flex-col gap-[18px]">
                 {/* §2 Finance hubs quick-links */}
                 <FinanceHubsBar />
 
@@ -692,8 +706,11 @@ export default function FinanceDashboard({
                 {/* §6 Charts row */}
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.35fr_1fr]">
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="text-base">Net profit trend</CardTitle>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                            <div>
+                                <CardTitle className="text-base">Net profit trend</CardTitle>
+                                <p className="mt-0.5 text-[11.8px] text-muted-foreground">Rolling 6 periods · NZD</p>
+                            </div>
                             {profitTrend ? (
                                 <span
                                     className={cn(
@@ -711,20 +728,29 @@ export default function FinanceDashboard({
                         <CardContent>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={profitData}>
+                                    <AreaChart data={profitData} margin={{ top: 16, right: 16, bottom: 0, left: 0 }}>
                                         <defs>
                                             <linearGradient id="npGradient" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
                                                 <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.01} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                        <CartesianGrid vertical={false} className="stroke-border/60" />
+                                        <XAxis
+                                            dataKey="month"
+                                            tickFormatter={shortMonth}
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
                                         <YAxis
                                             tick={{ fontSize: 11 }}
                                             className="fill-muted-foreground"
                                             tickFormatter={(v: number) => formatMoneyCompact(v)}
-                                            width={56}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            width={52}
                                         />
                                         <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
                                         <Area
@@ -734,7 +760,14 @@ export default function FinanceDashboard({
                                             strokeWidth={2.6}
                                             fill="url(#npGradient)"
                                             name="Net profit"
-                                        />
+                                            dot={{ r: 3.5, fill: 'var(--card)', stroke: 'var(--primary)', strokeWidth: 2 }}
+                                            activeDot={{ r: 5, fill: 'var(--primary)' }}
+                                        >
+                                            <LabelList
+                                                dataKey="profit"
+                                                content={renderLastProfitLabel as ComponentProps<typeof LabelList>['content']}
+                                            />
+                                        </Area>
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -744,23 +777,33 @@ export default function FinanceDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Revenue vs expenses</CardTitle>
+                            <p className="mt-0.5 text-[11.8px] text-muted-foreground">Last 6 periods</p>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                    <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                                        <CartesianGrid vertical={false} className="stroke-border/60" />
+                                        <XAxis
+                                            dataKey="month"
+                                            tickFormatter={shortMonth}
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                            axisLine={false}
+                                            tickLine={false}
+                                        />
                                         <YAxis
                                             tick={{ fontSize: 11 }}
                                             className="fill-muted-foreground"
                                             tickFormatter={(v: number) => formatMoneyCompact(v)}
-                                            width={56}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            width={52}
                                         />
-                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
-                                        <Legend />
-                                        <Bar dataKey="revenue" fill="var(--primary)" name="Revenue" radius={[3, 3, 0, 0]} />
-                                        <Bar dataKey="expenses" fill="var(--status-warning)" name="Expenses" radius={[3, 3, 0, 0]} />
+                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} cursor={{ fill: 'var(--accent)' }} />
+                                        <Legend verticalAlign="top" align="right" iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
+                                        <Bar dataKey="revenue" fill="var(--primary)" name="Revenue" radius={[3, 3, 0, 0]} maxBarSize={14} />
+                                        <Bar dataKey="expenses" fill="var(--status-warning)" name="Expenses" radius={[3, 3, 0, 0]} maxBarSize={14} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -918,9 +961,7 @@ export default function FinanceDashboard({
                         )}
                     </CardContent>
                 </Card>
-
-                {/* §9 Footer */}
-                <FinanceDashboardFooter orgName={orgName} />
+                </div>
             </PageLayout>
 
             {/* Quick-action wizard modals (reused dialogs). */}
