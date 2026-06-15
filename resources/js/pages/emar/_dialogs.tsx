@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ClientOption, MedRow } from '@/components/emar/medications/types';
 import { previewDoseTimes } from '@/components/emar/medications/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, Ban, CheckCircle2, ClipboardList, FileUp, HeartPulse, Pill, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, ClipboardList, FileText, FileUp, HeartPulse, Pencil, Pill, Printer, ShieldCheck, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -364,6 +364,16 @@ export function MedicationDetailDialog({
 }) {
     const pending = medication.approval_status === 'pending_verification';
     const rejected = medication.approval_status === 'rejected';
+    const flags =
+        [
+            medication.is_prn && 'PRN',
+            medication.controlled_drug && 'Controlled drug',
+            medication.high_risk && 'High-risk',
+            medication.witness_required && 'Witness required',
+            medication.interaction_severity && `Interaction: ${medication.interaction_severity}`,
+        ]
+            .filter(Boolean)
+            .join(' · ') || 'None';
     return (
         <MedsWizardDialog
             open
@@ -378,34 +388,44 @@ export function MedicationDetailDialog({
             onStepClick={() => {}}
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
-                    {medication.state === 'active' && (
-                        <Button variant="outline" onClick={onDiscontinue}>
-                            <Ban className="h-4 w-4" />
-                            Discontinue
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {pending && canVerify && (
+                            <>
+                                <Button variant="outline" onClick={onReject}>
+                                    <Ban className="h-4 w-4" /> Reject
+                                </Button>
+                                <Button onClick={onVerify}>
+                                    <BadgeCheck className="h-4 w-4" /> Verify order
+                                </Button>
+                            </>
+                        )}
+                        <Button variant={pending && canVerify ? 'outline' : 'default'} onClick={onEdit}>
+                            <Pencil className="h-4 w-4" /> Edit
                         </Button>
-                    )}
-                    <Button onClick={onEdit}>Edit</Button>
+                        {medication.state === 'active' && (
+                            <Button variant="outline" onClick={onDiscontinue}>
+                                <Ban className="h-4 w-4 text-status-critical" /> Discontinue
+                            </Button>
+                        )}
+                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${medication.client_id}/care`)}>
+                            <User className="h-4 w-4" /> Client
+                        </Button>
+                        <Button variant="ghost" onClick={() => router.visit(`/emar/mar?client_id=${medication.client_id}`)}>
+                            <FileText className="h-4 w-4" /> MAR
+                        </Button>
+                        <Button variant="ghost" onClick={() => window.print()}>
+                            <Printer className="h-4 w-4" /> Print
+                        </Button>
+                    </div>
                 </>
             }
         >
             {pending && (
                 <InfoCard icon={ShieldCheck} tone="warn">
-                    <div className="flex items-center justify-between gap-3">
-                        <span>Awaiting prescriber verification — not administrable until verified.</span>
-                        {canVerify && (
-                            <span className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={onReject}>
-                                    Reject
-                                </Button>
-                                <Button size="sm" onClick={onVerify}>
-                                    Verify order
-                                </Button>
-                            </span>
-                        )}
-                    </div>
+                    Awaiting prescriber verification — not administrable until verified.{canVerify ? ' Use Verify order below to confirm, or Reject to decline.' : ''}
                 </InfoCard>
             )}
             {rejected && (
@@ -419,6 +439,7 @@ export function MedicationDetailDialog({
                 <SummaryRow label="Route / form" value={[medication.route, medication.form].filter(Boolean).join(' · ') || '—'} />
                 <SummaryRow label="Indication" value={medication.indication ?? '—'} />
                 <SummaryRow label="Prescriber" value={medication.prescriber ?? '—'} />
+                <SummaryRow label="Flags" value={flags} tone={medication.controlled_drug || medication.high_risk ? 'crit' : undefined} />
                 {medication.is_prn && <SummaryRow label="PRN limit" value={medication.max_per_day ? `${medication.max_per_day} per 24h` : '—'} />}
                 <SummaryRow label="Stock" value={medication.stock ? `${medication.stock.on_hand ?? '—'} ${medication.stock.unit ?? ''}${medication.stock.low ? ' · low' : ''}` : '—'} />
             </div>
@@ -428,11 +449,6 @@ export function MedicationDetailDialog({
                     <p className="text-muted-foreground">{medication.instructions}</p>
                 </div>
             )}
-            <div className="mt-3">
-                <a href={`/emar/mar?client_id=${medication.client_id}`} className="text-sm font-medium text-primary hover:underline">
-                    Open on MAR chart →
-                </a>
-            </div>
         </MedsWizardDialog>
     );
 }
