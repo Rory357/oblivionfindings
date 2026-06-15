@@ -1,5 +1,6 @@
 import AttentionBar from '@/components/emar/mar/attention-bar';
 import ClinicalRail from '@/components/emar/mar/clinical-rail';
+import DoseContextMenu, { type DoseCtxTarget } from '@/components/emar/mar/dose-context-menu';
 import MarGrid, { type MarGridMed } from '@/components/emar/mar/mar-grid';
 import PrnCard from '@/components/emar/mar/prn-card';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
@@ -113,7 +114,8 @@ export default function MarCharts(props: Props) {
 
     const [activeTab, setActiveTab] = useState('schedule');
     const [search, setSearch] = useState('');
-    const [recordRow, setRecordRow] = useState<ScheduleRow | null>(null);
+    const [recordTarget, setRecordTarget] = useState<{ row: ScheduleRow; outcome: 'given' | 'refused' | 'withheld' } | null>(null);
+    const [ctxTarget, setCtxTarget] = useState<DoseCtxTarget | null>(null);
     const [prnMedId, setPrnMedId] = useState<number | null>(null);
     const [modal, setModal] = useState<MarModal>(null);
 
@@ -194,7 +196,7 @@ export default function MarCharts(props: Props) {
     const latestInr = (marData.inr_records ?? []).find((r) => !r.disabled_at) ?? (marData.inr_records ?? [])[0] ?? null;
     const awaitingCount = marData.awaiting_verification?.length ?? 0;
 
-    const onRecord = (row: ScheduleRow) => setRecordRow(row);
+    const onRecord = (row: ScheduleRow) => setRecordTarget({ row, outcome: 'given' });
     const onGivePrn = (med: PrnMedication) => setPrnMedId(med.id);
 
     // ── No viewable resident with active meds: the server defaults onto a chart
@@ -382,11 +384,14 @@ export default function MarCharts(props: Props) {
                                     schedule={schedule}
                                     onRecord={onRecord}
                                     onContext={(e, row) => {
-                                        // Right-click opens the full record wizard (safe default —
-                                        // CD witness is never skipped). One-click quick-actions are
-                                        // a documented follow-up enhancement.
                                         e.preventDefault();
-                                        onRecord(row);
+                                        setCtxTarget({
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                            row,
+                                            requiresObservation:
+                                                gridMeds.find((m) => m.id === row.medication_id)?.requires_observation ?? false,
+                                        });
                                     }}
                                 />
                                 <PrnCard prn={prn} canRecord={can.record} onGive={onGivePrn} />
@@ -415,17 +420,38 @@ export default function MarCharts(props: Props) {
                 </div>
             </div>
 
-            {recordRow && (
+            {recordTarget && (
                 <RecordDoseWizard
-                    row={recordRow}
+                    row={recordTarget.row}
                     client={info}
                     date={date}
                     witnesses={witnesses}
                     notGivenReasons={notGivenReasons}
                     signedAs={signedAs}
-                    onClose={() => setRecordRow(null)}
+                    initialOutcome={recordTarget.outcome}
+                    onClose={() => setRecordTarget(null)}
                 />
             )}
+
+            <DoseContextMenu
+                target={ctxTarget}
+                date={date}
+                isToday={isToday}
+                canRecord={can.record}
+                onRecordFull={(row) => {
+                    setCtxTarget(null);
+                    setRecordTarget({ row, outcome: 'given' });
+                }}
+                onOutcome={(row, outcome) => {
+                    setCtxTarget(null);
+                    setRecordTarget({ row, outcome });
+                }}
+                onViewHistory={() => {
+                    setCtxTarget(null);
+                    setActiveTab('history');
+                }}
+                onClose={() => setCtxTarget(null)}
+            />
 
             {prnMedId !== null && (
                 <PrnWizard
