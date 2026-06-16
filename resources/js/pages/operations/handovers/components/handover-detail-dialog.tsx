@@ -5,6 +5,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Link } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Activity,
     ArrowRight,
@@ -22,11 +23,12 @@ import {
     UserCheck,
     Users,
 } from 'lucide-react';
-import { type ComponentType, type ReactNode } from 'react';
+import { type ComponentType, type ReactNode, useEffect, useState } from 'react';
 
 import { formatDate } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
+import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 import {
     type Handover,
     HueAvatar,
@@ -228,6 +230,7 @@ export function HandoverDetailDialog({
     onEdit,
     onSubmit,
     onAcknowledge,
+    medicationSnapshotUrl,
 }: {
     handover: Handover | null;
     open: boolean;
@@ -235,7 +238,38 @@ export function HandoverDetailDialog({
     onEdit: (h: Handover) => void;
     onSubmit: (h: Handover) => void;
     onAcknowledge: (h: Handover) => void;
+    /** eMAR lens only: endpoint for the live "Medications this shift" snapshot
+     *  (GET ?shift_id=…). Operations leaves this unset, so the section is hidden
+     *  and no request fires there. */
+    medicationSnapshotUrl?: string;
 }) {
+    const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
+    const [snapLoading, setSnapLoading] = useState(false);
+    const shiftId = handover?.outgoing_shift?.id ?? null;
+
+    useEffect(() => {
+        if (!open || !medicationSnapshotUrl || !shiftId) {
+            setSnapshot(null);
+            return;
+        }
+        let cancelled = false;
+        setSnapLoading(true);
+        axios
+            .get(medicationSnapshotUrl, { params: { shift_id: shiftId } })
+            .then((res) => {
+                if (!cancelled) setSnapshot(res.data?.snapshot ?? null);
+            })
+            .catch(() => {
+                if (!cancelled) setSnapshot(null);
+            })
+            .finally(() => {
+                if (!cancelled) setSnapLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, medicationSnapshotUrl, shiftId]);
+
     if (!handover) return null;
     const h = handover;
     const out = h.outgoing_staff;
@@ -356,6 +390,14 @@ export function HandoverDetailDialog({
                             {h.handover_notes || 'No narrative recorded.'}
                         </p>
                     </div>
+
+                    {medicationSnapshotUrl ? (
+                        <ShiftMedSummary
+                            snapshot={snapshot}
+                            loading={snapLoading}
+                            hasShift={!!h.outgoing_shift}
+                        />
+                    ) : null}
 
                     <DetailList
                         icon={Pill}

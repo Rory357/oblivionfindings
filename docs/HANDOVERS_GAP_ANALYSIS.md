@@ -99,9 +99,14 @@ un-regressed.
   on outgoing-shift select, shows a read-only stat panel (`ShiftMedPanel`), and pre-fills the meds
   list once when empty (never clobbering an edit). Frontend tsc/eslint green; **PHP feature-tests
   environmentally blocked** in the bare worktree (no php/vendor/.env — like `npm run build`).*
-- [ ] **E1b** Detail-dialog **read-only** "Medications this shift" summary — fetch the same
-  snapshot on open (gated by a `medicationLens`-style prop so Operations is unaffected) and render a
-  read-only version of the stat panel. `// TODO(Gx):` anything the data layer doesn't expose.
+- [x] **E1b** Detail-dialog **read-only** "Medications this shift" summary. — *Done: extracted the
+  snapshot type + read-only panel into shared `shift-med-snapshot.tsx` (`ShiftMedSnapshot` +
+  `ShiftMedSummary`, with optional `note`/`noShiftHint`); refactored the wizard to consume it (DRY,
+  one implementation). `handover-detail-dialog.tsx` gained a `medicationSnapshotUrl?` prop + hooks
+  (axios-fetch the snapshot on open for the handover's outgoing shift) and renders `ShiftMedSummary`
+  above the manual "Medications due" list. eMAR `Handovers.tsx` passes
+  `medicationSnapshotUrl="/emar/handovers/shift-medications"`; Operations leaves it unset → section
+  hidden + no request (un-regressed; tsc green for both callers). Gap E complete.*
 
 ## F. Controlled-drug count at handover  *(domain + compliance)*
 - [ ] **F1** Add a CD count verification to the wizard (two-person check: result + witness),
