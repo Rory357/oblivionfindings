@@ -135,7 +135,7 @@ export default function HealthSafetyDashboard({
                 {tab === 'overview' && (
                     <div className="flex flex-col gap-4">
                         {/* Row 1 — overdue corrective actions (1.5fr) + site safety league (1fr) */}
-                        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                             <HsWorklists worklists={worklists} show={['corrective_actions']} />
                             <SiteLeagueCard data={site_league} />
                         </div>

@@ -402,32 +402,37 @@ export function SiteLeagueCard({
 }: {
     data: Array<{ id: number; name: string; incidents: number; hazards: number }>;
 }) {
-    const max = Math.max(...data.map((d) => d.incidents * 2 + d.hazards), 1);
+    // Rank by risk score and show the top sites only — the prototype is a compact league,
+    // not an exhaustive list (orgs can have many sites).
+    const ranked = data
+        .map((d) => ({ ...d, score: d.incidents * 2 + d.hazards }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6);
+    const max = Math.max(...ranked.map((d) => d.score), 1);
     return (
         <ChartCard title="Site safety league" subtitle="Incidents · open hazards (30d)" icon={Building2} iconTone="primary">
-            {data.length === 0 ? (
+            {ranked.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">No sites to compare.</p>
             ) : (
                 <div className="flex flex-col gap-3 py-1">
-                    {data.map((d) => {
-                        const score = d.incidents * 2 + d.hazards;
-                        const tone = score === 0 ? 'success' : score >= max * 0.6 ? 'critical' : 'warning';
+                    {ranked.map((d) => {
+                        const tone = d.score === 0 ? 'success' : d.score >= max * 0.6 ? 'critical' : 'warning';
                         return (
                             <Link
                                 key={d.id}
                                 href={`/sites/${d.id}`}
                                 className="block rounded-md transition-colors hover:bg-muted/50"
                             >
-                                <div className="mb-1 flex items-center justify-between text-xs">
-                                    <span className="font-semibold text-foreground">{d.name}</span>
-                                    <span className="tabular-nums text-muted-foreground">
+                                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                                    <span className="min-w-0 truncate font-semibold text-foreground">{d.name}</span>
+                                    <span className="shrink-0 tabular-nums text-muted-foreground">
                                         {d.incidents} inc · {d.hazards} haz
                                     </span>
                                 </div>
                                 <div className="h-[7px] overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${Math.max((score / max) * 100, 6)}%`, background: `var(--status-${tone})` }}
+                                        style={{ width: `${Math.max((d.score / max) * 100, 6)}%`, background: `var(--status-${tone})` }}
                                     />
                                 </div>
                             </Link>
