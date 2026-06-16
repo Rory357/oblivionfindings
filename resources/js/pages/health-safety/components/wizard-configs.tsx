@@ -3,6 +3,7 @@
  * Add a workflow here + flip its launcher tile to in-place to convert it from navigate-away. */
 import {
     Activity,
+    AlertOctagon,
     Clipboard,
     ClipboardCheck,
     FileText,
@@ -12,6 +13,7 @@ import {
     ShieldCheck,
     Siren,
     User,
+    Users,
 } from 'lucide-react';
 
 import type { WizardConfig } from './form-wizard';
@@ -344,6 +346,91 @@ const loneWorkerConfig: WizardConfig = {
     ],
 };
 
+const LIKELIHOODS = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'].map((v) => opt(v));
+const HAZARD_TYPES = [
+    'slips_trips_falls', 'manual_handling', 'electrical', 'chemical', 'biological', 'machinery',
+    'working_at_height', 'fire', 'vehicle', 'behaviour_aggression', 'noise', 'ergonomic', 'other',
+].map((v) => opt(v));
+const ELECTION_METHODS = ['elected', 'appointed', 'volunteered'].map((v) => opt(v));
+
+const hazardConfig: WizardConfig = {
+    key: 'hazard',
+    title: 'Log hazard + risk assessment',
+    description: 'Record a hazard with a likelihood × consequence risk rating (computed on save).',
+    railIcon: AlertOctagon,
+    railTitle: 'Hazard',
+    railSub: 'Hazard register',
+    endpoint: (v) => `/sites/${v.site_id}/hazards`,
+    successTitle: 'Hazard logged',
+    successBlurb: 'The hazard is in the register with its risk rating.',
+    steps: [
+        {
+            key: 'hazard',
+            label: 'Hazard',
+            blurb: 'Site, type & description',
+            icon: AlertOctagon,
+            fields: [
+                { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+                { key: 'hazard_type', label: 'Hazard type', type: 'select', required: true, options: HAZARD_TYPES },
+                { key: 'description', label: 'Description', type: 'textarea', required: true, placeholder: 'Describe the hazard…' },
+            ],
+        },
+        {
+            key: 'risk',
+            label: 'Risk assessment',
+            blurb: 'Likelihood × consequence',
+            icon: Activity,
+            fields: [
+                { key: 'severity', label: 'Consequence (severity)', type: 'segmented', required: true, options: SEVERITY_LMHC },
+                { key: 'likelihood', label: 'Likelihood', type: 'select', required: true, options: LIKELIHOODS },
+            ],
+        },
+        {
+            key: 'controls',
+            label: 'Controls & follow-up',
+            blurb: 'Actions & owner',
+            icon: ShieldCheck,
+            fields: [
+                { key: 'immediate_action_applied', label: 'Immediate action applied', type: 'toggle' },
+                { key: 'immediate_action_taken', label: 'Action taken', type: 'textarea' },
+                { key: 'assigned_to_user_id', label: 'Assigned to', type: 'select', source: 'staff' },
+                { key: 'due_date', label: 'Due date', type: 'date' },
+            ],
+        },
+        { key: 'review', label: 'Review', blurb: 'Confirm & log', icon: ClipboardCheck, fields: [] },
+    ],
+};
+
+const participationConfig: WizardConfig = {
+    key: 'participation',
+    title: 'Add H&S representative',
+    description: 'Record an elected or appointed health & safety representative (worker participation).',
+    railIcon: Users,
+    railTitle: 'Worker participation',
+    railSub: 'HSR register',
+    endpoint: '/health-safety/worker-participation/representatives',
+    successTitle: 'Representative added',
+    successBlurb: 'The HSR is on record.',
+    steps: [
+        {
+            key: 'rep',
+            label: 'Representative',
+            blurb: 'Worker, site & election',
+            icon: Users,
+            fields: [
+                { key: 'user_id', label: 'Worker (HSR)', type: 'select', source: 'staff', required: true },
+                { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
+                { key: 'election_method', label: 'How selected', type: 'segmented', required: true, options: ELECTION_METHODS },
+                { key: 'elected_at', label: 'Elected / appointed on', type: 'date', required: true },
+                { key: 'term_expires_at', label: 'Term expires', type: 'date' },
+                { key: 'training_days_completed', label: 'Training days completed', type: 'number' },
+                { key: 'notes', label: 'Notes', type: 'textarea' },
+            ],
+        },
+        { key: 'review', label: 'Review', blurb: 'Confirm & add', icon: ClipboardCheck, fields: [] },
+    ],
+};
+
 export const WIZARD_CONFIGS: Record<string, WizardConfig> = {
     drill: drillConfig,
     first_aid: firstAidConfig,
@@ -351,4 +438,6 @@ export const WIZARD_CONFIGS: Record<string, WizardConfig> = {
     rtw: rtwConfig,
     substance: substanceConfig,
     lone: loneWorkerConfig,
+    hazard: hazardConfig,
+    participation: participationConfig,
 };

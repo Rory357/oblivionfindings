@@ -74,7 +74,8 @@ export type WizardConfig = {
     railIcon: LucideIcon;
     railTitle: string;
     railSub: string;
-    endpoint: string;
+    /** Fixed URL, or a builder from the collected values (e.g. a site-scoped route). */
+    endpoint: string | ((values: Record<string, unknown>) => string);
     successTitle: string;
     successBlurb: string;
     steps: WizardStepSpec[];
@@ -197,7 +198,8 @@ export function HsFormWizard({
         setProcessing(true);
         setErrors({});
         const payload = { ...(config.transform ? config.transform(values) : values), stay: true };
-        router.post(config.endpoint, payload as Record<string, string | number | boolean | string[] | null>, {
+        const url = typeof config.endpoint === 'function' ? config.endpoint(values) : config.endpoint;
+        router.post(url, payload as Record<string, string | number | boolean | string[] | null>, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => setSubmitted(true),
