@@ -177,36 +177,44 @@ function StatusCard({
 /*  Tab panels                                                         */
 /* ------------------------------------------------------------------ */
 
-export function LeadingPanel({ data }: { data: HeroLeadingLagging['leading'] }) {
+export function LeadingPanel({
+    data,
+    workerParticipation,
+    siteCount,
+}: {
+    data: HeroLeadingLagging['leading'];
+    workerParticipation: { pct: number | null; committees: number };
+    siteCount: number;
+}) {
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
                 href="/incidents?type=near_miss"
                 label="Near-miss : incident"
                 value={fmt(data.near_miss_ratio, '×')}
-                caption="target ≥ 3 · strong reporting culture"
+                caption="target ≥ 3 — strong reporting culture"
                 accent={(data.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'}
             />
             <KpiCard
                 href="/health-safety/corrective-actions"
                 label="Actions closed on time"
                 value={fmt(data.actions_on_time_pct, '%')}
-                caption="this period · target ≥ 90%"
+                caption="30-day · target ≥ 90%"
                 accent={(data.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'}
             />
             <KpiCard
                 href="/health-safety/worker-participation"
                 label="Training & audit"
                 value={fmt(data.training_pct, '%')}
-                caption="compliance across sites"
+                caption={`compliance across ${siteCount} site${siteCount === 1 ? '' : 's'}`}
                 accent={(data.training_pct ?? 0) >= 90 ? 'success' : 'warning'}
             />
             <KpiCard
-                href="/compliance/hazards"
-                label="Open hazards"
-                value={fmt(data.open_hazards)}
-                caption="open now"
-                accent={data.open_hazards > 0 ? 'warning' : 'success'}
+                href="/health-safety/worker-participation"
+                label="Worker participation"
+                value={fmt(workerParticipation.pct, '%')}
+                caption={`HSR engagement · ${workerParticipation.committees} committee${workerParticipation.committees === 1 ? '' : 's'}`}
+                accent={(workerParticipation.pct ?? 0) >= 70 ? 'success' : 'warning'}
             />
         </div>
     );

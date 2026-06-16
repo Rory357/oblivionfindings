@@ -8,6 +8,8 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
+use App\Models\HsCommittee;
+use App\Models\HsRepresentative;
 use App\Models\LoneWorkerAlert;
 use App\Models\Organization;
 use App\Models\SafeguardingConcern;
@@ -183,6 +185,35 @@ class HealthSafetyDashboardController extends Controller
                 ->get()
                 ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count]),
             'site_league' => $this->dashboardService->siteLeague($from, $to),
+
+            // Leading tab — open-hazards list (row 3) + worker-participation KPI (row 1).
+            // Both rescue-guarded so a query issue degrades gracefully rather than 500-ing the page.
+            'open_hazards_list' => rescue(fn () => SiteHazard::query()
+                ->with('site:id,name')
+                ->whereIn('status', ['open', 'in_progress'])
+                ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+                ->orderByRaw("CASE risk_rating WHEN 'extreme' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC")
+                ->orderByDesc('created_at')
+                ->limit(6)
+                ->get()
+                ->map(fn ($h) => [
+                    'id' => $h->id,
+                    'site_id' => $h->site_id,
+                    'title' => $h->description
+                        ?: ($h->custom_hazard_type ?: ucwords(str_replace('_', ' ', (string) ($h->hazard_type ?? 'Hazard')))),
+                    'risk_rating' => $h->risk_rating,
+                    'site' => $h->site?->name,
+                ])
+                ->all(), [], false),
+            'worker_participation' => rescue(function () {
+                $totalSites = Site::count();
+                $sitesWithRep = HsRepresentative::whereNotNull('site_id')->distinct('site_id')->count('site_id');
+
+                return [
+                    'pct' => $totalSites > 0 ? (int) round($sitesWithRep / $totalSites * 100) : null,
+                    'committees' => HsCommittee::count(),
+                ];
+            }, ['pct' => null, 'committees' => 0], false),
         ]);
     }
 

@@ -445,6 +445,80 @@ export function SiteLeagueCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Open hazards list (Leading row 3)                                  */
+/* ------------------------------------------------------------------ */
+
+export type OpenHazardRow = {
+    id: number;
+    site_id: number | null;
+    title: string;
+    risk_rating: string | null;
+    site: string | null;
+};
+
+const HAZARD_TONE: Record<string, { label: string; cls: string }> = {
+    extreme: { label: 'High', cls: 'bg-status-critical-bg text-status-critical' },
+    high: { label: 'High', cls: 'bg-status-critical-bg text-status-critical' },
+    medium: { label: 'Med', cls: 'bg-status-warning-bg text-status-warning' },
+    low: { label: 'Low', cls: 'bg-muted text-muted-foreground' },
+};
+
+export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
+    return (
+        <Card>
+            <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-bold leading-tight">Open hazards</CardTitle>
+                    <Link
+                        href="/compliance/hazards"
+                        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                        Register →
+                    </Link>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {hazards.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">No open hazards.</p>
+                ) : (
+                    <div className="flex flex-col gap-1">
+                        {hazards.map((h) => {
+                            const tone = HAZARD_TONE[(h.risk_rating ?? '').toLowerCase()] ?? {
+                                label: 'Low',
+                                cls: 'bg-muted text-muted-foreground',
+                            };
+                            const inner = (
+                                <>
+                                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold', tone.cls)}>
+                                        {tone.label}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-foreground">
+                                        {h.title}
+                                    </span>
+                                </>
+                            );
+                            return h.site_id ? (
+                                <Link
+                                    key={h.id}
+                                    href={`/sites/${h.site_id}`}
+                                    className="flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/50"
+                                >
+                                    {inner}
+                                </Link>
+                            ) : (
+                                <div key={h.id} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2">
+                                    {inner}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Grouped tab layouts                                                */
 /* ------------------------------------------------------------------ */
 
@@ -454,12 +528,14 @@ export function LeadingCharts({
     burndown,
     drillPct,
     trainingPct,
+    openHazards,
 }: {
     ratio: number | null;
     operands: { near_misses: number; recordable: number };
     burndown: Array<{ week: string; open: number }>;
     drillPct: number;
     trainingPct: number;
+    openHazards: OpenHazardRow[];
 }) {
     return (
         <div className="flex flex-col gap-3">
@@ -467,9 +543,10 @@ export function LeadingCharts({
                 <RatioDonutCard ratio={ratio} operands={operands} />
                 <HazardBurndownCard series={burndown} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
                 <GaugeCard pct={drillPct} title="Drill compliance" />
                 <GaugeCard pct={trainingPct} title="Training compliance" />
+                <OpenHazardsCard hazards={openHazards} />
             </div>
         </div>
     );
