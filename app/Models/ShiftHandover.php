@@ -28,6 +28,8 @@ class ShiftHandover extends Model
         'cd_verification',
         'cd_required',
         'version',
+        'locked_by',
+        'locked_at',
         'submitted_at',
         'submitted_by',
         'acknowledged_at',
@@ -43,6 +45,7 @@ class ShiftHandover extends Model
         'cd_verification' => 'array',
         'cd_required' => 'boolean',
         'version' => 'integer',
+        'locked_at' => 'datetime',
         'submitted_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];
@@ -87,5 +90,10 @@ class ShiftHandover extends Model
     public function acknowledger()
     {
         return $this->belongsTo(User::class, 'acknowledged_by');
+    }
+
+    public function lockedBy()
+    {
+        return $this->belongsTo(User::class, 'locked_by');
     }
 }

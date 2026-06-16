@@ -18,6 +18,7 @@ function makeHandover(over: Partial<Handover> = {}): Handover {
         cd_verification: null,
         cd_required: false,
         version: 1,
+        edit_lock: null,
         incidents_to_note: [],
         follow_up_items: [],
         tasks_pending: [],
@@ -92,6 +93,13 @@ describe('buildItems (handover context menu)', () => {
 
     it('hides Edit when can_edit is false', () => {
         const ls = labels(buildItems(makeHandover({ can_edit: false }), allHandlers()));
+        expect(ls).not.toContain('Edit handover');
+    });
+
+    it('hides Edit when another worker holds the presence lock', () => {
+        const ls = labels(
+            buildItems(makeHandover({ can_edit: true, edit_lock: { held_by_name: 'Pat Rua', held_at: null } }), allHandlers()),
+        );
         expect(ls).not.toContain('Edit handover');
     });
 

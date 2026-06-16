@@ -20,6 +20,9 @@ class ShiftHandoverService
 
     public const STATUS_ACKNOWLEDGED = 'acknowledged';
 
+    /** A presence edit-lock is "active" only this many seconds after it was taken. */
+    public const EDIT_LOCK_TTL_SECONDS = 300;
+
     /**
      * Days the outgoing/assigned staff member may keep editing a posted handover
      * after the shift. Past this window it locks to managers only. Drafts stay
@@ -130,6 +133,9 @@ class ShiftHandoverService
                 'cd_verification' => $this->normalizeCdVerification($data['cd_verification_input'] ?? null, $actor),
                 'cd_required' => $cdRequired,
                 'version' => $existing && $existing->status === self::STATUS_DRAFT ? (int) $existing->version + 1 : 1,
+                // Saving releases the presence edit-lock — the editor is done.
+                'locked_by' => null,
+                'locked_at' => null,
                 'status' => self::STATUS_DRAFT,
             ]);
 
@@ -293,6 +299,56 @@ class ShiftHandoverService
 
             return $fresh;
         });
+    }
+
+    /**
+     * Try to take the presence edit-lock. Returns null when acquired (or already
+     * held by this actor); returns the current holder's name when another worker
+     * holds a still-active lock, so the UI can say "being edited by X".
+     */
+    public function acquireEditLock(ShiftHandover $handover, User $actor): ?string
+    {
+        return DB::transaction(function () use ($handover, $actor) {
+            $handover = ShiftHandover::query()->lockForUpdate()->findOrFail($handover->id);
+            $holder = $this->activeLockHolder($handover, $actor->id);
+
+            if ($holder !== null) {
+                return $holder->name;
+            }
+
+            $handover->forceFill(['locked_by' => $actor->id, 'locked_at' => now()])->save();
+
+            return null;
+        });
+    }
+
+    /** Release the presence edit-lock if this actor holds it (or is a manager). */
+    public function releaseEditLock(ShiftHandover $handover, User $actor): void
+    {
+        if ((int) $handover->locked_by === (int) $actor->id || $this->canViewAny($actor)) {
+            $handover->forceFill(['locked_by' => null, 'locked_at' => null])->save();
+        }
+    }
+
+    /**
+     * The user holding a still-active (within TTL) edit-lock, excluding the given
+     * viewer. Null when unlocked, expired, or held by the viewer themselves.
+     */
+    public function activeLockHolder(ShiftHandover $handover, ?int $viewerId = null): ?User
+    {
+        if ($handover->locked_by === null || $handover->locked_at === null) {
+            return null;
+        }
+
+        if ($handover->locked_at->lt(now()->subSeconds(self::EDIT_LOCK_TTL_SECONDS))) {
+            return null;
+        }
+
+        if ($viewerId !== null && (int) $handover->locked_by === (int) $viewerId) {
+            return null;
+        }
+
+        return $handover->lockedBy;
     }
 
     /**
