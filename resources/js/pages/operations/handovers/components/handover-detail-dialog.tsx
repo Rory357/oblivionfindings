@@ -529,7 +529,7 @@ export function HandoverDetailDialog({
                     <div className="flex flex-wrap items-center gap-1.5">
                         {h.client ? (
                             <OptionLink
-                                href={`/operations/clients/${h.client.id}/care`}
+                                href={`/operations/clients/${h.client.id}`}
                                 icon={User}
                             >
                                 View client

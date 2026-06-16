@@ -89,7 +89,7 @@ function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtxItem[] 
             icon: <User className="h-3.5 w-3.5" />,
             label: 'View client',
             sub: 'Care profile',
-            onClick: () => router.visit(`/operations/clients/${client.id}/care`),
+            onClick: () => router.visit(`/operations/clients/${client.id}`),
         });
     }
     if (outShift) {
