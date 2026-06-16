@@ -164,9 +164,9 @@ class HsAnalyticsService
         }
 
         // Fallback: rostered shift hours (flagged honestly in the payload).
+        // `shifts` is not soft-deletable (no deleted_at column).
         $shifts = DB::table('shifts')
             ->whereBetween('starts_at', [$from, $to])
-            ->whereNull('deleted_at')
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
             ->selectRaw("DATE_FORMAT(starts_at, '%Y-%m') as m, SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(expected_break_minutes, 0), 0)) as mins")
             ->groupBy('m')
@@ -193,7 +193,6 @@ class HsAnalyticsService
 
         $shiftMins = DB::table('shifts')
             ->whereBetween('starts_at', [$from, $to])
-            ->whereNull('deleted_at')
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
             ->selectRaw('SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(expected_break_minutes, 0), 0)) as mins')
             ->value('mins');
