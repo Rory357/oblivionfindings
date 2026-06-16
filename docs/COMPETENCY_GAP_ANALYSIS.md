@@ -38,10 +38,10 @@ Do NOT regress: the 5-step `AssessmentWizardDialog` or the `CoverageMatrix`.
 - [x] D1 — Replaced the single expired banner with a stacked, dismissible (per-session `sessionStorage`) alert strip mirroring `/emar/controlled` (`CompAlert` + `AlertRow` + `readDismissedAlerts`/`persistDismissedAlerts`): N expired (critical → Expired tab), N expiring ≤30d (warning → Expiring tab), N unassessed (warning → Unassessed tab). Each: icon + count message + "Review" → `setActiveTab` + dismiss ✕. Counts from KPIs (standing oversight signal, filter-independent).
 
 ## E. Click-to-open parity + search-pill polish
-- [ ] E1 — **Expiring** cards click-to-open the detail modal (cursor-pointer + hover + keyboard-focusable; `stopPropagation` on the inline button).
-- [ ] E2 — **Unassessed** rows click-to-open (no assessment → open Start assessment, the row's primary action; `stopPropagation` on inline button). Keyboard-focusable.
-- [ ] E3 — **Coverage matrix** rows click-to-open (already row-clickable — confirm + keyboard-focusable).
-- [ ] E4 — Align the hand-rolled footer search pill to the shared meds/today / PRN pill (clear-✕ + matching classes). NO day-stepper.
+- [x] E1 — **Expiring** cards click-to-open the detail modal (`cursor-pointer` + hover + `role="button"`/`tabIndex`/`onKeyDown`; `stopPropagation` on the Schedule-reassessment button).
+- [x] E2 — **Unassessed** rows click-to-open Start assessment (the row's primary action; keyboard-focusable; `stopPropagation` on the inline button).
+- [x] E3 — **Coverage matrix** rows confirmed row-clickable; added `tabIndex`/`onKeyDown` for keyboard parity.
+- [x] E4 — Footer search pill aligned to the shared meds/today / PRN pill (relative wrapper, absolute Search icon, `rounded-full bg-primary-foreground` input + clear-✕). NO day-stepper (Expiring/Expired tabs are the time dimension).
 
 ## Backend (front-end only — no new params)
 - [x] BK1 — Confirmed `competency()` payload (`serializeCompetency`, EmarController ~line 2121) carries the 12 areas ✓, `observed_rounds` ✓, outcome/permissions ✓, `assessor_comments` ✓. **Declarations are NOT persisted** (wizard `assessorDeclared`/`staffDeclared` are local-only) → `TODO(G1)`: persist declaration timestamps + signatures if required. No new params / migration this loop.

@@ -217,9 +217,20 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                     }
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search staff, role or assessor…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                            <div className="relative w-full max-w-xs md:w-[260px]">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search staff, role or assessor…"
+                                    aria-label="Search competency assessments"
+                                    className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                />
+                                {search ? (
+                                    <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {roleItems.length > 0 && <EntityFilter label="Role" allLabel="All roles" items={roleItems} value={roleFilter} onChange={setRoleFilter} onDark />}
@@ -255,9 +266,9 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                 {activeTab === 'expiring' && (
                     <ListCard empty={expiringList.length === 0 ? 'No assessments expiring in the next 30 days.' : null}>
                         {expiringList.map((a) => (
-                            <div key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0" onContextMenu={(e) => openAssessmentCtx(e, a)}>
+                            <div key={a.id} role="button" tabIndex={0} className="flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:bg-muted/30" onClick={() => viewAssessment(a)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); viewAssessment(a); } }} onContextMenu={(e) => openAssessmentCtx(e, a)}>
                                 <StaffCell a={a} sub={`Expires ${fmtDate(a.expiry_date)} · ${daysTo(a.expiry_date)}d`} />
-                                <Button size="sm" onClick={() => renewAssessment(a)}><RotateCcw className="h-3.5 w-3.5" />Schedule reassessment</Button>
+                                <Button size="sm" onClick={(e) => { e.stopPropagation(); renewAssessment(a); }}><RotateCcw className="h-3.5 w-3.5" />Schedule reassessment</Button>
                             </div>
                         ))}
                     </ListCard>
@@ -266,12 +277,12 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                 {activeTab === 'unassessed' && (
                     <ListCard empty={filteredUnassessed.length === 0 ? 'Every staff member has a current assessment.' : null}>
                         {filteredUnassessed.map((s) => (
-                            <div key={s.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0" onContextMenu={(e) => openUnassessedCtx(e, s)}>
+                            <div key={s.id} role="button" tabIndex={0} className="flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:bg-muted/30" onClick={() => startAssessment(s.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startAssessment(s.id); } }} onContextMenu={(e) => openUnassessedCtx(e, s)}>
                                 <div className="flex items-center gap-3">
                                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-status-warning-bg text-xs font-bold text-status-warning">{initials(s.name)}</span>
                                     <div><div className="text-sm font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.role ?? 'Staff'} · no current assessment</div></div>
                                 </div>
-                                <Button size="sm" onClick={() => startAssessment(s.id)}><Plus className="h-3.5 w-3.5" />Start assessment</Button>
+                                <Button size="sm" onClick={(e) => { e.stopPropagation(); startAssessment(s.id); }}><Plus className="h-3.5 w-3.5" />Start assessment</Button>
                             </div>
                         ))}
                     </ListCard>
@@ -403,7 +414,7 @@ function CoverageMatrix({ rows, onView, onCtx }: { rows: AssessmentRow[]; onView
                         </thead>
                         <tbody>
                             {rows.map((a) => (
-                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)} onContextMenu={(e) => onCtx(e, a)}>
+                                <tr key={a.id} tabIndex={0} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:bg-muted/30" onClick={() => onView(a)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView(a); } }} onContextMenu={(e) => onCtx(e, a)}>
                                     <td className="sticky left-0 bg-card px-3 py-2 text-left font-medium">{a.user_name}</td>
                                     {COMPETENCY_AREAS.map((ar) => <td key={ar.key} className="px-2 py-2 font-semibold">{cell(a, ar.key)}</td>)}
                                     <td className="px-3 py-2 tabular-nums text-muted-foreground">{a.total_score ?? 0}/12</td>
