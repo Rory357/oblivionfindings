@@ -1,0 +1,124 @@
+# eMAR Handovers — Gap Analysis & Consistency Loop
+
+Single source of truth for the `/loop` bringing **/emar/handovers** to standardised
+parity + deeper rostering/medication integration. One gap (or tight group) per pass,
+priority **A → H**. Tick `[x]` only when typecheck + lint + build are green for the
+touched files and (for shared-component changes) **/operations/handovers** is verified
+un-regressed.
+
+## Scope & architecture (read before coding)
+
+- **/emar/handovers** is a *medication-focused lens* over the unified shift-handover
+  workflow. It **reuses** the Operations handover components and writes to the shared
+  `ShiftHandover` model (FK'd to rostering shifts + staff).
+- Page: `resources/js/pages/emar/Handovers.tsx` (hero + week-stepper + 7-tab TabStrip +
+  reused shared components, `medicationFocus` wizard).
+- **Shared components** (edits here also hit **/operations/handovers** —
+  `resources/js/pages/operations/handovers/Index.tsx`):
+  `resources/js/pages/operations/handovers/components/` →
+  `cards-view.tsx`, `list-view.tsx`, `board-view.tsx`, `handover-rail.tsx`,
+  `handover-detail-dialog.tsx`, `handover-wizard.tsx`, `shared.tsx`.
+- Backend: `app/Models/ShiftHandover.php`, `app/Services/ShiftHandoverService.php`,
+  `app/Services/Operations/HandoverPresenter.php`,
+  `app/Http/Controllers/Emar/EmarController.php` →
+  `handovers()` (2754), `storeHandover()` (3731), `updateHandover()`,
+  `submitHandover()` (3782), `acknowledgeHandover()` (3799).
+- Routes (`routes/emar.php`): `emar.handovers[.store|.update|.submit|.acknowledge|.destroy]`.
+  Operations uses PATCH `/operations/handovers/{id}/{submit,acknowledge}`; eMAR uses POST.
+- Rostering coupling on `ShiftHandover`: `outgoing_shift_id` / `incoming_shift_id` (→ shifts),
+  `outgoing_staff_id` / `incoming_staff_id` (→ users), `client_id`, `medications_due` (JSON),
+  `observations_summary` (JSON).
+- Jumps: client → `/operations/clients/{id}/care`; shift → `/operations/shifts/{id}`;
+  staff → `/staff/{id}`; MAR chart → `/emar/mar?client_id={id}`; concern → `/clients/{id}/incidents`.
+- Idioms to reuse: `@/components/rostering/shift-context-menu`
+  (`ShiftContextMenu`/`ShiftCtxItem`/`ShiftCtxState`); PRN `openRowCtx`
+  (`PrnRecords.tsx:193`); detail Options bar (`components/emar/prn-detail-dialog.tsx`);
+  `EntityFilter`/`TabStrip` (`@/components/rostering`); alert strip mirrors `/emar/controlled`.
+
+> Note: `HANDOVERS_AUDIT.md` and the design-drop prototype referenced in the loop prompt
+> are **not present** in this worktree — this analysis is derived from the live code + the
+> loop prompt's §2/§3.
+
+---
+
+## A. Right-click context menu on cards + rail  *(shared → also Operations)*
+- [x] **A1** Add `onContextMenu` → `ShiftContextMenu` to handover **cards** (`cards-view.tsx`)
+  and the **rail's** awaiting list (`handover-rail.tsx`). Items: View handover (primary),
+  Acknowledge (needs-ack), Submit (draft), Edit (when `can_edit`), sep, View client, View
+  shift, View outgoing/incoming staff, Open on MAR chart, sep, Raise concern. Header tag =
+  status pill; meta = client · shift · staff. Actions guarded by the `can_*` flags already on
+  the payload. — *Done: new shared `handover-context-menu.tsx` (`useHandoverContextMenu`
+  hook) used by both `cards-view.tsx` + `handover-rail.tsx`; `onEdit` threaded as an optional
+  handler from both `emar/Handovers.tsx` and `operations/handovers/Index.tsx`; `CardHandlers`
+  gained optional `onEdit?`. Operations un-regressed (same handlers, jumps are global routes).*
+
+## B. Cross-entity jumps in the detail dialog  *(shared → also Operations)*
+- [ ] **B1** Make the shift labels/times + staff names in `handover-detail-dialog.tsx` link to
+  their entities, and add a footer **Options** action bar (mirror `prn-detail-dialog`): View
+  client, View shift, View staff, Open on MAR chart — alongside the existing Acknowledge/Edit/
+  Submit. Reuse the same jump targets as A.
+
+## C. Hero footer filters (eMAR only)
+- [ ] **C1** Add a **Client** `EntityFilter` and a **Staff** filter (outgoing/incoming) to the
+  eMAR hero footer beside Site (`emar/Handovers.tsx`); align the hand-rolled search pill to the
+  shared meds/today pill. **Keep the week-stepper** (Wk · {range} + prev/next) — do **not** add
+  a day-stepper. Client/Staff can filter client-side over the loaded week (mirror Operations'
+  `baseFiltered`).
+
+## D. Alert strip (eMAR only)
+- [ ] **D1** Replace the single needs-ack banner with a **stacked, dismissible** strip (mirror
+  `/emar/controlled`): *N awaiting your acknowledgement* (warning → Needs-ack tab), *N open
+  incoming shifts — needs cover* (critical → Open-incoming tab), and (after F) *N CD counts
+  unverified at handover* (critical → Open the CD register / Needs-ack).
+
+## E. Auto-surface the shift's medication state  *(the real win — expand the module)*
+- [ ] **E1** In `EmarController@handovers` (+ the wizard's meds step), auto-populate the
+  medication picture for the **outgoing shift's window** instead of relying on manual
+  `medications_due`: meds due/pending in the window, PRN given + effectiveness reviews
+  outstanding, MAR omissions/refusals during the shift, stock/CD alerts. Reuse
+  `EnhancedMarService` / `MarScheduleService` / the PRN+stock payload builders. Surface as a
+  pre-filled, **editable** "Medications this shift" panel in the wizard and a read-only summary
+  in the detail dialog. `// TODO(Gx):` anything the data layer doesn't expose.
+
+## F. Controlled-drug count at handover  *(domain + compliance)*
+- [ ] **F1** Add a CD count verification to the wizard (two-person check: result + witness),
+  surface unverified CD counts in the alert strip (D), and deep-link to `/emar/controlled`.
+  Store under a JSON key on `ShiftHandover` (e.g. `observations_summary` or a new
+  `cd_verification` key) — `// TODO(Gx):` if a real column is needed. (CD registers are
+  reconciled at each shift change.)
+
+## G. Clarify roles + edit-locking (dedupe the 3 write paths)
+- [ ] **G1** Three UIs (eMAR / Operations / Attendance clock-out) write one `ShiftHandover`
+  with no concurrency control. Add optimistic-concurrency / edit-locking in
+  `ShiftHandoverService` (submitted handovers already lock via the 7-day `editPermission`
+  window; add a `locked_by`/`locked_at` *or* version check so a second concurrent editor of a
+  draft is blocked / told who holds it). In the eMAR UI, show a "same handover as Operations"
+  cross-link and disable editing when another module/user holds it. Keep eMAR on the medication
+  slice; defer the full narrative to Operations.
+
+## H. Remove dead `MedicationHandover` code
+- [ ] **H1** `app/Models/MedicationHandover.php` + the `medication_handovers` table + its
+  seeder rows are unused and redundant with `ShiftHandover`. Only `EmarComprehensiveSeeder.php`
+  references the model (the coincidentally-named `MedicationHandoversTest` actually tests the
+  `ShiftHandover`-backed page). Remove the model + seeder block; drop the table via a **new**
+  reversible migration (don't edit the historical ones). Confirm no other references first.
+
+---
+
+## Verify each pass (§5)
+- `npm run types` + `npm run lint` clean for touched files; `npm run build` succeeds.
+- **Regression:** load `/operations/handovers` after any shared-component change (mandatory for
+  A, B). Compare against the loop prompt's expectations.
+- Exercise: right-click cards/rail; detail-dialog View client/shift/staff land on the right
+  pages; meds panel auto-populates from the shift window; CD verification records + links to the
+  register; edit-locking blocks a 2nd editor; alert strip jumps to the right tab; submit/
+  acknowledge still work end-to-end. Run any handover Dusk/Playwright/feature specs.
+
+## Loop exit (§6)
+Every box `[x]`; types/lint/build pass; `/operations/handovers` un-regressed; cards/rail have a
+right-click menu; detail dialog links to client + shift + staff; the eMAR lens auto-surfaces the
+shift med-state + a CD count at handover; concurrent edits are locked; dead `MedicationHandover`
+removed (or documented); all actions in-page via Inertia partial reloads.
+
+### Remaining `TODO(Gx)` markers
+- _(none yet)_

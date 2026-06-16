@@ -99,7 +99,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
     const closeWizard = () => { setWizardOpen(false); setEditingId(null); setPendingClientId(null); };
     const submitHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/submit`, {}, { preserveScroll: true, onSuccess: () => toast.success('Draft submitted to incoming worker') });
     const acknowledgeHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/acknowledge`, {}, { preserveScroll: true, onSuccess: () => toast.success(`Handover for ${clientName(h.client)} acknowledged`) });
-    const handlers = { onOpen: (h: Handover) => setDetailId(h.id), onSubmit: submitHandover, onAcknowledge: acknowledgeHandover };
+    const handlers = { onOpen: (h: Handover) => setDetailId(h.id), onSubmit: submitHandover, onAcknowledge: acknowledgeHandover, onEdit: openEdit };
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All', icon: Layers, tone: 'primary', badge: counts.total || undefined },
@@ -208,7 +208,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                                 <CardsView handovers={filtered} {...handlers} />
                             )}
                         </main>
-                        <HandoverRail handovers={handovers} counts={counts} weekStart={weekStartDate} onOpen={(h) => setDetailId(h.id)} />
+                        <HandoverRail handovers={handovers} counts={counts} weekStart={weekStartDate} onOpen={(h) => setDetailId(h.id)} onSubmit={submitHandover} onAcknowledge={acknowledgeHandover} onEdit={openEdit} />
                     </div>
                 )}
             </div>

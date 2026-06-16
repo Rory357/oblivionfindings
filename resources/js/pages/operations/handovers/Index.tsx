@@ -191,6 +191,7 @@ export default function HandoversIndex({
         onOpen: (h: Handover) => setDetailId(h.id),
         onSubmit: submitHandover,
         onAcknowledge: acknowledgeHandover,
+        onEdit: openEdit,
     };
 
     return (
@@ -249,6 +250,9 @@ export default function HandoversIndex({
                                 counts={counts}
                                 weekStart={weekStartDate}
                                 onOpen={(h) => setDetailId(h.id)}
+                                onSubmit={submitHandover}
+                                onAcknowledge={acknowledgeHandover}
+                                onEdit={openEdit}
                             />
                         </div>
                     )}

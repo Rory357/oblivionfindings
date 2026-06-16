@@ -6,6 +6,10 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 import {
+    type HandoverCtxHandlers,
+    useHandoverContextMenu,
+} from './handover-context-menu';
+import {
     type Handover,
     HueAvatar,
     clientName,
@@ -25,12 +29,20 @@ export function HandoverRail({
     counts,
     weekStart,
     onOpen,
+    onSubmit,
+    onAcknowledge,
+    onEdit,
 }: {
     handovers: Handover[];
     counts: RailCounts;
     weekStart: Date;
-    onOpen: (h: Handover) => void;
-}) {
+} & HandoverCtxHandlers) {
+    const { openCtx, menu } = useHandoverContextMenu({
+        onOpen,
+        onSubmit,
+        onAcknowledge,
+        onEdit,
+    });
     const awaiting = useMemo(
         () => handovers.filter((h) => h.status === 'submitted').slice(0, 5),
         [handovers],
@@ -80,6 +92,7 @@ export function HandoverRail({
                             key={h.id}
                             type="button"
                             onClick={() => onOpen(h)}
+                            onContextMenu={(e) => openCtx(e, h)}
                             className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent"
                         >
                             {h.outgoing_staff ? (
@@ -177,6 +190,7 @@ export function HandoverRail({
                     ))}
                 </div>
             </div>
+            {menu}
         </aside>
     );
 }
