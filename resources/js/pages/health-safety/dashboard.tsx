@@ -56,11 +56,12 @@ import {
 import {
     buildHsTabItems,
     CompliancePanel,
+    GovernanceExports,
     LaggingPanel,
     LeadingPanel,
     RoleLensBanner,
 } from './components/dashboard-tabs';
-import { LaggingCharts, LeadingCharts } from './components/charts';
+import { IncidentTrendCard, LaggingCharts, LeadingCharts, SiteLeagueCard } from './components/charts';
 import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
@@ -149,6 +150,7 @@ type Props = {
     frequency_operands: { near_misses: number; recordable: number };
     hazard_burndown: Array<{ week: string; open: number }>;
     incidents_by_category: Array<{ label: string; count: number }>;
+    site_league: Array<{ id: number; name: string; incidents: number; hazards: number }>;
     worklists: WorklistsPayload;
 };
 
@@ -565,6 +567,7 @@ export default function HealthSafetyDashboard({
     frequency_operands,
     hazard_burndown,
     incidents_by_category,
+    site_league,
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
@@ -733,10 +736,13 @@ export default function HealthSafetyDashboard({
                     </div>
                 )}
                 {tab === 'compliance' && (
-                    <CompliancePanel
-                        expiring={worklists.expiring}
-                        notifiableEvents={worklists.notifiable_events}
-                    />
+                    <div className="flex flex-col gap-4">
+                        <CompliancePanel
+                            expiring={worklists.expiring}
+                            notifiableEvents={worklists.notifiable_events}
+                        />
+                        <GovernanceExports />
+                    </div>
                 )}
 
                 {tab === 'overview' && (
@@ -745,6 +751,10 @@ export default function HealthSafetyDashboard({
                             worklists={worklists}
                             show={['corrective_actions', 'notifiable', 'expiring']}
                         />
+                        <div className="grid gap-4 lg:grid-cols-2">
+                            <SiteLeagueCard data={site_league} />
+                            <IncidentTrendCard bars={incident_trends} frequency={frequency_trends} variant="mini" />
+                        </div>
 
                 {/* ------------------------------------------------ */}
                 {/*  KPI Grid                                        */}

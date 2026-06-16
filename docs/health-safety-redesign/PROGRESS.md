@@ -33,7 +33,7 @@
 | 5 | **Charts — pixel-faithful** (7 of 8; site league → WS8) | **done** | _(this commit)_ | `charts-plan.md` |
 | 6 | **Report launcher + Report-incident wizard** (reference flow) | **done** | _(this commit)_ | `incident-wizard-plan.md` |
 | 7 | **The other 8 wizards** (config-driven engine + batches) | **done** (all 9 workflows in-place) | batch1 c8fc8b38 · batch2 00abf753 · batch3 _(this commit)_ | `wizards-plan.md` |
-| 8 | **Governance exports + site league** | todo | — | `governance-plan.md` |
+| 8 | **Governance exports + site league + legacy cleanup** | **in-progress** (WS8a governance strip + site league done; legacy Overview-body removal left) | _(WS8a this commit)_ | `governance-plan.md` |
 
 ## Key decisions / facts (from the audits)
 - **NZ-content is already clean** — zero CQC/RIDDOR/HSE/COSHH/OSHA/TRIR hits. Keep it that way; re-grep touched files each WS.

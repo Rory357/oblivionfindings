@@ -4,6 +4,7 @@
  * use recharts tuned to match. Colours are semantic tokens via var(--…); no raw hex/oklch. */
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Link } from '@inertiajs/react';
 import {
     Bar,
     CartesianGrid,
@@ -343,6 +344,50 @@ export function HazardBurndownCard({ series }: { series: Array<{ week: string; o
                     />
                 </LineChart>
             </ResponsiveContainer>
+        </ChartCard>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Site safety league — horizontal bars per site                      */
+/* ------------------------------------------------------------------ */
+
+export function SiteLeagueCard({
+    data,
+}: {
+    data: Array<{ id: number; name: string; incidents: number; hazards: number }>;
+}) {
+    const max = Math.max(...data.map((d) => d.incidents * 2 + d.hazards), 1);
+    return (
+        <ChartCard title="Site safety league" subtitle="Incidents · open hazards (this period)">
+            {data.length === 0 ? (
+                <p className="py-6 text-center text-xs text-muted-foreground">No sites to compare.</p>
+            ) : (
+                <div className="space-y-2 py-1">
+                    {data.map((d) => {
+                        const score = d.incidents * 2 + d.hazards;
+                        const tone = score === 0 ? 'success' : score >= max * 0.6 ? 'critical' : 'warning';
+                        return (
+                            <Link
+                                key={d.id}
+                                href={`/sites/${d.id}`}
+                                className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted/50"
+                            >
+                                <span className="w-28 shrink-0 truncate text-xs text-foreground">{d.name}</span>
+                                <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className="h-full rounded-full"
+                                        style={{ width: `${Math.max((score / max) * 100, 6)}%`, background: `var(--status-${tone})` }}
+                                    />
+                                </div>
+                                <span className="w-[88px] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                                    {d.incidents} inc · {d.hazards} haz
+                                </span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            )}
         </ChartCard>
     );
 }

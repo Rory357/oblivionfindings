@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import {
     CheckCircle2,
+    ClipboardCheck,
+    FileText,
     Flame,
     FlaskConical,
     HeartPulse,
@@ -16,6 +18,7 @@ import {
     Search,
     ShieldAlert,
     ShieldCheck,
+    Target,
     TrendingDown,
     TrendingUp,
 } from 'lucide-react';
@@ -293,5 +296,47 @@ export function CompliancePanel({
                 tone="success"
             />
         </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Governance & board exports (WS8)                                   */
+/* ------------------------------------------------------------------ */
+
+const GOVERNANCE_REPORTS: Array<{ label: string; desc: string; icon: LucideIcon; href: string }> = [
+    { label: 'Board summary', desc: 'H&S posture for the board', icon: FileText, href: '/health-safety/reports/board-summary' },
+    { label: 'WorkSafe register', desc: 'Notifiable-events register', icon: ShieldAlert, href: '/health-safety/reports/worksafe-register' },
+    { label: 'Investigation outcomes', desc: 'Findings & lessons', icon: Search, href: '/health-safety/reports/investigation-outcomes' },
+    { label: 'Corrective-action traceability', desc: 'Action → event trail', icon: ClipboardCheck, href: '/health-safety/reports/corrective-action-traceability' },
+    { label: 'Risk-assessment register', desc: 'Active risk assessments', icon: Target, href: '/health-safety/reports/risk-assessment-register' },
+];
+
+export function GovernanceExports() {
+    return (
+        <Card>
+            <CardContent className="p-4">
+                <div className="mb-3">
+                    <div className="text-base font-semibold text-foreground">Governance &amp; board exports</div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">One-click reports for the board &amp; WorkSafe NZ</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {GOVERNANCE_REPORTS.map((r) => (
+                        <Link
+                            key={r.href}
+                            href={r.href}
+                            className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/50 hover:bg-accent"
+                        >
+                            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <r.icon className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-[13px] font-semibold text-foreground">{r.label}</span>
+                                <span className="block text-[11px] text-muted-foreground">{r.desc}</span>
+                            </span>
+                        </Link>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
     );
 }

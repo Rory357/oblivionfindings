@@ -11,6 +11,8 @@ use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\HsTrainingRequirement;
 use App\Models\SafetyDataSheet;
+use App\Models\Site;
+use App\Models\SiteHazard;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -313,6 +315,34 @@ class HsDashboardService
             'register_url' => $registerUrl,
             'site' => $site,
         ];
+    }
+
+    /**
+     * Site safety league — incidents (HsEvent) + open hazards per site over the period,
+     * ranked by a simple risk score (incidents weighted ×2). Feeds the Overview league bars.
+     *
+     * @return array<int, array{id: int, name: string, incidents: int, hazards: int}>
+     */
+    public function siteLeague(?Carbon $from = null, ?Carbon $to = null): array
+    {
+        $from = $from ?? now()->subDays(30);
+        $to = $to ?? now();
+
+        return Site::orderBy('name')->get(['id', 'name'])
+            ->map(function (Site $site) use ($from, $to) {
+                $incidents = HsEvent::where('site_id', $site->id)
+                    ->whereIn('event_category', [HsEvent::CATEGORY_INCIDENT, HsEvent::CATEGORY_NEAR_MISS, HsEvent::CATEGORY_INJURY])
+                    ->whereBetween('occurred_at', [$from, $to])
+                    ->count();
+                $hazards = SiteHazard::where('site_id', $site->id)
+                    ->whereIn('status', ['open', 'in_progress'])
+                    ->count();
+
+                return ['id' => $site->id, 'name' => $site->name, 'incidents' => $incidents, 'hazards' => $hazards];
+            })
+            ->sortByDesc(fn ($s) => $s['incidents'] * 2 + $s['hazards'])
+            ->values()
+            ->all();
     }
 
     /* ------------------------------------------------------------------ */

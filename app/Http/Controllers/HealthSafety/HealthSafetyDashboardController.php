@@ -250,6 +250,7 @@ class HealthSafetyDashboardController extends Controller
                 ->limit(6)
                 ->get()
                 ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count]),
+            'site_league' => $this->dashboardService->siteLeague($from, $to),
         ]);
     }
 
