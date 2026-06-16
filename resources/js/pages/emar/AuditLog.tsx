@@ -125,6 +125,8 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
     const todayYmd = toYmd(new Date());
     const isToday = anchor === todayYmd;
     const sources = useMemo(() => [...new Set(events.map((e) => e.source))].sort(), [events]);
+    // EntityFilter works on {id,name}; sources are bare strings, so index them.
+    const sourceItems = useMemo(() => sources.map((s, i) => ({ id: i, name: s })), [sources]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -277,32 +279,34 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                     {view !== 'gaps' && (
                         <div className="flex flex-col gap-3 border-b p-4">
                             <TabStrip value={cat} onChange={setCat} items={CAT_TABS} ariaLabel="Event categories" />
-                            <div className="flex flex-wrap gap-2">
-                                <Select value={clientId || 'all'} onValueChange={(v) => setClientId(v === 'all' ? '' : v)}>
-                                    <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="All clients" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All clients</SelectItem>
-                                        {clients.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={staffName || 'all'} onValueChange={(v) => setStaffName(v === 'all' ? '' : v)}>
-                                    <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="All staff" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All staff</SelectItem>
-                                        {staff.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <EntityFilter
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={clients}
+                                    value={clientId ? Number(clientId) : null}
+                                    onChange={(id) => setClientId(id == null ? '' : String(id))}
+                                />
+                                <EntityFilter
+                                    label="Staff"
+                                    allLabel="All staff"
+                                    pluralLabel="staff"
+                                    items={staff}
+                                    value={staff.find((s) => s.name === staffName)?.id ?? null}
+                                    onChange={(id) => setStaffName(id == null ? '' : (staff.find((s) => s.id === id)?.name ?? ''))}
+                                />
+                                <EntityFilter
+                                    label="Source"
+                                    allLabel="All sources"
+                                    pluralLabel="sources"
+                                    items={sourceItems}
+                                    value={sourceItems.find((s) => s.name === source)?.id ?? null}
+                                    onChange={(id) => setSource(id == null ? '' : (sourceItems.find((s) => s.id === id)?.name ?? ''))}
+                                />
                                 <Select value={range} onValueChange={setRange}>
                                     <SelectTrigger className="h-9 w-[130px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {RANGES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
-                                    <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="All sources" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All sources</SelectItem>
-                                        {sources.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

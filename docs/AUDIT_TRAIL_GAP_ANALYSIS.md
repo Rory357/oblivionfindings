@@ -46,10 +46,12 @@ client jump = `router.visit('/operations/clients/${id}/care')`; alert strip mirr
 
 ## C. Convert secondary filters to EntityFilter  — priority 3
 
-- [ ] C1. Replace the raw shadcn `Select`s for **Client**, **Staff** and **Source** with
-      `EntityFilter` (label · count ▾) for cross-module consistency with PRN/Reviews.
-      Range stays a `Select`. Keep the existing client-side query wiring
-      (`clientId`, `staffName`, `source`, date window, `cat`).
+- [x] C1. Replaced the raw shadcn `Select`s for Client, Staff and Source with `EntityFilter`
+      (search · count ▾, inline/light variant) — cross-module parity with PRN/Reviews. Staff
+      and Source are indexed to `{id,name}` (EntityFilter is id-based) while the existing
+      client-side query state (`clientId`/`staffName`/`source`) is preserved unchanged via the
+      onChange adapters. Range stays a `Select`. File: `resources/js/pages/emar/AuditLog.tsx`.
+      types + lint clean.
 
 ## D. Integrity / omission alert strip  — priority 4 (optional)
 
