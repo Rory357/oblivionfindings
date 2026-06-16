@@ -10,7 +10,7 @@ import { BalanceCheckDialog, CdPill, LossActionDialog, RecordCdEntryDialog, Reco
 import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, Eye, FileWarning, Lock, Package, Plus, Printer, Search, ShieldCheck, Trash2, User, X } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, ClipboardCheck, Eye, FileWarning, Lock, Package, Plus, Printer, Search, ShieldCheck, Trash2, User, X } from 'lucide-react';
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
@@ -477,7 +477,24 @@ export default function ControlledDrugs(props: Props) {
 
                 {activeTab === 'destructions' && (
                     <div className="flex flex-col gap-3">
-                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} title={`CD destructions · ${props.date_label}`} count={destructions.length} action={btnDestruction} cta={destructions.length === 0 ? btnDestruction : undefined} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
+                        {/* The standalone /emar/destructions register is the canonical disposal
+                            surface (all medications + reports & export). This tab is a count +
+                            deep-link + read-only summary; "Record destruction" uses the same
+                            shared RecordDestructionDialog so it behaves identically here. */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-status-warning-bg text-status-warning"><Trash2 className="h-5 w-5" /></span>
+                                <div>
+                                    <div className="text-sm font-semibold">Destruction register</div>
+                                    <div className="text-xs text-muted-foreground">{destructions.length} controlled-drug destruction{destructions.length === 1 ? '' : 's'} on {props.date_label}. The full disposal register — all medications, reports &amp; export — is the canonical record.</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {btnDestruction}
+                                <Button size="sm" variant="outline" onClick={() => router.visit('/emar/destructions')}><ArrowUpRight className="h-4 w-4" />Open destructions register</Button>
+                            </div>
+                        </div>
+                        <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Destroyed by', 'Witness']} title={`CD destructions · ${props.date_label}`} count={destructions.length} cta={destructions.length === 0 ? btnDestruction : undefined} empty={destF.length === 0 ? (destructions.length === 0 ? `No CD destructions on ${props.date_label}.` : 'No destructions match your search.') : null}>
                             {destF.map((d) => (
                                 <tr key={d.id} {...rowProps({ kind: 'destruction', destruction: d })}>
                                     <td className="px-4 py-3 text-muted-foreground">{d.destroyed_at ? new Date(d.destroyed_at).toLocaleDateString('en-NZ') : '—'}</td>
