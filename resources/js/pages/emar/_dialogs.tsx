@@ -5,11 +5,11 @@ import { Field, InfoCard, SelectInput, Segmented, StepHead } from '@/components/
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type { ClientOption, MedRow } from '@/components/emar/medications/types';
+import type { ClientOption, MedDetailPayload, MedRow } from '@/components/emar/medications/types';
 import { previewDoseTimes } from '@/components/emar/medications/types';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, ClipboardList, FileText, FileUp, HeartPulse, Pencil, Pill, Printer, ShieldCheck, User } from 'lucide-react';
+import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, ClipboardList, FileText, FileUp, HeartPulse, History, Pencil, Pill, Printer, ShieldCheck, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -374,6 +374,24 @@ export function MedicationDetailDialog({
         ]
             .filter(Boolean)
             .join(' · ') || 'None';
+
+    // Stock-movement history + per-client interaction detail are lazy-loaded on
+    // open (kept off the whole-register payload), mirroring the allergies fetch.
+    const [detail, setDetail] = useState<MedDetailPayload | null>(null);
+    const [loadingDetail, setLoadingDetail] = useState(true);
+    useEffect(() => {
+        let cancelled = false;
+        setLoadingDetail(true);
+        axios
+            .get<MedDetailPayload>(`/emar/medications/${medication.id}/detail`)
+            .then((r) => !cancelled && setDetail(r.data))
+            .catch(() => !cancelled && setDetail({ movements: [], interactions: [] }))
+            .finally(() => !cancelled && setLoadingDetail(false));
+        return () => {
+            cancelled = true;
+        };
+    }, [medication.id]);
+
     return (
         <MedsWizardDialog
             open
@@ -468,6 +486,71 @@ export function MedicationDetailDialog({
                 {medication.review_date && <SummaryRow label="Review due" value={medication.review_date} />}
                 {medication.state === 'ceased' && (
                     <SummaryRow label="Ceased" value={[medication.ceased_by_name, medication.ceased_at, medication.ceased_reason].filter(Boolean).join(' · ') || '—'} tone="crit" />
+                )}
+            </div>
+
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                    <History className="h-4 w-4 text-muted-foreground" /> Recent stock activity
+                </div>
+                {loadingDetail ? (
+                    <p className="text-[13px] text-muted-foreground">Loading…</p>
+                ) : detail && detail.movements.length > 0 ? (
+                    <ul className="flex flex-col gap-2">
+                        {detail.movements.map((m, i) => (
+                            <li key={i} className="flex items-start gap-2.5 text-[13px]">
+                                <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', movementDot(m.status))} />
+                                <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-baseline gap-x-2">
+                                        <span className="font-medium">{m.label}</span>
+                                        <span className="text-xs text-muted-foreground">{m.at ?? '—'}</span>
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {[m.type === 'count' ? 'Stock count' : 'Administration', m.by, m.note].filter(Boolean).join(' · ')}
+                                    </span>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-[13px] text-muted-foreground">No recorded stock activity yet — doses given and completed stock counts will appear here.</p>
+                )}
+            </div>
+
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" /> Interactions
+                </div>
+                {loadingDetail ? (
+                    <p className="text-[13px] text-muted-foreground">Loading…</p>
+                ) : detail && detail.interactions.length > 0 ? (
+                    <ul className="flex flex-col gap-2.5">
+                        {detail.interactions.map((it, i) => (
+                            <li key={i} className="rounded-md border px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[13px] font-medium">with {it.other}</span>
+                                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', severityTone(it.severity))}>{it.severity_label}</span>
+                                </div>
+                                {it.description && <p className="mt-1 text-xs text-muted-foreground">{it.description}</p>}
+                                {it.clinical_effects && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">Effects:</span> {it.clinical_effects}
+                                    </p>
+                                )}
+                                {it.management && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">Manage:</span> {it.management}
+                                    </p>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                ) : medication.interaction_severity ? (
+                    <p className="text-[13px] text-muted-foreground">
+                        Flagged <span className="font-medium text-status-warning">{medication.interaction_severity}</span> interaction — no further detail recorded.
+                    </p>
+                ) : (
+                    <p className="text-[13px] text-muted-foreground">No interactions recorded against the client's other current medications.</p>
                 )}
             </div>
         </MedsWizardDialog>
@@ -663,7 +746,16 @@ export function InteractionsDialog({ medications, onClose }: { medications: MedR
 
 function severityTone(severity: string | null): string {
     const s = (severity ?? '').toLowerCase();
-    if (s.includes('major') || s.includes('severe') || s.includes('high')) return 'bg-status-critical-bg text-status-critical';
+    if (s.includes('contraindicated') || s.includes('major') || s.includes('severe') || s.includes('high')) return 'bg-status-critical-bg text-status-critical';
     if (s.includes('moderate')) return 'bg-status-warning-bg text-status-warning';
     return 'bg-status-info-bg text-status-info';
+}
+
+/** Stock-activity timeline dot colour by movement status (semantic tokens). */
+function movementDot(status: string | null): string {
+    const s = (status ?? '').toLowerCase();
+    if (s === 'given' || s === 'counted') return 'bg-status-success';
+    if (s === 'refused' || s === 'discrepancy') return 'bg-status-critical';
+    if (s === 'missed') return 'bg-status-warning';
+    return 'bg-muted-foreground';
 }

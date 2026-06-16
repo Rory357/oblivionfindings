@@ -29,6 +29,7 @@ use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
+use App\Models\MedicationScheduledStockCount;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Shift;
@@ -1635,6 +1636,102 @@ class EmarController extends Controller
     }
 
     // ─── Medications Database ──────────────────────────────
+    /**
+     * Lazy-loaded detail for a single register row (opened in the detail modal):
+     * real stock-movement history (administrations + completed counts) and
+     * per-client interaction detail (real MedicationInteraction records). Kept
+     * off the whole-register payload to keep that lean; mirrors the on-demand
+     * allergies fetch used by the Add-medication wizard. No invented tables.
+     */
+    public function medicationDetail(Request $request, ClientMedication $medication)
+    {
+        // ── Stock-movement history ──────────────────────────────────────────
+        // Each administered dose is a real stock-out event; completed scheduled
+        // counts are reconciliation events. Merged into one reverse-chron feed.
+        $administrations = $medication->administrations()
+            ->with('administeredBy:id,name')
+            ->whereNotNull('administered_at')
+            ->latest('administered_at')
+            ->limit(10)
+            ->get()
+            ->map(fn (ClientMedicationAdministration $a) => [
+                'type' => 'administration',
+                'ts' => $a->administered_at?->getTimestamp() ?? 0,
+                'at' => $a->administered_at?->format('j M Y, g:ia'),
+                'status' => $a->status,
+                'label' => $a->dose_given ?: ucfirst((string) ($a->status ?? 'dose')),
+                'by' => $a->administeredBy?->name,
+                'note' => $a->reason ?: $a->notes,
+            ]);
+
+        $counts = MedicationScheduledStockCount::query()
+            ->where('client_medication_id', $medication->id)
+            ->whereNotNull('completed_at')
+            ->with('completedBy:id,name')
+            ->latest('completed_at')
+            ->limit(5)
+            ->get()
+            ->map(function (MedicationScheduledStockCount $c) {
+                $disc = $c->discrepancy;
+
+                return [
+                    'type' => 'count',
+                    'ts' => $c->completed_at?->getTimestamp() ?? 0,
+                    'at' => $c->completed_at?->format('j M Y, g:ia'),
+                    'status' => $disc ? 'discrepancy' : 'counted',
+                    'label' => 'Counted '.$c->actual_quantity.($c->expected_quantity !== null ? ' (expected '.$c->expected_quantity.')' : ''),
+                    'by' => $c->completedBy?->name,
+                    'note' => $disc ? 'Discrepancy '.($disc > 0 ? '+' : '').$disc : ($c->notes ?: null),
+                ];
+            });
+
+        $movements = $administrations->concat($counts)
+            ->sortByDesc('ts')
+            ->take(12)
+            ->map(fn (array $m) => collect($m)->except('ts')->all())
+            ->values()
+            ->all();
+
+        // ── Per-client interaction detail ───────────────────────────────────
+        // Real MedicationInteraction records, intersected with the client's
+        // other current medications so only relevant pairs are surfaced.
+        $otherNames = ClientMedication::query()
+            ->current()
+            ->where('client_id', $medication->client_id)
+            ->where('id', '!=', $medication->id)
+            ->pluck('name')
+            ->filter()
+            ->values();
+
+        $interactions = [];
+        if ($otherNames->isNotEmpty()) {
+            $thisLower = strtolower($medication->name);
+            foreach (MedicationInteraction::findForMedication($medication->name) as $rec) {
+                $other = str_contains(strtolower($rec->medication_a), $thisLower)
+                    ? $rec->medication_b
+                    : $rec->medication_a;
+                $otherLower = strtolower($other);
+                $match = $otherNames->first(fn ($n) => str_contains($otherLower, strtolower($n)) || str_contains(strtolower($n), $otherLower));
+                if (! $match) {
+                    continue;
+                }
+                $interactions[] = [
+                    'other' => $match,
+                    'severity' => $rec->severity,
+                    'severity_label' => $rec->severity_info['label'] ?? ucfirst((string) $rec->severity),
+                    'description' => $rec->description,
+                    'clinical_effects' => $rec->clinical_effects,
+                    'management' => $rec->management,
+                ];
+            }
+        }
+
+        return response()->json([
+            'movements' => $movements,
+            'interactions' => $interactions,
+        ]);
+    }
+
     public function medications(Request $request)
     {
         $user = $request->user();
