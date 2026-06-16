@@ -12,6 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     AlertTriangle,
     ArrowLeftRight,
@@ -40,6 +41,7 @@ import { toast } from 'sonner';
 import { FieldErr as FieldError, StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 
+import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 import {
     type Catalogue,
     type CatalogueShift,
@@ -71,6 +73,10 @@ type WizForm = {
     incidents: string[];
     followups: string[];
     tasks: string[];
+    // eMAR lens: controlled-drug count reconciliation at handover.
+    cd_result: '' | 'verified' | 'discrepancy';
+    cd_witness: string;
+    cd_notes: string;
 };
 
 const WIZ_STEPS = [
@@ -114,6 +120,9 @@ function emptyForm(): WizForm {
         incidents: [],
         followups: [],
         tasks: [],
+        cd_result: '',
+        cd_witness: '',
+        cd_notes: '',
     };
 }
 
@@ -131,6 +140,9 @@ function initFromEditing(h: Handover): WizForm {
         incidents: [...(h.incidents_to_note ?? [])],
         followups: [...(h.follow_up_items ?? [])],
         tasks: [...(h.tasks_pending ?? [])],
+        cd_result: h.cd_verification?.result ?? '',
+        cd_witness: h.cd_verification?.witness_id ? String(h.cd_verification.witness_id) : '',
+        cd_notes: h.cd_verification?.notes ?? '',
     };
 }
 
@@ -287,6 +299,9 @@ export function HandoverWizard({
     const [f, setF] = useState<WizForm>(emptyForm);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
+    // eMAR lens: live medication picture for the selected outgoing shift's window.
+    const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
+    const [snapLoading, setSnapLoading] = useState(false);
 
     // Re-seed the form whenever the dialog (re)opens or the edited record changes.
     useEffect(() => {
@@ -307,6 +322,41 @@ export function HandoverWizard({
             incoming_shift: '',
         }));
     }, [preselectClientId]);
+
+    // eMAR lens only: when the outgoing shift is chosen, fetch its live medication
+    // snapshot and pre-fill the meds list once (only when empty — never clobbering
+    // an edit). medicationFocus is false on Operations, so this stays inert there.
+    useEffect(() => {
+        if (!open || !medicationFocus || !f.outgoing_shift) {
+            setSnapshot(null);
+            return;
+        }
+        let cancelled = false;
+        setSnapLoading(true);
+        axios
+            .get(`${basePath}/shift-medications`, { params: { shift_id: Number(f.outgoing_shift) } })
+            .then((res) => {
+                if (cancelled) return;
+                const snap: ShiftMedSnapshot | null = res.data?.snapshot ?? null;
+                setSnapshot(snap);
+                if (snap && snap.due.length > 0) {
+                    setF((p) =>
+                        p.medications.length === 0
+                            ? { ...p, medications: snap.due.map((d) => `${d.name} — due ${d.time}${d.controlled ? ' (CD)' : ''}`) }
+                            : p,
+                    );
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setSnapshot(null);
+            })
+            .finally(() => {
+                if (!cancelled) setSnapLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, medicationFocus, f.outgoing_shift, basePath]);
 
     const cur = WIZ_STEPS[stepIndex];
     const pct = readiness(f);
@@ -437,6 +487,14 @@ export function HandoverWizard({
             incidents_to_note_text: f.incidents.join('\n'),
             follow_up_items_text: f.followups.join('\n'),
             tasks_pending_text: f.tasks.join('\n'),
+            // eMAR lens only: controlled-drug count reconciliation.
+            ...(medicationFocus
+                ? {
+                      cd_result: f.cd_result || null,
+                      cd_witness_id: f.cd_witness ? Number(f.cd_witness) : null,
+                      cd_notes: f.cd_notes || null,
+                  }
+                : {}),
             submit: !asDraft,
         };
 
@@ -461,13 +519,15 @@ export function HandoverWizard({
                 );
                 onSubmitted(targetWeek);
             },
-            onError: () =>
-                toast.error('Could not save the handover. Please review and retry.'),
+            onError: (errors: Record<string, string>) =>
+                // Surface the server's concurrency message (someone else saved this
+                // shared draft) rather than a generic error.
+                toast.error(errors?.handover ?? 'Could not save the handover. Please review and retry.'),
             onFinish: () => setSubmitting(false),
         };
 
         if (editing) {
-            router.put(`${basePath}/${editing.id}`, payload, opts);
+            router.put(`${basePath}/${editing.id}`, { ...payload, version: editing.version }, opts);
         } else {
             router.post(
                 basePath,
@@ -898,6 +958,15 @@ export function HandoverWizard({
                                 <div className="grid gap-4 lg:grid-cols-2">
                                     <div className="space-y-2">
                                         {medicationFocus && (
+                                            <ShiftMedSummary
+                                                snapshot={snapshot}
+                                                loading={snapLoading}
+                                                hasShift={!!f.outgoing_shift}
+                                                noShiftHint="Select the outgoing shift to load its live medication picture."
+                                                note={snapshot && snapshot.due.length > 0 ? 'Due meds were pre-filled into the list below — edit or remove as needed.' : undefined}
+                                            />
+                                        )}
+                                        {medicationFocus && (
                                             <div className="rounded-xl border border-border bg-card p-3">
                                                 <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
                                                     <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical"><Pill className="h-3.5 w-3.5" /></span>
@@ -955,6 +1024,18 @@ export function HandoverWizard({
                                         onChange={(v) => set('tasks', v)}
                                     />
                                 </div>
+                                {medicationFocus && (
+                                    <CdVerificationSection
+                                        result={f.cd_result}
+                                        witness={f.cd_witness}
+                                        notes={f.cd_notes}
+                                        cdDue={snapshot?.counts.cd_due ?? 0}
+                                        witnesses={catalogue.staff.filter((s) => String(s.id) !== f.outgoing)}
+                                        onResult={(v) => set('cd_result', v)}
+                                        onWitness={(v) => set('cd_witness', v)}
+                                        onNotes={(v) => set('cd_notes', v)}
+                                    />
+                                )}
                             </div>
                         ) : null}
 
@@ -1079,6 +1160,106 @@ function SubHead({ n, text }: { n: number; text: string }) {
                 {n}
             </span>
             {text}
+        </div>
+    );
+}
+
+/** eMAR lens: two-person controlled-drug count reconciliation at handover —
+ *  result + witness + notes, with a deep-link to the CD register. */
+function CdVerificationSection({
+    result,
+    witness,
+    notes,
+    cdDue,
+    witnesses,
+    onResult,
+    onWitness,
+    onNotes,
+}: {
+    result: '' | 'verified' | 'discrepancy';
+    witness: string;
+    notes: string;
+    cdDue: number;
+    witnesses: { id: number; name: string }[];
+    onResult: (v: '' | 'verified' | 'discrepancy') => void;
+    onWitness: (v: string) => void;
+    onNotes: (v: string) => void;
+}) {
+    const options = [
+        ['verified', 'Counts verified', Check],
+        ['discrepancy', 'Discrepancy found', AlertTriangle],
+    ] as const;
+    return (
+        <div className="rounded-xl border border-border bg-card p-3.5">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical">
+                    <Pill className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-[13px] font-semibold">Controlled-drug count · two-person check</span>
+                {cdDue > 0 ? (
+                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[11px] font-semibold text-status-warning">
+                        {cdDue} CD{cdDue === 1 ? '' : 's'} due this shift
+                    </span>
+                ) : null}
+                <a href="/emar/controlled" target="_blank" rel="noopener noreferrer" className="ml-auto text-[12px] font-semibold text-primary hover:underline">
+                    Open CD register →
+                </a>
+            </div>
+            <p className="mb-2.5 text-[12px] text-muted-foreground">Reconcile the controlled-drug register with the incoming worker at shift change.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <label className="text-[12.5px] font-semibold">Count result</label>
+                    <div className="flex flex-wrap gap-2">
+                        {options.map(([val, label, Icon]) => (
+                            <button
+                                key={val}
+                                type="button"
+                                onClick={() => onResult(result === val ? '' : val)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-medium transition-colors',
+                                    result === val
+                                        ? val === 'discrepancy'
+                                            ? 'border-status-critical bg-status-critical-bg text-status-critical'
+                                            : 'border-status-success bg-status-success-bg text-status-success'
+                                        : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                                )}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[12.5px] font-semibold">Witness (second checker)</label>
+                    <select className={SELECT_CLASS} value={witness} disabled={!result} onChange={(e) => onWitness(e.target.value)}>
+                        <option value="">{result ? 'Select the witnessing worker…' : 'Record a result first'}</option>
+                        {witnesses.map((w) => (
+                            <option key={w.id} value={w.id}>
+                                {w.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+            {result ? (
+                <div className="mt-3 space-y-1.5">
+                    <label className="text-[12.5px] font-semibold">
+                        Notes{' '}
+                        {result === 'discrepancy' ? (
+                            <span className="text-status-critical">— describe the discrepancy</span>
+                        ) : (
+                            <span className="font-normal text-muted-foreground">(optional)</span>
+                        )}
+                    </label>
+                    <input
+                        className={cn(INPUT_CLASS, 'h-9')}
+                        placeholder={result === 'discrepancy' ? 'e.g. Diazepam register shows 1 fewer than counted — escalated' : 'e.g. All CD counts matched the register'}
+                        value={notes}
+                        onChange={(e) => onNotes(e.target.value)}
+                    />
+                </div>
+            ) : null}
         </div>
     );
 }

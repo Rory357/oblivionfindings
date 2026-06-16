@@ -13,10 +13,11 @@ import {
     ShieldAlert,
     User,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { type MouseEvent as ReactMouseEvent, useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { useHandoverContextMenu } from './handover-context-menu';
 import {
     type Handover,
     HueAvatar,
@@ -50,6 +51,8 @@ export type CardHandlers = {
     onOpen: (h: Handover) => void;
     onSubmit: (h: Handover) => void;
     onAcknowledge: (h: Handover) => void;
+    /** Optional — when present, the card's right-click menu offers "Edit". */
+    onEdit?: (h: Handover) => void;
 };
 
 function HandoverCard({
@@ -57,7 +60,11 @@ function HandoverCard({
     onOpen,
     onSubmit,
     onAcknowledge,
-}: { h: Handover } & CardHandlers) {
+    onContextMenu,
+}: {
+    h: Handover;
+    onContextMenu: (e: ReactMouseEvent, h: Handover) => void;
+} & CardHandlers) {
     const counts = cardCounts(h);
     const attn = h.status === 'submitted';
     const outRole = humanizeRole(h.outgoing_staff?.role);
@@ -68,6 +75,7 @@ function HandoverCard({
             role="button"
             tabIndex={0}
             onClick={() => onOpen(h)}
+            onContextMenu={(e) => onContextMenu(e, h)}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -232,6 +240,7 @@ export function CardsView({
     handovers,
     ...handlers
 }: { handovers: Handover[] } & CardHandlers) {
+    const { openCtx, menu } = useHandoverContextMenu(handlers);
     const groups = useMemo(() => {
         const byDay = new Map<string, { date: Date; items: Handover[] }>();
         for (const h of handovers) {
@@ -254,6 +263,7 @@ export function CardsView({
     if (handovers.length === 0) return <EmptyState />;
 
     return (
+        <>
         <div className="space-y-6">
             {groups.map((g) => (
                 <div key={ymd(g.date)} className="space-y-3">
@@ -274,10 +284,17 @@ export function CardsView({
                         </span>
                     </div>
                     {g.items.map((h) => (
-                        <HandoverCard key={h.id} h={h} {...handlers} />
+                        <HandoverCard
+                            key={h.id}
+                            h={h}
+                            {...handlers}
+                            onContextMenu={openCtx}
+                        />
                     ))}
                 </div>
             ))}
         </div>
+        {menu}
+        </>
     );
 }
