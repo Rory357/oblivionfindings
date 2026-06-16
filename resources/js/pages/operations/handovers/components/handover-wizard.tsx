@@ -358,6 +358,25 @@ export function HandoverWizard({
         };
     }, [open, medicationFocus, f.outgoing_shift, basePath]);
 
+    // eMAR lens: take a presence edit-lock while editing an existing draft so a
+    // second editor is warned; released on close (or by the server-side TTL if the
+    // tab dies). medicationFocus is false on Operations, so this stays inert there.
+    useEffect(() => {
+        const id = editing?.id;
+        if (!open || !medicationFocus || !id) return;
+        axios
+            .post(`${basePath}/${id}/lock`)
+            .then((res) => {
+                if (res.data?.locked === false && res.data?.held_by) {
+                    toast.warning(`${res.data.held_by} is editing this handover — your changes may conflict on save.`);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            axios.post(`${basePath}/${id}/unlock`).catch(() => {});
+        };
+    }, [open, medicationFocus, editing?.id, basePath]);
+
     const cur = WIZ_STEPS[stepIndex];
     const pct = readiness(f);
     const set = <K extends keyof WizForm>(k: K, v: WizForm[K]) =>

@@ -76,7 +76,7 @@ export function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtx
             onClick: () => handlers.onSubmit!(h),
         });
     }
-    if (h.can_edit && handlers.onEdit) {
+    if (h.can_edit && !h.edit_lock && handlers.onEdit) {
         items.push({
             icon: <FilePenLine className="h-3.5 w-3.5" />,
             label: 'Edit handover',

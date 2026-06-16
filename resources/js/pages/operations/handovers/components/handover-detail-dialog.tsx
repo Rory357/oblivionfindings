@@ -391,6 +391,13 @@ export function HandoverDetailDialog({
                         </div>
                     ) : null}
 
+                    {h.edit_lock ? (
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-[12px] font-medium text-status-warning">
+                            <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                            Being edited by {h.edit_lock.held_by_name} — editing is disabled here to avoid a conflict.
+                        </div>
+                    ) : null}
+
                     {/* Narrative */}
                     <div>
                         <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
@@ -604,7 +611,17 @@ export function HandoverDetailDialog({
                                 Acknowledge
                             </button>
                         ) : null}
-                        {h.can_edit ? (
+                        {h.edit_lock ? (
+                            <button
+                                type="button"
+                                disabled
+                                title={`Being edited by ${h.edit_lock.held_by_name}`}
+                                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
+                            >
+                                <ShieldAlert className="h-3.5 w-3.5" />
+                                Being edited
+                            </button>
+                        ) : h.can_edit ? (
                             <button
                                 type="button"
                                 onClick={() => onEdit(h)}

@@ -51,6 +51,9 @@ export type Handover = {
     /** Optimistic-concurrency token — sent back on edit so the server can detect a
      *  concurrent save of the same shared draft. */
     version: number;
+    /** Active presence edit-lock held by ANOTHER worker (within the TTL). Null when
+     *  the draft is free or this viewer holds it. */
+    edit_lock: { held_by_name: string; held_at: string | null } | null;
     incidents_to_note: string[];
     follow_up_items: string[];
     tasks_pending: string[];

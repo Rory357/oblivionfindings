@@ -258,6 +258,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/handovers/{handover}/acknowledge', [EmarController::class, 'acknowledgeHandover'])
         ->middleware('permission:handovers.viewAny|shifts.update|shifts.viewAssigned|clients.update')
         ->name('emar.handovers.acknowledge');
+    // Presence edit-lock (acquire on wizard open, release on close).
+    Route::post('/handovers/{handover}/lock', [EmarController::class, 'lockHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.lock');
+    Route::post('/handovers/{handover}/unlock', [EmarController::class, 'unlockHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.unlock');
     Route::delete('/handovers/{handover}', [EmarController::class, 'destroyHandover'])
         ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
         ->name('emar.handovers.destroy');

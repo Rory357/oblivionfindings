@@ -38,6 +38,7 @@ class HandoverPresenter
         $client = $handover->client;
         $site = $client?->site;
         $edit = $this->handoverService->editPermission($handover, $auth);
+        $lockHolder = $this->handoverService->activeLockHolder($handover, $auth->id);
 
         return [
             'id' => $handover->id,
@@ -48,6 +49,10 @@ class HandoverPresenter
             'cd_verification' => $handover->cd_verification,
             'cd_required' => (bool) $handover->cd_required,
             'version' => (int) $handover->version,
+            'edit_lock' => $lockHolder ? [
+                'held_by_name' => $lockHolder->name,
+                'held_at' => optional($handover->locked_at)->toISOString(),
+            ] : null,
             'incidents_to_note' => $this->listToDisplayStrings($handover->incidents_to_note),
             'follow_up_items' => $this->listToDisplayStrings($handover->follow_up_items),
             'tasks_pending' => $this->listToDisplayStrings($handover->tasks_pending),
@@ -106,6 +111,7 @@ class HandoverPresenter
             'incomingStaff:id,name,role',
             'acknowledger:id,name',
             'submitter:id,name',
+            'lockedBy:id,name',
         ];
     }
 

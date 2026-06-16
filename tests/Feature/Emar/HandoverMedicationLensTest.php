@@ -210,6 +210,27 @@ class HandoverMedicationLensTest extends TestCase
         $this->assertTrue((bool) $handover->cd_required, 'cd_required should be true when the client has an active controlled drug');
     }
 
+    public function test_presence_lock_blocks_a_second_editor_until_released(): void
+    {
+        $service = app(\App\Services\ShiftHandoverService::class);
+        $shift = $this->makeShift();
+        $handover = ShiftHandover::factory()->draft()->create([
+            'outgoing_shift_id' => $shift->id,
+            'client_id' => $this->client->id,
+            'outgoing_staff_id' => $this->worker->id,
+        ]);
+
+        // First worker takes the lock (null = acquired).
+        $this->assertNull($service->acquireEditLock($handover->fresh(), $this->worker));
+
+        // A second worker is blocked and told who holds it.
+        $this->assertSame($this->worker->name, $service->acquireEditLock($handover->fresh(), $this->witness));
+
+        // Once the holder releases, the second worker can take it.
+        $service->releaseEditLock($handover->fresh(), $this->worker);
+        $this->assertNull($service->acquireEditLock($handover->fresh(), $this->witness));
+    }
+
     protected function makeShift(): Shift
     {
         return Shift::factory()->create([

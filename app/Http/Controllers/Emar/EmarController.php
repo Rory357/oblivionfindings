@@ -3896,6 +3896,44 @@ class EmarController extends Controller
         ]);
     }
 
+    /**
+     * Take the presence edit-lock on a handover when the wizard opens it for
+     * editing. Returns held_by (the other worker) when someone else holds a still
+     * active lock, so the UI can warn + disable rather than clobber their edit.
+     */
+    public function lockHandover(Request $request, ShiftHandover $handover)
+    {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+
+        $heldBy = $this->handoverService->acquireEditLock($handover, $auth);
+
+        return response()->json(['locked' => $heldBy === null, 'held_by' => $heldBy]);
+    }
+
+    /** Release the presence edit-lock when the wizard closes. */
+    public function unlockHandover(Request $request, ShiftHandover $handover)
+    {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+
+        $this->handoverService->releaseEditLock($handover, $auth);
+
+        return response()->json(['released' => true]);
+    }
+
     // ─── Pharmacy Orders + Stock CRUD ───────────────────────
 
     public function storePharmacyOrder(Request $request)
