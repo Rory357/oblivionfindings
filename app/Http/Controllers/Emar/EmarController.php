@@ -2742,6 +2742,7 @@ class EmarController extends Controller
                 'void_reason' => $d->void_reason,
                 'voided_by_name' => $d->voidedByUser?->name,
                 'is_voided' => $d->voided_at !== null,
+                'mar_url' => $d->client_id ? EmarUrl::mar($d->client_id) : null,
             ])->values(),
             'medications' => $medications->map(fn (ClientMedication $m) => [
                 'id' => $m->id,
