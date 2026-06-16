@@ -289,10 +289,12 @@ export function IncidentTrendCard({
     bars,
     frequency,
     variant,
+    title = 'Incident & near-miss trend',
 }: {
     bars: Array<{ month: string; count: number }>;
     frequency: Array<{ month: string; ltifr: number | null; trifr: number | null }>;
     variant: 'mini' | 'full';
+    title?: string;
 }) {
     const freqByMonth = new Map(frequency.map((f) => [f.month, f]));
     const data = bars.map((b) => ({
@@ -320,7 +322,7 @@ export function IncidentTrendCard({
     );
 
     return (
-        <ChartCard title="Incident & near-miss trend" headerRight={legend}>
+        <ChartCard title={title} headerRight={legend}>
             <ResponsiveContainer width="100%" height={variant === 'full' ? 240 : 140}>
                 <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                     <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="var(--border)" />
@@ -565,7 +567,7 @@ export function LaggingCharts({
 }) {
     return (
         <div className={cn('flex flex-col gap-3')}>
-            <IncidentTrendCard bars={bars} frequency={frequency} variant="full" />
+            <IncidentTrendCard bars={bars} frequency={frequency} variant="full" title="Incident trend with LTIFR & TRIFR" />
             <div className="grid gap-3 lg:grid-cols-2">
                 <SeverityDonutCard data={mapSeverity(severity)} />
                 <CategoryBarsCard data={category} />
