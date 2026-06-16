@@ -449,6 +449,27 @@ export function MedicationDetailDialog({
                     <p className="text-muted-foreground">{medication.instructions}</p>
                 </div>
             )}
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                    <FileText className="h-4 w-4 text-muted-foreground" /> Audit trail
+                </div>
+                <SummaryRow label="Charted by" value={[medication.created_by_name, medication.created_at].filter(Boolean).join(' · ') || '—'} />
+                <SummaryRow
+                    label="Verification"
+                    value={
+                        pending
+                            ? 'Awaiting prescriber verification'
+                            : rejected
+                              ? `Rejected${medication.rejection_reason ? ` — ${medication.rejection_reason}` : ''}`
+                              : [medication.verified_by_name, medication.verified_at].filter(Boolean).join(' · ') || 'Verified'
+                    }
+                    tone={pending ? undefined : rejected ? 'crit' : 'success'}
+                />
+                {medication.review_date && <SummaryRow label="Review due" value={medication.review_date} />}
+                {medication.state === 'ceased' && (
+                    <SummaryRow label="Ceased" value={[medication.ceased_by_name, medication.ceased_at, medication.ceased_reason].filter(Boolean).join(' · ') || '—'} tone="crit" />
+                )}
+            </div>
         </MedsWizardDialog>
     );
 }

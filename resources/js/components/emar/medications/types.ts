@@ -35,6 +35,15 @@ export interface MedRow {
     start_date: string | null;
     stock: MedStock | null;
     interaction_severity: string | null;
+    // Verification / lifecycle audit (from EmarController@medications).
+    created_by_name: string | null;
+    created_at: string | null;
+    verified_by_name: string | null;
+    verified_at: string | null;
+    ceased_by_name: string | null;
+    ceased_at: string | null;
+    ceased_reason: string | null;
+    review_date: string | null;
 }
 
 export interface ClientOption {
