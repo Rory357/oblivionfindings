@@ -133,15 +133,16 @@ export default function HealthSafetyDashboard({
                 <RoleLensBanner lens={filters.lens} />
 
                 {tab === 'overview' && (
-                    <div className="flex flex-col gap-6">
-                        <HsWorklists
-                            worklists={worklists}
-                            show={['corrective_actions', 'notifiable', 'expiring']}
-                        />
-                        <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="flex flex-col gap-4">
+                        {/* Row 1 — overdue corrective actions (1.5fr) + site safety league (1fr) */}
+                        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                            <HsWorklists worklists={worklists} show={['corrective_actions']} />
                             <SiteLeagueCard data={site_league} />
-                            <IncidentTrendCard bars={incident_trends} frequency={frequency_trends} variant="mini" />
                         </div>
+                        {/* Row 2 — WorkSafe-notifiable events + expiring soon (1fr 1fr) */}
+                        <HsWorklists worklists={worklists} show={['notifiable', 'expiring']} />
+                        {/* Row 3 — full-width incident & near-miss trend */}
+                        <IncidentTrendCard bars={incident_trends} frequency={frequency_trends} variant="full" />
                     </div>
                 )}
 
