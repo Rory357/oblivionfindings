@@ -8,6 +8,7 @@ use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 
 /**
  * Computes the live medication picture for a single rostering shift's window —
@@ -26,8 +27,7 @@ class ShiftMedicationSnapshotService
         private readonly EnhancedMarService $marService,
         private readonly MarScheduleService $scheduleService,
         private readonly MarOmissionService $omissionService,
-    ) {
-    }
+    ) {}
 
     /**
      * Build the snapshot for an outgoing shift, or null when the shift has no
@@ -130,7 +130,7 @@ class ShiftMedicationSnapshotService
      * Low-stock + clinical attention alerts for the shift's medications, in the
      * stacked-banner shape the handover UIs render.
      *
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $scheduled
+     * @param  Collection<int, array<string, mixed>>  $scheduled
      * @param  array<int, array<string, mixed>>  $prn
      * @param  array<int, array<string, mixed>>  $attention
      * @return array<int, array{kind: string, tone: string, message: string}>
