@@ -6,7 +6,7 @@ import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, ClipboardList, FileWarning, Link2, Lock, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, FileText, FileWarning, Link2, Lock, ShieldCheck, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,7 @@ export type ErrorRow = {
     site_name: string | null;
     medication: { id: number; name: string } | null;
     incident: { id: number; ref: string } | null;
+    mar_url: string | null;
     reported_by_user: { id: number; name: string } | null;
     reviewed_by_user: { id: number; name: string } | null;
     attachments: ErrorAttachment[];
@@ -87,6 +88,12 @@ export type TriageAction = 'review' | 'resolve' | 'close';
 export function TriageDialog({ error, onDismiss, onAction }: { error: ErrorRow; onDismiss: () => void; onAction: (a: TriageAction) => void }) {
     const stageIdx = Math.max(0, STAGES.findIndex((s) => s.id === error.status));
     const sev = severityMeta(error.severity);
+    const [linking, setLinking] = useState(false);
+    const viewClient = () => error.client_id && router.visit(`/operations/clients/${error.client_id}/care`);
+    const viewIncident = () => error.incident && router.visit(`/incidents/${error.incident.id}`);
+    // Post-report create-and-link: reuses the errors controller endpoint, which
+    // creates the incident, links it and redirects into the incidents module.
+    const createIncident = () => { setLinking(true); router.post(`/emar/errors/${error.id}/link-incident`, {}, { onFinish: () => setLinking(false) }); };
     const sections: [string, string | null][] = [
         ['Description', error.description],
         ['Immediate action', error.immediate_action],
@@ -99,9 +106,16 @@ export function TriageDialog({ error, onDismiss, onAction }: { error: ErrorRow; 
     return (
         <MedsWizardDialog open onClose={onDismiss} title={`Error triage · ${error.ref}`} description={`${typeLabel(error.error_type)} · ${error.client ? `${error.client.first_name} ${error.client.last_name}` : 'Unknown client'}`} railIcon={FileWarning} railTitle="Error triage" railSubtitle={error.ref} steps={[{ key: 'detail', label: 'Triage', blurb: 'Read & act', icon: FileWarning }]} stepIndex={0} onStepClick={() => {}} footer={<>
             <Button variant="ghost" onClick={onDismiss}>Close</Button>
-            {error.status === 'reported' && <Button onClick={() => onAction('review')}><ClipboardList className="h-4 w-4" />Review</Button>}
-            {(error.status === 'reported' || error.status === 'investigating') && <Button onClick={() => onAction('resolve')}><ShieldCheck className="h-4 w-4" />Resolve</Button>}
-            {error.status === 'resolved' && <Button onClick={() => onAction('close')}><Lock className="h-4 w-4" />Close out</Button>}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                {error.status === 'reported' && <Button onClick={() => onAction('review')}><ClipboardList className="h-4 w-4" />Review</Button>}
+                {(error.status === 'reported' || error.status === 'investigating') && <Button onClick={() => onAction('resolve')}><ShieldCheck className="h-4 w-4" />Resolve</Button>}
+                {error.status === 'resolved' && <Button onClick={() => onAction('close')}><Lock className="h-4 w-4" />Close out</Button>}
+                {error.client_id && <Button variant="outline" onClick={viewClient}><User className="h-4 w-4" />Client</Button>}
+                {error.incident
+                    ? <Button variant="outline" onClick={viewIncident}><Link2 className="h-4 w-4" />Incident {error.incident.ref}</Button>
+                    : <Button variant="outline" onClick={createIncident} disabled={linking}><Link2 className="h-4 w-4" />Create &amp; link incident</Button>}
+                {error.mar_url && <Button variant="ghost" onClick={() => router.visit(error.mar_url!)}><FileText className="h-4 w-4" />MAR</Button>}
+            </div>
         </>}>
             <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sev.cls}`}>{sev.label}</span>
@@ -130,7 +144,7 @@ export function TriageDialog({ error, onDismiss, onAction }: { error: ErrorRow; 
             {error.incident && (
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/50 px-3 py-2">
                     <span className="flex items-center gap-2 text-sm text-status-critical"><Link2 className="h-4 w-4" />Linked incident {error.incident.ref}</span>
-                    <a href={`/clients/${error.client_id}`} className="text-xs font-medium text-status-critical underline">Open</a>
+                    <button type="button" onClick={viewIncident} className="text-xs font-medium text-status-critical underline">Open incident</button>
                 </div>
             )}
             {sections.filter(([, v]) => v).map(([label, v]) => (

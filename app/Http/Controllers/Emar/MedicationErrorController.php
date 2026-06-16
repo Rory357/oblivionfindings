@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -74,6 +75,7 @@ class MedicationErrorController extends Controller
                 'id' => $error->incident->id,
                 'ref' => 'INC-'.str_pad((string) $error->incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
+            'mar_url' => $error->client_id ? EmarUrl::mar($error->client_id) : null,
             'reported_by_user' => $error->reportedBy ? [
                 'id' => $error->reportedBy->id,
                 'name' => $error->reportedBy->name,
@@ -286,5 +288,41 @@ class MedicationErrorController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Error closed out.');
+    }
+
+    /**
+     * Post-report "create & link incident". The report-time create_incident path
+     * is only available at store(); this exposes the same incident-creation shape
+     * as a standalone action on an already-reported error, links it via
+     * client_incident_id, then navigates to the incidents module (incidents.show).
+     * Idempotent — if an incident is already linked it just jumps to it. This does
+     * NOT modify the incidents module. See docs/ERRORS_GAP_ANALYSIS.md (C1).
+     */
+    public function linkIncident(Request $request, MedicationError $error)
+    {
+        if ($error->client_incident_id) {
+            return redirect()->route('incidents.show', $error->client_incident_id);
+        }
+
+        $incident = ClientIncident::create([
+            'client_id' => $error->client_id,
+            'title' => 'Medication Error: '.str_replace('_', ' ', (string) $error->error_type),
+            'description' => $error->description ?: 'Linked from medication error '.$error->id.'.',
+            'occurred_at' => $error->reported_at ?? now(),
+            'reported_by' => $request->user()->id,
+            'severity' => match ($error->severity) {
+                'critical' => 'critical',
+                'major' => 'high',
+                'moderate' => 'medium',
+                default => 'low',
+            },
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'type' => 'medication_error',
+        ]);
+
+        $error->update(['client_incident_id' => $incident->id]);
+
+        return redirect()->route('incidents.show', $incident);
     }
 }
