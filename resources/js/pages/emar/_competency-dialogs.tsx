@@ -6,7 +6,7 @@ import { Field, SelectInput, Segmented, StepHead } from '@/components/wizard/pri
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { router } from '@inertiajs/react';
-import { Award, CheckCircle2, ClipboardCheck, Eye, GraduationCap, Plus, ShieldCheck, Trash2, User } from 'lucide-react';
+import { Award, CheckCircle2, ClipboardCheck, Eye, GraduationCap, Pencil, Plus, RotateCcw, ShieldCheck, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -239,15 +239,28 @@ export function AssessmentWizardDialog({ staff, assessment, mode, defaultUserId,
 }
 
 // ── View detail (read-only) ──────────────────────────────────────────────────
-export function ViewAssessmentDialog({ assessment, onClose }: { assessment: AssessmentRow; onClose: () => void }) {
+// Footer carries the standard Options action bar (mirrors prn-detail-dialog):
+// Renew / reassess · Edit open the wizard in place via the parent; "View staff
+// member" is the staff-centric jump to /staff/{id} (not the client care page).
+export function ViewAssessmentDialog({ assessment, onClose, onRenew, onEdit, onViewStaff }: { assessment: AssessmentRow; onClose: () => void; onRenew?: () => void; onEdit?: () => void; onViewStaff?: () => void }) {
     const triFor = (key: string): TriState => assessment.not_seen_areas.includes(key) ? 'not_seen' : areaVal(assessment, key) ? 'yes' : 'no';
     const chips: string[] = [];
     if (assessment.can_administer_unsupervised) chips.push('Unsupervised');
     if (assessment.can_witness_controlled) chips.push('CD witness');
     if (assessment.restricted) chips.push('Restricted');
     if (!assessment.can_administer_unsupervised) chips.push('Supervised only');
+    const viewStaff = onViewStaff ?? (() => router.visit(`/staff/${assessment.user_id}`));
     return (
-        <MedsWizardDialog open onClose={onClose} title="Assessment detail" description={`${assessment.user_name} · ${assessment.assessment_type ?? 'assessment'}`} railIcon={ClipboardCheck} railTitle="Assessment" railSubtitle={assessment.user_name} steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]} stepIndex={0} onStepClick={() => {}} footer={<Button onClick={onClose}>Close</Button>}>
+        <MedsWizardDialog open onClose={onClose} title="Assessment detail" description={`${assessment.user_name} · ${assessment.assessment_type ?? 'assessment'}`} railIcon={ClipboardCheck} railTitle="Assessment" railSubtitle={assessment.user_name} steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]} stepIndex={0} onStepClick={() => {}} footer={
+            <>
+                <Button variant="outline" onClick={onClose}>Close</Button>
+                <div className="flex items-center gap-2">
+                    {onRenew && <Button onClick={onRenew}><RotateCcw className="h-4 w-4" />Renew / reassess</Button>}
+                    {onEdit && <Button variant="outline" onClick={onEdit}><Pencil className="h-4 w-4" />Edit</Button>}
+                    <Button variant="ghost" onClick={viewStaff}><User className="h-4 w-4" />View staff member</Button>
+                </div>
+            </>
+        }>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <FactTile label="Type" value={assessment.assessment_type ?? '—'} />
                 <FactTile label="Score" value={`${assessment.total_score ?? 0}/${assessment.pass_threshold ?? 12}`} />
@@ -268,10 +281,30 @@ export function ViewAssessmentDialog({ assessment, onClose }: { assessment: Asse
                     );
                 })}
             </div>
+            {assessment.observed_rounds.length > 0 && (
+                <div className="mt-4">
+                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observed rounds ({assessment.observed_rounds.length})</div>
+                    <div className="flex flex-col gap-1.5">
+                        {assessment.observed_rounds.map((r, i) => (
+                            <div key={i} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-1.5 text-sm">
+                                <span className="font-medium">{r.resident || 'Resident'}</span>
+                                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {r.med_type && <span className="rounded-full border px-1.5 py-0.5 capitalize">{r.med_type}</span>}
+                                    {r.cd && <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">CD</span>}
+                                    {r.outcome && <span className={`font-semibold capitalize ${r.outcome === 'safe' ? 'text-status-success' : r.outcome === 'intervened' ? 'text-status-critical' : 'text-status-warning'}`}>{r.outcome}</span>}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             {assessment.restriction_notes && <Note label="Restrictions" value={assessment.restriction_notes} />}
             {assessment.strengths && <Note label="Strengths" value={assessment.strengths} />}
             {assessment.areas_for_improvement && <Note label="Areas for improvement" value={assessment.areas_for_improvement} />}
             {assessment.action_plan && <Note label="Action plan" value={assessment.action_plan} />}
+            {assessment.assessor_comments && <Note label="Assessor comments" value={assessment.assessor_comments} />}
+            {/* TODO(G1): sign-off declarations (assessor + staff acknowledgement) are captured in the
+                wizard but not persisted, so we surface the assessor/date audit line only — see docs/COMPETENCY_GAP_ANALYSIS.md. */}
             <div className="mt-4 text-xs text-muted-foreground">Assessed {assessment.assessment_date ?? '—'}{assessment.assessor_name ? ` by ${assessment.assessor_name}` : ''}.</div>
         </MedsWizardDialog>
     );

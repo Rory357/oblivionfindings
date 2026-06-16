@@ -2,7 +2,7 @@
    hero search/chip controls are custom-layout bordered surfaces / chip buttons (not Card/Button);
    all colours are semantic tokens. */
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -14,8 +14,8 @@ import {
     type StaffOpt,
 } from '@/pages/emar/_competency-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { Award, AlertTriangle, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, LayoutGrid, Lock, Pencil, Plus, RotateCcw, Search, ShieldCheck, UserX } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Award, AlertTriangle, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, LayoutGrid, Lock, Pencil, Plus, RotateCcw, Search, ShieldCheck, Trash2, User, UserX } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Kpis = { total_staff: number; in_date: number; in_date_pct: number; expiring: number; expired: number; unassessed: number; cd_witnesses: number };
 type UnassessedStaff = { id: number; name: string; role: string | null };
@@ -56,6 +56,44 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
     const [roleFilter, setRoleFilter] = useState<number | null>(null);
     const [statusFilter, setStatusFilter] = useState<number | null>(null);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+
+    // Shared row actions — every surface (table, expiring, unassessed, coverage)
+    // and the right-click menu funnel through these so behaviour stays identical.
+    const viewAssessment = (a: AssessmentRow) => setModal({ type: 'view', assessment: a });
+    const renewAssessment = (a: AssessmentRow) => setModal({ type: 'renew', assessment: a });
+    const editAssessment = (a: AssessmentRow) => setModal({ type: 'edit', assessment: a });
+    const deleteAssessment = (a: AssessmentRow) => { if (confirm(`Delete ${a.user_name}'s assessment? This cannot be undone.`)) router.delete(`/emar/competency/${a.id}`, { preserveScroll: true }); };
+    const startAssessment = (userId?: number) => setModal({ type: 'new', userId });
+    const viewStaff = (userId: number) => router.visit(`/staff/${userId}`);
+
+    // Right-click menu for an assessment row (copies PRN's openRowCtx idiom). The
+    // staff-centric "View staff member" replaces the cross-module "View client".
+    const openAssessmentCtx = (e: ReactMouseEvent, a: AssessmentRow) => {
+        e.preventDefault();
+        const t = ctxStatusTag(a);
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View assessment', sub: `${a.assessment_type ?? 'assessment'} · ${a.total_score ?? 0}/${a.pass_threshold ?? 12}`, tone: 'primary', onClick: () => viewAssessment(a) },
+            { icon: <RotateCcw className="h-3.5 w-3.5" />, label: 'Renew / reassess', onClick: () => renewAssessment(a) },
+            { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit', onClick: () => editAssessment(a) },
+            { sep: true },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View staff member', sub: a.user_role ?? undefined, onClick: () => viewStaff(a.user_id) },
+            { sep: true },
+            { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Delete assessment', tone: 'critical', onClick: () => deleteAssessment(a) },
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: t.tag, tagBg: t.tagBg, tagColor: t.tagColor, meta: `${a.user_name} · ${a.user_role ?? 'Staff'} · expires ${fmtDate(a.expiry_date)}`, items });
+    };
+
+    // Right-click menu for an unassessed staff member — no assessment to view yet.
+    const openUnassessedCtx = (e: ReactMouseEvent, s: UnassessedStaff) => {
+        e.preventDefault();
+        const items: ShiftCtxItem[] = [
+            { icon: <Plus className="h-3.5 w-3.5" />, label: 'Start assessment', tone: 'primary', onClick: () => startAssessment(s.id) },
+            { sep: true },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View staff member', sub: s.role ?? undefined, onClick: () => viewStaff(s.id) },
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: 'Unassessed', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)', meta: `${s.name} · ${s.role ?? 'Staff'} · no current assessment`, items });
+    };
 
     const roleItems = useMemo(() => {
         const set = new Set<string>();
@@ -179,15 +217,15 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Competency views" />
 
                 {['all', 'in_date', 'expired'].includes(activeTab) && (
-                    <AssessmentTable rows={activeTab === 'in_date' ? inDate : activeTab === 'expired' ? expiredList : visible} onView={(a) => setModal({ type: 'view', assessment: a })} onRenew={(a) => setModal({ type: 'renew', assessment: a })} onEdit={(a) => setModal({ type: 'edit', assessment: a })} onDelete={(a) => { if (confirm(`Delete ${a.user_name}'s assessment? This cannot be undone.`)) router.delete(`/emar/competency/${a.id}`, { preserveScroll: true }); }} />
+                    <AssessmentTable rows={activeTab === 'in_date' ? inDate : activeTab === 'expired' ? expiredList : visible} onView={viewAssessment} onRenew={renewAssessment} onEdit={editAssessment} onDelete={deleteAssessment} onCtx={openAssessmentCtx} />
                 )}
 
                 {activeTab === 'expiring' && (
                     <ListCard empty={expiringList.length === 0 ? 'No assessments expiring in the next 30 days.' : null}>
                         {expiringList.map((a) => (
-                            <div key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0">
+                            <div key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0" onContextMenu={(e) => openAssessmentCtx(e, a)}>
                                 <StaffCell a={a} sub={`Expires ${fmtDate(a.expiry_date)} · ${daysTo(a.expiry_date)}d`} />
-                                <Button size="sm" onClick={() => setModal({ type: 'renew', assessment: a })}><RotateCcw className="h-3.5 w-3.5" />Schedule reassessment</Button>
+                                <Button size="sm" onClick={() => renewAssessment(a)}><RotateCcw className="h-3.5 w-3.5" />Schedule reassessment</Button>
                             </div>
                         ))}
                     </ListCard>
@@ -196,24 +234,26 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                 {activeTab === 'unassessed' && (
                     <ListCard empty={filteredUnassessed.length === 0 ? 'Every staff member has a current assessment.' : null}>
                         {filteredUnassessed.map((s) => (
-                            <div key={s.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0">
+                            <div key={s.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0" onContextMenu={(e) => openUnassessedCtx(e, s)}>
                                 <div className="flex items-center gap-3">
                                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-status-warning-bg text-xs font-bold text-status-warning">{initials(s.name)}</span>
                                     <div><div className="text-sm font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.role ?? 'Staff'} · no current assessment</div></div>
                                 </div>
-                                <Button size="sm" onClick={() => setModal({ type: 'new', userId: s.id })}><Plus className="h-3.5 w-3.5" />Start assessment</Button>
+                                <Button size="sm" onClick={() => startAssessment(s.id)}><Plus className="h-3.5 w-3.5" />Start assessment</Button>
                             </div>
                         ))}
                     </ListCard>
                 )}
 
-                {activeTab === 'coverage' && <CoverageMatrix rows={latestByUser} onView={(a) => setModal({ type: 'view', assessment: a })} />}
+                {activeTab === 'coverage' && <CoverageMatrix rows={latestByUser} onView={viewAssessment} onCtx={openAssessmentCtx} />}
             </div>
 
             {modal?.type === 'new' && <AssessmentWizardDialog staff={staff} mode="new" defaultUserId={modal.userId} onClose={() => setModal(null)} />}
             {modal?.type === 'edit' && <AssessmentWizardDialog staff={staff} mode="edit" assessment={modal.assessment} onClose={() => setModal(null)} />}
             {modal?.type === 'renew' && <AssessmentWizardDialog staff={staff} mode="renew" assessment={modal.assessment} onClose={() => setModal(null)} />}
-            {modal?.type === 'view' && <ViewAssessmentDialog assessment={modal.assessment} onClose={() => setModal(null)} />}
+            {modal?.type === 'view' && <ViewAssessmentDialog assessment={modal.assessment} onClose={() => setModal(null)} onRenew={() => renewAssessment(modal.assessment)} onEdit={() => editAssessment(modal.assessment)} onViewStaff={() => viewStaff(modal.assessment.user_id)} />}
+
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
@@ -237,6 +277,20 @@ function StaffCell({ a, sub }: { a: AssessmentRow; sub?: string }) {
     );
 }
 
+// Status tag for the right-click menu header — same labels as statusChip but
+// surfaced as token CSS vars (the menu paints tagBg/tagColor inline) and with an
+// explicit "Expiring" state for in-date assessments inside the 30-day window.
+function ctxStatusTag(a: AssessmentRow): { tag: string; tagBg: string; tagColor: string } {
+    if (a.is_expired) return { tag: 'Expired', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' };
+    if (a.is_passed) {
+        if (a.restricted) return { tag: 'Supervised', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' };
+        const d = daysTo(a.expiry_date);
+        if (d !== null && d >= 0 && d <= 30) return { tag: 'Expiring', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' };
+        return { tag: 'In date', tagBg: 'var(--status-success-bg)', tagColor: 'var(--status-success)' };
+    }
+    return { tag: 'Failed', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' };
+}
+
 function permissionChips(a: AssessmentRow): { label: string; cls: string }[] {
     const c: { label: string; cls: string }[] = [];
     if (a.can_administer_unsupervised) c.push({ label: 'Unsupervised', cls: 'bg-status-success-bg text-status-success' });
@@ -246,7 +300,7 @@ function permissionChips(a: AssessmentRow): { label: string; cls: string }[] {
     return c;
 }
 
-function AssessmentTable({ rows, onView, onRenew, onEdit, onDelete }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void; onRenew: (a: AssessmentRow) => void; onEdit: (a: AssessmentRow) => void; onDelete: (a: AssessmentRow) => void }) {
+function AssessmentTable({ rows, onView, onRenew, onEdit, onDelete, onCtx }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void; onRenew: (a: AssessmentRow) => void; onEdit: (a: AssessmentRow) => void; onDelete: (a: AssessmentRow) => void; onCtx: (e: ReactMouseEvent, a: AssessmentRow) => void }) {
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             {rows.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No assessments match the current filters.</div> : (
@@ -261,7 +315,7 @@ function AssessmentTable({ rows, onView, onRenew, onEdit, onDelete }: { rows: As
                             {rows.map((a) => {
                                 const sc = statusChip(a); const dte = daysTo(a.expiry_date);
                                 return (
-                                    <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)}>
+                                    <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)} onContextMenu={(e) => onCtx(e, a)}>
                                         <td className="px-4 py-3"><StaffCell a={a} /></td>
                                         <td className="px-4 py-3"><span className="rounded-full border px-2 py-0.5 text-xs capitalize text-muted-foreground">{a.assessment_type ?? '—'}</span></td>
                                         <td className="px-4 py-3">
@@ -293,7 +347,7 @@ function ListCard({ empty, children }: { empty: string | null; children?: React.
     return <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">{empty ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">{empty}</div> : <div className="flex flex-col">{children}</div>}</div>;
 }
 
-function CoverageMatrix({ rows, onView }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void }) {
+function CoverageMatrix({ rows, onView, onCtx }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void; onCtx: (e: ReactMouseEvent, a: AssessmentRow) => void }) {
     const cell = (a: AssessmentRow, key: string) => {
         if (a.not_seen_areas.includes(key)) return <span className="text-muted-foreground/50">–</span>;
         return (a as unknown as Record<string, boolean>)[key] ? <span className="text-status-success">✓</span> : <span className="text-status-critical">✕</span>;
@@ -317,7 +371,7 @@ function CoverageMatrix({ rows, onView }: { rows: AssessmentRow[]; onView: (a: A
                         </thead>
                         <tbody>
                             {rows.map((a) => (
-                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)}>
+                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)} onContextMenu={(e) => onCtx(e, a)}>
                                     <td className="sticky left-0 bg-card px-3 py-2 text-left font-medium">{a.user_name}</td>
                                     {COMPETENCY_AREAS.map((ar) => <td key={ar.key} className="px-2 py-2 font-semibold">{cell(a, ar.key)}</td>)}
                                     <td className="px-3 py-2 tabular-nums text-muted-foreground">{a.total_score ?? 0}/12</td>
