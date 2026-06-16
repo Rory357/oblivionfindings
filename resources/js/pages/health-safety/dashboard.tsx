@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 
-import { IncidentTrendCard, LaggingCharts, LeadingCharts, SiteLeagueCard } from './components/charts';
+import { IncidentTrendCard, LaggingCharts, LeadingCharts, type OpenHazardRow, SiteLeagueCard } from './components/charts';
 import {
     CommandCentreHero,
     type HeroFilters,
@@ -75,6 +75,8 @@ type Props = {
     hazard_burndown: Array<{ week: string; open: number }>;
     incidents_by_category: Array<{ label: string; count: number }>;
     site_league: Array<{ id: number; name: string; incidents: number; hazards: number }>;
+    open_hazards_list: OpenHazardRow[];
+    worker_participation: { pct: number | null; committees: number };
     worklists: WorklistsPayload;
 };
 
@@ -93,6 +95,8 @@ export default function HealthSafetyDashboard({
     hazard_burndown,
     incidents_by_category,
     site_league,
+    open_hazards_list = [],
+    worker_participation = { pct: null, committees: 0 },
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
@@ -148,13 +152,18 @@ export default function HealthSafetyDashboard({
 
                 {tab === 'leading' && (
                     <div className="flex flex-col gap-4">
-                        <LeadingPanel data={leading_lagging.leading} />
+                        <LeadingPanel
+                            data={leading_lagging.leading}
+                            workerParticipation={worker_participation}
+                            siteCount={sites.length}
+                        />
                         <LeadingCharts
                             ratio={leading_lagging.leading.near_miss_ratio}
                             operands={frequency_operands}
                             burndown={hazard_burndown}
                             drillPct={kpis.drill_compliance_pct ?? 0}
                             trainingPct={leading_lagging.leading.training_pct ?? 0}
+                            openHazards={open_hazards_list}
                         />
                     </div>
                 )}
@@ -178,6 +187,7 @@ export default function HealthSafetyDashboard({
                             expiring={worklists.expiring}
                             notifiableEvents={worklists.notifiable_events}
                         />
+                        <HsWorklists worklists={worklists} show={['expiring']} />
                         <GovernanceExports />
                     </div>
                 )}
