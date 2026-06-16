@@ -44,11 +44,22 @@ import {
     YAxis,
 } from 'recharts';
 
+import { useState } from 'react';
+
+import { TabStrip } from '@/components/rostering';
+
 import {
     CommandCentreHero,
     type HeroFilters,
     type HeroLeadingLagging,
 } from './components/command-centre-hero';
+import {
+    buildHsTabItems,
+    CompliancePanel,
+    LaggingPanel,
+    LeadingPanel,
+    RoleLensBanner,
+} from './components/dashboard-tabs';
 
 type Props = {
     kpis: Record<string, number>;
@@ -544,6 +555,12 @@ export default function HealthSafetyDashboard({
     leading_lagging,
     worklists,
 }: Props) {
+    const [tab, setTab] = useState<string>('overview');
+    const tabItems = buildHsTabItems(
+        worklists.open_investigations.length,
+        worklists.expiring.length,
+    );
+
     /* -------------------------------------------------------------- */
     /*  Derive chart data                                             */
     /* -------------------------------------------------------------- */
@@ -666,6 +683,31 @@ export default function HealthSafetyDashboard({
                     notifiableEvents={worklists.notifiable_events}
                     activeAlerts={kpis.active_alerts ?? 0}
                 />
+
+                {/* Tabs + role lens */}
+                <TabStrip
+                    value={tab}
+                    onChange={setTab}
+                    items={tabItems}
+                    ariaLabel="Health & Safety views"
+                />
+                <RoleLensBanner lens={filters.lens} />
+
+                {tab === 'leading' && (
+                    <LeadingPanel data={leading_lagging.leading} />
+                )}
+                {tab === 'lagging' && (
+                    <LaggingPanel data={leading_lagging.lagging} />
+                )}
+                {tab === 'compliance' && (
+                    <CompliancePanel
+                        expiring={worklists.expiring}
+                        notifiableEvents={worklists.notifiable_events}
+                    />
+                )}
+
+                {tab === 'overview' && (
+                    <div className="flex flex-col gap-6">
 
                 {/* ------------------------------------------------ */}
                 {/*  KPI Grid                                        */}
@@ -1654,6 +1696,8 @@ export default function HealthSafetyDashboard({
                         </div>
                     </CardContent>
                 </Card>
+                    </div>
+                )}
             </div>
         </AppLayout>
     );
