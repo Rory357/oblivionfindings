@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
@@ -223,6 +224,8 @@ class HealthSafetyDashboardController extends Controller
             ],
             'lens' => $lens,
             'sites' => Site::orderBy('name')->get(['id', 'name']),
+            'clients' => Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
             'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteId),
             'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteId),
             'worklists' => [

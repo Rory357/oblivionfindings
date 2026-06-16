@@ -19,6 +19,7 @@ import {
     Clock,
     Flame,
     HeartPulse,
+    Plus,
     ShieldCheck,
     TrendingDown,
     type LucideIcon,
@@ -156,6 +157,7 @@ export function CommandCentreHero({
     expiring,
     notifiableEvents,
     activeAlerts,
+    onReport,
 }: {
     leadingLagging: HeroLeadingLagging;
     filters: HeroFilters;
@@ -163,6 +165,7 @@ export function CommandCentreHero({
     expiring: Array<{ type: string }>;
     notifiableEvents: Array<{ status: string }>;
     activeAlerts: number;
+    onReport?: () => void;
 }) {
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
@@ -360,6 +363,17 @@ export function CommandCentreHero({
             title="Health & Safety command centre"
             description={description}
             badges={badges}
+            actions={
+                onReport ? (
+                    <Button
+                        onClick={onReport}
+                        className="bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90"
+                    >
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        Report
+                    </Button>
+                ) : undefined
+            }
             footer={footer}
         >
             <div className="space-y-4">

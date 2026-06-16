@@ -61,6 +61,8 @@ import {
     RoleLensBanner,
 } from './components/dashboard-tabs';
 import { LaggingCharts, LeadingCharts } from './components/charts';
+import { ReportIncidentDialog } from './components/report-incident-dialog';
+import { ReportLauncher } from './components/report-launcher';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
 type Props = {
@@ -134,6 +136,7 @@ type Props = {
     filters: HeroFilters;
     lens: string;
     sites: Array<{ id: number; name: string }>;
+    clients: Array<{ id: number; name: string }>;
     leading_lagging: HeroLeadingLagging;
     frequency_trends: Array<{
         month: string;
@@ -552,6 +555,7 @@ export default function HealthSafetyDashboard({
     backbone,
     filters,
     sites,
+    clients,
     leading_lagging,
     frequency_trends,
     frequency_operands,
@@ -560,6 +564,8 @@ export default function HealthSafetyDashboard({
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
+    const [launcherOpen, setLauncherOpen] = useState(false);
+    const [incidentOpen, setIncidentOpen] = useState(false);
     const tabItems = buildHsTabItems(
         worklists.open_investigations.length,
         worklists.expiring.length,
@@ -686,6 +692,7 @@ export default function HealthSafetyDashboard({
                     expiring={worklists.expiring}
                     notifiableEvents={worklists.notifiable_events}
                     activeAlerts={kpis.active_alerts ?? 0}
+                    onReport={() => setLauncherOpen(true)}
                 />
 
                 {/* Tabs + role lens */}
@@ -1724,6 +1731,20 @@ export default function HealthSafetyDashboard({
                 </Card>
                     </div>
                 )}
+                <ReportLauncher
+                    open={launcherOpen}
+                    onClose={() => setLauncherOpen(false)}
+                    onIncident={() => {
+                        setLauncherOpen(false);
+                        setIncidentOpen(true);
+                    }}
+                />
+                <ReportIncidentDialog
+                    open={incidentOpen}
+                    onClose={() => setIncidentOpen(false)}
+                    clients={clients}
+                    sites={sites}
+                />
             </div>
         </AppLayout>
     );
