@@ -33,7 +33,10 @@
 | 5 | **Charts — pixel-faithful** (7 of 8; site league → WS8) | **done** | _(this commit)_ | `charts-plan.md` |
 | 6 | **Report launcher + Report-incident wizard** (reference flow) | **done** | _(this commit)_ | `incident-wizard-plan.md` |
 | 7 | **The other 8 wizards** (config-driven engine + batches) | **done** (all 9 workflows in-place) | batch1 c8fc8b38 · batch2 00abf753 · batch3 _(this commit)_ | `wizards-plan.md` |
-| 8 | **Governance exports + site league + legacy cleanup** | **in-progress** (WS8a governance strip + site league done; legacy Overview-body removal left) | _(WS8a this commit)_ | `governance-plan.md` |
+| 8 | **Governance exports + site league + legacy cleanup** | **done** | WS8a 48ac35f8 · WS8b _(this commit)_ | `governance-plan.md` |
+
+## ✅ REDESIGN COMPLETE (all 8 workstreams) — 2026-06-17
+`/health-safety` rebuilt to the command-centre prototype. Local gate green: `npm run types` H&S-clean, `npx eslint` clean (incl. raw-colour guard), NZ-content grep zero hits. **Pending (cannot run in this vendorless worktree):** backend feature tests → post-merge in parent; browser pixel-parity + axe + drive-every-wizard → post-merge on the deployed site (Chrome MCP). WS8b also trimmed the controller's now-dead payload (severity_breakdown/hazard_summary/site_drill_compliance per-site loop/recent_*). Concurrent `/analytics` loop owns `analytics()` (untouched); LTIFR/TRIFR service duplication = post-merge consolidation.
 
 ## Key decisions / facts (from the audits)
 - **NZ-content is already clean** — zero CQC/RIDDOR/HSE/COSHH/OSHA/TRIR hits. Keep it that way; re-grep touched files each WS.

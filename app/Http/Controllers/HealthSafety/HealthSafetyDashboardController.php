@@ -138,82 +138,12 @@ class HealthSafetyDashboardController extends Controller
             })
             ->values();
 
-        // -- Severity Breakdown --
-        $severityBreakdown = ClientIncident::select('severity', DB::raw('COUNT(*) as count'))
-            ->whereIn('status', ['submitted', 'reviewed', 'draft'])
-            ->groupBy('severity')
-            ->pluck('count', 'severity');
-
-        // -- Hazard Summary --
-        $hazardSummary = SiteHazard::select('risk_rating', DB::raw('COUNT(*) as count'))
-            ->whereIn('status', ['open', 'in_progress'])
-            ->groupBy('risk_rating')
-            ->pluck('count', 'risk_rating');
-
-        // -- Site Drill Compliance --
-        $siteDrillCompliance = Site::select('id', 'name')
-            ->orderBy('name')
-            ->get()
-            ->map(function ($site) use ($sixMonthsAgo, $now) {
-                $lastDrillAt = EmergencyDrill::where('site_id', $site->id)
-                    ->whereNotNull('completed_at')
-                    ->max('completed_at');
-
-                $lastDrill = $lastDrillAt ? Carbon::parse($lastDrillAt) : null;
-                $daysSince = $lastDrill ? (int) $lastDrill->diffInDays($now) : null;
-
-                if ($lastDrill && $lastDrill->gte($sixMonthsAgo)) {
-                    $status = 'compliant';
-                } elseif ($lastDrill && $lastDrill->gte($sixMonthsAgo->copy()->subMonth())) {
-                    $status = 'due_soon';
-                } else {
-                    $status = 'overdue';
-                }
-
-                return [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'last_drill_date' => $lastDrillAt,
-                    'days_since' => $daysSince,
-                    'status' => $status,
-                ];
-            });
-
-        // -- Recent Activity --
-        $recentIncidents = ClientIncident::select('id', 'type', 'severity', 'status', 'occurred_at', 'title', 'description')
-            ->orderByDesc('occurred_at')
-            ->limit(10)
-            ->get();
-
-        $recentHazards = SiteHazard::with('site:id,name')
-            ->select('id', 'hazard_type', 'risk_rating', 'status', 'site_id', 'created_at')
-            ->orderByDesc('created_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($h) => [
-                'id' => $h->id,
-                'type' => $h->hazard_type,
-                'risk_rating' => $h->risk_rating,
-                'status' => $h->status,
-                'site_name' => $h->site?->name,
-            ]);
-
         // ── H&S Backbone summary (PR5 addition — additive) ──
         $backboneSummary = $this->dashboardService->getDashboardSummary($thirtyDaysAgo);
 
         return Inertia::render('health-safety/dashboard', [
             'kpis' => $kpis,
             'incident_trends' => $incidentTrends,
-            'severity_breakdown' => $severityBreakdown,
-            'hazard_summary' => $hazardSummary,
-            'site_drill_compliance' => $siteDrillCompliance,
-            'recent_incidents' => $recentIncidents,
-            'recent_hazards' => $recentHazards,
-            'recent_fleet_incidents' => FleetIncident::with('asset:id,name')
-                ->select('id', 'incident_type', 'severity', 'status', 'occurred_at', 'location')
-                ->orderByDesc('occurred_at')
-                ->limit(5)
-                ->get(),
             'backbone' => $backboneSummary,
 
             // ── Command-centre additions — period/site/lens-aware (G3/G4/G5/G6) ──
