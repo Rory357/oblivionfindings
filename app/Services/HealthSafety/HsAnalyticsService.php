@@ -795,6 +795,132 @@ class HsAnalyticsService
         };
     }
 
+    // ── CSV export (record-level, mirrors the drill-in lists) ───────────
+
+    /**
+     * Rows for a CSV export of the active view. Read-only register records,
+     * site- and range-scoped to match what the page shows.
+     *
+     * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
+     */
+    public function exportRows(string $view, ?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $from = $from->copy()->startOfDay();
+        $to = $to->copy()->endOfDay();
+        $siteNames = Site::query()->pluck('name', 'id');
+
+        return match ($view) {
+            'injuries' => $this->exportInjuries($siteId, $from, $to, $siteNames),
+            'hazards' => $this->exportHazards($siteId, $from, $to, $siteNames),
+            'sites' => $this->exportSites($from, $to),
+            'root_cause' => [
+                'name' => 'root_cause',
+                'headers' => ['Cause', 'Count', '% of total', 'Cumulative %'],
+                'rows' => array_map(
+                    fn ($r) => [$r['cause'], $r['count'], $r['pct'], $r['cumulative_pct']],
+                    $this->rootCausePareto($siteId, $from, $to)
+                ),
+            ],
+            default => $this->exportIncidents($siteId, $from, $to, $siteNames),
+        };
+    }
+
+    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
+    private function exportIncidents(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    {
+        $rows = ClientIncident::query()
+            ->with('client:id,first_name,last_name,site_id')
+            ->whereBetween('occurred_at', [$from, $to])
+            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->orderByDesc('occurred_at')
+            ->get();
+
+        return [
+            'name' => 'incidents',
+            'headers' => ['ID', 'Occurred', 'Type', 'Severity', 'Status', 'Site', 'Client', 'Root cause'],
+            'rows' => $rows->map(fn ($i) => [
+                $i->id,
+                optional($i->occurred_at)->toDateString(),
+                $i->type,
+                $i->severity,
+                $i->status,
+                $siteNames[$i->client?->site_id] ?? '—',
+                trim(($i->client?->first_name ?? '').' '.($i->client?->last_name ?? '')) ?: '—',
+                $i->root_cause_category ?? '—',
+            ])->all(),
+        ];
+    }
+
+    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
+    private function exportInjuries(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    {
+        $rows = WorkplaceInjury::query()
+            ->whereBetween('injury_date', [$from, $to])
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->orderByDesc('injury_date')
+            ->get();
+
+        return [
+            'name' => 'injuries',
+            'headers' => ['ID', 'Date', 'Type', 'Body part', 'Severity', 'Lost-time days', 'Site', 'WorkSafe notifiable', 'ACC claim'],
+            'rows' => $rows->map(fn ($i) => [
+                $i->id,
+                optional($i->injury_date)->toDateString(),
+                $i->injury_type,
+                $i->body_part_affected ?? '—',
+                $i->severity,
+                (int) $i->lost_time_days,
+                $siteNames[$i->site_id] ?? '—',
+                $i->worksafe_notifiable ? 'Yes' : 'No',
+                $i->acc_claim_lodged ? 'Yes' : 'No',
+            ])->all(),
+        ];
+    }
+
+    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
+    private function exportHazards(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    {
+        $rows = SiteHazard::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->orderByDesc('created_at')
+            ->get();
+
+        return [
+            'name' => 'hazards',
+            'headers' => ['ID', 'Opened', 'Type', 'Risk rating', 'Status', 'Site', 'Due', 'Closed'],
+            'rows' => $rows->map(fn ($h) => [
+                $h->id,
+                optional($h->created_at)->toDateString(),
+                $h->hazard_type,
+                $h->risk_rating,
+                $h->status,
+                $siteNames[$h->site_id] ?? '—',
+                optional($h->due_date)->toDateString() ?? '—',
+                optional($h->closed_at)->toDateString() ?? '—',
+            ])->all(),
+        ];
+    }
+
+    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
+    private function exportSites(CarbonInterface $from, CarbonInterface $to): array
+    {
+        return [
+            'name' => 'site_league',
+            'headers' => ['Site', 'Incidents', 'Open hazards', 'Lost-time days', 'LTIFR', 'TRIFR', 'Compliance %', 'Drill status'],
+            'rows' => array_map(fn ($s) => [
+                $s['name'],
+                $s['total_incidents'],
+                $s['open_hazards'],
+                $s['lost_time_days'],
+                $s['ltifr'] ?? '—',
+                $s['trifr'] ?? '—',
+                $s['compliance_score'],
+                $s['drill_status'],
+            ], $this->siteComparison($from, $to)),
+        ];
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
 
     /** @return array<int,string> e.g. ['2025-07', …, '2026-06'] */

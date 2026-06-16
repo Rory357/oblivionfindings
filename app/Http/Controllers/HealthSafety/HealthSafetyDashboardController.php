@@ -239,6 +239,32 @@ class HealthSafetyDashboardController extends Controller
     }
 
     /**
+     * CSV export of the active analytics view (read-only register records).
+     * Honours the same period / site_id filters as the page.
+     */
+    public function analyticsExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $period = (string) $request->input('period', 'ytd');
+        [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));
+        $siteId = $request->input('site_id') ? (int) $request->input('site_id') : null;
+        $view = (string) $request->input('view', 'incidents');
+
+        $data = $this->analyticsService->exportRows($view, $siteId, $from, $to);
+        $filename = "hs_analytics_{$data['name']}_".now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($data) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $data['headers']);
+            foreach ($data['rows'] as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
      * Map a range preset (or custom from/to) to a [from, to] window.
      *
      * @return array{0: Carbon, 1: Carbon}

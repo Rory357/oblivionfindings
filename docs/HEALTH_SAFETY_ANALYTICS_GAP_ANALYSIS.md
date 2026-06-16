@@ -72,7 +72,7 @@ It **does not use `recharts`**, has **no leading-vs-lagging framing**, **no tren
 - [x] **BE4** 🐞 **Site-scoping bug fixed** — `siteComparison()` joins `clients` and groups by `clients.site_id` (one query, not N); per-site `ltifr`/`trifr` added.
 - [x] **BE5** **Site- & role-scoped payloads** — `build(?siteId, from, to, lens)`; every query site-scoped; `role_note` + scorecard for the lens.
 - [x] **BE6** **Worker-participation / training series** — `engagementByMonth` / `consultationByMonth` / `complianceByMonth`.
-- [ ] **BE7** **CSV export endpoint** + wire governance pack cards to `/health-safety/reports/*`.
+- [x] **BE7** **CSV export endpoint** — `analyticsExport()` streams record-level CSV (incidents/injuries/hazards/sites/root_cause) via `HsAnalyticsService::exportRows`, route `health-safety.analytics.export`. Governance pack JSON endpoints already exist under `/health-safety/reports/*` (front-end wiring = E2).
 
 ---
 
