@@ -1,4 +1,3 @@
-import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +43,12 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+
+import {
+    CommandCentreHero,
+    type HeroFilters,
+    type HeroLeadingLagging,
+} from './components/command-centre-hero';
 
 type Props = {
     kpis: Record<string, number>;
@@ -112,6 +117,21 @@ type Props = {
             blocking_requirements: number;
             staff_non_compliant: number;
         };
+    };
+    filters: HeroFilters;
+    lens: string;
+    sites: Array<{ id: number; name: string }>;
+    leading_lagging: HeroLeadingLagging;
+    frequency_trends: Array<{
+        month: string;
+        ltifr: number | null;
+        trifr: number | null;
+    }>;
+    worklists: {
+        overdue_corrective_actions: Array<Record<string, unknown>>;
+        open_investigations: Array<Record<string, unknown>>;
+        notifiable_events: Array<{ status: string }>;
+        expiring: Array<{ type: string }>;
     };
 };
 
@@ -519,6 +539,10 @@ export default function HealthSafetyDashboard({
     recent_hazards,
     recent_fleet_incidents = [],
     backbone,
+    filters,
+    sites,
+    leading_lagging,
+    worklists,
 }: Props) {
     /* -------------------------------------------------------------- */
     /*  Derive chart data                                             */
@@ -634,52 +658,13 @@ export default function HealthSafetyDashboard({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
-                <PageHero
-                    title="Health & Safety Dashboard"
-                    description="Real-time overview of workplace safety performance"
-                    icon={<Shield className="h-7 w-7 text-white" />}
-                    stats={[
-                        {
-                            label: 'Incidents (30d)',
-                            value: kpis.incidents_30d ?? 0,
-                        },
-                        {
-                            label: 'Open Hazards',
-                            value: kpis.open_hazards ?? 0,
-                        },
-                        {
-                            label: 'Overdue Actions',
-                            value: kpis.overdue_actions ?? 0,
-                        },
-                        {
-                            label: 'Drill Compliance',
-                            value: `${kpis.drill_compliance_pct ?? 0}%`,
-                        },
-                    ]}
-                    actions={
-                        <div className="flex flex-wrap gap-2">
-                            <Link href="/incidents/create">
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className="gap-1.5"
-                                >
-                                    <AlertTriangle className="h-4 w-4" />
-                                    Report Incident
-                                </Button>
-                            </Link>
-                            <Link href="/compliance/hazards">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="gap-1.5"
-                                >
-                                    <Flame className="h-4 w-4" />
-                                    Report Hazard
-                                </Button>
-                            </Link>
-                        </div>
-                    }
+                <CommandCentreHero
+                    leadingLagging={leading_lagging}
+                    filters={filters}
+                    sites={sites}
+                    expiring={worklists.expiring}
+                    notifiableEvents={worklists.notifiable_events}
+                    activeAlerts={kpis.active_alerts ?? 0}
                 />
 
                 {/* ------------------------------------------------ */}

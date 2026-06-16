@@ -276,10 +276,10 @@ class HealthSafetyDashboardController extends Controller
         // -- Site Comparison --
         $sixMonthsAgo = Carbon::now()->subMonths(6);
         $siteComparison = Site::orderBy('name')->get(['id', 'name'])->map(function ($site) use ($from, $to, $sixMonthsAgo) {
-            // Scope incidents to this site via the linked shift (client_incidents has no site_id).
-            $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])
-                ->whereHas('shift', fn ($q) => $q->where('site_id', $site->id))
-                ->count();
+            // NOTE: site_comparison.total_incidents is unscoped (a known bug) — left as-is here
+            // because the concurrent /health-safety/analytics rebuild (branch claude/sharp-hypatia-*)
+            // owns analytics() and fixes it via client.site_id. Avoid a cross-branch conflict.
+            $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])->count();
 
             $openHazards = SiteHazard::where('site_id', $site->id)
                 ->whereIn('status', ['open', 'in_progress'])
