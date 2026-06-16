@@ -216,7 +216,7 @@ function DoseRow({
                     />
                     <div className="min-w-0">
                         <Link
-                            href={`/operations/clients/${row.client_id}/care`}
+                            href={`/operations/clients/${row.client_id}?tab=mar`}
                             className="block truncate text-sm font-semibold hover:underline"
                         >
                             {row.client_name}
@@ -1280,7 +1280,7 @@ export default function MedsToday(props: MedsTodayProps) {
                 icon: <User className="h-3.5 w-3.5" />,
                 label: `View ${preferred}'s profile`,
                 onClick: () =>
-                    router.visit(`/operations/clients/${row.client_id}/care`),
+                    router.visit(`/operations/clients/${row.client_id}?tab=mar`),
             },
             ...(client?.nhi
                 ? [

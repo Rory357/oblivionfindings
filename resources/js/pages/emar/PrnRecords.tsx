@@ -199,7 +199,7 @@ export default function PrnRecords(props: Props) {
             ...(reviewDue ? [{ icon: <Stethoscope className="h-3.5 w-3.5" />, label: 'Record effectiveness', sub: 'Did it help?', onClick: () => setModal({ type: 'effect', followUp: adminToFollowUp(a) }) } satisfies ShiftCtxItem] : []),
             { icon: <RotateCcw className="h-3.5 w-3.5" />, label: 'Re-record / correct dose', onClick: () => setModal({ type: 'record', initialMedId: a.client_medication_id }) },
             { sep: true },
-            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${a.client_id}/care`) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${a.client_id}?tab=mar`) },
             ...(a.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(a.mar_url!) } satisfies ShiftCtxItem] : []),
             { icon: <Printer className="h-3.5 w-3.5" />, label: 'Print PRN slip', onClick: () => window.print() },
             { sep: true },

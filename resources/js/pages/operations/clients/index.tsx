@@ -1102,9 +1102,6 @@ export default function ClientsIndex() {
     const canAddNote = !!(
         auth?.can?.progress_notes?.create || auth?.can?.timeline?.create
     );
-    // Support workers land on the frontline care view; everyone else opens the
-    // full client profile by default (the care view stays one click away in the menu).
-    const isSupportWorker = auth?.user?.role === 'support_worker';
 
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
@@ -1276,11 +1273,7 @@ export default function ClientsIndex() {
         setSelected(new Set(filtered.map((c) => c.id)));
 
     const openClient = (c: Client) =>
-        router.visit(
-            isSupportWorker
-                ? `/operations/clients/${c.id}/care`
-                : `/operations/clients/${c.id}`,
-        );
+        router.visit(`/operations/clients/${c.id}`);
     const openCtx = (e: React.MouseEvent, c: Client) => {
         e.preventDefault();
         setCtx({ x: e.clientX, y: e.clientY, client: c });
@@ -1315,11 +1308,6 @@ export default function ClientsIndex() {
             ]);
         }
         return compactMenu([
-            {
-                label: 'Open care view',
-                icon: HeartHandshake,
-                onClick: () => router.visit(`/operations/clients/${c.id}/care`),
-            },
             {
                 label: 'View full profile',
                 icon: Eye,

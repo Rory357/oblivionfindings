@@ -144,6 +144,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::get('/handovers', [EmarController::class, 'handovers'])
         ->middleware('permission:medications.view')
         ->name('emar.handovers');
+    // Live "Medications this shift" snapshot for the handover wizard/detail lens.
+    Route::get('/handovers/shift-medications', [EmarController::class, 'shiftMedicationSnapshot'])
+        ->middleware('permission:medications.view')
+        ->name('emar.handovers.shift_medications');
 
     // ─── CRUD Routes (permission-gated) ─────────────────────
 

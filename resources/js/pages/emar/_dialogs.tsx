@@ -428,7 +428,7 @@ export function MedicationDetailDialog({
                                 <Ban className="h-4 w-4 text-status-critical" /> Discontinue
                             </Button>
                         )}
-                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${medication.client_id}/care`)}>
+                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${medication.client_id}?tab=mar`)}>
                             <User className="h-4 w-4" /> Client
                         </Button>
                         <Button variant="ghost" onClick={() => router.visit(`/emar/mar?client_id=${medication.client_id}`)}>

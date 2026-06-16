@@ -74,10 +74,10 @@ describe('StockDetailDialog', () => {
         expect(onOrder).toHaveBeenCalledTimes(1);
     });
 
-    it('jumps to the client care page from the footer', () => {
+    it('jumps to the client profile MAR tab from the footer', () => {
         render(<StockDetailDialog item={baseItem} onClose={() => {}} onAdjust={() => {}} onCount={() => {}} onOrder={() => {}} />);
         fireEvent.click(screen.getByRole('button', { name: /^Client$/i }));
-        expect(visit).toHaveBeenCalledWith('/operations/clients/7/care');
+        expect(visit).toHaveBeenCalledWith('/operations/clients/7?tab=mar');
     });
 
     it('shows the movement history on the activity tab', () => {

@@ -30,7 +30,6 @@ use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
 use App\Http\Controllers\Operations\ClientActionsController;
-use App\Http\Controllers\Operations\ClientCareController;
 use App\Http\Controllers\Operations\ClientConsentController;
 use App\Http\Controllers\Operations\ClientDailyNoteController;
 use App\Http\Controllers\Operations\ClientFundController;
@@ -173,16 +172,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->whereNumber('client')
             ->name('operations.clients.family-chat.store');
 
-        // PR 14 — Consolidated frontline client care page
-        // Worker-facing landing for a single client. Uses StaffPageShell,
-        // ClientSafetyRibbon and the shared PRN sheet; admin show/medical/
-        // risks remain at their existing routes for manager flows.
-        Route::get('/clients/{client}/care', [ClientCareController::class, 'show'])
+        // The former mobile "care" page is retired (this is a web-only app).
+        // Redirect the old URL to the full client profile so stale bookmarks or
+        // any missed link still land somewhere useful. The route name is kept so
+        // remaining route('operations.clients.care', ...) callers keep resolving.
+        Route::redirect('/clients/{client}/care', '/operations/clients/{client}', 302)
             ->whereNumber('client')
             ->name('operations.clients.care');
-        Route::post('/clients/{client}/care/prn', [ClientCareController::class, 'recordPrn'])
-            ->whereNumber('client')
-            ->name('operations.clients.care.prn');
     });
 
     // Client creation

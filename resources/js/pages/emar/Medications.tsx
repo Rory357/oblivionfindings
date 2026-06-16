@@ -194,7 +194,7 @@ export default function Medications(props: Props) {
                 : []),
             { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/emar/mar?client_id=${m.client_id}`) },
             { sep: true },
-            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${m.client_id}/care`) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${m.client_id}?tab=mar`) },
             { icon: <Package className="h-3.5 w-3.5" />, label: 'View stock', onClick: () => router.visit('/emar/stock') },
             ...(m.state === 'active'
                 ? [

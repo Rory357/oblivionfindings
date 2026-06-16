@@ -108,7 +108,7 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
 
     // ── Row interactions (parity with PRN/Controlled) — shared across every list. ──
     const openView = (a: SelfAdminRow) => setModal({ type: 'view', assessment: a });
-    const viewClient = (id: number) => router.visit(`/operations/clients/${id}/care`);
+    const viewClient = (id: number) => router.visit(`/operations/clients/${id}?tab=mar`);
     const openMar = (id: number) => router.visit(`/emar/mar?client_id=${id}`);
 
     const openRowCtx = (e: ReactMouseEvent, a: SelfAdminRow) => {

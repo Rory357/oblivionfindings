@@ -206,7 +206,7 @@ export default function Prescriptions(props: Props) {
             ...(o.status === 'confirmed' ? [{ icon: <Package className="h-3.5 w-3.5" />, label: 'Record dispensing', onClick: () => setModal({ type: 'dispense', order: o }) } satisfies ShiftCtxItem] : []),
             ...(['pending', 'confirmed'].includes(o.status) ? [{ icon: <Link2 className="h-3.5 w-3.5" />, label: 'Link to MAR', onClick: () => setModal({ type: 'link', order: o }) } satisfies ShiftCtxItem] : []),
             { sep: true },
-            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${o.client_id}/care`) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${o.client_id}?tab=mar`) },
             { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/clients/${o.client_id}/mar`) },
             ...(['pending', 'confirmed'].includes(o.status)
                 ? [{ sep: true } satisfies ShiftCtxItem, { icon: <Ban className="h-3.5 w-3.5" />, label: 'Cancel order', tone: 'critical', onClick: () => cancel(o) } satisfies ShiftCtxItem]
@@ -219,7 +219,7 @@ export default function Prescriptions(props: Props) {
     const openCovertCtx = (e: ReactMouseEvent, c: CovertAuth) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [
-            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${c.client_id}/care`) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${c.client_id}?tab=mar`) },
             { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/clients/${c.client_id}/mar`) },
             { sep: true },
             { icon: <Ban className="h-3.5 w-3.5" />, label: 'Revoke authorisation', tone: 'critical', onClick: () => revoke(c) },

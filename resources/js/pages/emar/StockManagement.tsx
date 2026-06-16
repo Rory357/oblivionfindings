@@ -130,7 +130,7 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
             { icon: <ShoppingCart className="h-3.5 w-3.5" />, label: 'Order more', onClick: () => setModal({ type: 'order', clientId: s.client_id ?? undefined, medId: s.medication_id }) },
             ...(order ? [{ icon: <Truck className="h-3.5 w-3.5" />, label: 'Receive against order', onClick: () => setModal({ type: 'receive', medId: s.medication_id }) } satisfies ShiftCtxItem] : []),
             { sep: true },
-            ...(s.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${s.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            ...(s.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${s.client_id}?tab=mar`) } satisfies ShiftCtxItem] : []),
             ...(s.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR', onClick: () => router.visit(s.mar_url!) } satisfies ShiftCtxItem] : []),
             ...(s.is_expired ? [{ sep: true } satisfies ShiftCtxItem, { icon: <AlertOctagon className="h-3.5 w-3.5" />, label: 'Mark expired / quarantine', sub: 'Adjust out & record reason', tone: 'critical', onClick: () => setModal({ type: 'adjust', item: s }) } satisfies ShiftCtxItem] : []),
         ];
@@ -148,7 +148,7 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
             ...(s ? [{ icon: <Pencil className="h-3.5 w-3.5" />, label: 'Adjust stock', onClick: () => setModal({ type: 'adjust', item: s }) } satisfies ShiftCtxItem] : []),
             ...(s ? [{ icon: <ShoppingCart className="h-3.5 w-3.5" />, label: 'Order more', onClick: () => setModal({ type: 'order', clientId: r.client_id ?? undefined, medId: r.medication_id }) } satisfies ShiftCtxItem] : []),
             { sep: true },
-            ...(r.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            ...(r.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}?tab=mar`) } satisfies ShiftCtxItem] : []),
             { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open CD register', onClick: () => router.visit('/emar/controlled') },
             ...(!reconciled ? [{ sep: true } satisfies ShiftCtxItem, { icon: <AlertOctagon className="h-3.5 w-3.5" />, label: 'Investigate discrepancy', tone: 'critical', onClick: () => router.visit('/emar/controlled') } satisfies ShiftCtxItem] : []),
         ];
@@ -333,7 +333,7 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                         {g.client_id ? (
                                             <button
                                                 type="button"
-                                                onClick={() => router.visit(`/operations/clients/${g.client_id}/care`)}
+                                                onClick={() => router.visit(`/operations/clients/${g.client_id}?tab=mar`)}
                                                 className="group flex items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                                                 title={`Open ${g.client_name}'s care profile`}
                                             >

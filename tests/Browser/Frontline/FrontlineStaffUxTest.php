@@ -7,7 +7,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Laravel\Dusk\Browser;
 
-test('frontline my day uses the worker date and avoids admin client links', function () {
+test('frontline my day uses the worker date and links clients to the full profile', function () {
     $user = User::where('email', 'sw2@demo.test')->firstOrFail();
     $todayNz = Carbon::now('Pacific/Auckland')->format('l, j F Y');
 
@@ -18,15 +18,13 @@ test('frontline my day uses the worker date and avoids admin client links', func
             ->waitForText('Open items', 10)
             ->assertSee($todayNz);
 
-        $adminClientLinks = (int) ($browser->script(
-            'return document.querySelectorAll(\'a[href^="/clients/"]\').length;',
-        )[0] ?? 0);
+        // The mobile "care" page has been retired (web-only app); frontline links
+        // now point at the full client profile, so no legacy /care links remain.
         $careLinks = (int) ($browser->script(
-            'return document.querySelectorAll(\'a[href^="/operations/clients/"][href$="/care"]\').length;',
+            'return document.querySelectorAll(\'a[href$="/care"]\').length;',
         )[0] ?? 0);
 
-        expect($adminClientLinks)->toBe(0);
-        expect($careLinks)->toBeGreaterThan(0);
+        expect($careLinks)->toBe(0);
     });
 });
 

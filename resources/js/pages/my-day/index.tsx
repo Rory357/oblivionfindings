@@ -655,7 +655,7 @@ export default function MyDay() {
                 item.kind === 'task' &&
                 item.clientId
             ) {
-                router.visit(`/clients/${item.clientId}/care`);
+                router.visit(`/clients/${item.clientId}?tab=care_plans`);
             }
             if (action === 'add-note') {
                 handleAddNote(item.clientId ?? null);

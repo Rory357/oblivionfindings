@@ -398,7 +398,7 @@ export function MedicationEventDrawer({ event, onClose, initialSection }: { even
                             <Button variant="outline" onClick={onClose}>Close</Button>
                             <div className="flex flex-wrap items-center justify-end gap-1.5">
                                 {event.client_id ? (
-                                    <Button variant="ghost" size="sm" onClick={() => router.visit(`/operations/clients/${event.client_id}/care`)}>
+                                    <Button variant="ghost" size="sm" onClick={() => router.visit(`/operations/clients/${event.client_id}?tab=mar`)}>
                                         <User className="h-4 w-4" />View client
                                     </Button>
                                 ) : null}

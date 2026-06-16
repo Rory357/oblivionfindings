@@ -92,7 +92,7 @@ export function PrnNearLimitDialog({
                     >
                         <Stethoscope className="h-4 w-4" /> Effectiveness
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${med.client_id}/care`)}>
+                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${med.client_id}?tab=mar`)}>
                         <User className="h-4 w-4" /> Client
                     </Button>
                     <Button type="button" variant="ghost" onClick={() => router.visit(`/emar/mar?client_id=${med.client_id}`)}>
