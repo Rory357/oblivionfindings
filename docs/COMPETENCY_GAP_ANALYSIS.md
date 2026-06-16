@@ -60,4 +60,6 @@ Do NOT regress: the 5-step `AssessmentWizardDialog` or the `CoverageMatrix`.
 **LOOP COMPLETE 2026-06-16.** Only `TODO(G1)` remains (declarations not persisted — needs a backend column; out of scope for this front-end loop). Browser pixel-parity vs the `.dc.html` prototype on a live env is a user/browser step.
 
 ## TODO(Gx) carried forward
-- `TODO(G1)` — Sign-off declarations (assessor + staff acknowledgement) are captured in the wizard but not persisted, so the detail modal cannot show a real declaration audit line. Needs a backend column/relation; out of scope for this front-end loop.
+- ~~`TODO(G1)`~~ ✅ **RESOLVED 2026-06-16** — Sign-off declarations are now persisted. Migration `2026_06_16_010000_add_signoff_declarations_to_competency.php` adds nullable `assessor_declared_at` / `staff_acknowledged_at`; `storeCompetency`/`updateCompetency` stamp them from the wizard's `assessor_declared` / `staff_acknowledged` flags (re-attestation re-stamps on edit/renew); `serializeCompetency` exposes them; the detail modal shows a "Sign-off declarations" block (assessor confirmed · staff acknowledged, with dates). Test `test_store_persists_signoff_declarations`. The deploy runs `php artisan migrate --force` (scripts/deploy-server.sh) so the column ships safely.
+
+_No open TODOs remain._
