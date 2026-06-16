@@ -50,6 +50,8 @@ export type AssessmentRow = {
     areas_for_improvement: string | null;
     action_plan: string | null;
     assessor_comments: string | null;
+    assessor_declared_at: string | null;
+    staff_acknowledged_at: string | null;
     can_administer_unsupervised: boolean;
     can_witness_controlled: boolean;
     is_expired: boolean;
@@ -122,6 +124,8 @@ export function AssessmentWizardDialog({ staff, assessment, mode, defaultUserId,
             assessor_comments: incident ? `Triggering incident: ${incident}` : (mode === 'edit' ? assessment?.assessor_comments : null),
             can_administer_unsupervised: eligible && canUnsup,
             can_witness_controlled: canWitness,
+            assessor_declared: assessorDeclared,
+            staff_acknowledged: staffDeclared,
         };
         COMPETENCY_AREAS.forEach((a) => { payload[a.key] = areas[a.key] === 'yes'; });
         const opts = { preserveScroll: true, onSuccess: () => { toast.success(mode === 'edit' ? 'Assessment updated' : 'Assessment recorded'); onClose(); }, onError: () => toast.error('Please check the assessment details'), onFinish: () => setBusy(false) };
@@ -303,8 +307,21 @@ export function ViewAssessmentDialog({ assessment, onClose, onRenew, onEdit, onV
             {assessment.areas_for_improvement && <Note label="Areas for improvement" value={assessment.areas_for_improvement} />}
             {assessment.action_plan && <Note label="Action plan" value={assessment.action_plan} />}
             {assessment.assessor_comments && <Note label="Assessor comments" value={assessment.assessor_comments} />}
-            {/* TODO(G1): sign-off declarations (assessor + staff acknowledgement) are captured in the
-                wizard but not persisted, so we surface the assessor/date audit line only — see docs/COMPETENCY_GAP_ANALYSIS.md. */}
+            {(assessment.assessor_declared_at || assessment.staff_acknowledged_at) && (
+                <div className="mt-4">
+                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sign-off declarations</div>
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm">
+                            <span className="flex items-center gap-2"><CheckCircle2 className={`h-3.5 w-3.5 ${assessment.assessor_declared_at ? 'text-status-success' : 'text-muted-foreground'}`} />Assessor confirmed accuracy</span>
+                            <span className="text-xs text-muted-foreground">{assessment.assessor_declared_at ?? 'Not recorded'}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm">
+                            <span className="flex items-center gap-2"><CheckCircle2 className={`h-3.5 w-3.5 ${assessment.staff_acknowledged_at ? 'text-status-success' : 'text-muted-foreground'}`} />Staff member acknowledged outcome</span>
+                            <span className="text-xs text-muted-foreground">{assessment.staff_acknowledged_at ?? 'Not recorded'}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="mt-4 text-xs text-muted-foreground">Assessed {assessment.assessment_date ?? '—'}{assessment.assessor_name ? ` by ${assessment.assessor_name}` : ''}.</div>
         </MedsWizardDialog>
     );
