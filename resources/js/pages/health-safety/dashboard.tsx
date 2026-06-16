@@ -60,6 +60,7 @@ import {
     LeadingPanel,
     RoleLensBanner,
 } from './components/dashboard-tabs';
+import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
 type Props = {
     kpis: Record<string, number>;
@@ -138,12 +139,7 @@ type Props = {
         ltifr: number | null;
         trifr: number | null;
     }>;
-    worklists: {
-        overdue_corrective_actions: Array<Record<string, unknown>>;
-        open_investigations: Array<Record<string, unknown>>;
-        notifiable_events: Array<{ status: string }>;
-        expiring: Array<{ type: string }>;
-    };
+    worklists: WorklistsPayload;
 };
 
 /* ------------------------------------------------------------------ */
@@ -697,7 +693,10 @@ export default function HealthSafetyDashboard({
                     <LeadingPanel data={leading_lagging.leading} />
                 )}
                 {tab === 'lagging' && (
-                    <LaggingPanel data={leading_lagging.lagging} />
+                    <div className="flex flex-col gap-4">
+                        <LaggingPanel data={leading_lagging.lagging} />
+                        <HsWorklists worklists={worklists} show={['investigations']} />
+                    </div>
                 )}
                 {tab === 'compliance' && (
                     <CompliancePanel
@@ -708,6 +707,10 @@ export default function HealthSafetyDashboard({
 
                 {tab === 'overview' && (
                     <div className="flex flex-col gap-6">
+                        <HsWorklists
+                            worklists={worklists}
+                            show={['corrective_actions', 'notifiable', 'expiring']}
+                        />
 
                 {/* ------------------------------------------------ */}
                 {/*  KPI Grid                                        */}

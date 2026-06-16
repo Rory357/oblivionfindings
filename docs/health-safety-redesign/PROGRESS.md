@@ -29,7 +29,7 @@
 | 4. Controller `index()` rewire (G3/G4 params + payload + site_comparison fix) | **done (php -l clean)** | _this commit_ |
 | 2 | **Hero command centre + footer band** | **done** | _(this commit)_ | `hero-plan.md` |
 | 3 | **TabStrip + role lens** (Overview/Leading/Lagging/Compliance) | **done** | _(this commit)_ | `tabs-plan.md` |
-| 4 | **Worklists + detail modal + context menu** | todo | — | `worklists-plan.md` |
+| 4 | **Worklists + detail modal + context menu** | **done** | _(this commit)_ | `worklists-plan.md` |
 | 5 | **Charts — pixel-faithful** (8 charts) | todo | — | `charts-plan.md` |
 | 6 | **Report launcher + Report-incident wizard** (reference flow) | todo | — | `incident-wizard-plan.md` |
 | 7 | **The other 8 wizards** | todo | — | `wizards-plan.md` |
