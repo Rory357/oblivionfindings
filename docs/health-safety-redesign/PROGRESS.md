@@ -25,7 +25,7 @@
 |---|---|---|
 | 1. `HsKpiService` (G1) + `HsKpiServiceTest` | **done (php -l clean; tests run post-merge)** | _this commit_ |
 | 2. `NotifiableEventClassifier` (G2) + test | **done (php -l clean)** | _this commit_ |
-| 3. `HsDashboardService` row builders G5/G6 + test | todo | — |
+| 3. `HsDashboardService` row builders G5/G6 + test | **done (php -l clean)** | _this commit_ |
 | 4. Controller `index()` rewire (G3/G4 params + payload + site_comparison fix) | todo | — |
 | 2 | **Hero command centre + footer band** | todo | — | `hero-plan.md` |
 | 3 | **TabStrip + role lens** (Overview/Leading/Lagging/Compliance) | todo | — | `tabs-plan.md` |
