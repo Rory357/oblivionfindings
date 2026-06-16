@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-syntax -- register tables, reassess/agreement/per-med cards, the
-   activity feed and hero search are custom-layout bordered surfaces / chip buttons (not Card/Button);
-   all colours are semantic tokens. */
+   activity feed, hero search and the dismissible alert strip are custom-layout bordered surfaces /
+   chip buttons (not Card/Button); all colours are semantic tokens. */
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -16,8 +16,8 @@ import {
     type SelfAdminRow,
 } from '@/pages/emar/_self-admin-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { AlarmClock, ClipboardCheck, Eye, FileSignature, FileText, History, ListChecks, Pill, Plus, RotateCcw, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlarmClock, ClipboardCheck, Eye, FileSignature, FileText, History, ListChecks, Pill, Plus, Printer, RotateCcw, Search, User, X } from 'lucide-react';
+import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
 type ActivityItem = { actor: string; text: string; subject: string; at: string | null; icon: string };
 type Kpis = { self_managing: number; supervised: number; administered: number; due_now: number; independent: number; independent_pct: number; unsigned: number; total: number };
@@ -41,6 +41,43 @@ type Modal =
     | { type: 'scope'; assessment: SelfAdminRow }
     | null;
 
+// ── Stacked, dismissible alert strip (mirror /emar/controlled) ────────────────
+type SaAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof AlarmClock; message: string; tab: string };
+const DISMISSED_ALERTS_KEY = 'self-admin-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
+}
+
+/** Outcome → context-menu header tag colour (semantic token CSS vars). */
+function catCtxTag(outcome: string): { tag: string; tagBg: string; tagColor: string } {
+    const map: Record<string, { tag: string; tagBg: string; tagColor: string }> = {
+        independent: { tag: 'Independent', tagBg: 'var(--status-success-bg)', tagColor: 'var(--status-success)' },
+        prompted: { tag: 'Prompted', tagBg: 'var(--status-info-bg)', tagColor: 'var(--status-info)' },
+        supervised: { tag: 'Supervised', tagBg: 'var(--status-warning-bg)', tagColor: 'var(--status-warning)' },
+        administered: { tag: 'Staff-admin', tagBg: 'var(--status-critical-bg)', tagColor: 'var(--status-critical)' },
+    };
+    return map[outcome] ?? { tag: 'Not assessed', tagBg: 'var(--muted)', tagColor: 'var(--muted-foreground)' };
+}
+
 const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const relative = (iso: string | null) => { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`; };
@@ -49,18 +86,60 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
     const [activeTab, setActiveTab] = useState('assessments');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return assessments.filter((a) => !q || `${a.client_name} ${a.nhi ?? ''} ${a.assessor_name ?? ''}`.toLowerCase().includes(q));
-    }, [assessments, search]);
+        return assessments.filter((a) =>
+            (!q || `${a.client_name} ${a.nhi ?? ''} ${a.assessor_name ?? ''}`.toLowerCase().includes(q)) &&
+            (!clientFilter || a.client_id === clientFilter),
+        );
+    }, [assessments, search, clientFilter]);
 
     const dueList = visible.filter((a) => a.reassessment_due);
     const agreements = visible.filter((a) => a.outcome === 'independent' || a.outcome === 'prompted');
     const selfManaging = visible.filter((a) => a.outcome !== 'administered' && a.client_medications.length > 0);
 
     const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/self-admin', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
+
+    // ── Row interactions (parity with PRN/Controlled) — shared across every list. ──
+    const openView = (a: SelfAdminRow) => setModal({ type: 'view', assessment: a });
+    const viewClient = (id: number) => router.visit(`/operations/clients/${id}/care`);
+    const openMar = (id: number) => router.visit(`/emar/mar?client_id=${id}`);
+
+    const openRowCtx = (e: ReactMouseEvent, a: SelfAdminRow) => {
+        e.preventDefault();
+        const t = catCtxTag(a.outcome);
+        const isSelfManaging = a.outcome === 'independent' || a.outcome === 'prompted';
+        const canScope = a.outcome !== 'administered' && a.client_medications.length > 0;
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View assessment', sub: categoryMeta(a.outcome).label, tone: 'primary', onClick: () => openView(a) },
+            { icon: <RotateCcw className="h-3.5 w-3.5" />, label: 'Reassess', onClick: () => setModal({ type: 'reassess', assessment: a }) },
+            ...(isSelfManaging && !a.agreement_signed_at ? [{ icon: <FileSignature className="h-3.5 w-3.5" />, label: 'Sign agreement', sub: 'Awaiting signature', onClick: () => setModal({ type: 'agreement', assessment: a }) } satisfies ShiftCtxItem] : []),
+            ...(canScope ? [{ icon: <Pill className="h-3.5 w-3.5" />, label: 'Set medication scope', onClick: () => setModal({ type: 'scope', assessment: a }) } satisfies ShiftCtxItem] : []),
+            { sep: true },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => viewClient(a.client_id) },
+            { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => openMar(a.client_id) },
+            { sep: true },
+            { icon: <Printer className="h-3.5 w-3.5" />, label: 'Print assessment', onClick: () => window.print() },
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: t.tag, tagBg: t.tagBg, tagColor: t.tagColor, meta: `${a.client_name}${a.nhi ? ` · NHI ${a.nhi}` : ''}${a.reassessment_date ? ` · review ${fmtDate(a.reassessment_date)}` : ''}`, items });
+    };
+
+    /** Spread onto a card/row/header to make it behave like the assessments table
+     * (click → detail, right-click → context menu, keyboard-focusable). Inline
+     * action buttons inside the surface must stopPropagation. */
+    const rowInteract = (a: SelfAdminRow) => ({
+        role: 'button' as const,
+        tabIndex: 0,
+        onClick: () => openView(a),
+        onContextMenu: (e: ReactMouseEvent) => openRowCtx(e, a),
+        onKeyDown: (e: ReactKeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openView(a); } },
+    });
 
     const TABS: RosterTabItem[] = [
         { id: 'assessments', label: 'Assessments', icon: ListChecks, tone: 'primary', badge: assessments.length || undefined },
@@ -76,6 +155,11 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
         { label: 'Due now', value: kpis.due_now, tone: kpis.due_now > 0 ? 'critical' : 'neutral' },
         { label: 'Independent', value: `${kpis.independent_pct}%` },
     ];
+
+    const alerts: SaAlert[] = [
+        kpis.due_now > 0 && { kind: 'due', tone: 'warning' as const, icon: AlarmClock, message: `${kpis.due_now} self-administration assessment${kpis.due_now === 1 ? '' : 's'} due for reassessment.`, tab: 'reassess' },
+        kpis.unsigned > 0 && { kind: 'unsigned', tone: 'critical' as const, icon: FileSignature, message: `${kpis.unsigned} self-managing client${kpis.unsigned === 1 ? '' : 's'} awaiting a signed self-administration agreement.`, tab: 'agreements' },
+    ].filter((a): a is SaAlert => Boolean(a) && !dismissed.includes((a as SaAlert).kind));
 
     return (
         <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Self-Administration', href: '/emar/self-admin' }]}>
@@ -111,19 +195,41 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                     }
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client or NHI…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                            <div className="relative w-full max-w-xs lg:w-[260px]">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search client or NHI…"
+                                    aria-label="Search self-administration assessments"
+                                    className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                />
+                                {search ? (
+                                    <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
                             </div>
-                            {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+                                {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                                <EntityFilter
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))}
+                                    value={clientFilter}
+                                    onChange={setClientFilter}
+                                    onDark
+                                />
+                            </div>
                         </div>
                     }
                 />
 
-                {kpis.due_now > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg/60 px-4 py-3">
-                        <span className="text-sm font-medium text-status-warning">{kpis.due_now} self-administration assessment{kpis.due_now === 1 ? '' : 's'} due for reassessment.</span>
-                        <Button size="sm" variant="outline" onClick={() => setActiveTab('reassess')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setActiveTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
                     </div>
                 )}
 
@@ -145,7 +251,7 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                                             const capPct = (a.total_score / 25) * 100;
                                             const capCount = [a.can_identify_medications, a.can_read_labels, a.can_open_packaging, a.can_manage_timing, a.can_store_safely, a.willing_to_self_admin].filter(Boolean).length;
                                             return (
-                                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setModal({ type: 'view', assessment: a })}>
+                                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => openView(a)} onContextMenu={(e) => openRowCtx(e, a)}>
                                                     <td className="px-4 py-3"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(a.client_name)}</span><div><div className="font-medium">{a.client_name}</div><div className="text-xs text-muted-foreground">{a.nhi ? `NHI ${a.nhi} · ` : ''}{a.site_name ?? ''}</div></div></div></td>
                                                     <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cat.cls}`}>{cat.label}</span></td>
                                                     <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${capPct >= 80 ? 'bg-status-success' : capPct >= 55 ? 'bg-status-warning' : 'bg-status-critical'}`} style={{ width: `${capPct}%` }} /></div><span className="tabular-nums text-xs">{a.total_score}/25</span></div></td>
@@ -155,7 +261,7 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                                                     <td className="px-4 py-3 text-muted-foreground">{a.assessor_name ?? '—'}</td>
                                                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex items-center justify-end gap-1">
-                                                            <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'view', assessment: a })} title="View"><Eye className="h-3.5 w-3.5" /></Button>
+                                                            <Button size="sm" variant="ghost" onClick={() => openView(a)} title="View"><Eye className="h-3.5 w-3.5" /></Button>
                                                             <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'reassess', assessment: a })} title="Reassess"><RotateCcw className="h-3.5 w-3.5" /></Button>
                                                         </div>
                                                     </td>
@@ -175,10 +281,10 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                             {dueList.map((a) => {
                                 const cat = categoryMeta(a.outcome);
                                 return (
-                                    <div key={a.id} className="rounded-2xl border-l-4 border-l-status-critical border bg-card p-4 shadow-sm">
+                                    <div key={a.id} {...rowInteract(a)} className="cursor-pointer rounded-2xl border border-l-4 border-l-status-critical bg-card p-4 shadow-sm transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                         <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(a.client_name)}</span><div><div className="font-medium">{a.client_name}</div><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cat.cls}`}>{cat.label}</span></div></div>
                                         <div className="mt-3 text-xs text-muted-foreground">Reassessment was due {fmtDate(a.reassessment_date)}.{a.reassessment_trigger ? ` Trigger: ${a.reassessment_trigger}.` : ''}</div>
-                                        <div className="mt-3 flex gap-2"><Button size="sm" onClick={() => setModal({ type: 'reassess', assessment: a })}>Start reassessment</Button><Button size="sm" variant="outline" onClick={() => setModal({ type: 'view', assessment: a })}>View</Button></div>
+                                        <div className="mt-3 flex gap-2"><Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'reassess', assessment: a }); }}>Start reassessment</Button><Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openView(a); }}>View</Button></div>
                                     </div>
                                 );
                             })}
@@ -192,11 +298,11 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                             {agreements.map((a) => {
                                 const signed = !!a.agreement_signed_at;
                                 return (
-                                    <div key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0">
+                                    <div key={a.id} {...rowInteract(a)} className="flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 transition-colors last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
                                         <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(a.client_name)}</span><div><div className="text-sm font-medium">{a.client_name}</div><div className="text-xs text-muted-foreground">{categoryMeta(a.outcome).label}{a.ordering_responsibility ? ` · ordering: ${a.ordering_responsibility}` : ''}</div></div></div>
                                         <div className="flex items-center gap-2">
                                             {signed ? <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[11px] font-semibold text-status-success">Signed</span> : <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">Awaiting signature</span>}
-                                            {signed ? <Button size="sm" variant="outline" onClick={() => setModal({ type: 'view', assessment: a })}>View</Button> : <Button size="sm" onClick={() => setModal({ type: 'agreement', assessment: a })}>Sign agreement</Button>}
+                                            {signed ? <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openView(a); }}>View</Button> : <Button size="sm" onClick={(e) => { e.stopPropagation(); setModal({ type: 'agreement', assessment: a }); }}>Sign agreement</Button>}
                                         </div>
                                     </div>
                                 );
@@ -210,9 +316,9 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
                         <div className="flex flex-col gap-4">
                             {selfManaging.map((a) => (
                                 <div key={a.id} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                                    <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3">
+                                    <div {...rowInteract(a)} className="flex cursor-pointer items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
                                         <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(a.client_name)}</span><div><div className="text-sm font-semibold">{a.client_name}</div><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryMeta(a.outcome).cls}`}>{categoryMeta(a.outcome).label}</span></div></div>
-                                        <Button size="sm" variant="outline" onClick={() => setModal({ type: 'scope', assessment: a })}><Pill className="h-3.5 w-3.5" />Set scope</Button>
+                                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setModal({ type: 'scope', assessment: a }); }}><Pill className="h-3.5 w-3.5" />Set scope</Button>
                                     </div>
                                     <div className="flex flex-col">
                                         {a.client_medications.map((m) => { const sm = scopeMeta(m.scope); return (
@@ -248,10 +354,41 @@ export default function SelfAdmin({ assessments, activity, kpis, clients, sites,
 
             {modal?.type === 'new' && <AssessmentWizardDialog clients={clients} mode="new" onClose={() => setModal(null)} />}
             {modal?.type === 'reassess' && <AssessmentWizardDialog clients={clients} mode="reassess" assessment={modal.assessment} onClose={() => setModal(null)} />}
-            {modal?.type === 'view' && <ViewSelfAdminDialog assessment={modal.assessment} onClose={() => setModal(null)} />}
+            {modal?.type === 'view' && (
+                <ViewSelfAdminDialog
+                    assessment={modal.assessment}
+                    onClose={() => setModal(null)}
+                    onReassess={() => setModal({ type: 'reassess', assessment: modal.assessment })}
+                    onSignAgreement={() => setModal({ type: 'agreement', assessment: modal.assessment })}
+                    onSetScope={() => setModal({ type: 'scope', assessment: modal.assessment })}
+                />
+            )}
             {modal?.type === 'agreement' && <SignAgreementDialog assessment={modal.assessment} onClose={() => setModal(null)} />}
             {modal?.type === 'scope' && <MedScopeDialog assessment={modal.assessment} onClose={() => setModal(null)} />}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
+    );
+}
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session dismiss. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: SaAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
     );
 }
 
