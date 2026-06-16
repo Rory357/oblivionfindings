@@ -12,13 +12,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Link, router } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowRight,
     CalendarClock,
+    Check,
     ClipboardCheck,
     ClipboardList,
     Clock,
     ExternalLink,
     Eye,
+    FileText,
     type LucideIcon,
     Printer,
     Search,
@@ -115,6 +118,15 @@ const TAG_TONE_BG: Record<PillTone, string> = {
     neutral: 'var(--muted)',
 };
 
+/* Tinted rounded-square badge behind each card-header icon (prototype: 30px, --x-bg / --x). */
+const BADGE_TONE: Record<PillTone, string> = {
+    success: 'bg-status-success-bg text-status-success',
+    warning: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
+    info: 'bg-status-info-bg text-status-info',
+    neutral: 'bg-accent text-primary',
+};
+
 function fmtDate(value?: string | null): string {
     if (!value) return '—';
     const d = new Date(value);
@@ -148,7 +160,7 @@ function initials(name: string): string {
 
 type NormRow = {
     key: string;
-    pill: { label: string; tone: PillTone; icon: LucideIcon };
+    pill: { label: string; tone: PillTone; icon?: LucideIcon };
     title: string;
     sub: string;
     owner: string | null;
@@ -170,7 +182,11 @@ type NormRow = {
 function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
     return rows.map((r) => ({
         key: `ca-${r.id}`,
-        pill: { label: r.days_overdue != null ? `${r.days_overdue}d overdue` : 'Overdue', tone: 'critical', icon: Clock },
+        pill: {
+            label: r.days_overdue != null ? `${r.days_overdue}d overdue` : 'Overdue',
+            tone: ['high', 'critical', 'urgent'].includes((r.priority ?? '').toLowerCase()) ? 'critical' : 'warning',
+            icon: ['high', 'critical', 'urgent'].includes((r.priority ?? '').toLowerCase()) ? AlertTriangle : undefined,
+        },
         title: r.title ?? r.reference ?? `Corrective action #${r.id}`,
         sub: [r.reference, titleCase(r.priority)].filter(Boolean).join(' · '),
         owner: r.owner,
@@ -253,15 +269,18 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
 function notifiableRows(rows: NotifiableRow[]): NormRow[] {
     return rows.map((r) => {
         const awaiting = r.status === 'pending';
+        const notifiedSub = [r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null, r.notified_at ? fmtDate(r.notified_at) : null]
+            .filter(Boolean)
+            .join(' · ');
         return {
             key: `ntf-${r.id}`,
             pill: awaiting
-                ? { label: 'Awaiting', tone: 'warning', icon: ShieldAlert }
-                : { label: titleCase(r.status), tone: 'success', icon: ShieldAlert },
+                ? { label: 'Awaiting', tone: 'critical', icon: Clock }
+                : { label: titleCase(r.status), tone: 'success', icon: Check },
             title: r.title ?? `Notifiable event #${r.id}`,
-            sub: titleCase(r.incident_type),
+            sub: awaiting ? 'Notify WorkSafe — action required' : notifiedSub || titleCase(r.incident_type),
             owner: null,
-            due: fmtDate(r.notification_deadline),
+            due: null,
             clientId: null,
             staffId: null,
             registerUrl: '/health-safety/reports/worksafe-register',
@@ -300,12 +319,12 @@ function expiringRows(rows: ExpiringRow[]): NormRow[] {
         return {
             key: `exp-${r.type}-${i}`,
             pill: overdue
-                ? { label: 'Overdue', tone: 'critical', icon: CalendarClock }
-                : { label: r.days_until != null ? `${r.days_until}d` : 'Due', tone: 'warning', icon: CalendarClock },
+                ? { label: r.days_until != null ? `Expired ${Math.abs(r.days_until)}d` : 'Overdue', tone: 'critical' }
+                : { label: r.days_until != null ? `${r.days_until} days` : 'Due', tone: 'warning' },
             title: r.label ?? r.type_label,
             sub: r.type_label,
-            owner: r.site,
-            due: fmtDate(r.due_date),
+            owner: null,
+            due: null,
             clientId: null,
             staffId: null,
             registerUrl: r.register_url,
@@ -342,9 +361,10 @@ function expiringRows(rows: ExpiringRow[]): NormRow[] {
 type CardConfig = {
     key: WorklistKey;
     icon: LucideIcon;
+    iconTone: PillTone;
     title: string;
     subtitle: string;
-    registerUrl: string;
+    registerUrl: string | null;
     registerLabel: string;
     rows: NormRow[];
     emptyText: string;
@@ -388,9 +408,10 @@ export function HsWorklists({
     const allConfigs: Record<WorklistKey, CardConfig> = {
         corrective_actions: {
             key: 'corrective_actions',
-            icon: ClipboardCheck,
+            icon: Clock,
+            iconTone: 'critical',
             title: 'Overdue corrective actions',
-            subtitle: 'Past due · right-click a row for actions',
+            subtitle: `${worklists.overdue_corrective_actions.length} past due · right-click a row for actions`,
             registerUrl: '/health-safety/corrective-actions',
             registerLabel: 'View register',
             rows: correctiveActionRows(worklists.overdue_corrective_actions),
@@ -399,6 +420,7 @@ export function HsWorklists({
         investigations: {
             key: 'investigations',
             icon: Search,
+            iconTone: 'info',
             title: 'Open investigations',
             subtitle: 'Active H&S investigations',
             registerUrl: '/health-safety/events',
@@ -408,7 +430,8 @@ export function HsWorklists({
         },
         notifiable: {
             key: 'notifiable',
-            icon: ShieldAlert,
+            icon: FileText,
+            iconTone: 'critical',
             title: 'WorkSafe-notifiable events',
             subtitle: 'HSWA 2015 · notified / awaiting',
             registerUrl: '/health-safety/reports/worksafe-register',
@@ -419,9 +442,10 @@ export function HsWorklists({
         expiring: {
             key: 'expiring',
             icon: CalendarClock,
+            iconTone: 'warning',
             title: 'Expiring soon',
-            subtitle: 'Risk assessments · SDS · drills',
-            registerUrl: '/health-safety/risk-assessments',
+            subtitle: 'Risk assessments · SDS · drills · competencies',
+            registerUrl: null,
             registerLabel: 'View registers',
             rows: expiringRows(worklists.expiring),
             emptyText: 'Nothing expiring soon.',
@@ -435,21 +459,30 @@ export function HsWorklists({
             <div className={cn('grid gap-4', configs.length > 1 && 'lg:grid-cols-2')}>
                 {configs.map((cfg) => (
                     <Card key={cfg.key}>
-                        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-                            <div>
-                                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                                    <cfg.icon className="h-4 w-4 text-muted-foreground" />
-                                    {cfg.title}
-                                </CardTitle>
-                                <p className="mt-0.5 text-xs text-muted-foreground">{cfg.subtitle}</p>
+                        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <span
+                                    className={cn(
+                                        'inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]',
+                                        BADGE_TONE[cfg.iconTone],
+                                    )}
+                                >
+                                    <cfg.icon className="h-4 w-4" />
+                                </span>
+                                <div>
+                                    <CardTitle className="text-sm font-bold leading-tight">{cfg.title}</CardTitle>
+                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">{cfg.subtitle}</p>
+                                </div>
                             </div>
-                            <Link
-                                href={cfg.registerUrl}
-                                className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                            >
-                                {cfg.registerLabel}
-                                <ArrowRight className="h-3 w-3" />
-                            </Link>
+                            {cfg.registerUrl ? (
+                                <Link
+                                    href={cfg.registerUrl}
+                                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                >
+                                    {cfg.registerLabel}
+                                    <ArrowRight className="h-3 w-3" />
+                                </Link>
+                            ) : null}
                         </CardHeader>
                         <CardContent className="space-y-1.5">
                             {cfg.rows.length === 0 ? (
@@ -470,7 +503,7 @@ export function HsWorklists({
                                                 PILL_CLASS[row.pill.tone],
                                             )}
                                         >
-                                            <row.pill.icon className="h-3 w-3" />
+                                            {row.pill.icon ? <row.pill.icon className="h-3 w-3" /> : null}
                                             {row.pill.label}
                                         </span>
                                         <span className="min-w-0 flex-1">

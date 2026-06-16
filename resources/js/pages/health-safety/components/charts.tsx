@@ -5,11 +5,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
+import { Building2, type LucideIcon } from 'lucide-react';
 import {
     Bar,
     CartesianGrid,
     ComposedChart,
-    Legend,
     Line,
     LineChart,
     ResponsiveContainer,
@@ -39,22 +39,56 @@ function titleCase(value: string): string {
     return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const BADGE_TONE = {
+    critical: 'bg-status-critical-bg text-status-critical',
+    warning: 'bg-status-warning-bg text-status-warning',
+    success: 'bg-status-success-bg text-status-success',
+    info: 'bg-status-info-bg text-status-info',
+    primary: 'bg-accent text-primary',
+} as const;
+type BadgeTone = keyof typeof BADGE_TONE;
+
 function ChartCard({
     title,
     subtitle,
     children,
     className,
+    icon: Icon,
+    iconTone = 'primary',
+    headerRight,
 }: {
     title: string;
     subtitle?: string;
     children: React.ReactNode;
     className?: string;
+    icon?: LucideIcon;
+    iconTone?: BadgeTone;
+    headerRight?: React.ReactNode;
 }) {
     return (
         <Card className={className}>
             <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">{title}</CardTitle>
-                {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+                <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                        {Icon ? (
+                            <span
+                                className={cn(
+                                    'inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]',
+                                    BADGE_TONE[iconTone],
+                                )}
+                            >
+                                <Icon className="h-4 w-4" />
+                            </span>
+                        ) : null}
+                        <div>
+                            <CardTitle className="text-sm font-bold leading-tight">{title}</CardTitle>
+                            {subtitle ? (
+                                <p className="mt-0.5 text-[11.5px] text-muted-foreground">{subtitle}</p>
+                            ) : null}
+                        </div>
+                    </div>
+                    {headerRight ?? null}
+                </div>
             </CardHeader>
             <CardContent>{children}</CardContent>
         </Card>
@@ -268,16 +302,28 @@ export function IncidentTrendCard({
         trifr: freqByMonth.get(b.month)?.trifr ?? null,
     }));
 
+    const legend = (
+        <div className="flex flex-wrap items-center justify-end gap-x-3.5 gap-y-1 text-[11.5px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+                <span className="h-[9px] w-[9px] rounded-sm" style={{ background: 'var(--primary)' }} />
+                Incidents
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+                <span className="h-[3px] w-3.5 rounded-sm" style={{ background: 'var(--status-critical)' }} />
+                TRIFR
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+                <span className="h-[3px] w-3.5 rounded-sm" style={{ background: 'var(--status-warning)' }} />
+                LTIFR
+            </span>
+        </div>
+    );
+
     return (
-        <ChartCard
-            title="Incident & near-miss trend"
-            subtitle="Monthly incidents · TRIFR & LTIFR per million hours"
-        >
+        <ChartCard title="Incident & near-miss trend" headerRight={legend}>
             <ResponsiveContainer width="100%" height={variant === 'full' ? 240 : 140}>
                 <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
-                    {variant === 'full' ? (
-                        <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="var(--border)" />
-                    ) : null}
+                    <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="var(--border)" />
                     <XAxis
                         dataKey="label"
                         tickLine={false}
@@ -286,7 +332,6 @@ export function IncidentTrendCard({
                     />
                     <YAxis hide />
                     <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
-                    {variant === 'full' ? <Legend wrapperStyle={{ fontSize: 11 }} /> : null}
                     <Bar
                         dataKey="incidents"
                         name="Incidents"
@@ -359,11 +404,11 @@ export function SiteLeagueCard({
 }) {
     const max = Math.max(...data.map((d) => d.incidents * 2 + d.hazards), 1);
     return (
-        <ChartCard title="Site safety league" subtitle="Incidents · open hazards (this period)">
+        <ChartCard title="Site safety league" subtitle="Incidents · open hazards (30d)" icon={Building2} iconTone="primary">
             {data.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">No sites to compare.</p>
             ) : (
-                <div className="space-y-2 py-1">
+                <div className="flex flex-col gap-3 py-1">
                     {data.map((d) => {
                         const score = d.incidents * 2 + d.hazards;
                         const tone = score === 0 ? 'success' : score >= max * 0.6 ? 'critical' : 'warning';
@@ -371,18 +416,20 @@ export function SiteLeagueCard({
                             <Link
                                 key={d.id}
                                 href={`/sites/${d.id}`}
-                                className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted/50"
+                                className="block rounded-md transition-colors hover:bg-muted/50"
                             >
-                                <span className="w-28 shrink-0 truncate text-xs text-foreground">{d.name}</span>
-                                <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-muted">
+                                <div className="mb-1 flex items-center justify-between text-xs">
+                                    <span className="font-semibold text-foreground">{d.name}</span>
+                                    <span className="tabular-nums text-muted-foreground">
+                                        {d.incidents} inc · {d.hazards} haz
+                                    </span>
+                                </div>
+                                <div className="h-[7px] overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
                                         style={{ width: `${Math.max((score / max) * 100, 6)}%`, background: `var(--status-${tone})` }}
                                     />
                                 </div>
-                                <span className="w-[88px] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
-                                    {d.incidents} inc · {d.hazards} haz
-                                </span>
                             </Link>
                         );
                     })}
