@@ -5,12 +5,12 @@ import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
 import { type CdMedication } from '@/components/emar/controlled/types';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { ReportLossDialog } from '@/pages/emar/_cd-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertOctagon, AlertTriangle, Award, ClipboardCheck, Download, FileBarChart, FileText, Lock, Package, Pill, Printer, Search, Shield, XCircle } from 'lucide-react';
+import { Activity, AlertOctagon, AlertTriangle, Award, ClipboardCheck, Download, Eye, FileBarChart, FileText, Lock, Package, Pill, Printer, Search, Shield, User, X, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -57,6 +57,7 @@ export default function Reports(props: Props) {
     const [tab, setTab] = useState('administration');
     const [modal, setModal] = useState<Modal>(null);
     const [search, setSearch] = useState('');
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     const periodLabel = `${fmtDate(filters.date_from)} – ${fmtDate(filters.date_to)}`;
     const activePreset = useMemo(() => {
@@ -82,6 +83,38 @@ export default function Reports(props: Props) {
         if (filters.client_id) p.set('client_id', String(filters.client_id));
         if (filters.site_id) p.set('site_id', String(filters.site_id));
         return `/emar/reports/export?${p.toString()}`;
+    };
+    // Per-client administration CSV (right-click "Export this client's CSV") — scoped to one row,
+    // independent of the active client filter, but still honours the period + site window.
+    const clientExportUrl = (clientId: number) => {
+        const p = new URLSearchParams({ report_type: 'administration', date_from: filters.date_from, date_to: filters.date_to, client_id: String(clientId) });
+        if (filters.site_id) p.set('site_id', String(filters.site_id));
+        return `/emar/reports/export?${p.toString()}`;
+    };
+
+    // Care level is a string enum; EntityFilter is id-keyed, so map string↔index.
+    const careLevelOptions = useMemo(() => careLevels.map((c, i) => ({ id: i, name: c.replace(/_/g, ' ') })), [careLevels]);
+    const careLevelValue = useMemo(() => {
+        if (!filters.care_level) return null;
+        const i = careLevels.indexOf(filters.care_level);
+        return i >= 0 ? i : null;
+    }, [careLevels, filters.care_level]);
+    const onCareLevel = (id: number | null) => reload({ care_level: id === null ? null : careLevels[id] });
+    const hasActiveFilter = Boolean(filters.client_id || filters.care_level || filters.site_id);
+
+    // Read-only right-click menu for the Administration client-breakdown rows. Analytics table —
+    // no mutations: drill, jump to client, open MAR chart, export this client's CSV.
+    const openRowCtx = (e: React.MouseEvent, r: ClientBreakdownRow) => {
+        e.preventDefault();
+        const band = r.compliance >= 95 ? 'success' : r.compliance >= 85 ? 'warning' : 'critical';
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View breakdown', sub: 'Read-only drill-in', tone: 'primary', onClick: () => setModal({ type: 'drill', row: r }) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}/care`) },
+            { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/emar/mar?client_id=${r.client_id}`) },
+            { sep: true },
+            { icon: <Download className="h-3.5 w-3.5" />, label: "Export this client's CSV", onClick: () => { window.location.href = clientExportUrl(r.client_id); } },
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: `${r.compliance}%`, tagBg: `var(--status-${band}-bg)`, tagColor: `var(--status-${band})`, meta: `${r.client_name} · ${r.total} dose${r.total === 1 ? '' : 's'}`, items });
     };
 
     const TABS: RosterTabItem[] = [
@@ -153,30 +186,28 @@ export default function Reports(props: Props) {
                                     </span>
                                 )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a table…" className="w-40 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <div className="relative w-full max-w-xs lg:w-[240px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search a table…" aria-label="Search reports" className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50" />
+                                    {search ? (
+                                        <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
                                 </div>
                                 {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => reload({ site_id: id })} onDark />}
+                                <EntityFilter label="Client" allLabel="All clients" items={clients} value={filters.client_id} onChange={(id) => reload({ client_id: id })} onDark />
+                                {careLevels.length > 0 && <EntityFilter label="Care level" allLabel="All care levels" items={careLevelOptions} value={careLevelValue} onChange={onCareLevel} onDark pluralLabel="care levels" />}
+                                {hasActiveFilter && (
+                                    <Button variant="outline" size="sm" onClick={() => reload({ client_id: null, care_level: null, site_id: null })} className="h-8 rounded-full border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                        <X className="h-3.5 w-3.5" />Clear filters
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     }
                 />
-
-                {/* Filter bar */}
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card px-4 py-2.5 shadow-sm">
-                    <span className="text-xs text-muted-foreground">Filters</span>
-                    <select className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm" value={filters.client_id ?? ''} onChange={(e) => reload({ client_id: e.target.value || null })}>
-                        <option value="">All clients</option>
-                        {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <select className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm" value={filters.care_level ?? ''} onChange={(e) => reload({ care_level: e.target.value || null })}>
-                        <option value="">All care levels</option>
-                        {careLevels.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
-                    </select>
-                    {(filters.client_id || filters.care_level || filters.site_id) && <Button size="sm" variant="ghost" onClick={() => reload({ client_id: null, care_level: null, site_id: null })}>Clear filters</Button>}
-                </div>
 
                 <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Report views" />
 
@@ -204,7 +235,7 @@ export default function Reports(props: Props) {
                         </ChartCard>
                         <SimpleTable head={['Resident', 'Total', 'Given', 'Refused', 'Missed', 'Compliance', '']} empty={clientBreakdown.length === 0 ? 'No administrations in this period.' : null}>
                             {clientBreakdown.map((r) => (
-                                <tr key={r.client_id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setModal({ type: 'drill', row: r })}>
+                                <tr key={r.client_id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setModal({ type: 'drill', row: r })} onContextMenu={(e) => openRowCtx(e, r)}>
                                     <td className="px-4 py-2.5 font-medium">{r.client_name}</td>
                                     <td className="px-4 py-2.5 tabular-nums">{r.total}</td>
                                     <td className="px-4 py-2.5 tabular-nums text-status-success">{r.given}</td>
@@ -358,6 +389,7 @@ export default function Reports(props: Props) {
 
             {modal?.type === 'cdloss' && <ReportLossDialog medications={cdMedications} onClose={() => setModal(null)} />}
             {modal?.type === 'drill' && <DrillDialog row={modal.row} onClose={() => setModal(null)} />}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
@@ -423,7 +455,9 @@ function PackCard({ icon: Icon, title, desc, href }: { icon: typeof FileText; ti
 }
 function DrillDialog({ row, onClose }: { row: ClientBreakdownRow; onClose: () => void }) {
     return (
-        <MedsWizardDialog open onClose={onClose} title={`${row.client_name} · administration`} description="Read-only summary for the selected period." railIcon={Activity} railTitle="Drill-in" railSubtitle={row.client_name} steps={[{ key: 'd', label: 'Summary', blurb: 'Read-only', icon: Activity }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose}>Close</Button><a href={`/emar/mar?client_id=${row.client_id}`}><Button>Open MAR chart</Button></a></>}>
+        <MedsWizardDialog open onClose={onClose} title={`${row.client_name} · administration`} description="Read-only summary for the selected period." railIcon={Activity} railTitle="Drill-in" railSubtitle={row.client_name} steps={[{ key: 'd', label: 'Summary', blurb: 'Read-only', icon: Activity }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose}>Close</Button><Button variant="outline" onClick={() => router.visit(`/operations/clients/${row.client_id}/care`)}><User className="h-4 w-4" />View client</Button><a href={`/emar/mar?client_id=${row.client_id}`}><Button>Open MAR chart</Button></a></>}>
+            {/* TODO(G-reasons): enrich with top refusal/withhold reason codes once clientBreakdown carries
+                per-client reason data — see docs/REPORTS_GAP_ANALYSIS.md (front-end-only scope today). */}
             <div className="rounded-lg border px-4">
                 <SummaryRow label="Total doses" value={row.total} />
                 <SummaryRow label="Given" value={row.given} />
