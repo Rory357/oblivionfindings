@@ -37,11 +37,11 @@ const WORKFLOWS: Workflow[] = [
     { key: 'incident', label: 'Report incident / near-miss', desc: 'Events register · WorkSafe check', icon: ShieldAlert, inPlace: true },
     { key: 'hazard', label: 'Log hazard + risk assessment', desc: 'L×C matrix · hierarchy of control', icon: AlertOctagon, href: '/compliance/hazards' },
     { key: 'first_aid', label: 'Record first-aid treatment', desc: 'First-aid register', icon: HeartPulse, inPlace: true },
-    { key: 'restraint', label: 'Log restraint event', desc: 'Least-restrictive · debrief', icon: Clipboard, href: '/health-safety/restraints' },
+    { key: 'restraint', label: 'Log restraint event', desc: 'Least-restrictive · debrief', icon: Clipboard, inPlace: true },
     { key: 'drill', label: 'Record emergency drill', desc: 'Fire / evacuation / lockdown', icon: Siren, inPlace: true },
-    { key: 'rtw', label: 'Injury → return-to-work', desc: 'ACC claim · RTW plan', icon: Activity, href: '/health-safety/injuries/create' },
-    { key: 'substance', label: 'Add hazardous substance', desc: 'SDS · Hazardous Substances Regs 2017', icon: FlaskConical, href: '/health-safety/substances/create' },
-    { key: 'lone', label: 'Lone-worker check-in', desc: 'Check-in / escalate to on-call', icon: PersonStanding, href: '/health-safety/lone-workers' },
+    { key: 'rtw', label: 'Injury → return-to-work', desc: 'ACC claim · RTW plan', icon: Activity, inPlace: true },
+    { key: 'substance', label: 'Add hazardous substance', desc: 'SDS · Hazardous Substances Regs 2017', icon: FlaskConical, inPlace: true },
+    { key: 'lone', label: 'Lone-worker check-in', desc: 'Check-in / escalate to on-call', icon: PersonStanding, inPlace: true },
     { key: 'participation', label: 'Worker participation / committee', desc: 'HSR · committee minutes', icon: Users, href: '/health-safety/worker-participation' },
 ];
 

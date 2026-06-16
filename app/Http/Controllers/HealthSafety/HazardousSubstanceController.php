@@ -96,6 +96,10 @@ class HazardousSubstanceController extends Controller
             'created_by' => $request->user()->id,
         ]));
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Hazardous substance registered successfully.');
+        }
+
         return redirect()->route('health-safety.substances.index')
             ->with('success', 'Hazardous substance registered successfully.');
     }

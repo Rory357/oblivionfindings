@@ -99,6 +99,10 @@ class ReturnToWorkController extends Controller
             'created_by' => $request->user()->id,
         ]));
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Workplace injury recorded successfully.');
+        }
+
         return redirect()->route('health-safety.injuries.index')
             ->with('success', 'Workplace injury recorded successfully.');
     }

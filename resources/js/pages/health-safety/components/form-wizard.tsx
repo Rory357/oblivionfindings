@@ -55,6 +55,8 @@ export type FieldSpec = {
     options?: Array<{ value: string; label: string; description?: string }>;
     /** Pull options from reference data instead of a static list. */
     source?: keyof RefData;
+    /** Initial value (e.g. a toggle that should default ON). */
+    default?: string | string[] | boolean;
 };
 
 export type WizardStepSpec = {
@@ -84,7 +86,7 @@ function initDefaults(config: WizardConfig): Record<string, unknown> {
     const v: Record<string, unknown> = {};
     for (const s of config.steps) {
         for (const f of s.fields) {
-            v[f.key] = f.type === 'chips' ? [] : f.type === 'toggle' ? false : '';
+            v[f.key] = f.default !== undefined ? f.default : f.type === 'chips' ? [] : f.type === 'toggle' ? false : '';
         }
     }
     return v;
@@ -165,6 +167,7 @@ export function HsFormWizard({
     const [step, setStep] = useState(0);
     const [submitted, setSubmitted] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [values, setValues] = useState<Record<string, unknown>>(() => initDefaults(config));
 
     const steps: WizardStep[] = config.steps.map((s) => ({ key: s.key, label: s.label, blurb: s.blurb, icon: s.icon }));
@@ -181,6 +184,7 @@ export function HsFormWizard({
     const set = (k: string, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }));
     const reset = () => {
         setValues(initDefaults(config));
+        setErrors({});
         setStep(0);
         setSubmitted(false);
     };
@@ -191,11 +195,18 @@ export function HsFormWizard({
 
     const submit = () => {
         setProcessing(true);
+        setErrors({});
         const payload = { ...(config.transform ? config.transform(values) : values), stay: true };
         router.post(config.endpoint, payload as Record<string, string | number | boolean | string[] | null>, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => setSubmitted(true),
+            onError: (errs) => {
+                setErrors(errs as Record<string, string>);
+                const keys = Object.keys(errs);
+                const idx = config.steps.findIndex((s) => s.fields.some((f) => keys.includes(f.key)));
+                if (idx >= 0) setStep(idx);
+            },
             onFinish: () => setProcessing(false),
         });
     };
@@ -286,6 +297,7 @@ export function HsFormWizard({
                                     label={f.label}
                                     required={f.required}
                                     hint={f.hint}
+                                    error={errors[f.key]}
                                     span={f.span || f.type === 'textarea' || f.type === 'tiles' || f.type === 'chips'}
                                 >
                                     <FieldInput f={f} value={values[f.key]} onChange={(v) => set(f.key, v)} refData={refData} />
