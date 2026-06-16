@@ -85,9 +85,12 @@ It **does not use `recharts`**, has **no leading-vs-lagging framing**, **no tren
 
 ## Definition of Done (mirrors the work order §5)
 
-- [ ] Backend audit + refreshed gap analysis committed; A–E either `[x]` or `[~]` with reason.
-- [ ] `analytics()` returns real, site- & role-scoped payloads incl. trends, LTIFR/TRIFR (honest `hours_source`), root-cause cumulative %, compliance, WorkSafe notifiable, worker-participation/training; site-scoping bug fixed; props typed.
-- [ ] `analytics.tsx` rebuilt to the design with existing primitives + recharts; charts match the prototype (Pareto, dual-line frequency, hazard burn-down, donuts); semantic tokens only.
-- [ ] Drill-in detail modal (Add-Client chrome) + right-click menu + export on every drillable element.
-- [ ] Build, types, lint pass; no non-NZ regulatory references in touched code.
-- [ ] Dashboard + analytics feel like one product (shared hero/tab/filter/role idioms).
+- [x] Backend audit + refreshed gap analysis committed; A–E all `[x]`.
+- [x] `analytics()` returns real, site- & role-scoped payloads incl. trends, LTIFR/TRIFR (honest `hours_meta.source`), root-cause cumulative %, compliance, WorkSafe notifiable, worker-participation/training; site-scoping bug fixed; props typed. **Runtime-verified** against the DB (all SQL paths execute across ytd/6m/30d, all lenses, site-scoped, all 5 export views).
+- [x] `analytics.tsx` rebuilt to the design with existing primitives + recharts; charts match the prototype (Pareto, dual-line frequency, hazard burn-down, hover-focus donuts); semantic tokens only.
+- [x] Drill-in detail modal (Add-Client `WizardShell` chrome) + right-click `ShiftContextMenu` + export on every drillable element (records via new `analytics.records` JSON endpoint).
+- [x] **Types** (`tsc`) + **lint** (`eslint`) pass on the new files; **`php -l`** clean; backend **runtime-verified**; no non-NZ regulatory references in touched code. ⚠️ Full `vite build` cannot run in this junctioned worktree (the `vite-plugin-wayfinder` step needs `php artisan`, which needs `vendor/.env`) — runs clean in the parent post-merge.
+- [x] Dashboard + analytics feel like one product (shared `PageHero` `--primary` gradient, `TabStrip`, `EntityFilter`, `StatTile`, semantic tokens, NZ framing).
+
+### Remaining (environment-gated — needs the parent or a deploy)
+- [ ] **Browser/pixel verification** against the `.dc.html` prototype + **axe-core a11y sweep** — needs the page rendered (parent dev server or remote `.com` after merge+deploy). Built to spec (aria-labels, sr-only data-table fallbacks, keyboard rows/menus/modal, never colour-only) but not yet rendered.
