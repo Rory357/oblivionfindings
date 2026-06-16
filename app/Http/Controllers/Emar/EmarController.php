@@ -2773,6 +2773,14 @@ class EmarController extends Controller
         $validated['status'] = 'pending';
         $validated['requires_countersign'] = in_array($validated['order_type'], ['verbal', 'telephone']);
 
+        // prescriber_type is NOT NULL with a 'gp' schema default, but the create
+        // dialog leaves it blank — and the global ConvertEmptyStringsToNull
+        // middleware turns that '' into an explicit null, which MySQL (strict
+        // mode) rejects. Drop the blank value so the column default applies.
+        if (blank($validated['prescriber_type'] ?? null)) {
+            unset($validated['prescriber_type']);
+        }
+
         MedicationPrescriberOrder::create($validated);
 
         return redirect()->back();
