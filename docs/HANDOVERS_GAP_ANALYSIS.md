@@ -77,10 +77,14 @@ un-regressed.
   unchanged. Site stays server-side; Client/Staff are client-side. eMAR-only — no shared component.*
 
 ## D. Alert strip (eMAR only)
-- [ ] **D1** Replace the single needs-ack banner with a **stacked, dismissible** strip (mirror
+- [x] **D1** Replace the single needs-ack banner with a **stacked, dismissible** strip (mirror
   `/emar/controlled`): *N awaiting your acknowledgement* (warning → Needs-ack tab), *N open
   incoming shifts — needs cover* (critical → Open-incoming tab), and (after F) *N CD counts
-  unverified at handover* (critical → Open the CD register / Needs-ack).
+  unverified at handover* (critical → Open the CD register / Needs-ack). — *Done: `emar/Handovers.tsx`
+  — `AlertRow` component + per-session `sessionStorage` dismiss (`handover-dismissed-alerts`,
+  `read/persistDismissedAlerts`) copied from ControlledDrugs; `alerts[]` built from `counts`
+  (needs-ack → warning → `needs_ack` tab; open-incoming → critical → `open_incoming` tab). The CD
+  banner is stubbed `// TODO(F):` and wired when Gap F lands. eMAR-only.*
 
 ## E. Auto-surface the shift's medication state  *(the real win — expand the module)*
 - [ ] **E1** In `EmarController@handovers` (+ the wizard's meds step), auto-populate the
@@ -132,4 +136,4 @@ shift med-state + a CD count at handover; concurrent edits are locked; dead `Med
 removed (or documented); all actions in-page via Inertia partial reloads.
 
 ### Remaining `TODO(Gx)` markers
-- _(none yet)_
+- `emar/Handovers.tsx` `alerts[]` — `// TODO(F):` CD-counts-unverified banner (critical → `/emar/controlled`), to be added when Gap F lands.

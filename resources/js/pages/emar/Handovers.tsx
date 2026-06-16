@@ -37,6 +37,33 @@ const fmtRange = (start: string, end: string) => {
 };
 const relative = (iso: string | null) => { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`; };
 
+type HandoverAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof BellRing; message: string; tab: string };
+
+const DISMISSED_ALERTS_KEY = 'handover-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
+}
+
 export default function Handovers({ handovers = [], weekStart, weekEnd, catalogue, can = { create: false, manage: false }, currentUser, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
     const weekStartDate = useMemo(() => new Date(`${weekStart}T00:00:00`), [weekStart]);
     const [tab, setTab] = useState('all');
@@ -46,6 +73,8 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
     // to the server for its query scope + brand colour; mirror Operations' baseFiltered).
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [staffFilter, setStaffFilter] = useState<number | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [detailId, setDetailId] = useState<number | null>(null);
@@ -61,6 +90,13 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
         needsAck: handovers.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id).length,
         incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
     }), [handovers, currentUser]);
+
+    // Stacked, dismissible (per session) alert strip built from already-computed counts.
+    const alerts: HandoverAlert[] = [
+        counts.needsAck > 0 && { kind: 'needs_ack', tone: 'warning' as const, icon: BellRing, message: `${counts.needsAck} handover${counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.`, tab: 'needs_ack' },
+        counts.openIncoming > 0 && { kind: 'open_incoming', tone: 'critical' as const, icon: ShieldAlert, message: `${counts.openIncoming} open incoming shift${counts.openIncoming === 1 ? '' : 's'} — needs cover.`, tab: 'open_incoming' },
+        // TODO(F): N controlled-drug counts unverified at handover (critical → /emar/controlled) — added with Gap F.
+    ].filter((a): a is HandoverAlert => Boolean(a) && !dismissed.includes((a as HandoverAlert).kind));
 
     // Unique clients + staff present in this week's handovers, for the hero filters.
     const clientItems = useMemo(() => {
@@ -197,10 +233,11 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                     }
                 />
 
-                {counts.needsAck > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-warning"><BellRing className="h-4 w-4" />{counts.needsAck} handover{counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.</span>
-                        <Button size="sm" variant="outline" onClick={() => setTab('needs_ack')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
                     </div>
                 )}
 
@@ -276,5 +313,28 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                 onSaved={(id) => { setAddClientOpen(false); router.reload({ only: ['catalogue'], onSuccess: () => setPendingClientId(id) }); }}
             />
         </AppLayout>
+    );
+}
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session
+ *  dismiss. Mirrors /emar/controlled's AlertRow. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: HandoverAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
     );
 }
