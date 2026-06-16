@@ -45,6 +45,8 @@ class HandoverPresenter
             'handover_notes' => $handover->handover_notes,
             'client_mood' => $handover->client_mood,
             'medications_due' => $this->listToDisplayStrings($handover->medications_due),
+            'cd_verification' => $handover->cd_verification,
+            'version' => (int) $handover->version,
             'incidents_to_note' => $this->listToDisplayStrings($handover->incidents_to_note),
             'follow_up_items' => $this->listToDisplayStrings($handover->follow_up_items),
             'tasks_pending' => $this->listToDisplayStrings($handover->tasks_pending),

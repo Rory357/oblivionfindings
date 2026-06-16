@@ -26,12 +26,28 @@ export type HandoverLock = {
     age_days: number | null;
 };
 
+/** Two-person controlled-drug count reconciliation recorded at the handover
+ *  (eMAR medication lens). Null when no CD check was recorded. */
+export type CdVerification = {
+    result: 'verified' | 'discrepancy';
+    witness_id: number | null;
+    witness_name: string | null;
+    notes: string | null;
+    verified_at: string | null;
+    verified_by: number | null;
+    verified_by_name: string | null;
+};
+
 export type Handover = {
     id: number;
     status: HandoverStatus | string;
     handover_notes: string;
     client_mood: string | null;
     medications_due: string[];
+    cd_verification: CdVerification | null;
+    /** Optimistic-concurrency token — sent back on edit so the server can detect a
+     *  concurrent save of the same shared draft. */
+    version: number;
     incidents_to_note: string[];
     follow_up_items: string[];
     tasks_pending: string[];

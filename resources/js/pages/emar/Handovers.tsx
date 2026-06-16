@@ -12,7 +12,7 @@ import { HandoverRail } from '@/pages/operations/handovers/components/handover-r
 import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
 import { clientName, ymd, type Catalogue, type Handover } from '@/pages/operations/handovers/components/shared';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeftRight, BellRing, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FilePenLine, History, Layers, Pill, Plus, Search, Send, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BellRing, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FilePenLine, History, Layers, Pill, Plus, Search, Send, ShieldAlert, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -37,11 +37,44 @@ const fmtRange = (start: string, end: string) => {
 };
 const relative = (iso: string | null) => { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`; };
 
+type HandoverAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof BellRing; message: string; tab?: string; href?: string };
+
+const DISMISSED_ALERTS_KEY = 'handover-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
+}
+
 export default function Handovers({ handovers = [], weekStart, weekEnd, catalogue, can = { create: false, manage: false }, currentUser, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
     const weekStartDate = useMemo(() => new Date(`${weekStart}T00:00:00`), [weekStart]);
     const [tab, setTab] = useState('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    // Client + staff are filtered client-side over the loaded week (Site round-trips
+    // to the server for its query scope + brand colour; mirror Operations' baseFiltered).
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
+    const [staffFilter, setStaffFilter] = useState<number | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [detailId, setDetailId] = useState<number | null>(null);
@@ -56,13 +89,45 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
         openIncoming: handovers.filter((h) => h.incoming_staff == null).length,
         needsAck: handovers.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id).length,
         incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
+        // Submitted/acknowledged handovers that mention a controlled drug (the "(CD)"
+        // tag the wizard pre-fills from the live shift snapshot, or "controlled") but
+        // carry no two-person CD count check. TODO(Gx): a live per-handover CD-due
+        // query would be exact, but that is the index-time N+1 the snapshot avoids.
+        cdUnverified: handovers.filter((h) => (h.status === 'submitted' || h.status === 'acknowledged') && !h.cd_verification && (h.medications_due ?? []).some((m) => /\(cd\)|controlled/i.test(m))).length,
     }), [handovers, currentUser]);
+
+    // Stacked, dismissible (per session) alert strip built from already-computed counts.
+    const alertDefs: (HandoverAlert | false)[] = [
+        counts.needsAck > 0 && { kind: 'needs_ack', tone: 'warning' as const, icon: BellRing, message: `${counts.needsAck} handover${counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.`, tab: 'needs_ack' },
+        counts.openIncoming > 0 && { kind: 'open_incoming', tone: 'critical' as const, icon: ShieldAlert, message: `${counts.openIncoming} open incoming shift${counts.openIncoming === 1 ? '' : 's'} — needs cover.`, tab: 'open_incoming' },
+        counts.cdUnverified > 0 && { kind: 'cd_unverified', tone: 'critical' as const, icon: Pill, message: `${counts.cdUnverified} submitted handover${counts.cdUnverified === 1 ? '' : 's'} with controlled drugs but no count check recorded.`, href: '/emar/controlled' },
+    ];
+    const alerts = alertDefs.filter((a): a is HandoverAlert => Boolean(a) && !dismissed.includes((a as HandoverAlert).kind));
+
+    // Unique clients + staff present in this week's handovers, for the hero filters.
+    const clientItems = useMemo(() => {
+        const map = new Map<number, string>();
+        handovers.forEach((h) => { if (h.client) map.set(h.client.id, clientName(h.client)); });
+        return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [handovers]);
+    const staffItems = useMemo(() => {
+        const map = new Map<number, string>();
+        handovers.forEach((h) => {
+            if (h.outgoing_staff) map.set(h.outgoing_staff.id, h.outgoing_staff.name);
+            if (h.incoming_staff) map.set(h.incoming_staff.id, h.incoming_staff.name);
+        });
+        return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [handovers]);
 
     const searched = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return handovers;
-        return handovers.filter((h) => [h.handover_notes, clientName(h.client), h.outgoing_staff?.name, h.incoming_staff?.name, h.site?.name, h.client_mood, ...(h.medications_due ?? []), ...(h.incidents_to_note ?? [])].filter(Boolean).join(' ').toLowerCase().includes(q));
-    }, [handovers, search]);
+        return handovers.filter((h) => {
+            if (clientFilter != null && h.client?.id !== clientFilter) return false;
+            if (staffFilter != null && h.outgoing_staff?.id !== staffFilter && h.incoming_staff?.id !== staffFilter && h.acknowledger?.id !== staffFilter) return false;
+            if (q && ![h.handover_notes, clientName(h.client), h.outgoing_staff?.name, h.incoming_staff?.name, h.site?.name, h.client_mood, ...(h.medications_due ?? []), ...(h.incidents_to_note ?? [])].filter(Boolean).join(' ').toLowerCase().includes(q)) return false;
+            return true;
+        });
+    }, [handovers, search, clientFilter, staffFilter]);
 
     const filtered = useMemo(() => {
         switch (tab) {
@@ -99,7 +164,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
     const closeWizard = () => { setWizardOpen(false); setEditingId(null); setPendingClientId(null); };
     const submitHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/submit`, {}, { preserveScroll: true, onSuccess: () => toast.success('Draft submitted to incoming worker') });
     const acknowledgeHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/acknowledge`, {}, { preserveScroll: true, onSuccess: () => toast.success(`Handover for ${clientName(h.client)} acknowledged`) });
-    const handlers = { onOpen: (h: Handover) => setDetailId(h.id), onSubmit: submitHandover, onAcknowledge: acknowledgeHandover };
+    const handlers = { onOpen: (h: Handover) => setDetailId(h.id), onSubmit: submitHandover, onAcknowledge: acknowledgeHandover, onEdit: openEdit };
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All', icon: Layers, tone: 'primary', badge: counts.total || undefined },
@@ -159,20 +224,26 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                                 <button onClick={() => stepWeek(1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronRight className="h-3.5 w-3.5" /></button>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, staff or note…" className="w-52 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                <div className="relative w-full sm:w-[240px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, staff or note…" aria-label="Search handovers" className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50" />
+                                    {search ? (
+                                        <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+                                    ) : null}
                                 </div>
                                 {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                                {clientItems.length > 0 && <EntityFilter label="Client" allLabel="All clients" items={clientItems} value={clientFilter} onChange={setClientFilter} onDark />}
+                                {staffItems.length > 0 && <EntityFilter label="Staff" allLabel="All staff" pluralLabel="staff" items={staffItems} value={staffFilter} onChange={setStaffFilter} onDark />}
                             </div>
                         </div>
                     }
                 />
 
-                {counts.needsAck > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-warning"><BellRing className="h-4 w-4" />{counts.needsAck} handover{counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.</span>
-                        <Button size="sm" variant="outline" onClick={() => setTab('needs_ack')}>Review</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => (a.href ? router.visit(a.href) : a.tab ? setTab(a.tab) : undefined)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
                     </div>
                 )}
 
@@ -208,7 +279,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                                 <CardsView handovers={filtered} {...handlers} />
                             )}
                         </main>
-                        <HandoverRail handovers={handovers} counts={counts} weekStart={weekStartDate} onOpen={(h) => setDetailId(h.id)} />
+                        <HandoverRail handovers={handovers} counts={counts} weekStart={weekStartDate} onOpen={(h) => setDetailId(h.id)} onSubmit={submitHandover} onAcknowledge={acknowledgeHandover} onEdit={openEdit} />
                     </div>
                 )}
             </div>
@@ -220,6 +291,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                 onEdit={openEdit}
                 onSubmit={submitHandover}
                 onAcknowledge={acknowledgeHandover}
+                medicationSnapshotUrl="/emar/handovers/shift-medications"
             />
 
             {wizardOpen && (
@@ -248,5 +320,28 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                 onSaved={(id) => { setAddClientOpen(false); router.reload({ only: ['catalogue'], onSuccess: () => setPendingClientId(id) }); }}
             />
         </AppLayout>
+    );
+}
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session
+ *  dismiss. Mirrors /emar/controlled's AlertRow. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: HandoverAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
     );
 }

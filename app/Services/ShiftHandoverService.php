@@ -64,6 +64,26 @@ class ShiftHandoverService
         return DB::transaction(function () use ($outgoingShift, $actor, $data, $submit, $existing) {
             $incomingShift = $this->resolveIncomingShift($outgoingShift, $data['incoming_shift_id'] ?? null);
 
+            // Reusing an existing draft? Re-read it under a row lock and enforce
+            // optimistic concurrency — if the caller's expected version is stale,
+            // another worker saved in between, so block instead of overwriting.
+            if ($existing && $existing->status === self::STATUS_DRAFT) {
+                $existing = ShiftHandover::query()
+                    ->with('outgoingStaff:id,name')
+                    ->lockForUpdate()
+                    ->findOrFail($existing->id);
+
+                $expectedVersion = $data['expected_version'] ?? null;
+                if ($expectedVersion !== null && (int) $existing->version !== (int) $expectedVersion) {
+                    throw ValidationException::withMessages([
+                        'handover' => sprintf(
+                            'This handover was changed by %s after you opened it. Reload to see their version, then re-apply your edits.',
+                            $existing->outgoingStaff?->name ?? 'another worker',
+                        ),
+                    ]);
+                }
+            }
+
             $handover = $existing && $existing->status === self::STATUS_DRAFT
                 ? $existing
                 : new ShiftHandover();
@@ -97,6 +117,8 @@ class ShiftHandoverService
                         ->all(),
                 'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
                 'observations_summary' => $this->buildObservationsSummary($outgoingShift),
+                'cd_verification' => $this->normalizeCdVerification($data['cd_verification_input'] ?? null, $actor),
+                'version' => $existing && $existing->status === self::STATUS_DRAFT ? (int) $existing->version + 1 : 1,
                 'status' => self::STATUS_DRAFT,
             ]);
 
@@ -700,6 +722,38 @@ class ShiftHandoverService
             ]);
         }
 
+    }
+
+    /**
+     * Normalise the wizard's controlled-drug count check into the stored
+     * cd_verification shape, stamping who reconciled it and when. Returns null
+     * (no record) unless a real result was chosen — not every shift handles CDs.
+     *
+     * @param  array<string, mixed>|null  $input
+     * @return array<string, mixed>|null
+     */
+    protected function normalizeCdVerification(?array $input, User $actor): ?array
+    {
+        $result = $input['result'] ?? null;
+
+        if (! in_array($result, ['verified', 'discrepancy'], true)) {
+            return null;
+        }
+
+        $witnessId = isset($input['witness_id']) && $input['witness_id'] !== ''
+            ? (int) $input['witness_id']
+            : null;
+        $witness = $witnessId ? User::query()->find($witnessId) : null;
+
+        return [
+            'result' => $result,
+            'witness_id' => $witnessId,
+            'witness_name' => $witness?->name,
+            'notes' => isset($input['notes']) && $input['notes'] !== '' ? (string) $input['notes'] : null,
+            'verified_at' => now()->toISOString(),
+            'verified_by' => $actor->id,
+            'verified_by_name' => $actor->name,
+        ];
     }
 
     /**
