@@ -36,12 +36,13 @@ client jump = `router.visit('/operations/clients/${id}/care')`; alert strip mirr
 
 ## B. Detail drawer — Options bar + Verify integrity action  — priority 2
 
-- [ ] B1. Add a footer Options bar to `MedicationEventDrawer` (adapt `prn-detail-dialog.tsx`;
-      read-only/navigational only): **View client · Open on MAR · Verify integrity · Export event**
-      (+ Close, + contextual Resolve-gap primary when the event is flagged). "View client" →
-      `/operations/clients/{id}/care`. "Verify integrity" focuses + re-fetches the lazy
-      integrity panel (`/event/{id}/integrity`). Keep the existing append-only
-      "Flag for investigation" governance action.
+- [x] B1. Rebuilt the `MedicationEventDrawer` footer as a read-only Options bar (prn-detail
+      pattern): Close (left) · View client (`router.visit` → `/operations/clients/{id}/care`) ·
+      Open on {MAR/CD register/…} (`router.visit` → primaryHref) · Verify integrity · Export event ·
+      Flag for investigation (kept, append-only, gated on `integrity.backed`) · Resolve gap
+      (contextual primary when flagged). New `verifyIntegrity()` focuses the integrity panel
+      (`goToSection`) and re-fetches `/event/{id}/integrity` with a toast — no mutation.
+      File: `resources/js/components/emar/medication-event-drawer.tsx`. types + lint clean.
 
 ## C. Convert secondary filters to EntityFilter  — priority 3
 
