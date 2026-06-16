@@ -1458,6 +1458,7 @@ class EmarController extends Controller
                 'reportedBy:id,name',
                 'witnessedBy:id,name',
                 'resolvedBy:id,name',
+                'incident:id,title',
                 'attachments.uploadedBy:id,name',
             ])
             ->latest()
@@ -1479,6 +1480,7 @@ class EmarController extends Controller
             ->with([
                 'client:id,first_name,last_name',
                 'discoveredBy:id,name',
+                'incident:id,title',
                 'attachments.uploadedBy:id,name',
             ])
             ->latest()
@@ -1560,6 +1562,8 @@ class EmarController extends Controller
                 'resolved_at' => $discrepancy->resolved_at instanceof \DateTimeInterface ? $discrepancy->resolved_at->toIso8601String() : null,
                 'resolved_by_name' => $discrepancy->resolvedBy?->name,
                 'resolution_notes' => $discrepancy->resolution_notes,
+                'incident_id' => $discrepancy->incident_id,
+                'incident_title' => $discrepancy->incident?->title,
                 'attachments' => $discrepancy->attachments
                     ->map(fn ($attachment) => $this->serializeSupportingAttachment(
                         $attachment,
@@ -1606,6 +1610,8 @@ class EmarController extends Controller
                 'regulator_notified_at' => $report->regulator_notified_at?->toIso8601String(),
                 'discovered_at' => $report->discovered_at?->toIso8601String(),
                 'discovered_by_name' => $report->discoveredBy?->name,
+                'incident_id' => $report->incident_id,
+                'incident_title' => $report->incident?->title,
                 'investigation_status' => $report->investigation_status,
                 'investigation_notes' => $report->investigation_notes,
                 'resolution_outcome' => $report->resolution_outcome,
@@ -4377,8 +4383,13 @@ class EmarController extends Controller
         });
 
         if ($discrepancy) {
-            app(MedicationIncidentIntegrationService::class)
+            $incident = app(MedicationIncidentIntegrationService::class)
                 ->handleControlledDiscrepancy($discrepancy, auth()->id());
+
+            // Persist the link so the discrepancy detail can surface the incident.
+            if ($incident) {
+                $discrepancy->forceFill(['incident_id' => $incident->id])->save();
+            }
         }
 
         $refreshedStock = $medication?->stock()->first();

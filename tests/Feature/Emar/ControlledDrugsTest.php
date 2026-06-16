@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ControlledDrugLossReport;
@@ -178,6 +179,27 @@ class ControlledDrugsTest extends TestCase
         $this->assertSame('Medsafe', $report->regulator_name);
         $this->assertSame('MS-123', $report->regulator_reference);
         $this->assertNotNull($report->regulator_notified_at);
+    }
+
+    public function test_balance_check_mismatch_links_incident_to_discrepancy(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/balance-check', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'expected_balance' => 10,
+                'actual_balance' => 8,
+                'witnessed_by' => $witness->id,
+                'discrepancy_notes' => 'Two tablets unaccounted for.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $discrepancy = ClientControlledDrugDiscrepancy::first();
+        $this->assertNotNull($discrepancy);
+        $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
     }
 
     protected function makeRoleUser(string $roleName): User

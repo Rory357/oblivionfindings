@@ -73,8 +73,13 @@ class CDLossReportController extends Controller
 
         $report = ControlledDrugLossReport::create($validated);
 
-        app(MedicationIncidentIntegrationService::class)
+        $incident = app(MedicationIncidentIntegrationService::class)
             ->handleControlledLossReport($report, $request->user()->id);
+
+        // Persist the link so the loss detail can surface the governing incident.
+        if ($incident) {
+            $report->forceFill(['incident_id' => $incident->id])->save();
+        }
 
         $payload = [
             'success' => true,

@@ -17,6 +17,7 @@ class ControlledDrugLossReport extends Model
     protected $fillable = [
         'client_id',
         'client_medication_id',
+        'incident_id',
         'medication_name',
         'quantity_lost',
         'unit',
@@ -63,6 +64,11 @@ class ControlledDrugLossReport extends Model
     public function medication(): BelongsTo
     {
         return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+    }
+
+    public function incident(): BelongsTo
+    {
+        return $this->belongsTo(ClientIncident::class, 'incident_id');
     }
 
     public function discoveredBy(): BelongsTo

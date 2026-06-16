@@ -60,6 +60,8 @@ export interface CdDiscrepancy {
     resolved_at?: string | null;
     resolved_by_name?: string | null;
     resolution_notes?: string | null;
+    incident_id?: number | null;
+    incident_title?: string | null;
     attachments: unknown[];
 }
 
@@ -101,6 +103,8 @@ export interface CdLossReport {
     investigation_status: string;
     investigation_notes: string | null;
     resolution_outcome: string | null;
+    incident_id?: number | null;
+    incident_title?: string | null;
     attachments: unknown[];
 }
 

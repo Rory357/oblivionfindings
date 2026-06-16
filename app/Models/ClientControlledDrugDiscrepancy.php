@@ -15,6 +15,7 @@ class ClientControlledDrugDiscrepancy extends Model
         'client_id',
         'client_medication_id',
         'service_context_id',
+        'incident_id',
         'on_hand_before',
         'on_hand_after',
         'difference',
@@ -47,6 +48,11 @@ class ClientControlledDrugDiscrepancy extends Model
     public function serviceContext(): BelongsTo
     {
         return $this->belongsTo(ServiceContext::class);
+    }
+
+    public function incident(): BelongsTo
+    {
+        return $this->belongsTo(ClientIncident::class, 'incident_id');
     }
 
     public function reportedBy(): BelongsTo

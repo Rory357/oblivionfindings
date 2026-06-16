@@ -178,6 +178,18 @@ export function CdDetailDialog({
     );
 }
 
+/** Linked-incident chip — deep-links to the client's incidents page. */
+function IncidentLink({ id, title, clientId }: { id: number; title?: string | null; clientId: number | null }) {
+    const label = title || `Incident #${id}`;
+    if (!clientId) return <>{label}</>;
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- inline text link inside a ReviewRow value, not a shadcn Button.
+        <button type="button" onClick={() => router.visit(`/clients/${clientId}/incidents`)} className="inline-flex items-center gap-1 text-primary hover:underline">
+            {label}
+        </button>
+    );
+}
+
 function DrugName({ name, controlled }: { name: ReactNode; controlled?: boolean }) {
     return (
         <span className="inline-flex items-center gap-1.5">
@@ -270,6 +282,9 @@ function DiscrepancyBody({ disc }: { disc: CdDiscrepancy }) {
                     <ReviewRow label="Difference" value={disc.difference != null ? String(disc.difference) : null} />
                 </ReviewCard>
                 <ReviewCard icon={FileText} title="Reporting & resolution" span>
+                    {disc.incident_id ? (
+                        <ReviewRow label="Linked incident" value={<IncidentLink id={disc.incident_id} title={disc.incident_title} clientId={disc.client?.id ?? null} />} />
+                    ) : null}
                     <ReviewRow label="Reported by" value={disc.reported_by_name} />
                     <ReviewRow label="Witnessed by" value={disc.witnessed_by_name} />
                     <ReviewRow label="Reported at" value={fmtTs(disc.reported_at)} />
@@ -323,6 +338,9 @@ function LossBody({ loss: l }: { loss: CdLossReport }) {
                     <ReviewRow label="Circumstances" value={l.circumstances} />
                 </ReviewCard>
                 <ReviewCard icon={ShieldCheck} title="Escalation & investigation">
+                    {l.incident_id ? (
+                        <ReviewRow label="Linked incident" value={<IncidentLink id={l.incident_id} title={l.incident_title} clientId={l.client?.id ?? null} />} />
+                    ) : null}
                     <ReviewRow label="Accountable Officer" value={l.accountable_officer_name} />
                     <ReviewRow label="Discovered by" value={l.discovered_by_name} />
                     <ReviewRow label="Discovered at" value={fmtTs(l.discovered_at)} />
