@@ -4,6 +4,7 @@ import {
     DialogContent,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Link } from '@inertiajs/react';
 import {
     Activity,
     ArrowRight,
@@ -17,9 +18,11 @@ import {
     Pill,
     Send,
     ShieldAlert,
+    User,
     UserCheck,
+    Users,
 } from 'lucide-react';
-import { type ComponentType } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 
 import { formatDate } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
@@ -172,6 +175,52 @@ function lockNote(h: Handover) {
     return null;
 }
 
+/** Inline Inertia link for an entity name/label inside the detail body. Renders
+ *  an <a> (so no raw-button lint) that client-side-navigates on click. */
+function EntityLink({
+    href,
+    className,
+    children,
+}: {
+    href: string;
+    className?: string;
+    children: ReactNode;
+}) {
+    return (
+        <Link
+            href={href}
+            className={cn(
+                'rounded transition-colors hover:text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                className,
+            )}
+        >
+            {children}
+        </Link>
+    );
+}
+
+/** A jump action in the detail dialog's footer Options bar — mirrors the
+ *  prn-detail-dialog ghost-button idiom. Navigates via Inertia. */
+function OptionLink({
+    href,
+    icon: Icon,
+    children,
+}: {
+    href: string;
+    icon: ComponentType<{ className?: string }>;
+    children: ReactNode;
+}) {
+    return (
+        <Link
+            href={href}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+        >
+            <Icon className="h-3.5 w-3.5" />
+            {children}
+        </Link>
+    );
+}
+
 export function HandoverDetailDialog({
     handover,
     open,
@@ -220,11 +269,14 @@ export function HandoverDetailDialog({
                                 </span>
                             ) : null}
                             {h.outgoing_shift ? (
-                                <span className="inline-flex items-center gap-1">
+                                <EntityLink
+                                    href={`/operations/shifts/${h.outgoing_shift.id}`}
+                                    className="inline-flex items-center gap-1"
+                                >
                                     <Clock className="h-3 w-3" />
                                     {h.outgoing_shift.label} ·{' '}
                                     {fmtShiftRange(h.outgoing_shift)}
-                                </span>
+                                </EntityLink>
                             ) : null}
                             <span className="inline-flex items-center gap-1">
                                 <Activity className="h-3 w-3" />
@@ -246,9 +298,12 @@ export function HandoverDetailDialog({
                             <div className="flex items-center gap-2">
                                 <HueAvatar name={out.name} size={38} />
                                 <div className="leading-tight">
-                                    <div className="text-[13px] font-bold">
+                                    <EntityLink
+                                        href={`/staff/${out.id}`}
+                                        className="block text-[13px] font-bold"
+                                    >
                                         {out.name}
-                                    </div>
+                                    </EntityLink>
                                     <div className="text-[11px] text-muted-foreground">
                                         Outgoing
                                         {humanizeRole(out.role)
@@ -263,9 +318,12 @@ export function HandoverDetailDialog({
                             <div className="flex items-center gap-2">
                                 <HueAvatar name={inc.name} size={38} />
                                 <div className="leading-tight">
-                                    <div className="text-[13px] font-bold">
+                                    <EntityLink
+                                        href={`/staff/${inc.id}`}
+                                        className="block text-[13px] font-bold"
+                                    >
                                         {inc.name}
-                                    </div>
+                                    </EntityLink>
                                     <div className="text-[11px] text-muted-foreground">
                                         Incoming
                                         {humanizeRole(inc.role)
@@ -364,7 +422,45 @@ export function HandoverDetailDialog({
                 </div>
 
                 {/* Footer */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3.5">
+                <div className="flex flex-col gap-2.5 border-t border-border px-5 py-3.5">
+                    {/* Options bar — cross-entity jumps (client / shift / staff / MAR) */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {h.client ? (
+                            <OptionLink
+                                href={`/operations/clients/${h.client.id}/care`}
+                                icon={User}
+                            >
+                                View client
+                            </OptionLink>
+                        ) : null}
+                        {h.outgoing_shift ? (
+                            <OptionLink
+                                href={`/operations/shifts/${h.outgoing_shift.id}`}
+                                icon={Clock}
+                            >
+                                View shift
+                            </OptionLink>
+                        ) : null}
+                        {out ? (
+                            <OptionLink href={`/staff/${out.id}`} icon={UserCheck}>
+                                {out.name.split(' ')[0]} · outgoing
+                            </OptionLink>
+                        ) : null}
+                        {inc ? (
+                            <OptionLink href={`/staff/${inc.id}`} icon={Users}>
+                                {inc.name.split(' ')[0]} · incoming
+                            </OptionLink>
+                        ) : null}
+                        {h.client ? (
+                            <OptionLink
+                                href={`/emar/mar?client_id=${h.client.id}`}
+                                icon={Pill}
+                            >
+                                Open on MAR chart
+                            </OptionLink>
+                        ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
                         {note ? (
                             <>
@@ -426,6 +522,7 @@ export function HandoverDetailDialog({
                                 Edit locked
                             </button>
                         )}
+                    </div>
                     </div>
                 </div>
             </DialogContent>

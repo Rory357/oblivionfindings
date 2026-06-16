@@ -53,10 +53,16 @@ un-regressed.
   gained optional `onEdit?`. Operations un-regressed (same handlers, jumps are global routes).*
 
 ## B. Cross-entity jumps in the detail dialog  *(shared → also Operations)*
-- [ ] **B1** Make the shift labels/times + staff names in `handover-detail-dialog.tsx` link to
+- [x] **B1** Make the shift labels/times + staff names in `handover-detail-dialog.tsx` link to
   their entities, and add a footer **Options** action bar (mirror `prn-detail-dialog`): View
   client, View shift, View staff, Open on MAR chart — alongside the existing Acknowledge/Edit/
-  Submit. Reuse the same jump targets as A.
+  Submit. Reuse the same jump targets as A. — *Done: `handover-detail-dialog.tsx` — header
+  outgoing-shift label + outgoing/incoming staff names are now Inertia `<Link>`s (new `EntityLink`
+  helper); footer restructured to `flex-col` with an Options bar (`OptionLink` ghost-buttons) =
+  View client (`/operations/clients/{id}/care`) · View shift (`/operations/shifts/{id}`) · outgoing
+  & incoming staff (`/staff/{id}`) · Open on MAR chart (`/emar/mar?client_id={id}`), above the
+  existing Close/Submit/Acknowledge/Edit row. Shared component → Operations gets the same links
+  with no prop changes (un-regressed). `<Link>`-based, so no new raw-button lint.*
 
 ## C. Hero footer filters (eMAR only)
 - [ ] **C1** Add a **Client** `EntityFilter` and a **Staff** filter (outgoing/incoming) to the
