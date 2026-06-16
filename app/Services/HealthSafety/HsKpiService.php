@@ -23,8 +23,9 @@ use Illuminate\Database\Eloquent\Builder;
  *
  * Frequency rates use the standard NZ/AU "per 1,000,000 hours worked" denominator.
  * The hours-worked source is {@see BillingEntry::$hours} (the only SQL-summable worked-hours
- * column, scoped by site + service_date). Rate methods return NULL when hours = 0 so the
- * dashboard renders "—" rather than a divide-by-zero figure (never fabricated data).
+ * column, scoped by site + service_date). Rate methods return NULL below MIN_RATE_HOURS of
+ * worked exposure so the dashboard renders "—" rather than a divide-by-near-zero figure that
+ * would extrapolate one injury into a six-figure rate (never fabricated data).
  *
  * All methods are read-only. No mutations.
  */
@@ -32,6 +33,14 @@ class HsKpiService
 {
     /** Per-million-hours-worked base multiplier for LTIFR / TRIFR / severity rate. */
     private const FREQUENCY_BASE = 1_000_000;
+
+    /**
+     * Minimum worked-hours in the basis window before a per-million-hours frequency rate is
+     * reported. Below this the denominator is too small to be meaningful — a handful of logged
+     * hours would extrapolate a single injury into a six-figure rate — so the rate returns NULL
+     * and the dashboard shows "—" instead. (Standard frequency rates assume substantial exposure.)
+     */
+    private const MIN_RATE_HOURS = 1_000;
 
     /**
      * medical_treatment_type values that make a WorkplaceInjury "recordable" (treatment
@@ -72,7 +81,7 @@ class HsKpiService
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
-        if ($hours <= 0) {
+        if ($hours < self::MIN_RATE_HOURS) {
             return null;
         }
 
@@ -92,7 +101,7 @@ class HsKpiService
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
-        if ($hours <= 0) {
+        if ($hours < self::MIN_RATE_HOURS) {
             return null;
         }
 
@@ -106,7 +115,7 @@ class HsKpiService
     {
         [$from, $to] = $this->rateWindow($from, $to);
         $hours = $this->totalHoursWorked($from, $to, $siteId);
-        if ($hours <= 0) {
+        if ($hours < self::MIN_RATE_HOURS) {
             return null;
         }
 
@@ -256,8 +265,8 @@ class HsKpiService
 
             $rows[] = [
                 'month' => $monthEnd->format('Y-m'),
-                'ltifr' => $hours > 0 ? round($lostTime / $hours * self::FREQUENCY_BASE, 1) : null,
-                'trifr' => $hours > 0 ? round($recordable / $hours * self::FREQUENCY_BASE, 1) : null,
+                'ltifr' => $hours >= self::MIN_RATE_HOURS ? round($lostTime / $hours * self::FREQUENCY_BASE, 1) : null,
+                'trifr' => $hours >= self::MIN_RATE_HOURS ? round($recordable / $hours * self::FREQUENCY_BASE, 1) : null,
             ];
         }
 
