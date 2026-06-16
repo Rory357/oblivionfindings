@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\WorkplaceInjury;
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Services\HealthSafety\HsAnalyticsService;
 use App\Services\HealthSafety\HsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class HealthSafetyDashboardController extends Controller
 {
     public function __construct(
         private readonly HsDashboardService $dashboardService,
+        private readonly HsAnalyticsService $analyticsService,
     ) {}
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
@@ -202,114 +204,58 @@ class HealthSafetyDashboardController extends Controller
     }
 
     /**
-     * Analytics page with date range filters and deeper breakdowns.
+     * Health & Safety Analytics — trend / root-cause / governance explorer.
+     *
+     * Accepts a range preset (period) or a custom from/to window, a site_id
+     * filter and a role lens; returns site- & role-scoped payloads built by
+     * HsAnalyticsService. NZ-only metrics (LTIFR/TRIFR, WorkSafe notifiable,
+     * Nga Paerewa). See docs/HEALTH_SAFETY_ANALYTICS_BACKEND_AUDIT.md.
      */
     public function analytics(Request $request): \Inertia\Response
     {
-        $from = $request->input('from')
-            ? Carbon::parse($request->input('from'))->startOfDay()
-            : Carbon::now()->subMonths(12)->startOfMonth();
-        $to = $request->input('to')
-            ? Carbon::parse($request->input('to'))->endOfDay()
-            : Carbon::now()->endOfDay();
+        $period = (string) $request->input('period', 'ytd'); // 30d|q|6m|ytd|custom
+        [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));
 
-        // -- Incident Data by Type --
-        $incidentData = ClientIncident::select('type', DB::raw('COUNT(*) as count'))
-            ->whereBetween('occurred_at', [$from, $to])
-            ->groupBy('type')
-            ->orderByDesc('count')
-            ->get();
+        $siteId = $request->input('site_id') ? (int) $request->input('site_id') : null;
+        $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
+            ? (string) $request->input('lens')
+            : 'manager';
 
-        // -- Hazard Data by Risk Rating --
-        $hazardData = SiteHazard::select('risk_rating', DB::raw('COUNT(*) as count'))
-            ->whereBetween('created_at', [$from, $to])
-            ->groupBy('risk_rating')
-            ->get();
+        $payload = $this->analyticsService->build($siteId, $from, $to, $lens);
+        $activeSite = $siteId ? Site::find($siteId) : null;
 
-        // -- Injury Data --
-        $injuryByType = WorkplaceInjury::select('injury_type as type', DB::raw('COUNT(*) as count'))
-            ->whereBetween('injury_date', [$from, $to])
-            ->groupBy('injury_type')
-            ->orderByDesc('count')
-            ->get();
-
-        $injuryByBodyPart = WorkplaceInjury::select('body_part_affected as body_part', DB::raw('COUNT(*) as count'))
-            ->whereBetween('injury_date', [$from, $to])
-            ->whereNotNull('body_part_affected')
-            ->groupBy('body_part_affected')
-            ->orderByDesc('count')
-            ->get();
-
-        // -- Site Comparison --
-        $sixMonthsAgo = Carbon::now()->subMonths(6);
-        $siteComparison = Site::orderBy('name')->get(['id', 'name'])->map(function ($site) use ($from, $to, $sixMonthsAgo) {
-            $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])->count();
-
-            $openHazards = SiteHazard::where('site_id', $site->id)
-                ->whereIn('status', ['open', 'in_progress'])
-                ->count();
-
-            $lostTimeDays = (int) WorkplaceInjury::where('site_id', $site->id)
-                ->whereBetween('injury_date', [$from, $to])
-                ->sum('lost_time_days');
-
-            $lastDrill = EmergencyDrill::where('site_id', $site->id)
-                ->whereNotNull('completed_at')
-                ->max('completed_at');
-
-            $lastDrillDate = $lastDrill ? Carbon::parse($lastDrill) : null;
-            $drillStatus = 'overdue';
-            if ($lastDrillDate && $lastDrillDate->gte($sixMonthsAgo)) {
-                $drillStatus = 'compliant';
-            } elseif ($lastDrillDate && $lastDrillDate->gte($sixMonthsAgo->copy()->subMonth())) {
-                $drillStatus = 'due_soon';
-            }
-
-            $score = 100;
-            $score -= min($totalIncidents * 5, 30);
-            $score -= min($openHazards * 10, 30);
-            if ($drillStatus === 'overdue') $score -= 20;
-            elseif ($drillStatus === 'due_soon') $score -= 10;
-
-            return [
-                'id' => $site->id,
-                'name' => $site->name,
-                'total_incidents' => $totalIncidents,
-                'open_hazards' => $openHazards,
-                'lost_time_days' => $lostTimeDays,
-                'drill_status' => $drillStatus,
-                'compliance_score' => max(0, $score),
-            ];
-        });
-
-        // -- Root Cause Analysis --
-        $rootCauseRaw = ClientIncident::select('root_cause_category', DB::raw('COUNT(*) as count'))
-            ->whereBetween('occurred_at', [$from, $to])
-            ->whereNotNull('root_cause_category')
-            ->groupBy('root_cause_category')
-            ->orderByDesc('count')
-            ->get();
-
-        $rootCauseTotal = $rootCauseRaw->sum('count') ?: 1;
-        $rootCauseData = $rootCauseRaw->map(fn ($item) => [
-            'category' => $item->root_cause_category,
-            'count' => $item->count,
-            'percentage' => (int) round(($item->count / $rootCauseTotal) * 100),
-        ]);
-
-        return Inertia::render('health-safety/analytics', [
+        return Inertia::render('health-safety/analytics', array_merge($payload, [
             'filters' => [
+                'period' => $period,
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
+                'site_id' => $siteId,
+                'lens' => $lens,
             ],
-            'incident_data' => $incidentData,
-            'hazard_data' => $hazardData,
-            'injury_data' => [
-                'by_type' => $injuryByType,
-                'by_body_part' => $injuryByBodyPart,
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
+        ]));
+    }
+
+    /**
+     * Map a range preset (or custom from/to) to a [from, to] window.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function resolveRange(string $period, ?string $from, ?string $to): array
+    {
+        $now = Carbon::now();
+
+        return match ($period) {
+            '30d' => [$now->copy()->subDays(30)->startOfDay(), $now->copy()->endOfDay()],
+            'q' => [$now->copy()->subMonths(3)->startOfDay(), $now->copy()->endOfDay()],
+            '6m' => [$now->copy()->subMonths(6)->startOfDay(), $now->copy()->endOfDay()],
+            'custom' => [
+                $from ? Carbon::parse($from)->startOfDay() : $now->copy()->subMonths(12)->startOfDay(),
+                $to ? Carbon::parse($to)->endOfDay() : $now->copy()->endOfDay(),
             ],
-            'site_comparison' => $siteComparison,
-            'root_cause_data' => $rootCauseData,
-        ]);
+            default => [$now->copy()->startOfYear(), $now->copy()->endOfDay()], // ytd
+        };
     }
 }

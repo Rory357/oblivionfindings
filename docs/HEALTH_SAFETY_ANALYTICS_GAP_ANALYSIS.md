@@ -66,12 +66,12 @@ It **does not use `recharts`**, has **no leading-vs-lagging framing**, **no tren
 
 ## Backend gaps (verified — detail in `HEALTH_SAFETY_ANALYTICS_BACKEND_AUDIT.md`)
 
-- [ ] **BE1** `analytics()` returns **no trend series** — add monthly `trends[]` (LTIFR/TRIFR, near-miss ratio, incidents, hazards opened/closed/open, CA avg-days + %-on-time, compliance %, worker engagement + consultation, WorkSafe notified/awaiting).
-- [ ] **BE2** **LTIFR / TRIFR calc** — hours-worked **is** available (`timesheets.total_hours`, site-scoped). LTIFR truthful; TRIFR via the documented recordable heuristic (audit §9). Carry `hours_source` for honesty; return `null` (not 0) when hours are missing.
-- [ ] **BE3** **Root-cause Pareto** — add ordered `cumulative_pct` to `root_cause_data`.
-- [ ] **BE4** 🐞 **`site_comparison.total_incidents` not site-scoped** (`analytics():246`). Fix is a **join through `client.site_id`** — `client_incidents` has **no `site_id`** column. Add per-site `ltifr`/`trifr`.
-- [ ] **BE5** **Site- & role-scoped payloads** — accept `site_id` + `lens`; scope queries; role re-weights ordering/emphasis.
-- [ ] **BE6** **Worker-participation / training series** (BE feeds C7/C9/E3).
+- [x] **BE1** `analytics()` returns monthly `trends[]` (LTIFR/TRIFR, near-miss ratio, incidents, hazards opened/closed/open, CA avg-days + %-on-time, compliance %, worker engagement + consultation, WorkSafe notified/awaiting) — `HsAnalyticsService::buildTrends`. *(commit b-payload)*
+- [x] **BE2** **LTIFR / TRIFR calc** from `timesheets.total_hours` (site-scoped, `submitted`/`approved`; rostered-shift fallback flagged via `hours_meta.source`). LTIFR truthful; TRIFR via the documented recordable heuristic (audit §9); `null` (not 0) when hours missing.
+- [x] **BE3** **Root-cause Pareto** — `rootCausePareto()` returns ordered `count`/`pct`/`cumulative_pct`.
+- [x] **BE4** 🐞 **Site-scoping bug fixed** — `siteComparison()` joins `clients` and groups by `clients.site_id` (one query, not N); per-site `ltifr`/`trifr` added.
+- [x] **BE5** **Site- & role-scoped payloads** — `build(?siteId, from, to, lens)`; every query site-scoped; `role_note` + scorecard for the lens.
+- [x] **BE6** **Worker-participation / training series** — `engagementByMonth` / `consultationByMonth` / `complianceByMonth`.
 - [ ] **BE7** **CSV export endpoint** + wire governance pack cards to `/health-safety/reports/*`.
 
 ---
