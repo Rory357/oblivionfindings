@@ -53,17 +53,24 @@ export function ShiftContextMenu({
 
     const [pos, setPos] = useState({ top: ctx.y, left: ctx.x });
     useLayoutEffect(() => {
-        if (!ref.current) return;
-        const r = ref.current.getBoundingClientRect();
+        const el = ref.current;
+        if (!el) return;
+        // Measure with offsetWidth/offsetHeight (the layout box), NOT
+        // getBoundingClientRect(): the `animate-in zoom-in-95` enter animation
+        // applies a transient scale() transform, so the rect's transformed
+        // height made the reposition under-correct — the lowest items clipped
+        // below the viewport when the menu opened from a row near the bottom
+        // edge. The layout box is transform-independent and stable.
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         let top = ctx.y;
         let left = ctx.x;
-        if (left + r.width + 8 > vw) left = vw - r.width - 8;
-        if (top + r.height + 8 > vh) top = vh - r.height - 8;
-        // Never let the menu run off the top/left edge — when it is taller than
-        // the viewport the maxHeight cap + internal scroll (below) keep every
-        // item reachable instead of clipping the lowest ones off-screen.
+        if (left + w + 8 > vw) left = vw - w - 8;
+        if (top + h + 8 > vh) top = vh - h - 8;
+        // Never let the menu run off the top/left edge; with the maxHeight cap +
+        // internal scroll (below) every item stays reachable for any menu length.
         top = Math.max(8, top);
         left = Math.max(8, left);
         setPos({ top, left });
