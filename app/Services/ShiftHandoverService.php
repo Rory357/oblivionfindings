@@ -97,6 +97,7 @@ class ShiftHandoverService
                         ->all(),
                 'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
                 'observations_summary' => $this->buildObservationsSummary($outgoingShift),
+                'cd_verification' => $this->normalizeCdVerification($data['cd_verification_input'] ?? null, $actor),
                 'status' => self::STATUS_DRAFT,
             ]);
 
@@ -700,6 +701,38 @@ class ShiftHandoverService
             ]);
         }
 
+    }
+
+    /**
+     * Normalise the wizard's controlled-drug count check into the stored
+     * cd_verification shape, stamping who reconciled it and when. Returns null
+     * (no record) unless a real result was chosen — not every shift handles CDs.
+     *
+     * @param  array<string, mixed>|null  $input
+     * @return array<string, mixed>|null
+     */
+    protected function normalizeCdVerification(?array $input, User $actor): ?array
+    {
+        $result = $input['result'] ?? null;
+
+        if (! in_array($result, ['verified', 'discrepancy'], true)) {
+            return null;
+        }
+
+        $witnessId = isset($input['witness_id']) && $input['witness_id'] !== ''
+            ? (int) $input['witness_id']
+            : null;
+        $witness = $witnessId ? User::query()->find($witnessId) : null;
+
+        return [
+            'result' => $result,
+            'witness_id' => $witnessId,
+            'witness_name' => $witness?->name,
+            'notes' => isset($input['notes']) && $input['notes'] !== '' ? (string) $input['notes'] : null,
+            'verified_at' => now()->toISOString(),
+            'verified_by' => $actor->id,
+            'verified_by_name' => $actor->name,
+        ];
     }
 
     /**

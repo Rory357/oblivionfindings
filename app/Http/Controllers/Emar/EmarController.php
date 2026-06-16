@@ -3744,6 +3744,9 @@ class EmarController extends Controller
             'follow_up_items_text' => ['nullable', 'string'],
             'incidents_to_note_text' => ['nullable', 'string'],
             'tasks_pending_text' => ['nullable', 'string'],
+            'cd_result' => ['nullable', 'in:verified,discrepancy'],
+            'cd_witness_id' => ['nullable', 'integer', 'exists:users,id'],
+            'cd_notes' => ['nullable', 'string', 'max:2000'],
             'submit' => ['nullable', 'boolean'],
         ]);
 
@@ -3771,6 +3774,11 @@ class EmarController extends Controller
             'follow_up_items' => $this->parseHandoverText($validated['follow_up_items_text'] ?? null),
             'incidents_to_note' => $this->parseHandoverText($validated['incidents_to_note_text'] ?? null),
             'tasks_pending' => $this->parseHandoverText($validated['tasks_pending_text'] ?? null),
+            'cd_verification_input' => [
+                'result' => $validated['cd_result'] ?? null,
+                'witness_id' => $validated['cd_witness_id'] ?? null,
+                'notes' => $validated['cd_notes'] ?? null,
+            ],
             'submit' => (bool) ($validated['submit'] ?? true),
         ]);
 
@@ -4620,6 +4628,9 @@ class EmarController extends Controller
             'follow_up_items_text' => ['nullable', 'string'],
             'incidents_to_note_text' => ['nullable', 'string'],
             'tasks_pending_text' => ['nullable', 'string'],
+            'cd_result' => ['nullable', 'in:verified,discrepancy'],
+            'cd_witness_id' => ['nullable', 'integer', 'exists:users,id'],
+            'cd_notes' => ['nullable', 'string', 'max:2000'],
             'submit' => ['nullable', 'boolean'],
         ]);
 
@@ -4632,6 +4643,11 @@ class EmarController extends Controller
             'follow_up_items' => $this->parseHandoverText($validated['follow_up_items_text'] ?? null),
             'incidents_to_note' => $this->parseHandoverText($validated['incidents_to_note_text'] ?? null),
             'tasks_pending' => $this->parseHandoverText($validated['tasks_pending_text'] ?? null),
+            'cd_verification_input' => [
+                'result' => $validated['cd_result'] ?? null,
+                'witness_id' => $validated['cd_witness_id'] ?? null,
+                'notes' => $validated['cd_notes'] ?? null,
+            ],
             'submit' => (bool) ($validated['submit'] ?? false),
         ]);
 

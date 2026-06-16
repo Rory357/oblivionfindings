@@ -109,11 +109,19 @@ un-regressed.
   hidden + no request (un-regressed; tsc green for both callers). Gap E complete.*
 
 ## F. Controlled-drug count at handover  *(domain + compliance)*
-- [ ] **F1** Add a CD count verification to the wizard (two-person check: result + witness),
-  surface unverified CD counts in the alert strip (D), and deep-link to `/emar/controlled`.
-  Store under a JSON key on `ShiftHandover` (e.g. `observations_summary` or a new
-  `cd_verification` key) — `// TODO(Gx):` if a real column is needed. (CD registers are
-  reconciled at each shift change.)
+- [x] **F1a** CD count verification capture + storage. — *Done: new **column** `cd_verification`
+  (JSON) on `shift_handovers` (migration `2026_06_16_000200…`, mirrors `observations_summary`) +
+  `ShiftHandover` fillable/cast. The shared **wizard** (`medicationFocus`-gated) gained a
+  `CdVerificationSection` in the meds step: two-person check (result = verified/discrepancy, witness
+  select excluding the outgoing worker, notes) + `cd_due`-this-shift chip (from the E snapshot) +
+  deep-link to `/emar/controlled` (new tab). The eMAR `storeHandover`/`updateHandover` validate
+  `cd_result`/`cd_witness_id`/`cd_notes` and pass `cd_verification_input`; `ShiftHandoverService::
+  normalizeCdVerification()` stamps `verified_at`/`verified_by`/witness+actor names. `HandoverPresenter`
+  exposes `cd_verification`; shared `Handover` type gained it. Operations inert (gated). Frontend
+  tsc/eslint green; **PHP feature-tests environmentally blocked** (no php/vendor/.env).*
+- [ ] **F1b** Surface CD verification: detail-dialog read-only CD status block + the alert-strip
+  **CD banner** (wire the `// TODO(F)` in `emar/Handovers.tsx` — N submitted handovers missing a CD
+  count check → critical, deep-link `/emar/controlled`).
 
 ## G. Clarify roles + edit-locking (dedupe the 3 write paths)
 - [ ] **G1** Three UIs (eMAR / Operations / Attendance clock-out) write one `ShiftHandover`
