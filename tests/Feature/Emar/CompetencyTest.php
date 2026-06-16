@@ -61,6 +61,36 @@ class CompetencyTest extends TestCase
             );
     }
 
+    public function test_assessment_payload_carries_detail_and_staff_jump_fields(): void
+    {
+        // Guards the cross-module parity contract the redesigned page relies on:
+        // user_id drives the "View staff member" jump (/staff/{id}); observed_rounds
+        // + assessor_comments + the 12 area booleans drive the enriched detail modal.
+        ['user' => $user, 'staff' => $staff] = $this->seedCompetency();
+        MedicationCompetencyAssessment::query()->create(array_merge($this->fullAreas(), [
+            'user_id' => $staff->id, 'assessor_id' => $user->id, 'assessment_type' => 'annual', 'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(), 'expiry_date' => now()->addMonths(11)->toDateString(),
+            'total_score' => 12, 'pass_threshold' => 10,
+            'observed_rounds' => [['resident' => 'Aroha', 'med_type' => 'oral', 'outcome' => 'safe']],
+            'assessor_comments' => 'Confident and methodical.',
+        ]));
+
+        $this->actingAs($user)
+            ->get('/emar/competency')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/Competency')
+                ->has('assessments.0', fn (Assert $row) => $row
+                    ->where('user_id', $staff->id)
+                    ->where('user_name', $staff->name)
+                    ->where('assessor_comments', 'Confident and methodical.')
+                    ->has('observed_rounds', 1)
+                    ->where('medication_knowledge', true)
+                    ->etc()
+                )
+            );
+    }
+
     public function test_store_persists_observed_rounds_tristate_and_restrictions(): void
     {
         ['user' => $user, 'staff' => $staff] = $this->seedCompetency();
