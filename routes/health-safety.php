@@ -30,6 +30,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/', [HealthSafetyDashboardController::class, 'index'])->name('dashboard');
         Route::get('/analytics', [HealthSafetyDashboardController::class, 'analytics'])->name('analytics');
         Route::get('/analytics/export', [HealthSafetyDashboardController::class, 'analyticsExport'])->name('analytics.export');
+        Route::get('/analytics/records', [HealthSafetyDashboardController::class, 'analyticsRecords'])->name('analytics.records');
     });
 
     // ── PR5: H&S Backbone Views (Events, Actions, Risk Assessments) ──

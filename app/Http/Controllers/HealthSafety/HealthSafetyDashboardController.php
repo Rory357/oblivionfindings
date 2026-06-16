@@ -240,7 +240,7 @@ class HealthSafetyDashboardController extends Controller
 
     /**
      * CSV export of the active analytics view (read-only register records).
-     * Honours the same period / site_id filters as the page.
+     * Honours the same period / site_id / drill filters as the page.
      */
     public function analyticsExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
@@ -249,7 +249,7 @@ class HealthSafetyDashboardController extends Controller
         $siteId = $request->input('site_id') ? (int) $request->input('site_id') : null;
         $view = (string) $request->input('view', 'incidents');
 
-        $data = $this->analyticsService->exportRows($view, $siteId, $from, $to);
+        $data = $this->analyticsService->exportRows($view, $siteId, $from, $to, $this->drillFilters($request));
         $filename = "hs_analytics_{$data['name']}_".now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($data) {
@@ -262,6 +262,40 @@ class HealthSafetyDashboardController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    /**
+     * JSON records for the read-only drill-in detail modal. Same scoping as
+     * the page + the clicked breakdown's drill filter. Capped for display.
+     */
+    public function analyticsRecords(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $period = (string) $request->input('period', 'ytd');
+        [$from, $to] = $this->resolveRange($period, $request->input('from'), $request->input('to'));
+        $siteId = $request->input('site_id') ? (int) $request->input('site_id') : null;
+        $view = (string) $request->input('view', 'incidents');
+
+        $data = $this->analyticsService->exportRows($view, $siteId, $from, $to, $this->drillFilters($request));
+
+        return response()->json([
+            'name' => $data['name'],
+            'headers' => $data['headers'],
+            'rows' => array_slice($data['rows'], 0, 200),
+            'total' => count($data['rows']),
+        ]);
+    }
+
+    /** @return array<string,string> the drill sub-filters present on the request */
+    private function drillFilters(Request $request): array
+    {
+        return array_filter([
+            'type' => $request->input('type'),
+            'severity' => $request->input('severity'),
+            'cause' => $request->input('cause'),
+            'risk' => $request->input('risk'),
+            'status' => $request->input('drill_status'),
+            'body_part' => $request->input('body_part'),
+        ], fn ($v) => $v !== null && $v !== '');
     }
 
     /**

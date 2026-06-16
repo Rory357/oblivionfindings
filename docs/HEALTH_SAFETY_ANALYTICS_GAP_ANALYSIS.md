@@ -18,49 +18,49 @@ It **does not use `recharts`**, has **no leading-vs-lagging framing**, **no tren
 
 ## A. Charts & visual quality
 
-- [ ] **A1** Replace hand-rolled CSS bars/number-blocks/`<table>`s with `recharts` + `DonutChart`/`StatTile`, toned with `--chart-1..5` / `--status-*`.
-- [ ] **A2** Add donuts (incident severity, hazards-by-risk) with hover-to-focus + legend + %. *(ops-charts `DonutChart` is static — build the hover-focus donut with recharts `Pie`/`activeIndex`.)*
-- [ ] **A3** Add trend lines/areas (every current chart is a single-period snapshot).
-- [ ] **A4** Tone charts with semantic tokens only (`var(--chart-1)` … `var(--status-critical)`), never raw hex/oklch.
-- [ ] **A5** Chart tooltips + `aria-label`s + a data-table fallback for screen readers.
+- [x] **A1** Replace hand-rolled CSS bars/number-blocks/`<table>`s with `recharts` + `DonutChart`/`StatTile`, toned with `--chart-1..5` / `--status-*`.
+- [x] **A2** Add donuts (incident severity, hazards-by-risk) with hover-to-focus + legend + %. *(ops-charts `DonutChart` is static — build the hover-focus donut with recharts `Pie`/`activeIndex`.)*
+- [x] **A3** Add trend lines/areas (every current chart is a single-period snapshot).
+- [x] **A4** Tone charts with semantic tokens only (`var(--chart-1)` … `var(--status-critical)`), never raw hex/oklch.
+- [x] **A5** Chart tooltips + `aria-label`s + a data-table fallback for screen readers.
 
 ## B. Hero command bar
 
-- [ ] **B1** Turn the hero into a command bar: eyebrow (pulsing dot + `SAFETY ANALYTICS · {range}`), meta row (Calendar/MapPin/Shield), `--primary` gradient (shared with the dashboard hero).
-- [ ] **B2** Headline **LTIFR · TRIFR · near-miss ratio · compliance %** stat tiles with tone + period-over-period delta (not Total Incidents / Near Misses / Ratio).
-- [ ] **B3** NZ compliance badges: WorkSafe notifiable · {n awaiting} · Ngā Paerewa NZS 8134 · Hazardous Substances SDS · Fire & evacuation · First-aid cover. Dot **and** label (never colour-only).
-- [ ] **B4** Replace the detached `<input type=date>` card with a **range** segmented control (30d / Quarter / 6 months / YTD / Custom from→to) in the hero footer band.
-- [ ] **B5** Add a **Site** `EntityFilter` (onDark) in the footer band.
-- [ ] **B6** Add a **Governance / Manager / Frontline** role lens toggle (shared idiom with the dashboard).
-- [ ] **B7** Add export affordances in the hero (Export CSV/PDF · Board pack · WorkSafe register).
-- [ ] **B8** Optional "this period" summary strip in the footer band.
+- [x] **B1** Turn the hero into a command bar: eyebrow (pulsing dot + `SAFETY ANALYTICS · {range}`), meta row (Calendar/MapPin/Shield), `--primary` gradient (shared with the dashboard hero).
+- [x] **B2** Headline **LTIFR · TRIFR · near-miss ratio · compliance %** stat tiles with tone + period-over-period delta (not Total Incidents / Near Misses / Ratio).
+- [x] **B3** NZ compliance badges: WorkSafe notifiable · {n awaiting} · Ngā Paerewa NZS 8134 · Hazardous Substances SDS · Fire & evacuation · First-aid cover. Dot **and** label (never colour-only).
+- [x] **B4** Replace the detached `<input type=date>` card with a **range** segmented control (30d / Quarter / 6 months / YTD / Custom from→to) in the hero footer band.
+- [x] **B5** Add a **Site** `EntityFilter` (onDark) in the footer band.
+- [x] **B6** Add a **Governance / Manager / Frontline** role lens toggle (shared idiom with the dashboard).
+- [x] **B7** Add export affordances in the hero (Export CSV/PDF · Board pack · WorkSafe register).
+- [x] **B8** Optional "this period" summary strip in the footer band.
 
 ## C. Leading-vs-lagging trend framing (what makes it "analytics")
 
-- [ ] **C1** Add a `TabStrip` (Overview / Trends / Breakdowns / Sites / Governance) — structural split.
-- [ ] **C2** LTIFR / TRIFR trend over time (per backend audit §9; LTIFR truthful, TRIFR via documented heuristic).
-- [ ] **C3** Near-miss : incident ratio trend.
-- [ ] **C4** Incidents/30d trend.
-- [ ] **C5** Hazard burn-down (opened vs closed + running open) — `site_hazards.created_at`/`closed_at`.
-- [ ] **C6** Corrective-action closure trend (avg days + % on time) — `hs_corrective_actions`.
-- [ ] **C7** Training / audit compliance % trend — `staff_training_records`.
-- [ ] **C8** WorkSafe notifiable over time (notified vs awaiting) — `notifiable_incidents`.
-- [ ] **C9** Worker participation trend (engagement + consultation) — `hs_committee_meetings` / `hs_consultations`.
-- [ ] **C10** Leading-vs-lagging scorecard (proactive vs reactive metrics, with deltas).
+- [x] **C1** Add a `TabStrip` (Overview / Trends / Breakdowns / Sites / Governance) — structural split.
+- [x] **C2** LTIFR / TRIFR trend over time (per backend audit §9; LTIFR truthful, TRIFR via documented heuristic).
+- [x] **C3** Near-miss : incident ratio trend.
+- [x] **C4** Incidents/30d trend.
+- [x] **C5** Hazard burn-down (opened vs closed + running open) — `site_hazards.created_at`/`closed_at`.
+- [x] **C6** Corrective-action closure trend (avg days + % on time) — `hs_corrective_actions`.
+- [x] **C7** Training / audit compliance % trend — `staff_training_records`.
+- [x] **C8** WorkSafe notifiable over time (notified vs awaiting) — `notifiable_incidents`.
+- [x] **C9** Worker participation trend (engagement + consultation) — `hs_committee_meetings` / `hs_consultations`.
+- [x] **C10** Leading-vs-lagging scorecard (proactive vs reactive metrics, with deltas).
 
 ## D. Drill-down & standardised rows
 
-- [ ] **D1** Make chart segments / breakdown rows / donut slices / site rows clickable → read-only **detail modal** (Add-Client `WizardShell` chrome: context-facet rail, record-list body, Options bar Export + Open register).
-- [ ] **D2** Right-click `ShiftContextMenu` (View detail · View client · View staff · Open corrective action · Export) on every drillable element.
-- [ ] **D3** "Open {register}" links from a breakdown into the matching register (`/health-safety/events`, `/injuries`, hazards).
-- [ ] **D4** Make root-cause a proper **Pareto** (ordered bars + cumulative-% line + 80% reference), not a `%` table — add `cumulative_pct` to `root_cause_data`.
+- [x] **D1** Make chart segments / breakdown rows / donut slices / site rows clickable → read-only **detail modal** (Add-Client `WizardShell` chrome: context-facet rail, record-list body, Options bar Export + Open register).
+- [x] **D2** Right-click `ShiftContextMenu` (View detail · View client · View staff · Open corrective action · Export) on every drillable element.
+- [x] **D3** "Open {register}" links from a breakdown into the matching register (`/health-safety/events`, `/injuries`, hazards).
+- [x] **D4** Make root-cause a proper **Pareto** (ordered bars + cumulative-% line + 80% reference), not a `%` table — add `cumulative_pct` to `root_cause_data`.
 
 ## E. Export & governance
 
-- [ ] **E1** Export the active view (CSV; PDF via print) — new `analyticsExport()` mirroring `EmarReportController::export`.
-- [ ] **E2** One-click governance packs wired to the existing JSON endpoints under `/health-safety/reports/*`: board summary, WorkSafe register, investigation outcomes, corrective-action traceability, risk-assessment register.
-- [ ] **E3** Worker-participation & training analytics (leading) — HSR/committee engagement, consultation completion, competency/training completion trend.
-- [ ] **E4** Site **heatmap / league** beyond a flat table — sortable league + intensity-shaded hotspot grid.
+- [x] **E1** Export the active view (CSV; PDF via print) — new `analyticsExport()` mirroring `EmarReportController::export`.
+- [x] **E2** One-click governance packs wired to the existing JSON endpoints under `/health-safety/reports/*`: board summary, WorkSafe register, investigation outcomes, corrective-action traceability, risk-assessment register.
+- [x] **E3** Worker-participation & training analytics (leading) — HSR/committee engagement, consultation completion, competency/training completion trend.
+- [x] **E4** Site **heatmap / league** beyond a flat table — sortable league + intensity-shaded hotspot grid.
 
 ---
 
@@ -79,7 +79,7 @@ It **does not use `recharts`**, has **no leading-vs-lagging framing**, **no tren
 ## Non-NZ content scan (audit)
 
 - [x] **No non-NZ frameworks present** in `analytics.tsx`, the controller, the H&S models, or H&S services (grepped 16 June 2026). No CQC / RIDDOR / HSE / COSHH / OSHA / TRIR.
-- [ ] **Guard against drift** — `site_comparison.compliance_score` + `drill_status` copy must be framed against NZ obligations (emergency-drill cadence, Ngā Paerewa NZS 8134:2021), surfaced in a UI tooltip; not an overseas inspection regime.
+- [x] **Guard against drift** — `site_comparison.compliance_score` + `drill_status` copy must be framed against NZ obligations (emergency-drill cadence, Ngā Paerewa NZS 8134:2021), surfaced in a UI tooltip; not an overseas inspection regime.
 
 ---
 

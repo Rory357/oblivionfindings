@@ -798,20 +798,22 @@ class HsAnalyticsService
     // ── CSV export (record-level, mirrors the drill-in lists) ───────────
 
     /**
-     * Rows for a CSV export of the active view. Read-only register records,
-     * site- and range-scoped to match what the page shows.
+     * Rows for a CSV export / drill-in records list of the active view.
+     * Read-only register records, site- and range-scoped to match the page,
+     * plus optional drill sub-filters (type/severity/cause/risk/body_part).
      *
+     * @param  array<string,mixed>  $filters
      * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
      */
-    public function exportRows(string $view, ?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    public function exportRows(string $view, ?int $siteId, CarbonInterface $from, CarbonInterface $to, array $filters = []): array
     {
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
         $siteNames = Site::query()->pluck('name', 'id');
 
         return match ($view) {
-            'injuries' => $this->exportInjuries($siteId, $from, $to, $siteNames),
-            'hazards' => $this->exportHazards($siteId, $from, $to, $siteNames),
+            'injuries' => $this->exportInjuries($siteId, $from, $to, $siteNames, $filters),
+            'hazards' => $this->exportHazards($siteId, $from, $to, $siteNames, $filters),
             'sites' => $this->exportSites($from, $to),
             'root_cause' => [
                 'name' => 'root_cause',
@@ -821,17 +823,23 @@ class HsAnalyticsService
                     $this->rootCausePareto($siteId, $from, $to)
                 ),
             ],
-            default => $this->exportIncidents($siteId, $from, $to, $siteNames),
+            default => $this->exportIncidents($siteId, $from, $to, $siteNames, $filters),
         };
     }
 
-    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
-    private function exportIncidents(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    /**
+     * @param  array<string,mixed>  $filters
+     * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
+     */
+    private function exportIncidents(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $rows = ClientIncident::query()
             ->with('client:id,first_name,last_name,site_id')
             ->whereBetween('occurred_at', [$from, $to])
             ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+            ->when(! empty($filters['type']), fn ($q) => $q->where('type', $filters['type']))
+            ->when(! empty($filters['severity']), fn ($q) => $q->where('severity', $filters['severity']))
+            ->when(! empty($filters['cause']), fn ($q) => $q->where('root_cause_category', $filters['cause']))
             ->orderByDesc('occurred_at')
             ->get();
 
@@ -851,12 +859,17 @@ class HsAnalyticsService
         ];
     }
 
-    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
-    private function exportInjuries(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    /**
+     * @param  array<string,mixed>  $filters
+     * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
+     */
+    private function exportInjuries(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $rows = WorkplaceInjury::query()
             ->whereBetween('injury_date', [$from, $to])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when(! empty($filters['type']), fn ($q) => $q->where('injury_type', $filters['type']))
+            ->when(! empty($filters['body_part']), fn ($q) => $q->where('body_part_affected', $filters['body_part']))
             ->orderByDesc('injury_date')
             ->get();
 
@@ -877,12 +890,17 @@ class HsAnalyticsService
         ];
     }
 
-    /** @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>} */
-    private function exportHazards(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames): array
+    /**
+     * @param  array<string,mixed>  $filters
+     * @return array{name:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}
+     */
+    private function exportHazards(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
         $rows = SiteHazard::query()
             ->whereBetween('created_at', [$from, $to])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when(! empty($filters['risk']), fn ($q) => $q->where('risk_rating', $filters['risk']))
+            ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->orderByDesc('created_at')
             ->get();
 
