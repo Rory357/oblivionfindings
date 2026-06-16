@@ -145,11 +145,13 @@ un-regressed.
   mutate via `save()`).
 
 ## H. Remove dead `MedicationHandover` code
-- [ ] **H1** `app/Models/MedicationHandover.php` + the `medication_handovers` table + its
-  seeder rows are unused and redundant with `ShiftHandover`. Only `EmarComprehensiveSeeder.php`
-  references the model (the coincidentally-named `MedicationHandoversTest` actually tests the
-  `ShiftHandover`-backed page). Remove the model + seeder block; drop the table via a **new**
-  reversible migration (don't edit the historical ones). Confirm no other references first.
+- [x] **H1** Remove dead `MedicationHandover`. — *Done: re-audited — the model was referenced only by
+  `EmarComprehensiveSeeder` (import + one `firstOrCreate`); `MedicationHandoversTest` is
+  `ShiftHandover`-backed (coincidental name); no factory. Deleted `app/Models/MedicationHandover.php`,
+  removed the seeder's section-8 block + import, and dropped the `medication_handovers` table via a new
+  **reversible** migration `2026_06_16_000400…` (down() recreates the full original structure — the
+  historical create/checklist migrations are untouched). Zero code references remain (only the
+  migration docblock + seeder note mention the name). tsc still 0 (PHP-only change).*
 
 ---
 
@@ -173,3 +175,40 @@ removed (or documented); all actions in-page via Inertia partial reloads.
   controlled drug" from the `(CD)`/"controlled" tag in the stored `medications_due` list (the wizard's
   snapshot pre-fill). A live per-handover CD-due query would be exact but is the index-time N+1 the
   on-demand snapshot deliberately avoids. `TODO(Gx)` if exactness is later required.
+- `ShiftMedicationSnapshotService` — PRN given/reviews-outstanding use a focused administration query;
+  omissions clamp `to` to now (future shifts → 0). Refused = `administration.status === 'refused'`.
+- Gap G — live presence-based "who holds it right now" pessimistic lock (disable-on-open) is deferred;
+  the optimistic block-on-save (`version`) is the implemented guard. `applyEdit()` (Operations
+  submitted-edit path) keeps its in-txn `lockForUpdate` and doesn't bump `version` (drafts only mutate
+  via `save()`).
+
+---
+
+## ✅ Loop complete — 2026-06-16
+
+Every box **A–H** is `[x]` (10 passes, one reviewable commit per gap). Final state:
+
+- **A** right-click context menu (cards + rail) · **B** detail-dialog cross-entity links + Options bar ·
+  **C** Client/Staff hero filters + aligned search pill · **D** stacked dismissible alert strip ·
+  **E** live "Medications this shift" snapshot (service + on-demand endpoint, wizard pre-fill + detail
+  summary) · **F** controlled-drug count verification (two-person check, capture + detail + alert banner)
+  · **G** optimistic-concurrency `version` edit-lock + "same as Operations" cross-link · **H** dead
+  `MedicationHandover` model/seeder/table removed.
+- **Reuse-first throughout:** `ShiftContextMenu`, `EntityFilter`, `EnhancedMarService`/`MarOmissionService`,
+  `/emar/controlled` AlertRow idiom, the shared wizard/detail/rail/cards. New shared bits:
+  `handover-context-menu.tsx`, `shift-med-snapshot.tsx`, `ShiftMedicationSnapshotService`.
+- **Operations un-regressed:** every shared-component addition is either additive or gated
+  (`medicationFocus` / `medicationSnapshotUrl` / data-gated by a null field). Full-project `tsc` is
+  green for **both** entry pages after every pass.
+
+### ⚠️ Verification done vs. deferred (environmental — this is a bare worktree)
+- **Done every pass:** `npm run types` (full project, **0 errors**) + `npm run lint` (touched files
+  clean) + read-verified backend against real signatures/columns/relations + Operations non-regression
+  reasoning.
+- **Deferred to a built environment (NOT gaps — no `php`/`vendor`/`.env`/dev-server here):**
+  (1) PHP **feature-tests** (`MedicationHandoversTest` + new coverage for the snapshot endpoint, CD
+  persistence, and the version conflict) and running the **3 new migrations**;
+  (2) full `npm run build` (the wayfinder vite plugin shells out to `php artisan`);
+  (3) **live browser** check of `/emar/handovers` **and** `/operations/handovers` (right-click menus,
+  detail jumps, the meds panel, CD record→register, version-conflict toast, alert-strip jumps).
+  Recommend running these on `oblivionfindings.com` / a full local env before merge.

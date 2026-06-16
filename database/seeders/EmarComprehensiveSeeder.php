@@ -7,7 +7,6 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDashboardAlert;
-use App\Models\MedicationHandover;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationReview;
@@ -196,28 +195,9 @@ class EmarComprehensiveSeeder extends Seeder
 
         $this->command->info('Competency assessments seeded.');
 
-        // 8. Handover records (past 3 days)
-        for ($i = 2; $i >= 0; $i--) {
-            foreach (['morning', 'evening'] as $shift) {
-                $handoverAt = now()->subDays($i)->setTime($shift === 'morning' ? 7 : 19, 0);
-
-                MedicationHandover::firstOrCreate(
-                    [
-                        'outgoing_user_id' => $staff->random()->id,
-                        'handover_at' => $handoverAt,
-                    ],
-                    [
-                        'incoming_user_id' => $staff->random()->id,
-                        'controlled_drugs_verified' => true,
-                        'general_notes' => "Shift handover notes for {$shift} shift. All medications administered as scheduled.",
-                        'acknowledged' => true,
-                        'acknowledged_at' => $handoverAt->copy()->addMinutes(15),
-                    ]
-                );
-            }
-        }
-
-        $this->command->info('Handover records seeded.');
+        // 8. (removed) Handover demo rows previously seeded the dead MedicationHandover
+        //    model. Shift handovers are the canonical ShiftHandover records (FK'd to
+        //    rostering shifts/staff) and are seeded via the rostering/handover path.
 
         // 9. Dashboard alerts
         $firstClient = $clients->first();
