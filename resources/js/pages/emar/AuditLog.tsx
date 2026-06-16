@@ -34,6 +34,8 @@ import {
     Table,
     User,
     Users,
+    X,
+    type LucideIcon,
 } from 'lucide-react';
 import { type MouseEvent as ReactMouseEvent, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -79,6 +81,30 @@ const ctxToneFor = (e: AuditEvent): keyof typeof CTX_TAG => {
         default: return 'info';
     }
 };
+
+// Dismissible compliance alert strip (mirrors ControlledDrugs' per-session pattern).
+type AuditAlert = { kind: string; tone: 'critical' | 'warning'; icon: LucideIcon; message: string; onReview: () => void };
+const DISMISSED_ALERTS_KEY = 'audit-dismissed-alerts';
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
+}
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtShort = (d: Date) => d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
@@ -154,6 +180,38 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
     const clearFilters = () => { setSearch(''); setClientId(''); setStaffName(''); setSource(''); setRange('90'); setCat('all'); setAnchor(todayYmd); };
 
     const missingWitness = useMemo(() => events.filter((e) => e.flags.includes('missing_witness')).length, [events]);
+
+    // ── Compliance alert strip (Gap D) — dismissible per session, mirrors /emar/controlled.
+    //    Counts are windowed by the date range + client/staff/source facets (not the category
+    //    tab) so the signal persists regardless of which category you are viewing.
+    const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() => readDismissedAlerts());
+    const dismissAlert = (kind: string) => setDismissedAlerts((prev) => persistDismissedAlerts([...prev, kind]));
+    const windowEvents = useMemo(() => {
+        const end = parseYmd(anchor);
+        end.setHours(23, 59, 59, 999);
+        const windowEnd = end.getTime();
+        const windowStart = windowEnd - Number(range) * 86400000;
+        return events.filter((e) => {
+            if (clientId && String(e.client_id) !== clientId) return false;
+            if (staffName && e.performed_by !== staffName) return false;
+            if (source && e.source !== source) return false;
+            const t = new Date(e.timestamp).getTime();
+            return t >= windowStart && t <= windowEnd;
+        });
+    }, [events, clientId, staffName, source, range, anchor]);
+    const windowOmissions = useMemo(() => windowEvents.filter((e) => e.flags.includes('omission')).length, [windowEvents]);
+    const windowMissingWitness = useMemo(() => windowEvents.filter((e) => e.flags.includes('missing_witness')).length, [windowEvents]);
+    // TODO(Gx): "N events edited since recording" is not on the index payload — integrity.edit_count
+    // is lazy-loaded per event from /emar/audit/event/{id}/integrity, so surfacing it here would mean
+    // fetching N integrity records on load. Omitted (see docs/AUDIT_TRAIL_GAP_ANALYSIS.md, Gap D).
+    const allAlerts: AuditAlert[] = [];
+    if (windowOmissions > 0) {
+        allAlerts.push({ kind: 'omission', tone: 'critical', icon: AlertTriangle, message: `${windowOmissions} MAR omission${windowOmissions === 1 ? '' : 's'} in this window — reconcile each with an outcome and reason.`, onReview: () => { setCat('doses'); setView('gaps'); } });
+    }
+    if (windowMissingWitness > 0) {
+        allAlerts.push({ kind: 'witness', tone: 'critical', icon: Lock, message: `${windowMissingWitness} controlled-drug ${windowMissingWitness === 1 ? 'entry is' : 'entries are'} missing a second signature.`, onReview: () => { setCat('controlled'); setView('gaps'); } });
+    }
+    const auditAlerts = allAlerts.filter((a) => !dismissedAlerts.includes(a.kind));
 
     const catCounts = useMemo(() => {
         const base = events.filter((e) => {
@@ -267,6 +325,14 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                     }
                 />
 
+                {auditAlerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {auditAlerts.map((a) => (
+                            <AuditAlertRow key={a.kind} alert={a} onDismiss={() => dismissAlert(a.kind)} />
+                        ))}
+                    </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <TabStrip value={view} onChange={setView} items={VIEW_TABS} ariaLabel="Audit views" />
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -379,6 +445,28 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
             )}
             {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
+    );
+}
+
+/** One row of the dismissible compliance alert strip — icon + message + Review jump + dismiss. */
+function AuditAlertRow({ alert, onDismiss }: { alert: AuditAlert; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={alert.onReview}>Review</Button>
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
     );
 }
 

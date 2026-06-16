@@ -55,13 +55,14 @@ client jump = `router.visit('/operations/clients/${id}/care')`; alert strip mirr
 
 ## D. Integrity / omission alert strip  — priority 4 (optional)
 
-- [ ] D1. Add a dismissible (per-session) alert strip below the hero, mirroring
-      `/emar/controlled`, surfacing the compliance signals already on the payload:
-      **N MAR omissions in this window** (critical → gaps view) and **N CD entries missing a
-      witness** (critical → controlled gaps). Each: icon + count + message + a "Review" jump +
-      dismiss. `TODO(Gx)`: "N events edited since recording" is **not** on the index payload —
-      `integrity.edit_count` is lazy-loaded per event from the integrity endpoint — so it is
-      omitted (would need a payload/aggregate change, out of front-end scope).
+- [x] D1. Added a dismissible (per-session, `sessionStorage`) alert strip below the hero,
+      mirroring `/emar/controlled` (`AuditAlertRow` + `readDismissedAlerts`/`persistDismissedAlerts`).
+      Signals are windowed by date-range + client/staff/source (not the category tab): **N MAR
+      omissions in this window** (critical → doses + gaps view) and **N CD entries missing a
+      witness** (critical → controlled + gaps view). Each: icon + count + message + Review jump +
+      dismiss. `TODO(Gx)` recorded in-code: "N events edited since recording" is NOT on the index
+      payload (`integrity.edit_count` is lazy per-event) → omitted rather than fetching N records.
+      File: `resources/js/pages/emar/AuditLog.tsx`. types + lint + build clean.
 
 ---
 
@@ -78,3 +79,18 @@ navigational/read-only with Inertia partial reloads where applicable.
   menu; drawer footer has Flag/Export/Resolve only — no View-client / Verify-integrity).
   Confirmed the `.design-drops` prototype is not checked into this worktree; using
   `docs/emar-redesign/audit-design-review.md` + the cross-module standard as the reference.
+- (pass 1) Gap A — row right-click menu + View client. commit `faf61687`.
+- (pass 2) Gap B — drawer Options bar + Verify integrity. commit `b8f11e22`.
+- (pass 3) Gap C — Client/Staff/Source → EntityFilter. commit `cc912a24`.
+- (pass 4) Gap D — dismissible omission/witness alert strip (edited-since TODO(Gx)). commit (this).
+
+## §6 status — ALL BOXES [x]
+All A–D closed. `npm run types` (only pre-existing `@/routes/*` worktree-stub errors, none in the
+two touched files), `npm run lint` (clean for touched files), and `npm run build` (full production
+bundle, exit 0 — verified in-worktree with parent-copied Wayfinder routes + wayfinder plugin
+temporarily disabled, since the worktree has no vendor/.env to regenerate them; my branch adds no
+routes) all pass. The page remains strictly append-only — every new affordance is
+navigational/read-only (View record/client, Open on MAR, Verify integrity, Export, Copy ID) or an
+append-only governance flag; no create/edit/delete was added. Remaining: `TODO(Gx)` edited-since
+signal needs a payload/aggregate change (out of front-end scope); live pixel/interaction verify on
+oblivionfindings.com is the user's (browser) step.
