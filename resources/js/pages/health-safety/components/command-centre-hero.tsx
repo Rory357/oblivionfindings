@@ -1,9 +1,8 @@
-/* Health & Safety command-centre hero (WS2). Mirrors the handovers/shift-notes hero
- * idiom: PageHero category="ops" shell + live-dot eyebrow (children) + leading/lagging
- * stat clusters + a footer band (period range · site · role lens · "this week" strip).
- * Tokens only; plain string URLs (no wayfinder imports). The ＋Report launcher (WS6) and
- * board-export action (WS8) are intentionally omitted until their workstreams build them. */
-import { PageHero } from '@/components/page';
+/* Health & Safety command-centre hero. Bespoke gradient banner matching the prototype exactly
+ * (PROTOTYPE_DIGEST §1): eyebrow pill + action row (＋Report · Export board summary) on top, then
+ * the medallion + title + meta + NZ compliance badges, the leading/lagging stat clusters, and a
+ * footer band (period range · site · role lens · "this week" strip). Semantic tokens only;
+ * plain string URLs. */
 import { EntityFilter } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,13 +15,15 @@ import { Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
+    ChevronDown,
     Clock,
+    Download,
     Flame,
     HeartPulse,
+    type LucideIcon,
     Plus,
     ShieldCheck,
     TrendingDown,
-    type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
@@ -71,6 +72,14 @@ const LENS_ITEMS = [
     { key: 'frontline', label: 'Frontline' },
 ] as const;
 
+const GOV_REPORTS = [
+    { label: 'Board summary', href: '/health-safety/reports/board-summary' },
+    { label: 'WorkSafe register', href: '/health-safety/reports/worksafe-register' },
+    { label: 'Investigation outcomes', href: '/health-safety/reports/investigation-outcomes' },
+    { label: 'Corrective-action traceability', href: '/health-safety/reports/corrective-action-traceability' },
+    { label: 'Risk-assessment register', href: '/health-safety/reports/risk-assessment-register' },
+];
+
 function toISODate(d: Date): string {
     return d.toISOString().slice(0, 10);
 }
@@ -113,10 +122,10 @@ function ClusterTile({
         >
             <span className="flex items-center gap-1.5">
                 <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_CLASS[tone])} />
-                <span className="text-[11px] font-medium text-primary-foreground/70">{label}</span>
+                <span className="text-[10.5px] font-semibold tracking-wide text-primary-foreground/70 uppercase">{label}</span>
             </span>
-            <span className="text-xl font-bold tabular-nums text-primary-foreground">{value}</span>
-            <span className="text-[10.5px] text-primary-foreground/55">{caption}</span>
+            <span className="text-[25px] leading-tight font-bold tabular-nums text-primary-foreground">{value}</span>
+            <span className="text-[10.5px] text-primary-foreground/60">{caption}</span>
         </Link>
     );
 }
@@ -158,6 +167,7 @@ export function CommandCentreHero({
     notifiableEvents,
     activeAlerts,
     onReport,
+    orgName,
 }: {
     leadingLagging: HeroLeadingLagging;
     filters: HeroFilters;
@@ -166,6 +176,7 @@ export function CommandCentreHero({
     notifiableEvents: Array<{ status: string }>;
     activeAlerts: number;
     onReport?: () => void;
+    orgName?: string | null;
 }) {
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
@@ -201,15 +212,6 @@ export function CommandCentreHero({
     const activeSite = filters.site != null ? sites.find((s) => s.id === filters.site) : null;
     const siteLabel = activeSite ? activeSite.name : 'All sites';
 
-    const description = (
-        <span>
-            <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                {siteLabel}
-            </span>
-            {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
-        </span>
-    );
-
     const badges: { icon: LucideIcon; tone: 'success' | 'warning'; label: string }[] = [
         {
             icon: notifiableAwaiting > 0 ? AlertTriangle : CheckCircle2,
@@ -233,223 +235,199 @@ export function CommandCentreHero({
         { icon: HeartPulse, tone: 'success', label: 'First aid · Cover OK' },
     ];
 
-    const pillBase =
-        'rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors';
+    const pillBase = 'rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors';
     const pillActive = 'bg-primary-foreground/25 text-primary-foreground';
-    const pillInactive =
-        'bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20';
+    const pillInactive = 'bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20';
     const segBase = 'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors';
     const segActive = 'bg-primary-foreground text-primary';
     const segInactive = 'text-primary-foreground/80 hover:text-primary-foreground';
 
-    const footer = (
-        <div className="flex flex-col gap-3 py-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Period range control */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                        Period
-                    </span>
-                    {PERIOD_ITEMS.map((p) =>
-                        p.key === 'custom' ? (
-                            <Popover key={p.key}>
-                                <PopoverTrigger asChild>
-                                    {/* eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button. */}
-                                    <button
-                                        type="button"
-                                        className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}
-                                    >
-                                        {p.label}
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="start" className="w-auto space-y-2 p-3">
-                                    <div className="flex items-end gap-2">
-                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                            From
-                                            <input
-                                                type="date"
-                                                value={customFrom}
-                                                max={customTo}
-                                                onChange={(e) => setCustomFrom(e.target.value)}
-                                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                                            />
-                                        </label>
-                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                            To
-                                            <input
-                                                type="date"
-                                                value={customTo}
-                                                min={customFrom}
-                                                onChange={(e) => setCustomTo(e.target.value)}
-                                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                                            />
-                                        </label>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() => go({ from: customFrom, to: customTo })}
-                                    >
-                                        Apply range
-                                    </Button>
-                                </PopoverContent>
-                            </Popover>
-                        ) : (
-                            // eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button.
-                            <button
-                                key={p.key}
-                                type="button"
-                                onClick={() => go(presetRange(p.key))}
-                                className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}
-                            >
-                                {p.label}
-                            </button>
-                        ),
-                    )}
-                </div>
+    return (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 text-primary-foreground shadow-[0_24px_60px_-28px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
+            {/* decorative orbs */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+            </div>
 
-                {/* Site filter + role lens */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <EntityFilter
-                        onDark
-                        label="Site"
-                        allLabel="All sites"
-                        items={sites.map((s) => ({ id: s.id, name: s.name }))}
-                        value={filters.site}
-                        onChange={(v) => go({ site: v ?? undefined })}
-                    />
-                    <span className="ml-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                        Lens
-                    </span>
-                    <div className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
-                        {LENS_ITEMS.map((l) => (
-                            // eslint-disable-next-line no-restricted-syntax -- segmented lens toggle on dark hero; not a shadcn Button.
-                            <button
-                                key={l.key}
-                                type="button"
-                                onClick={() => go({ lens: l.key })}
-                                aria-pressed={filters.lens === l.key}
-                                className={cn(segBase, filters.lens === l.key ? segActive : segInactive)}
+            <div className="relative flex flex-col gap-5 p-6 md:p-7">
+                {/* Eyebrow + action row */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="inline-flex items-center gap-1.5 self-start rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.07em] text-primary-foreground/85 uppercase">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-70 motion-reduce:animate-none" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                        </span>
+                        Safety system · synced just now
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {onReport ? (
+                            <Button
+                                onClick={onReport}
+                                className="bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90"
                             >
-                                {l.label}
-                            </button>
-                        ))}
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Report
+                            </Button>
+                        ) : null}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export board summary
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-60 p-1">
+                                {GOV_REPORTS.map((r) => (
+                                    <Link
+                                        key={r.href}
+                                        href={r.href}
+                                        className="block rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-muted"
+                                    >
+                                        {r.label}
+                                    </Link>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
-            </div>
 
-            {/* "This week" summary strip */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-primary-foreground/15 pt-2.5 text-xs text-primary-foreground/80">
-                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                    This week
-                </span>
-                <SummaryMetric tone="warning">{lagging.incidents} incidents</SummaryMetric>
-                <SummaryMetric tone="critical">{notifiableAwaiting} WorkSafe-notifiable</SummaryMetric>
-                <SummaryMetric tone="warning">{leading.open_hazards} hazards open</SummaryMetric>
-                <SummaryMetric tone="warning">{drillsDue} drills due</SummaryMetric>
-                <SummaryMetric tone={activeAlerts > 0 ? 'critical' : 'success'}>
-                    {activeAlerts > 0
-                        ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}`
-                        : 'lone-workers all checked in'}
-                </SummaryMetric>
-            </div>
-        </div>
-    );
-
-    return (
-        <PageHero
-            category="ops"
-            icon={ShieldCheck}
-            title="Health & Safety command centre"
-            description={description}
-            badges={badges}
-            actions={
-                onReport ? (
-                    <Button
-                        onClick={onReport}
-                        className="bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90"
-                    >
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        Report
-                    </Button>
-                ) : undefined
-            }
-            footer={footer}
-        >
-            <div className="space-y-4">
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-primary-foreground/70 uppercase">
-                    <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-70 motion-reduce:animate-none" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                    </span>
-                    Safety system · synced just now
+                {/* Title block */}
+                <div className="flex items-start gap-4 md:gap-5">
+                    <div className="hidden h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl sm:flex md:h-20 md:w-20">
+                        <ShieldCheck className="h-9 w-9 text-primary-foreground md:h-10 md:w-10" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">Health &amp; Safety command centre</h1>
+                        <p className="mt-1 text-sm text-primary-foreground/75">
+                            <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteLabel}</span>
+                            {orgName ? ` · ${orgName}` : ''}
+                            {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {badges.map((b, i) => (
+                                <span
+                                    key={i}
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                                        b.tone === 'warning'
+                                            ? 'border-status-warning/50 bg-status-warning/25 text-primary-foreground'
+                                            : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
+                                    )}
+                                >
+                                    <b.icon
+                                        className={cn(
+                                            'h-3.5 w-3.5',
+                                            b.tone === 'warning' ? 'text-status-warning' : 'text-primary-foreground/80',
+                                        )}
+                                    />
+                                    {b.label}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
+                {/* Stat clusters */}
                 <div className="grid gap-3 lg:grid-cols-2">
                     <Cluster title="Lagging · outcomes" icon={TrendingDown}>
-                        <ClusterTile
-                            href="/incidents"
-                            label="Incidents"
-                            value={fmt(lagging.incidents)}
-                            caption="this period"
-                            tone={lagging.incidents > 0 ? 'warning' : 'success'}
-                        />
-                        <ClusterTile
-                            href="/health-safety/injuries"
-                            label="LTIFR"
-                            value={fmt(lagging.ltifr)}
-                            caption="per M hrs"
-                            tone="neutral"
-                        />
-                        <ClusterTile
-                            href="/health-safety/injuries"
-                            label="TRIFR"
-                            value={fmt(lagging.trifr)}
-                            caption="per M hrs"
-                            tone="neutral"
-                        />
-                        <ClusterTile
-                            href="/health-safety/injuries"
-                            label="Days LTI-free"
-                            value={fmt(lagging.days_since_lti)}
-                            caption="since last LTI"
-                            tone={(lagging.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'}
-                        />
+                        <ClusterTile href="/incidents" label="Incidents" value={fmt(lagging.incidents)} caption="this period" tone={lagging.incidents > 0 ? 'warning' : 'success'} />
+                        <ClusterTile href="/health-safety/injuries" label="LTIFR" value={fmt(lagging.ltifr)} caption="per M hrs" tone="neutral" />
+                        <ClusterTile href="/health-safety/injuries" label="TRIFR" value={fmt(lagging.trifr)} caption="per M hrs" tone="neutral" />
+                        <ClusterTile href="/health-safety/injuries" label="Days LTI-free" value={fmt(lagging.days_since_lti)} caption="since last LTI" tone={(lagging.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'} />
                     </Cluster>
 
                     <Cluster title="Leading · proactive" icon={Clock}>
-                        <ClusterTile
-                            href="/incidents?type=near_miss"
-                            label="Near-miss"
-                            value={fmt(leading.near_miss_ratio, '×')}
-                            caption=": incident"
-                            tone={(leading.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'}
-                        />
-                        <ClusterTile
-                            href="/health-safety/corrective-actions"
-                            label="Actions on time"
-                            value={fmt(leading.actions_on_time_pct, '%')}
-                            caption="this period"
-                            tone={(leading.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'}
-                        />
-                        <ClusterTile
-                            href="/health-safety/worker-participation"
-                            label="Train / audit"
-                            value={fmt(leading.training_pct, '%')}
-                            caption="compliance"
-                            tone={(leading.training_pct ?? 0) >= 90 ? 'success' : 'warning'}
-                        />
-                        <ClusterTile
-                            href="/compliance/hazards"
-                            label="Open hazards"
-                            value={fmt(leading.open_hazards)}
-                            caption="open now"
-                            tone={leading.open_hazards > 0 ? 'warning' : 'success'}
-                        />
+                        <ClusterTile href="/incidents?type=near_miss" label="Near-miss" value={fmt(leading.near_miss_ratio, '×')} caption=": incident" tone={(leading.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'} />
+                        <ClusterTile href="/health-safety/corrective-actions" label="Actions on time" value={fmt(leading.actions_on_time_pct, '%')} caption="30-day" tone={(leading.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'} />
+                        <ClusterTile href="/health-safety/worker-participation" label="Train / audit" value={fmt(leading.training_pct, '%')} caption="compliance" tone={(leading.training_pct ?? 0) >= 90 ? 'success' : 'warning'} />
+                        <ClusterTile href="/compliance/hazards" label="Open hazards" value={fmt(leading.open_hazards)} caption="open now" tone={leading.open_hazards > 0 ? 'warning' : 'success'} />
                     </Cluster>
                 </div>
             </div>
-        </PageHero>
+
+            {/* Footer band */}
+            <div className="relative flex flex-col gap-3 border-t border-primary-foreground/15 px-6 py-3 md:px-7">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    {/* Period range control */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Period</span>
+                        {PERIOD_ITEMS.map((p) =>
+                            p.key === 'custom' ? (
+                                <Popover key={p.key}>
+                                    <PopoverTrigger asChild>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button. */}
+                                        <button type="button" className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}>
+                                            {p.label}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-auto space-y-2 p-3">
+                                        <div className="flex items-end gap-2">
+                                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                                From
+                                                <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                                            </label>
+                                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                                To
+                                                <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                                            </label>
+                                        </div>
+                                        <Button size="sm" className="w-full" onClick={() => go({ from: customFrom, to: customTo })}>
+                                            Apply range
+                                        </Button>
+                                    </PopoverContent>
+                                </Popover>
+                            ) : (
+                                // eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button.
+                                <button key={p.key} type="button" onClick={() => go(presetRange(p.key))} className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}>
+                                    {p.label}
+                                </button>
+                            ),
+                        )}
+                    </div>
+
+                    {/* Site filter + role lens */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <EntityFilter
+                            onDark
+                            label="Site"
+                            allLabel="All sites"
+                            items={sites.map((s) => ({ id: s.id, name: s.name }))}
+                            value={filters.site}
+                            onChange={(v) => go({ site: v ?? undefined })}
+                        />
+                        <span className="ml-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Lens</span>
+                        <div className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
+                            {LENS_ITEMS.map((l) => (
+                                // eslint-disable-next-line no-restricted-syntax -- segmented lens toggle on dark hero; not a shadcn Button.
+                                <button key={l.key} type="button" onClick={() => go({ lens: l.key })} aria-pressed={filters.lens === l.key} className={cn(segBase, filters.lens === l.key ? segActive : segInactive)}>
+                                    {l.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* "This week" summary strip */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-primary-foreground/15 pt-2.5 text-xs text-primary-foreground/80">
+                    <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">This week</span>
+                    <SummaryMetric tone="warning">{lagging.incidents} incidents</SummaryMetric>
+                    <SummaryMetric tone="critical">{notifiableAwaiting} WorkSafe-notifiable</SummaryMetric>
+                    <SummaryMetric tone="warning">{leading.open_hazards} hazards open</SummaryMetric>
+                    <SummaryMetric tone="warning">{drillsDue} drills due</SummaryMetric>
+                    <SummaryMetric tone={activeAlerts > 0 ? 'critical' : 'success'}>
+                        {activeAlerts > 0 ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}` : 'lone-workers all checked in'}
+                    </SummaryMetric>
+                </div>
+            </div>
+        </div>
     );
 }
 

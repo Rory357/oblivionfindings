@@ -127,6 +127,25 @@ function titleCase(value?: string | null): string {
     return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const AVATAR_TONES = [
+    'bg-primary text-primary-foreground',
+    'bg-status-info text-white',
+    'bg-status-success text-white',
+    'bg-status-warning text-white',
+];
+
+function avatarTone(name: string): string {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return AVATAR_TONES[h % AVATAR_TONES.length];
+}
+
+function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    return ((parts[0][0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
 type NormRow = {
     key: string;
     pill: { label: string; tone: PillTone; icon: LucideIcon };
@@ -458,9 +477,21 @@ export function HsWorklists({
                                             <span className="block truncate text-[13px] font-medium text-foreground">{row.title}</span>
                                             <span className="block truncate text-[11px] text-muted-foreground">{row.sub}</span>
                                         </span>
-                                        <span className="shrink-0 text-right text-[11px] text-muted-foreground">
-                                            {row.owner ? <span className="block truncate">{row.owner}</span> : null}
-                                            {row.due ? <span className="block tabular-nums">{row.due}</span> : null}
+                                        <span className="flex shrink-0 items-center gap-2">
+                                            {row.owner ? (
+                                                <span
+                                                    title={row.owner}
+                                                    className={cn(
+                                                        'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
+                                                        avatarTone(row.owner),
+                                                    )}
+                                                >
+                                                    {initials(row.owner)}
+                                                </span>
+                                            ) : null}
+                                            {row.due ? (
+                                                <span className="w-12 text-right text-[11px] tabular-nums text-muted-foreground">{row.due}</span>
+                                            ) : null}
                                         </span>
                                     </button>
                                 ))

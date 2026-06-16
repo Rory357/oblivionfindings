@@ -9,6 +9,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\LoneWorkerAlert;
+use App\Models\Organization;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\SiteHazard;
@@ -155,6 +156,7 @@ class HealthSafetyDashboardController extends Controller
             ],
             'lens' => $lens,
             'sites' => Site::orderBy('name')->get(['id', 'name']),
+            'org_name' => rescue(fn () => Organization::query()->value('name'), null, false),
             'clients' => Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])
                 ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
             'staff' => User::query()

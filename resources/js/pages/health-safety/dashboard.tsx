@@ -62,6 +62,7 @@ type Props = {
     filters: HeroFilters;
     lens: string;
     sites: Array<{ id: number; name: string }>;
+    org_name: string | null;
     clients: Array<{ id: number; name: string }>;
     staff: Array<{ id: number; name: string }>;
     leading_lagging: HeroLeadingLagging;
@@ -83,6 +84,7 @@ export default function HealthSafetyDashboard({
     backbone,
     filters,
     sites,
+    org_name,
     clients,
     staff,
     leading_lagging,
@@ -119,6 +121,7 @@ export default function HealthSafetyDashboard({
                     notifiableEvents={worklists.notifiable_events}
                     activeAlerts={kpis.active_alerts ?? 0}
                     onReport={() => setLauncherOpen(true)}
+                    orgName={org_name}
                 />
 
                 <TabStrip
