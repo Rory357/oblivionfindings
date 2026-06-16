@@ -14,7 +14,7 @@ import {
     type StaffOpt,
 } from '@/pages/emar/_competency-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { Award, AlertTriangle, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, LayoutGrid, Lock, Pencil, Plus, RotateCcw, Search, ShieldCheck, Trash2, User, UserX } from 'lucide-react';
+import { Award, AlertTriangle, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, LayoutGrid, Lock, Pencil, Plus, RotateCcw, Search, ShieldCheck, Trash2, User, UserX, X } from 'lucide-react';
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Kpis = { total_staff: number; in_date: number; in_date_pct: number; expiring: number; expired: number; unassessed: number; cd_witnesses: number };
@@ -41,6 +41,31 @@ const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p)
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const daysTo = (iso: string | null) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / 86400000) : null);
 const STATUS_OPTS = [{ id: 0, name: 'In date' }, { id: 1, name: 'Supervised' }, { id: 2, name: 'Expired' }, { id: 3, name: 'Failed' }];
+
+type CompAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof AlertTriangle; message: string; tab: string };
+const DISMISSED_ALERTS_KEY = 'competency-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') {
+        try {
+            window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique));
+        } catch {
+            /* sessionStorage unavailable — dismissal stays in-memory only */
+        }
+    }
+    return unique;
+}
 
 function csvCell(v: unknown): string { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
 function exportCsv(rows: AssessmentRow[]) {
@@ -125,7 +150,15 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
         return staffWithoutAssessment.filter((s) => (!role || s.role === role) && (!q || s.name.toLowerCase().includes(q)));
     }, [staffWithoutAssessment, search, roleFilter, roleItems]);
 
-    const firstExpired = expiredList[0];
+    // Stacked, dismissible (per session) alert strip built from the headline KPIs
+    // (the standing oversight counts, independent of role/status/search filters).
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
+    const alerts: CompAlert[] = [
+        kpis.expired > 0 && { kind: 'expired', tone: 'critical' as const, icon: AlertTriangle, message: `${kpis.expired} staff competenc${kpis.expired === 1 ? 'y has' : 'ies have'} expired — those staff must not administer medication unsupervised until reassessed.`, tab: 'expired' },
+        kpis.expiring > 0 && { kind: 'expiring', tone: 'warning' as const, icon: CalendarClock, message: `${kpis.expiring} competenc${kpis.expiring === 1 ? 'y expires' : 'ies expire'} within 30 days — schedule reassessment.`, tab: 'expiring' },
+        kpis.unassessed > 0 && { kind: 'unassessed', tone: 'warning' as const, icon: UserX, message: `${kpis.unassessed} staff member${kpis.unassessed === 1 ? ' has' : 's have'} no current medication competency assessment.`, tab: 'unassessed' },
+    ].filter((a): a is CompAlert => Boolean(a) && !dismissed.includes((a as CompAlert).kind));
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All assessments', icon: LayoutGrid, tone: 'primary', badge: assessments.length || undefined },
@@ -196,12 +229,11 @@ export default function Competency({ assessments, staffWithoutAssessment, staff,
                     }
                 />
 
-                {kpis.expired > 0 && firstExpired && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
-                        <span className="text-sm text-status-critical">
-                            <span className="font-semibold">{firstExpired.user_name}'s competency lapsed {Math.abs(daysTo(firstExpired.expiry_date) ?? 0)} days ago.</span> A lapsed competency means that staff member must not administer medication unsupervised until reassessed.
-                        </span>
-                        <Button size="sm" variant="outline" onClick={() => setActiveTab('expired')}>Review expired</Button>
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setActiveTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
                     </div>
                 )}
 
@@ -381,6 +413,29 @@ function CoverageMatrix({ rows, onView, onCtx }: { rows: AssessmentRow[]; onView
                     </table>
                 )}
             </div>
+        </div>
+    );
+}
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session dismiss. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: CompAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                {/* eslint-disable-next-line no-restricted-syntax -- inline dismiss affordance on the alert strip. */}
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
         </div>
     );
 }

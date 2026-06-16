@@ -35,7 +35,7 @@ Do NOT regress: the 5-step `AssessmentWizardDialog` or the `CoverageMatrix`.
 - [x] C1 — "View staff member" (→ `/staff/{id}`) wired in **both** the context menu (A) and the detail modal footer (B). Uses `staff.show`, never the client care page.
 
 ## D. Stacked alert strip
-- [ ] D1 — Replace the single expired banner with a stacked, dismissible (per-session) alert strip mirroring `/emar/controlled`: N expired (critical → Expired tab), N expiring ≤30d (warning → Expiring tab), N unassessed (warning → Unassessed tab). Each: icon + count + message + "Review" → sets `activeTab` + dismiss ✕.
+- [x] D1 — Replaced the single expired banner with a stacked, dismissible (per-session `sessionStorage`) alert strip mirroring `/emar/controlled` (`CompAlert` + `AlertRow` + `readDismissedAlerts`/`persistDismissedAlerts`): N expired (critical → Expired tab), N expiring ≤30d (warning → Expiring tab), N unassessed (warning → Unassessed tab). Each: icon + count message + "Review" → `setActiveTab` + dismiss ✕. Counts from KPIs (standing oversight signal, filter-independent).
 
 ## E. Click-to-open parity + search-pill polish
 - [ ] E1 — **Expiring** cards click-to-open the detail modal (cursor-pointer + hover + keyboard-focusable; `stopPropagation` on the inline button).
