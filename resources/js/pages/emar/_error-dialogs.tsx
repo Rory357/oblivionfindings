@@ -89,7 +89,7 @@ export function TriageDialog({ error, onDismiss, onAction }: { error: ErrorRow; 
     const stageIdx = Math.max(0, STAGES.findIndex((s) => s.id === error.status));
     const sev = severityMeta(error.severity);
     const [linking, setLinking] = useState(false);
-    const viewClient = () => error.client_id && router.visit(`/operations/clients/${error.client_id}/care`);
+    const viewClient = () => error.client_id && router.visit(`/operations/clients/${error.client_id}?tab=mar`);
     const viewIncident = () => error.incident && router.visit(`/incidents/${error.incident.id}`);
     // Post-report create-and-link: reuses the errors controller endpoint, which
     // creates the incident, links it and redirects into the incidents module.

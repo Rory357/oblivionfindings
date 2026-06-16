@@ -105,7 +105,7 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
     const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/errors', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
 
     // Cross-module jumps + right-click row menu (parity with PRN/CD).
-    const viewClient = (id: number | null) => { if (id) router.visit(`/operations/clients/${id}/care`); };
+    const viewClient = (id: number | null) => { if (id) router.visit(`/operations/clients/${id}?tab=mar`); };
     const viewIncident = (id: number) => router.visit(`/incidents/${id}`);
     // Post-report create-and-link: the errors endpoint creates the incident,
     // links it and redirects into the incidents module (see ERRORS_GAP_ANALYSIS C).
