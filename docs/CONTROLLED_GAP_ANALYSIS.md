@@ -15,15 +15,22 @@ expiry; cross-tab consistency + 3 new feature tests.
 `ControlledDrugsTest` 6/6 ✓. All CD recording/balance/destruction/loss/discrepancy actions happen
 in-page via modals with Inertia partial reloads.
 
-**Remaining `TODO(Gx)` (need schema/design or are browser-only — out of the headless loop's scope):**
-- **Schedule (2/3/4) chip** — no `cd_schedule` column on `client_medications`; not invented.
-- **Overdue-reconciliation escalation job** — UI count is live from `overdue_check`; a background
-  `MedicationDashboardAlert` generator for CDs unchecked in N days is unbuilt (code comment in `controlled()`).
-- **CD-mutation offline queue convergence** — CD wizards post via Inertia, not the shared offline
-  queue (IndexedDB); the eyebrow reflects device state, not a CD-specific pending count.
-- **Linked incident_id/discrepancy_id on the detail modal** — no FK column (link lives in
-  `MedicationIncidentIntegrationService`); not surfaced.
-- **CD Accountable Officer / regulator-notified on loss reports** — no column (only police/pharmacy exist).
+### ✅ Follow-up `TODO(Gx)` round — NOW CLOSED (2026-06-16, 5 commits `5c8fcc01`→`<offline>`)
+
+All five deferred backend items are now implemented (migrations authorised by the user):
+- **Schedule (2/3/4) chip** — ✅ `cd_schedule` column on `client_medications`; set in-context from the
+  Record-CD-entry wizard (validated `in:2,3,4`); rendered as an `S2/S3/S4` chip + detail row.
+- **Overdue-reconciliation escalation job** — ✅ `emar:escalate-overdue-cd-checks` command (scheduled
+  daily 07:30 NZ) raises a `controlled_overdue_check` `MedicationDashboardAlert`; cleared on the next
+  balance check. (Also fixed a latent 500 on note-less balance checks.)
+- **CD-mutation offline queue convergence** — ✅ all 4 recording wizards divert to `submitOffline`
+  when `!navigator.onLine` (replayed on reconnect, server dedupes on `client_request_uuid`); online
+  path unchanged. New `cd_balance_check`/`cd_destruction` offline actions.
+- **Linked incident on the detail modal** — ✅ real `incident_id` FK on discrepancies + loss reports,
+  captured from `MedicationIncidentIntegrationService`, surfaced as a deep-linking "Linked incident" row.
+- **CD Accountable Officer / regulator-notified on loss reports** — ✅ columns + wizard fields + detail.
+
+**Remaining (browser-only — out of the headless loop's scope):**
 - **Live pixel/axe/responsive verify on oblivionfindings.com** — browser-only → USER.
 
 ---
@@ -99,6 +106,8 @@ Legend: `[ ]` open · `[x]` done · `TODO(Gx)` deferred backend (needs schema / 
 ## Pass log
 
 _(append one line per pass: date · item(s) · what changed · files)_
+
+- **2026-06-16 · Follow-up TODO(Gx) round (5 items)** — Migrations authorised by user. (1) Loss accountable-officer + regulator notification (`5c8fcc01`). (2) Real `incident_id` FK on discrepancy/loss + deep-linked detail row (`b0c597a7`). (3) `emar:escalate-overdue-cd-checks` scheduled command + balance-check clears the alert; fixed a latent note-less balance-check 500 (`5e9f6d9e`). (4) CD schedule (2/3/4) column + in-context classification + chip (`102748c0`). (5) Offline-queue convergence — 4 CD wizards divert to `submitOffline` when offline (this commit). New migrations: `2026_06_16_000200/000210/000220`. Gates per item: types/eslint/pint + targeted feature tests; final build + full `ControlledDrugsTest` 9/9.
 
 - **2026-06-16 · Group F + G + BK-overdue (F13, G14, BK-overdue) — LOOP COMPLETE** — `DrugCell` (CD lock glyph + CD badge) + `ExpiryNote` (inline expiry, warn ≤30d) on Register/Reconciliation/Recent; schedule chip stays TODO(G-F). Cross-tab consistency verified; 3 new feature tests added (ControlledDrugsTest 6/6). BK-overdue investigated → UI complete (live `overdue_check`), escalation job = TODO(Gx) w/ code comment. Gates: types ✓, eslint ✓, Pint ✓, build ✓, tests 6/6 ✓. Files: `ControlledDrugs.tsx`, `EmarController.php@controlled`, `tests/Feature/Emar/ControlledDrugsTest.php`.
 - **2026-06-16 · Group E (E11, E12)** — Self-witnessing now blocked in the UI (`witnessOptions` excludes the recorder from every witness select; witness 2 excludes witness 1) via a threaded `current_user`. Record-CD-entry gained an expiry_date field + batch/expiry required on receipts; Balance-check shows a "last checked N days / overdue" hint; Record-destruction requires a denaturing-kit confirmation for CDs. CD Accountable Officer / regulator-notified left as TODO(Gx) (no column). Gates: types ✓, eslint ✓, build ✓. Files: `ControlledDrugs.tsx`, `_cd-dialogs.tsx`.

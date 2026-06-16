@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ENTRY_TYPES, entryDirection, type CdDiscrepancy, type CdLossReport, type CdMedication, type StaffOption } from '@/components/emar/controlled/types';
+import { submitOffline, type OfflineAction } from '@/lib/offline-queue';
 import { useForm } from '@inertiajs/react';
 import { AlertTriangle, ArrowDownUp, Ban, FileWarning, Lock, Package, ShieldCheck, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -21,6 +22,28 @@ function medOptions(meds: CdMedication[]) {
 function witnessOptions(staff: StaffOption[], exclude: (number | null | undefined)[]) {
     const skip = new Set(exclude.filter((id): id is number => typeof id === 'number'));
     return staff.filter((s) => !skip.has(s.id)).map((s) => ({ value: String(s.id), label: s.name }));
+}
+
+/**
+ * When the device is offline, divert a CD mutation to the shared offline queue
+ * (replayed on reconnect; the server dedupes on client_request_uuid). Returns
+ * true when it queued, so the caller skips the online Inertia post. Mirrors the
+ * prn-wizard pattern — online behaviour (validation errors + partial reload) is
+ * left entirely to Inertia. CD-queue convergence (TODO Gx) — now closed.
+ */
+function queueIfOffline(action: OfflineAction, url: string, payload: Record<string, unknown>, onClose: () => void): boolean {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        void submitOffline({
+            action,
+            url,
+            payload,
+            queuedMessage: 'Saved on this device — we’ll send it when you’re back online.',
+        }).then(() => onClose());
+
+        return true;
+    }
+
+    return false;
 }
 
 // ── Record CD entry (3-step) ─────────────────────────────────────────────────
@@ -65,6 +88,7 @@ export function RecordCdEntryDialog({ medications, staff, currentUserId, onClose
     };
 
     const submit = () => {
+        if (queueIfOffline('cd_entry', '/emar/controlled/entries', { ...form.data, witnessed_by: form.data.witnessed_by ? Number(form.data.witnessed_by) : null }, onClose)) return;
         form.transform((d) => ({ ...d, witnessed_by: d.witnessed_by ? Number(d.witnessed_by) : null }));
         form.post('/emar/controlled/entries', {
             preserveScroll: true,
@@ -215,6 +239,7 @@ export function BalanceCheckDialog({ medications, staff, currentUserId, presetMe
     };
 
     const submit = () => {
+        if (queueIfOffline('cd_balance_check', '/emar/controlled/balance-check', { ...form.data, witnessed_by: form.data.witnessed_by ? Number(form.data.witnessed_by) : null }, onClose)) return;
         form.transform((d) => ({ ...d, witnessed_by: d.witnessed_by ? Number(d.witnessed_by) : null }));
         form.post('/emar/controlled/balance-check', { preserveScroll: true, onSuccess: () => { toast.success(mismatch ? 'Balance check recorded — discrepancy raised' : 'Balance check recorded'); onClose(); }, onError: () => toast.error('Please check the details') });
     };
@@ -301,7 +326,10 @@ export function ReportLossDialog({ medications, onClose }: { medications: CdMedi
         const m = medications.find((x) => String(x.id) === id);
         form.setData({ ...form.data, medication_id: id, client_id: m?.client_id ?? null, medication_name: m?.name ?? '', unit: m?.stock?.unit ?? '' });
     };
-    const submit = () => form.post('/emar/controlled/loss-reports', { preserveScroll: true, onSuccess: () => { toast.success('Loss report raised'); onClose(); }, onError: () => toast.error('Please check the report') });
+    const submit = () => {
+        if (queueIfOffline('cd_loss_report', '/emar/controlled/loss-reports', { ...form.data }, onClose)) return;
+        form.post('/emar/controlled/loss-reports', { preserveScroll: true, onSuccess: () => { toast.success('Loss report raised'); onClose(); }, onError: () => toast.error('Please check the report') });
+    };
     const valid = [!!form.data.medication_name && !!form.data.quantity_lost && !!form.data.circumstances, true, true];
     return (
         <MedsWizardDialog open onClose={onClose} title="Report CD loss" description="Report a controlled-drug loss or discrepancy for investigation." railIcon={FileWarning} railTitle="CD loss report" railSubtitle="Investigation" steps={[{ key: 'details', label: 'Loss details', blurb: 'What & how much', icon: FileWarning }, { key: 'escalation', label: 'Escalation', blurb: 'Police / pharmacy', icon: ShieldCheck }, { key: 'review', label: 'Review', blurb: 'Confirm', icon: AlertTriangle }]} stepIndex={step} onStepClick={(i) => i < step && setStep(i)} footer={<><Button variant="ghost" onClick={step === 0 ? onClose : () => setStep(step - 1)} disabled={form.processing}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 2 ? <Button onClick={() => setStep(step + 1)} disabled={!valid[step]}>Continue</Button> : <Button variant="destructive" onClick={submit} disabled={form.processing}>Raise loss report</Button>}</>}>
@@ -426,12 +454,13 @@ export function RecordDestructionDialog({ medications, staff, sites, defaultSite
         form.setData({ ...form.data, medication_id: id, client_id: m?.client_id ?? 0, medication_name: m?.name ?? '', unit: m?.stock?.unit ?? '', is_controlled_drug: !!m?.controlled_drug });
     };
     const submit = () => {
-        form.transform((d) => ({
-            ...d,
-            site_id: d.site_id ? Number(d.site_id) : null,
-            witness_1_id: d.witness_1_id ? Number(d.witness_1_id) : null,
-            witness_2_id: d.witness_2_id ? Number(d.witness_2_id) : null,
-        }));
+        const ids = {
+            site_id: form.data.site_id ? Number(form.data.site_id) : null,
+            witness_1_id: form.data.witness_1_id ? Number(form.data.witness_1_id) : null,
+            witness_2_id: form.data.witness_2_id ? Number(form.data.witness_2_id) : null,
+        };
+        if (queueIfOffline('cd_destruction', '/emar/destructions', { ...form.data, ...ids }, onClose)) return;
+        form.transform((d) => ({ ...d, ...ids }));
         form.post('/emar/destructions', { preserveScroll: true, onSuccess: () => { toast.success('Destruction recorded'); onClose(); }, onError: () => toast.error(isCd ? 'Please check — CD destruction needs two distinct witnesses + authorisation' : 'Please check the destruction details') });
     };
     const valid = [

@@ -33,6 +33,8 @@ export type OfflineAction =
     | 'correction'
     | 'cd_loss_report'
     | 'cd_entry'
+    | 'cd_balance_check'
+    | 'cd_destruction'
     | 'stock_update'
     | `transport_${string}`;
 type HttpMethod = 'post' | 'put' | 'patch' | 'delete';
