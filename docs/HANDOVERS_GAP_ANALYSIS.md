@@ -119,9 +119,13 @@ un-regressed.
   normalizeCdVerification()` stamps `verified_at`/`verified_by`/witness+actor names. `HandoverPresenter`
   exposes `cd_verification`; shared `Handover` type gained it. Operations inert (gated). Frontend
   tsc/eslint green; **PHP feature-tests environmentally blocked** (no php/vendor/.env).*
-- [ ] **F1b** Surface CD verification: detail-dialog read-only CD status block + the alert-strip
-  **CD banner** (wire the `// TODO(F)` in `emar/Handovers.tsx` — N submitted handovers missing a CD
-  count check → critical, deep-link `/emar/controlled`).
+- [x] **F1b** Surface CD verification. — *Done: `handover-detail-dialog.tsx` shows a read-only CD
+  block (verified/discrepancy tone, witness, checked-by + time, notes, CD-register link) — data-gated
+  by `h.cd_verification` (null on Operations → hidden). `emar/Handovers.tsx` alert strip wires the CD
+  banner: counts submitted/acknowledged handovers whose `medications_due` mentions a CD (the wizard's
+  `(CD)` pre-fill tag) but carry no `cd_verification` → critical, deep-links `/emar/controlled`
+  (`HandoverAlert` gained `href?`; `AlertRow` does href-or-tab nav). **Gap F complete.** Frontend
+  tsc/eslint green.*
 
 ## G. Clarify roles + edit-locking (dedupe the 3 write paths)
 - [ ] **G1** Three UIs (eMAR / Operations / Attendance clock-out) write one `ShiftHandover`
@@ -157,4 +161,7 @@ shift med-state + a CD count at handover; concurrent edits are locked; dead `Med
 removed (or documented); all actions in-page via Inertia partial reloads.
 
 ### Remaining `TODO(Gx)` markers
-- `emar/Handovers.tsx` `alerts[]` — `// TODO(F):` CD-counts-unverified banner (critical → `/emar/controlled`), to be added when Gap F lands.
+- `emar/Handovers.tsx` `counts.cdUnverified` — the CD-unverified alert derives "this handover involved a
+  controlled drug" from the `(CD)`/"controlled" tag in the stored `medications_due` list (the wizard's
+  snapshot pre-fill). A live per-handover CD-due query would be exact but is the index-time N+1 the
+  on-demand snapshot deliberately avoids. `TODO(Gx)` if exactness is later required.

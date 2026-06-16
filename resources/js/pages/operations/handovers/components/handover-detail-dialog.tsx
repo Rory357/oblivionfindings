@@ -399,6 +399,55 @@ export function HandoverDetailDialog({
                         />
                     ) : null}
 
+                    {h.cd_verification ? (
+                        <div
+                            className={cn(
+                                'rounded-xl border p-3.5',
+                                h.cd_verification.result === 'discrepancy'
+                                    ? 'border-status-critical/30 bg-status-critical-bg/50'
+                                    : 'border-status-success/30 bg-status-success-bg/50',
+                            )}
+                        >
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                    className={cn(
+                                        'flex h-6 w-6 items-center justify-center rounded-md',
+                                        h.cd_verification.result === 'discrepancy'
+                                            ? 'bg-status-critical-bg text-status-critical'
+                                            : 'bg-status-success-bg text-status-success',
+                                    )}
+                                >
+                                    {h.cd_verification.result === 'discrepancy' ? (
+                                        <ShieldAlert className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                    )}
+                                </span>
+                                <span className="text-[13px] font-semibold">
+                                    Controlled-drug count{' '}
+                                    {h.cd_verification.result === 'discrepancy' ? '— discrepancy found' : 'verified'}
+                                </span>
+                                <Link href="/emar/controlled" className="ml-auto text-[12px] font-semibold text-primary hover:underline">
+                                    CD register
+                                </Link>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+                                {h.cd_verification.witness_name ? (
+                                    <span>
+                                        Witness: <b className="text-foreground">{h.cd_verification.witness_name}</b>
+                                    </span>
+                                ) : null}
+                                {h.cd_verification.verified_by_name ? <span>Checked by {h.cd_verification.verified_by_name}</span> : null}
+                                {h.cd_verification.verified_at ? (
+                                    <span>
+                                        {formatDate(h.cd_verification.verified_at)} {fmtTime(h.cd_verification.verified_at)}
+                                    </span>
+                                ) : null}
+                            </div>
+                            {h.cd_verification.notes ? <p className="mt-1.5 text-[12.5px] leading-snug">{h.cd_verification.notes}</p> : null}
+                        </div>
+                    ) : null}
+
                     <DetailList
                         icon={Pill}
                         tone="critical"

@@ -37,7 +37,7 @@ const fmtRange = (start: string, end: string) => {
 };
 const relative = (iso: string | null) => { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`; };
 
-type HandoverAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof BellRing; message: string; tab: string };
+type HandoverAlert = { kind: string; tone: 'critical' | 'warning'; icon: typeof BellRing; message: string; tab?: string; href?: string };
 
 const DISMISSED_ALERTS_KEY = 'handover-dismissed-alerts';
 
@@ -89,14 +89,20 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
         openIncoming: handovers.filter((h) => h.incoming_staff == null).length,
         needsAck: handovers.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id).length,
         incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
+        // Submitted/acknowledged handovers that mention a controlled drug (the "(CD)"
+        // tag the wizard pre-fills from the live shift snapshot, or "controlled") but
+        // carry no two-person CD count check. TODO(Gx): a live per-handover CD-due
+        // query would be exact, but that is the index-time N+1 the snapshot avoids.
+        cdUnverified: handovers.filter((h) => (h.status === 'submitted' || h.status === 'acknowledged') && !h.cd_verification && (h.medications_due ?? []).some((m) => /\(cd\)|controlled/i.test(m))).length,
     }), [handovers, currentUser]);
 
     // Stacked, dismissible (per session) alert strip built from already-computed counts.
-    const alerts: HandoverAlert[] = [
+    const alertDefs: (HandoverAlert | false)[] = [
         counts.needsAck > 0 && { kind: 'needs_ack', tone: 'warning' as const, icon: BellRing, message: `${counts.needsAck} handover${counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.`, tab: 'needs_ack' },
         counts.openIncoming > 0 && { kind: 'open_incoming', tone: 'critical' as const, icon: ShieldAlert, message: `${counts.openIncoming} open incoming shift${counts.openIncoming === 1 ? '' : 's'} — needs cover.`, tab: 'open_incoming' },
-        // TODO(F): N controlled-drug counts unverified at handover (critical → /emar/controlled) — added with Gap F.
-    ].filter((a): a is HandoverAlert => Boolean(a) && !dismissed.includes((a as HandoverAlert).kind));
+        counts.cdUnverified > 0 && { kind: 'cd_unverified', tone: 'critical' as const, icon: Pill, message: `${counts.cdUnverified} submitted handover${counts.cdUnverified === 1 ? '' : 's'} with controlled drugs but no count check recorded.`, href: '/emar/controlled' },
+    ];
+    const alerts = alertDefs.filter((a): a is HandoverAlert => Boolean(a) && !dismissed.includes((a as HandoverAlert).kind));
 
     // Unique clients + staff present in this week's handovers, for the hero filters.
     const clientItems = useMemo(() => {
@@ -236,7 +242,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                 {alerts.length > 0 && (
                     <div className="flex flex-col gap-2">
                         {alerts.map((a) => (
-                            <AlertRow key={a.kind} alert={a} onReview={() => setTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                            <AlertRow key={a.kind} alert={a} onReview={() => (a.href ? router.visit(a.href) : a.tab ? setTab(a.tab) : undefined)} onDismiss={() => dismiss(a.kind)} />
                         ))}
                     </div>
                 )}
