@@ -289,6 +289,49 @@ class HsKpiService
         ];
     }
 
+    /**
+     * Operands behind the near-miss : incident ratio donut, over the trailing-12-month
+     * basis: near misses reported and recordable incidents. The donut arc fills to
+     * `near_misses / (near_misses + recordable)` (proactive-reporting share).
+     *
+     * @return array{near_misses: int, recordable: int}
+     */
+    public function nearMissOperands(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): array
+    {
+        [$from, $to] = $this->rateWindow($from, $to);
+
+        return [
+            'near_misses' => $this->nearMissesInPeriod($from, $to, $siteId),
+            'recordable' => $this->recordableInjuriesQuery($from, $to, $siteId)->count(),
+        ];
+    }
+
+    /**
+     * Open-hazard burn-down series — the count of hazards still open at the end of each of
+     * the last $weeks weeks (created on/before the week-end and not yet closed by then).
+     *
+     * @return array<int, array{week: string, open: int}>
+     */
+    public function hazardBurndown(int $weeks = 6, ?int $siteId = null): array
+    {
+        $rows = [];
+        $end = now()->endOfWeek();
+
+        for ($i = $weeks - 1; $i >= 0; $i--) {
+            $weekEnd = $end->copy()->subWeeks($i);
+            $open = SiteHazard::query()
+                ->where('created_at', '<=', $weekEnd)
+                ->where(function (Builder $q) use ($weekEnd) {
+                    $q->whereNull('closed_at')->orWhere('closed_at', '>', $weekEnd);
+                })
+                ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+                ->count();
+            $rows[] = ['week' => $weekEnd->toDateString(), 'open' => $open];
+        }
+
+        return $rows;
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Internals                                                          */
     /* ------------------------------------------------------------------ */

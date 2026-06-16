@@ -60,6 +60,7 @@ import {
     LeadingPanel,
     RoleLensBanner,
 } from './components/dashboard-tabs';
+import { LaggingCharts, LeadingCharts } from './components/charts';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
 type Props = {
@@ -139,6 +140,9 @@ type Props = {
         ltifr: number | null;
         trifr: number | null;
     }>;
+    frequency_operands: { near_misses: number; recordable: number };
+    hazard_burndown: Array<{ week: string; open: number }>;
+    incidents_by_category: Array<{ label: string; count: number }>;
     worklists: WorklistsPayload;
 };
 
@@ -549,6 +553,10 @@ export default function HealthSafetyDashboard({
     filters,
     sites,
     leading_lagging,
+    frequency_trends,
+    frequency_operands,
+    hazard_burndown,
+    incidents_by_category,
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
@@ -690,11 +698,26 @@ export default function HealthSafetyDashboard({
                 <RoleLensBanner lens={filters.lens} />
 
                 {tab === 'leading' && (
-                    <LeadingPanel data={leading_lagging.leading} />
+                    <div className="flex flex-col gap-4">
+                        <LeadingPanel data={leading_lagging.leading} />
+                        <LeadingCharts
+                            ratio={leading_lagging.leading.near_miss_ratio}
+                            operands={frequency_operands}
+                            burndown={hazard_burndown}
+                            drillPct={kpis.drill_compliance_pct ?? 0}
+                            trainingPct={leading_lagging.leading.training_pct ?? 0}
+                        />
+                    </div>
                 )}
                 {tab === 'lagging' && (
                     <div className="flex flex-col gap-4">
                         <LaggingPanel data={leading_lagging.lagging} />
+                        <LaggingCharts
+                            bars={incident_trends}
+                            frequency={frequency_trends}
+                            severity={backbone?.events?.events_by_severity}
+                            category={incidents_by_category}
+                        />
                         <HsWorklists worklists={worklists} show={['investigations']} />
                     </div>
                 )}

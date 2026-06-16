@@ -231,6 +231,17 @@ class HealthSafetyDashboardController extends Controller
                 'notifiable_events' => $this->dashboardService->notifiableEvents(),
                 'expiring' => $this->dashboardService->expiringFeed($siteId),
             ],
+            'frequency_operands' => $this->kpiService->nearMissOperands($from, $to, $siteId),
+            'hazard_burndown' => $this->kpiService->hazardBurndown(6, $siteId),
+            'incidents_by_category' => ClientIncident::select('type', DB::raw('COUNT(*) as count'))
+                ->whereBetween('occurred_at', [$from, $to])
+                ->where('type', '!=', 'near_miss')
+                ->when($siteId, fn ($q) => $q->whereHas('shift', fn ($s) => $s->where('site_id', $siteId)))
+                ->groupBy('type')
+                ->orderByDesc('count')
+                ->limit(6)
+                ->get()
+                ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count]),
         ]);
     }
 

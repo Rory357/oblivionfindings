@@ -30,7 +30,7 @@
 | 2 | **Hero command centre + footer band** | **done** | _(this commit)_ | `hero-plan.md` |
 | 3 | **TabStrip + role lens** (Overview/Leading/Lagging/Compliance) | **done** | _(this commit)_ | `tabs-plan.md` |
 | 4 | **Worklists + detail modal + context menu** | **done** | _(this commit)_ | `worklists-plan.md` |
-| 5 | **Charts — pixel-faithful** (8 charts) | todo | — | `charts-plan.md` |
+| 5 | **Charts — pixel-faithful** (7 of 8; site league → WS8) | **done** | _(this commit)_ | `charts-plan.md` |
 | 6 | **Report launcher + Report-incident wizard** (reference flow) | todo | — | `incident-wizard-plan.md` |
 | 7 | **The other 8 wizards** | todo | — | `wizards-plan.md` |
 | 8 | **Governance exports + site league** | todo | — | `governance-plan.md` |

@@ -231,4 +231,31 @@ class HsKpiServiceTest extends TestCase
         $this->assertArrayHasKey('ltifr', $rates[0]);
         $this->assertArrayHasKey('trifr', $rates[0]);
     }
+
+    public function test_near_miss_operands_count_over_window(): void
+    {
+        ClientIncident::factory()->count(4)->create([
+            'type' => 'near_miss',
+            'occurred_at' => now()->subMonths(2),
+        ]);
+        WorkplaceInjury::factory()->count(2)->create([
+            'injury_date' => now()->subMonths(2),
+            'lost_time_days' => 1,
+        ]);
+
+        $operands = $this->svc->nearMissOperands();
+
+        $this->assertEquals(4, $operands['near_misses']);
+        $this->assertEquals(2, $operands['recordable']);
+    }
+
+    public function test_hazard_burndown_returns_weekly_series(): void
+    {
+        $series = $this->svc->hazardBurndown(6);
+
+        $this->assertCount(6, $series);
+        $this->assertArrayHasKey('week', $series[0]);
+        $this->assertArrayHasKey('open', $series[0]);
+        $this->assertEquals(0, $series[0]['open']); // empty DB → nothing open
+    }
 }
