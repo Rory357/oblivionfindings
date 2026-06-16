@@ -170,17 +170,26 @@ right-click menu; detail dialog links to client + shift + staff; the eMAR lens a
 shift med-state + a CD count at handover; concurrent edits are locked; dead `MedicationHandover`
 removed (or documented); all actions in-page via Inertia partial reloads.
 
-### Remaining `TODO(Gx)` markers
-- `emar/Handovers.tsx` `counts.cdUnverified` — the CD-unverified alert derives "this handover involved a
-  controlled drug" from the `(CD)`/"controlled" tag in the stored `medications_due` list (the wizard's
-  snapshot pre-fill). A live per-handover CD-due query would be exact but is the index-time N+1 the
-  on-demand snapshot deliberately avoids. `TODO(Gx)` if exactness is later required.
+### Deferred enhancements — now COMPLETE (merged + verified)
+- ✅ **Exact CD-unverified alert** (was a heuristic): new `cd_required` boolean column stamped at save
+  time from `ClientMedication->active()->controlled()->exists()` for the client; the alert counts
+  submitted/acknowledged handovers where `cd_required && !cd_verification`. No index-time N+1 (one
+  existence check per save). Migration `2026_06_16_000500`; pushed `7f985b0b`.
+- ✅ **Presence-based pessimistic edit-lock** ("being edited by X" / disable-on-open): `locked_by` +
+  `locked_at` (TTL `EDIT_LOCK_TTL_SECONDS=300`); `acquireEditLock`/`releaseEditLock`/`activeLockHolder`;
+  endpoints `emar.handovers.lock`/`.unlock`; wizard acquires on open + releases on close; detail dialog
+  banner + disabled Edit; card menu hides Edit when locked. Complements the optimistic `version` lock
+  (blocks lost updates on save). Migration `2026_06_16_000600`; pushed `a5c1f02f`. Verified: **60
+  handover tests pass / 411 assertions** in the parent repo (incl. new `HandoverMedicationLensTest`
+  cases for cd_required + the presence lock).
+
+### Remaining `TODO(Gx)` markers (intentional, low-value)
 - `ShiftMedicationSnapshotService` — PRN given/reviews-outstanding use a focused administration query;
   omissions clamp `to` to now (future shifts → 0). Refused = `administration.status === 'refused'`.
-- Gap G — live presence-based "who holds it right now" pessimistic lock (disable-on-open) is deferred;
-  the optimistic block-on-save (`version`) is the implemented guard. `applyEdit()` (Operations
-  submitted-edit path) keeps its in-txn `lockForUpdate` and doesn't bump `version` (drafts only mutate
-  via `save()`).
+- `applyEdit()` (Operations submitted-edit path) keeps its in-txn `lockForUpdate` and doesn't bump
+  `version` (drafts only mutate via `save()`); cross-module *presence* detection (eMAR vs Operations)
+  would need Operations to also acquire the lock — deferred (the `version` lock already catches
+  cross-module save conflicts).
 
 ---
 
