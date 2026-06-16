@@ -150,6 +150,49 @@ class DestructionsTest extends TestCase
                 ->has('destructions')
                 ->has('sites')
                 ->has('staff')
+                // The hero footer Client EntityFilter (Gap A) is driven by `clients`.
+                ->has('clients')
+            );
+    }
+
+    /**
+     * The read-only detail modal (Gap B) and the immutable-register UI render
+     * entirely from the page payload: it must carry the witnesses, authoriser,
+     * controlled-drug flags, human labels and the full void trail so a record can
+     * be inspected without an extra round-trip. (Backend gap BK1.)
+     */
+    public function test_payload_carries_detail_fields_for_voided_cd_record(): void
+    {
+        ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client] = $this->setupRegister();
+        $rec = $this->record([
+            'client_id' => $client->id,
+            'witness_1_id' => $w1->id,
+            'witness_2_id' => $w2->id,
+            'authorised_by_name' => 'Pharmacist Pat',
+            'reason' => 'expired',
+            'disposal_method' => 'denaturing',
+        ]);
+
+        // Void it so the payload also exercises the void trail (immutable: retained).
+        $this->actingAs($user)
+            ->from('/emar/destructions')
+            ->post("/emar/destructions/{$rec->id}/void", ['void_reason' => 'Wrong quantity recorded'])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->get('/emar/destructions')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/Destructions')
+                ->where('destructions.0.witness_1_name', $w1->name)
+                ->where('destructions.0.witness_2_name', $w2->name)
+                ->where('destructions.0.authorised_by_name', 'Pharmacist Pat')
+                ->where('destructions.0.is_controlled_drug', true)
+                ->where('destructions.0.reason_label', 'Expired')
+                ->where('destructions.0.disposal_method_label', 'Denaturing')
+                ->where('destructions.0.is_voided', true)
+                ->where('destructions.0.void_reason', 'Wrong quantity recorded')
+                ->where('destructions.0.voided_by_name', $user->name)
             );
     }
 
