@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
@@ -106,6 +107,53 @@ class MedicationErrorsTest extends TestCase
             ->assertSessionHasErrors('status');
 
         $this->assertSame('reported', $error->refresh()->status);
+    }
+
+    public function test_link_incident_creates_and_links_incident(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id, 'error_type' => 'wrong_dose', 'severity' => 'critical', 'description' => 'Wrong strength dispensed.',
+            'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
+        ]);
+        $this->assertNull($error->client_incident_id);
+        $this->assertSame(0, ClientIncident::query()->count());
+
+        $response = $this->actingAs($user)
+            ->from('/emar/errors')
+            ->post("/emar/errors/{$error->id}/link-incident");
+
+        $error->refresh();
+        $this->assertNotNull($error->client_incident_id, 'The error should be linked to the new incident.');
+        $response->assertRedirect(route('incidents.show', $error->client_incident_id));
+
+        $incident = ClientIncident::query()->findOrFail($error->client_incident_id);
+        $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame('medication_error', $incident->type);
+        $this->assertSame($user->id, (int) $incident->reported_by);
+        $this->assertSame('critical', $incident->severity);
+    }
+
+    public function test_link_incident_is_idempotent_when_already_linked(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id, 'error_type' => 'omission', 'severity' => 'minor', 'description' => 'Dose missed.',
+            'status' => 'investigating', 'reported_by' => $user->id, 'reported_at' => now(),
+        ]);
+
+        // First call creates + links the incident.
+        $this->actingAs($user)->from('/emar/errors')->post("/emar/errors/{$error->id}/link-incident");
+        $firstIncidentId = $error->refresh()->client_incident_id;
+        $this->assertNotNull($firstIncidentId);
+        $this->assertSame(1, ClientIncident::query()->count());
+
+        // Second call is idempotent: jumps to the existing incident, creates none.
+        $response = $this->actingAs($user)->from('/emar/errors')->post("/emar/errors/{$error->id}/link-incident");
+
+        $this->assertSame($firstIncidentId, $error->refresh()->client_incident_id);
+        $this->assertSame(1, ClientIncident::query()->count(), 'A second link must not create a duplicate incident.');
+        $response->assertRedirect(route('incidents.show', $firstIncidentId));
     }
 
     protected function makeRoleUser(string $roleName): User
