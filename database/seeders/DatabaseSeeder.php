@@ -74,6 +74,11 @@ class DatabaseSeeder extends Seeder
         $this->call(FamilyPortalDemoSeeder::class);
         $this->call(RosteringProductionDemoSeeder::class);
 
+        // Health & Safety demo dataset + right-sized worked-hours basis for the LTIFR/TRIFR
+        // denominator (both idempotent). Run late so clients/users/sites/events all exist.
+        $this->call(HealthSafetyDemoSeeder::class);
+        $this->call(HealthSafetyBillingDemoSeeder::class);
+
         $this->call(SeedAllPermissionsToAdminSeeder::class);
     }
 }
