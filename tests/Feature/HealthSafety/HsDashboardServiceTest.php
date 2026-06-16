@@ -101,7 +101,12 @@ class HsDashboardServiceTest extends TestCase
         HsRiskAssessment::factory()->active()->create([
             'likelihood' => 1, 'consequence' => 1, 'risk_score' => 1, 'risk_level' => 'low',
         ]);
-        HsRiskAssessment::factory()->dueForReview()->create();
+        // Pin the review-due assessment to a low level — dueForReview() inherits the base
+        // factory's RANDOM risk_score, which intermittently lands high/extreme and skews
+        // the high_extreme_active assertion below (pre-existing flake).
+        HsRiskAssessment::factory()->dueForReview()->create([
+            'likelihood' => 1, 'consequence' => 1, 'risk_score' => 1, 'risk_level' => 'low',
+        ]);
 
         $kpis = $this->dashboardService->getRiskAssessmentKpis();
 

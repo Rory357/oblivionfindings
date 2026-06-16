@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -51,9 +52,7 @@ class NotifiableEventClassifierTest extends TestCase
         $this->assertEquals(NotifiableEventClassifier::CATEGORY_DEATH, $result['category']);
     }
 
-    /**
-     * @dataProvider nonNotifiableProvider
-     */
+    #[DataProvider('nonNotifiableProvider')]
     public function test_below_threshold_is_not_notifiable(?string $harm, ?string $severity): void
     {
         $result = $this->classifier->classify($harm, $severity);
