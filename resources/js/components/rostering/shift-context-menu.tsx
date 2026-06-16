@@ -61,6 +61,11 @@ export function ShiftContextMenu({
         let left = ctx.x;
         if (left + r.width + 8 > vw) left = vw - r.width - 8;
         if (top + r.height + 8 > vh) top = vh - r.height - 8;
+        // Never let the menu run off the top/left edge — when it is taller than
+        // the viewport the maxHeight cap + internal scroll (below) keep every
+        // item reachable instead of clipping the lowest ones off-screen.
+        top = Math.max(8, top);
+        left = Math.max(8, left);
         setPos({ top, left });
     }, [ctx]);
 
@@ -72,8 +77,8 @@ export function ShiftContextMenu({
     return createPortal(
         <div
             ref={ref}
-            className="pointer-events-auto fixed z-[60] w-[280px] rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
-            style={{ top: pos.top, left: pos.left }}
+            className="pointer-events-auto fixed z-[60] w-[280px] overflow-y-auto overscroll-contain rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
+            style={{ top: pos.top, left: pos.left, maxHeight: 'calc(100vh - 16px)' }}
             role="menu"
         >
             <div className="mb-1 flex items-center gap-2 px-2 py-1.5 border-b border-border/60">
