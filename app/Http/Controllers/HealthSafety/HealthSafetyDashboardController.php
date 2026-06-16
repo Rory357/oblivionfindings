@@ -14,6 +14,7 @@ use App\Models\SiteHazard;
 use App\Models\WorkplaceInjury;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Services\HealthSafety\HsDashboardService;
+use App\Services\HealthSafety\HsKpiService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ class HealthSafetyDashboardController extends Controller
 {
     public function __construct(
         private readonly HsDashboardService $dashboardService,
+        private readonly HsKpiService $kpiService,
     ) {}
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
@@ -33,6 +35,18 @@ class HealthSafetyDashboardController extends Controller
         $thirtyDaysAgo = $now->copy()->subDays(30);
         $startOfYear = $now->copy()->startOfYear();
         $sixMonthsAgo = $now->copy()->subMonths(6);
+
+        // Period range (G4), site filter (G4) and role lens (G3) — replace the fixed snapshot.
+        $from = $request->input('from')
+            ? Carbon::parse($request->input('from'))->startOfDay()
+            : $thirtyDaysAgo;
+        $to = $request->input('to')
+            ? Carbon::parse($request->input('to'))->endOfDay()
+            : $now;
+        $siteId = $request->integer('site') ?: null;
+        $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
+            ? $request->input('lens')
+            : 'manager';
 
         // -- KPIs --
         $totalIncidents30d = ClientIncident::where('occurred_at', '>=', $thirtyDaysAgo)->count();
@@ -91,7 +105,8 @@ class HealthSafetyDashboardController extends Controller
             'open_safeguarding' => $openSafeguarding,
             'fleet_incidents_30d' => $fleetIncidents30d,
             'fleet_unresolved' => $fleetUnresolved,
-            'staff_compliance_pct' => 0,
+            'staff_compliance_pct' => (int) round($this->kpiService->trainingAuditCompliancePct() ?? 0),
+            'days_since_lti' => $this->kpiService->daysSinceLostTimeInjury($siteId),
         ];
 
         // -- Incident Trends (12 months) --
@@ -198,6 +213,24 @@ class HealthSafetyDashboardController extends Controller
                 ->limit(5)
                 ->get(),
             'backbone' => $backboneSummary,
+
+            // ── Command-centre additions — period/site/lens-aware (G3/G4/G5/G6) ──
+            'filters' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'site' => $siteId,
+                'lens' => $lens,
+            ],
+            'lens' => $lens,
+            'sites' => Site::orderBy('name')->get(['id', 'name']),
+            'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteId),
+            'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteId),
+            'worklists' => [
+                'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteId),
+                'open_investigations' => $this->dashboardService->openInvestigations($siteId),
+                'notifiable_events' => $this->dashboardService->notifiableEvents(),
+                'expiring' => $this->dashboardService->expiringFeed($siteId),
+            ],
         ]);
     }
 
@@ -243,7 +276,10 @@ class HealthSafetyDashboardController extends Controller
         // -- Site Comparison --
         $sixMonthsAgo = Carbon::now()->subMonths(6);
         $siteComparison = Site::orderBy('name')->get(['id', 'name'])->map(function ($site) use ($from, $to, $sixMonthsAgo) {
-            $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])->count();
+            // Scope incidents to this site via the linked shift (client_incidents has no site_id).
+            $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])
+                ->whereHas('shift', fn ($q) => $q->where('site_id', $site->id))
+                ->count();
 
             $openHazards = SiteHazard::where('site_id', $site->id)
                 ->whereIn('status', ['open', 'in_progress'])

@@ -18,7 +18,7 @@
 ## Workstreams (ordered — data spine first so UI binds to real props)
 | # | Workstream | Status | Commit | Plan |
 |---|---|---|---|---|
-| 1 | **Backend data spine** — `HsKpiService` (G1) + notifiable classifier (G2) + role/period/site params (G3/G4) + expiring feed (G5) + worklist payloads (G6) | **in-progress** | — | `backend-spine-plan.md` |
+| 1 | **Backend data spine** — `HsKpiService` (G1) + notifiable classifier (G2) + role/period/site params (G3/G4) + expiring feed (G5) + worklist payloads (G6) | **done** | 3026e4a0 · 618bbdcc · 2ae6173e · _(controller)_ | `backend-spine-plan.md` |
 
 ### WS1 sub-steps
 | Step | Status | Commit |
@@ -26,7 +26,7 @@
 | 1. `HsKpiService` (G1) + `HsKpiServiceTest` | **done (php -l clean; tests run post-merge)** | _this commit_ |
 | 2. `NotifiableEventClassifier` (G2) + test | **done (php -l clean)** | _this commit_ |
 | 3. `HsDashboardService` row builders G5/G6 + test | **done (php -l clean)** | _this commit_ |
-| 4. Controller `index()` rewire (G3/G4 params + payload + site_comparison fix) | todo | — |
+| 4. Controller `index()` rewire (G3/G4 params + payload + site_comparison fix) | **done (php -l clean)** | _this commit_ |
 | 2 | **Hero command centre + footer band** | todo | — | `hero-plan.md` |
 | 3 | **TabStrip + role lens** (Overview/Leading/Lagging/Compliance) | todo | — | `tabs-plan.md` |
 | 4 | **Worklists + detail modal + context menu** | todo | — | `worklists-plan.md` |
