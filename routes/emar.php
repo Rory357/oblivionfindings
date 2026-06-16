@@ -369,6 +369,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/errors/{error}/close', [MedicationErrorController::class, 'close'])
         ->middleware('permission:medications.administer.correct|clients.update')
         ->name('emar.errors.close');
+    // Post-report "create & link incident" — the report-time create_incident path
+    // only runs at store(). Reuses that incident-creation shape, links it, then
+    // jumps to the incidents module. See docs/ERRORS_GAP_ANALYSIS.md (C1).
+    Route::post('/errors/{error}/link-incident', [MedicationErrorController::class, 'linkIncident'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('emar.errors.link_incident');
 
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {

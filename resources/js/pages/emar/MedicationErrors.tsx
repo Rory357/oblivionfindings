@@ -2,9 +2,8 @@
    hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
    are semantic tokens. */
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import {
     CloseErrorDialog,
@@ -21,8 +20,8 @@ import {
 } from '@/pages/emar/_error-dialogs';
 import { ReportErrorModal } from '@/pages/emar/components/report-error-modal';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Link2, ListChecks, Paperclip, Plus, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Eye, FileText, Link2, ListChecks, Lock, Paperclip, Plus, Search, ShieldCheck, User, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Trend = { week: string; count: number; near_miss: number };
 type Stats = { total_open: number; critical: number; this_month: number; resolved_this_month: number; near_miss: number; trend: Trend[]; by_type: Record<string, number>; by_severity: Record<string, number> };
@@ -42,6 +41,28 @@ type Modal = { type: 'report' } | { type: 'triage' | 'review' | 'resolve' | 'clo
 const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—');
 const SEV_DOT: Record<string, string> = { near_miss: 'bg-muted-foreground', minor: 'bg-status-info', moderate: 'bg-status-warning', major: 'bg-status-warning', critical: 'bg-status-critical' };
+/** Context-menu header tag colours (semantic token CSS vars), keyed by severity. */
+const SEV_CTX: Record<string, { bg: string; color: string }> = {
+    near_miss: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+    minor: { bg: 'var(--status-info-bg)', color: 'var(--status-info)' },
+    moderate: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
+    major: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
+    critical: { bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' },
+};
+
+type ErrAlert = { kind: string; tone: 'critical' | 'warning' | 'info'; icon: typeof AlertTriangle; message: string; tab: string };
+
+const DISMISSED_ALERTS_KEY = 'err-dismissed-alerts';
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    if (typeof window === 'undefined') return [];
+    try { const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY); return raw ? (JSON.parse(raw) as string[]) : []; } catch { return []; }
+}
+function persistDismissedAlerts(kinds: string[]): string[] {
+    const unique = Array.from(new Set(kinds));
+    if (typeof window !== 'undefined') { try { window.sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(unique)); } catch { /* sessionStorage unavailable — dismissal stays in-memory only */ } }
+    return unique;
+}
 
 export default function MedicationErrors({ errors, stats, clients, staff, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
     const [activeTab, setActiveTab] = useState('all');
@@ -53,6 +74,7 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
     const [month, setMonth] = useState<number | null>(null); // null = all time; else offset from current month
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     const monthLabel = useMemo(() => { const d = new Date(); d.setMonth(d.getMonth() + (month ?? 0)); return d.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' }); }, [month]);
 
@@ -81,6 +103,52 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
     const hasFilters = search || clientFilter || severityFilter !== null || typeFilter !== null || reporterFilter || month !== null;
     const clearFilters = () => { setSearch(''); setClientFilter(null); setSeverityFilter(null); setTypeFilter(null); setReporterFilter(null); setMonth(null); };
     const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/errors', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
+
+    // Cross-module jumps + right-click row menu (parity with PRN/CD).
+    const viewClient = (id: number | null) => { if (id) router.visit(`/operations/clients/${id}/care`); };
+    const viewIncident = (id: number) => router.visit(`/incidents/${id}`);
+    // Post-report create-and-link: the errors endpoint creates the incident,
+    // links it and redirects into the incidents module (see ERRORS_GAP_ANALYSIS C).
+    const createAndLinkIncident = (err: ErrorRow) => router.post(`/emar/errors/${err.id}/link-incident`);
+    const openRowCtx = (ev: ReactMouseEvent, err: ErrorRow) => {
+        ev.preventDefault();
+        const sevm = severityMeta(err.severity);
+        const tag = SEV_CTX[err.severity] ?? SEV_CTX.near_miss;
+        const open = err.status === 'reported' || err.status === 'investigating';
+        const criticalOpen = open && (err.severity === 'critical' || err.severity === 'major');
+        const clientName = err.client ? `${err.client.first_name} ${err.client.last_name}` : 'Unknown client';
+        // One honest incident action: jump when linked, else create-and-link;
+        // for an open critical/major error with no incident it escalates (critical tone).
+        const incidentItem: ShiftCtxItem = err.incident
+            ? { icon: <Link2 className="h-3.5 w-3.5" />, label: `View linked incident ${err.incident.ref}`, onClick: () => viewIncident(err.incident!.id) }
+            : criticalOpen
+                ? { icon: <AlertTriangle className="h-3.5 w-3.5" />, label: 'Escalate — create & link incident', sub: 'Raise into the incident register', tone: 'critical', onClick: () => createAndLinkIncident(err) }
+                : { icon: <Link2 className="h-3.5 w-3.5" />, label: 'Create & link incident', sub: 'Raise into the incident register', onClick: () => createAndLinkIncident(err) };
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View / triage', sub: `${typeLabel(err.error_type)} · ${sevm.label}`, tone: 'primary', onClick: () => setModal({ type: 'triage', error: err }) },
+            ...(err.status === 'reported' ? [{ icon: <ClipboardList className="h-3.5 w-3.5" />, label: 'Review', onClick: () => setModal({ type: 'review', error: err }) } satisfies ShiftCtxItem] : []),
+            ...(open ? [{ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Resolve', onClick: () => setModal({ type: 'resolve', error: err }) } satisfies ShiftCtxItem] : []),
+            ...(err.status === 'resolved' ? [{ icon: <Lock className="h-3.5 w-3.5" />, label: 'Close out', onClick: () => setModal({ type: 'close', error: err }) } satisfies ShiftCtxItem] : []),
+            { sep: true },
+            ...(err.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => viewClient(err.client_id) } satisfies ShiftCtxItem] : []),
+            ...(err.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(err.mar_url!) } satisfies ShiftCtxItem] : []),
+            incidentItem,
+        ];
+        setCtx({ x: ev.clientX, y: ev.clientY, tag: sevm.label, tagBg: tag.bg, tagColor: tag.color, meta: `${err.ref} · ${clientName}${err.medication ? ` · ${err.medication.name}` : ''}`, items });
+    };
+
+    // Stacked, dismissible (per session) alert strip built from the loaded register
+    // (stable regardless of search/month facets). Each row jumps to the right tab.
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
+    const criticalOpen = useMemo(() => errors.filter((e) => e.severity === 'critical' && (e.status === 'reported' || e.status === 'investigating')).length, [errors]);
+    const awaitingReview = useMemo(() => errors.filter((e) => e.status === 'reported').length, [errors]);
+    const resolvedNotClosed = useMemo(() => errors.filter((e) => e.status === 'resolved').length, [errors]);
+    const alerts: ErrAlert[] = [
+        criticalOpen > 0 && { kind: 'critical', tone: 'critical' as const, icon: AlertTriangle, message: `${criticalOpen} critical error${criticalOpen === 1 ? '' : 's'} still open — triage and resolve urgently.`, tab: 'critical' },
+        awaitingReview > 0 && { kind: 'review', tone: 'warning' as const, icon: ClipboardList, message: `${awaitingReview} error${awaitingReview === 1 ? '' : 's'} awaiting review.`, tab: 'open' },
+        resolvedNotClosed > 0 && { kind: 'closeout', tone: 'info' as const, icon: CheckCircle2, message: `${resolvedNotClosed} resolved error${resolvedNotClosed === 1 ? '' : 's'} awaiting close-out sign-off.`, tab: 'resolved' },
+    ].filter((a): a is ErrAlert => Boolean(a) && !dismissed.includes((a as ErrAlert).kind));
 
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All errors', icon: ListChecks, tone: 'primary', badge: filtered.length || undefined },
@@ -144,10 +212,26 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
                                 <button onClick={() => setMonth((m) => (m ?? 0) + 1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronRight className="h-3.5 w-3.5" /></button>
                                 {month !== null && <button onClick={() => setMonth(null)} className="rounded-full bg-primary-foreground px-3 py-1 text-xs font-medium text-primary">All time</button>}
                             </div>
-                            {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <div className="relative w-full max-w-xs md:w-[240px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, medication or ref…" aria-label="Search medication errors" className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50" />
+                                    {search ? <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button> : null}
+                                </div>
+                                <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))} value={clientFilter} onChange={setClientFilter} onDark />
+                                {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            </div>
                         </div>
                     }
                 />
+
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setActiveTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
+                    </div>
+                )}
 
                 <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr]">
                     <Card title="Reports · last 8 weeks">
@@ -188,11 +272,7 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Error views" />
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5">
-                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, medication or ref…" className="w-48 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
-                    </div>
-                    <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))} value={clientFilter} onChange={setClientFilter} />
+                    <span className="text-xs font-medium text-muted-foreground">Filter</span>
                     <EntityFilter label="Severity" allLabel="All severities" items={SEVERITIES.map((s, i) => ({ id: i, name: s.label }))} value={severityFilter} onChange={setSeverityFilter} />
                     <EntityFilter label="Type" allLabel="All types" items={ERROR_TYPES.map((t, i) => ({ id: i, name: t.label }))} value={typeFilter} onChange={setTypeFilter} />
                     <EntityFilter label="Reporter" allLabel="Any reporter" items={staff} value={reporterFilter} onChange={setReporterFilter} />
@@ -200,7 +280,13 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
                 </div>
 
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                    {rows.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No errors match the current filters.</div> : (
+                    {rows.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
+                            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40" />
+                            <p className="text-sm font-medium">No errors to show</p>
+                            <p className="text-xs text-muted-foreground">{hasFilters ? 'No errors match the current filters — try clearing them.' : 'Nothing in this view. A quiet register is a good sign.'}</p>
+                        </div>
+                    ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[940px] text-sm">
                                 <thead>
@@ -212,7 +298,7 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
                                     {rows.map((e) => {
                                         const sev = severityMeta(e.severity); const st = statusMeta(e.status);
                                         return (
-                                            <tr key={e.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setModal({ type: 'triage', error: e })}>
+                                            <tr key={e.id} tabIndex={0} aria-label={`Triage ${e.ref} · ${e.client ? `${e.client.first_name} ${e.client.last_name}` : 'unknown client'}`} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" onClick={() => setModal({ type: 'triage', error: e })} onContextMenu={(ev) => openRowCtx(ev, e)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setModal({ type: 'triage', error: e }); } }}>
                                                 <td className="px-4 py-3"><div>{fmtDate(e.reported_at)}</div><div className="font-mono text-[10px] text-muted-foreground">{e.ref}</div></td>
                                                 <td className="px-4 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(e.client ? `${e.client.first_name} ${e.client.last_name}` : '?')}</span><div><div className="font-medium">{e.client ? `${e.client.first_name} ${e.client.last_name}` : 'Unknown'}</div><div className="text-xs text-muted-foreground">{e.site_name ?? ''}</div></div></div></td>
                                                 <td className="px-4 py-3 text-muted-foreground">{e.medication?.name ?? '—'}</td>
@@ -243,6 +329,7 @@ export default function MedicationErrors({ errors, stats, clients, staff, sites,
             {modal?.type === 'review' && <ReviewErrorDialog error={modal.error} onClose={() => setModal(null)} />}
             {modal?.type === 'resolve' && <ResolveErrorDialog error={modal.error} onClose={() => setModal(null)} />}
             {modal?.type === 'close' && <CloseErrorDialog error={modal.error} onClose={() => setModal(null)} />}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
@@ -252,6 +339,30 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="mb-3 text-sm font-semibold">{title}</div>
             {children}
+        </div>
+    );
+}
+
+/** One row of the alert strip — icon + message + Review jump + per-session dismiss. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: ErrAlert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'critical'
+        ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+        : alert.tone === 'warning'
+            ? 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning'
+            : 'border-status-info/30 bg-status-info-bg/60 text-status-info';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
         </div>
     );
 }

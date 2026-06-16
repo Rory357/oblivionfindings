@@ -244,18 +244,17 @@ export default function ControlledDrugs(props: Props) {
         setCtx({ x: event.clientX, y: event.clientY, tag: tag.toUpperCase(), tagBg: t.bg, tagColor: t.color, meta, items });
     };
 
-    // Shared interactivity (click → detail, right-click → menu, keyboard-focusable);
-    // table rows add row chrome, cards supply their own.
+    // Shared interactivity (click → detail, right-click → menu). Rows/cards are
+    // plain clickable surfaces with no interactive role/tabindex (matches PRN), so
+    // their inner controls (Check balance / Resolve) aren't nested inside an
+    // interactive ancestor — keeps the accessibility tree clean (no nested-interactive).
     const interactive = (subject: CdDetailSubject, readOnly = false) => ({
-        tabIndex: 0,
-        role: 'button' as const,
         onClick: () => openDetail(subject),
         onContextMenu: (e: ReactMouseEvent) => openRowCtx(e, subject, readOnly),
-        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(subject); } },
     });
     const rowProps = (subject: CdDetailSubject, readOnly = false) => ({
         ...interactive(subject, readOnly),
-        className: 'cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/40 focus:bg-muted/40 focus:outline-none',
+        className: 'cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/40',
     });
 
     const TABS: RosterTabItem[] = [
