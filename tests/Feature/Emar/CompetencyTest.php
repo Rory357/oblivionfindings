@@ -120,6 +120,38 @@ class CompetencyTest extends TestCase
         $this->assertSame('passed', $a->status);
     }
 
+    public function test_store_persists_signoff_declarations(): void
+    {
+        // G1: the two-party Review & sign declarations are now stored (timestamps).
+        ['user' => $user, 'staff' => $staff] = $this->seedCompetency();
+
+        $this->actingAs($user)
+            ->from('/emar/competency')
+            ->post('/emar/competency', array_merge($this->fullAreas(true), [
+                'user_id' => $staff->id,
+                'assessment_type' => 'initial',
+                'assessment_date' => now()->toDateString(),
+                'assessor_declared' => true,
+                'staff_acknowledged' => true,
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $a = MedicationCompetencyAssessment::query()->firstOrFail();
+        $this->assertNotNull($a->assessor_declared_at);
+        $this->assertNotNull($a->staff_acknowledged_at);
+
+        // Serialized payload surfaces the declarations for the detail modal.
+        $this->actingAs($user)
+            ->get('/emar/competency')
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('assessments.0', fn (Assert $row) => $row
+                    ->where('assessor_declared_at', now()->toDateString())
+                    ->where('staff_acknowledged_at', now()->toDateString())
+                    ->etc()
+                )
+            );
+    }
+
     public function test_store_marks_failed_below_threshold(): void
     {
         ['user' => $user, 'staff' => $staff] = $this->seedCompetency();

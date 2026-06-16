@@ -41,6 +41,7 @@ export type DestructionRow = {
     void_reason: string | null;
     voided_by_name: string | null;
     is_voided: boolean;
+    mar_url: string | null;
 };
 
 const SECTIONS: WizardStep[] = [
@@ -97,6 +98,11 @@ export function DestructionDetailDialog({
                     {d.client_id ? (
                         <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${d.client_id}/care`)}>
                             <User className="h-4 w-4" /> View client
+                        </Button>
+                    ) : null}
+                    {d.mar_url ? (
+                        <Button type="button" variant="ghost" onClick={() => router.visit(d.mar_url!)}>
+                            <FileText className="h-4 w-4" /> MAR chart
                         </Button>
                     ) : null}
                     <Button type="button" variant="ghost" onClick={onExport}>

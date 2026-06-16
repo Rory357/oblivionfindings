@@ -2266,6 +2266,8 @@ class EmarController extends Controller
                 'areas_for_improvement' => $a->areas_for_improvement,
                 'action_plan' => $a->action_plan,
                 'assessor_comments' => $a->assessor_comments,
+                'assessor_declared_at' => $a->assessor_declared_at?->toDateString(),
+                'staff_acknowledged_at' => $a->staff_acknowledged_at?->toDateString(),
                 'can_administer_unsupervised' => (bool) $a->can_administer_unsupervised,
                 'can_witness_controlled' => (bool) $a->can_witness_controlled,
                 'is_expired' => $a->isExpired(),
@@ -2740,6 +2742,7 @@ class EmarController extends Controller
                 'void_reason' => $d->void_reason,
                 'voided_by_name' => $d->voidedByUser?->name,
                 'is_voided' => $d->voided_at !== null,
+                'mar_url' => $d->client_id ? EmarUrl::mar($d->client_id) : null,
             ])->values(),
             'medications' => $medications->map(fn (ClientMedication $m) => [
                 'id' => $m->id,
@@ -3332,6 +3335,8 @@ class EmarController extends Controller
             'restriction_notes' => 'nullable|string',
             'can_administer_unsupervised' => 'nullable|boolean',
             'can_witness_controlled' => 'nullable|boolean',
+            'assessor_declared' => 'nullable|boolean',
+            'staff_acknowledged' => 'nullable|boolean',
         ]);
 
         $booleanFields = [
@@ -3347,6 +3352,10 @@ class EmarController extends Controller
         $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
         $validated['restricted'] = (bool) ($validated['restricted'] ?? false);
         $validated['assessor_id'] = auth()->id();
+        // Two-party sign-off (G1): stamp when each party declared on the Review & sign step.
+        $validated['assessor_declared_at'] = ! empty($validated['assessor_declared']) ? now() : null;
+        $validated['staff_acknowledged_at'] = ! empty($validated['staff_acknowledged']) ? now() : null;
+        unset($validated['assessor_declared'], $validated['staff_acknowledged']);
         $validated['expiry_date'] = $validated['expiry_date']
             ?? Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
         $validated['can_administer_unsupervised'] = (bool) ($validated['can_administer_unsupervised'] ?? false);
@@ -3387,7 +3396,18 @@ class EmarController extends Controller
             'expiry_date' => 'nullable|date|after_or_equal:assessment_date',
             'can_administer_unsupervised' => 'nullable|boolean',
             'can_witness_controlled' => 'nullable|boolean',
+            'assessor_declared' => 'nullable|boolean',
+            'staff_acknowledged' => 'nullable|boolean',
         ]);
+
+        // Re-attestation (G1): a fresh declaration on edit/renew re-stamps the sign-off.
+        if (array_key_exists('assessor_declared', $validated)) {
+            $validated['assessor_declared_at'] = $validated['assessor_declared'] ? now() : null;
+        }
+        if (array_key_exists('staff_acknowledged', $validated)) {
+            $validated['staff_acknowledged_at'] = $validated['staff_acknowledged'] ? now() : null;
+        }
+        unset($validated['assessor_declared'], $validated['staff_acknowledged']);
 
         $booleanFields = [
             'medication_knowledge', 'five_rights', 'safety_checks', 'documentation',

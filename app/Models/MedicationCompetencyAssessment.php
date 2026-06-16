@@ -35,6 +35,8 @@ class MedicationCompetencyAssessment extends Model
         'areas_for_improvement',
         'action_plan',
         'assessor_comments',
+        'assessor_declared_at',
+        'staff_acknowledged_at',
         'observed_rounds',
         'can_administer_unsupervised',
         'can_witness_controlled',
@@ -46,6 +48,8 @@ class MedicationCompetencyAssessment extends Model
     protected $casts = [
         'assessment_date' => 'date',
         'expiry_date' => 'date',
+        'assessor_declared_at' => 'datetime',
+        'staff_acknowledged_at' => 'datetime',
         'medication_knowledge' => 'boolean',
         'five_rights' => 'boolean',
         'safety_checks' => 'boolean',
