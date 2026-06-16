@@ -328,18 +328,29 @@ class HsDashboardService
         $from = $from ?? now()->subDays(30);
         $to = $to ?? now();
 
-        return Site::orderBy('name')->get(['id', 'name'])
-            ->map(function (Site $site) use ($from, $to) {
-                $incidents = HsEvent::where('site_id', $site->id)
-                    ->whereIn('event_category', [HsEvent::CATEGORY_INCIDENT, HsEvent::CATEGORY_NEAR_MISS, HsEvent::CATEGORY_INJURY])
-                    ->whereBetween('occurred_at', [$from, $to])
-                    ->count();
-                $hazards = SiteHazard::where('site_id', $site->id)
-                    ->whereIn('status', ['open', 'in_progress'])
-                    ->count();
+        // Two grouped queries (not 2 per site) — avoid an N+1 on the dashboard endpoint.
+        $incidentsBySite = HsEvent::query()
+            ->whereIn('event_category', [HsEvent::CATEGORY_INCIDENT, HsEvent::CATEGORY_NEAR_MISS, HsEvent::CATEGORY_INJURY])
+            ->whereBetween('occurred_at', [$from, $to])
+            ->whereNotNull('site_id')
+            ->select('site_id', DB::raw('COUNT(*) as aggregate'))
+            ->groupBy('site_id')
+            ->pluck('aggregate', 'site_id');
 
-                return ['id' => $site->id, 'name' => $site->name, 'incidents' => $incidents, 'hazards' => $hazards];
-            })
+        $hazardsBySite = SiteHazard::query()
+            ->whereIn('status', ['open', 'in_progress'])
+            ->whereNotNull('site_id')
+            ->select('site_id', DB::raw('COUNT(*) as aggregate'))
+            ->groupBy('site_id')
+            ->pluck('aggregate', 'site_id');
+
+        return Site::orderBy('name')->get(['id', 'name'])
+            ->map(fn (Site $site) => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'incidents' => (int) ($incidentsBySite[$site->id] ?? 0),
+                'hazards' => (int) ($hazardsBySite[$site->id] ?? 0),
+            ])
             ->sortByDesc(fn ($s) => $s['incidents'] * 2 + $s['hazards'])
             ->values()
             ->all();
