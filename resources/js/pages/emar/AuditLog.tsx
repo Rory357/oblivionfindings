@@ -3,12 +3,12 @@
 /* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
    deliberate deviations, and a fidelity checklist for reviewing this page's design. */
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays, DayPickerChip, parseYmd, toYmd } from '@/components/meds/day-picker-chip';
 import AppLayout from '@/layouts/app-layout';
-import { eventMeta, FLAG_META, MedicationEventDrawer, type AuditEvent } from '@/components/emar/medication-event-drawer';
+import { eventMeta, eventPrimaryLink, FLAG_META, MedicationEventDrawer, type AuditEvent } from '@/components/emar/medication-event-drawer';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
@@ -18,7 +18,11 @@ import {
     ChevronRight,
     ClipboardCheck,
     Clock,
+    Copy,
     Download,
+    Eye,
+    FileText,
+    Fingerprint,
     History,
     Lock,
     Package,
@@ -28,9 +32,11 @@ import {
     ShieldAlert,
     ShieldCheck,
     Table,
+    User,
     Users,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type MouseEvent as ReactMouseEvent, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 type Stats = { total: number; this_week: number; this_month: number; open_gaps: number };
 type Props = {
@@ -53,6 +59,26 @@ const CATEGORIES = [
     { id: 'errors', label: 'Errors', icon: AlertOctagon, tone: 'critical' as const },
 ];
 const RANGES = [{ v: '7', l: '7 days' }, { v: '30', l: '30 days' }, { v: '90', l: '90 days' }];
+
+// Right-click menu tag colours (token-based; mirrors ControlledDrugs' CTX_TAG).
+const CTX_TAG: Record<'critical' | 'warning' | 'info' | 'success' | 'muted', { bg: string; color: string }> = {
+    critical: { bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' },
+    warning: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
+    info: { bg: 'var(--status-info-bg)', color: 'var(--status-info)' },
+    success: { bg: 'var(--status-success-bg)', color: 'var(--status-success)' },
+    muted: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+};
+const ctxToneFor = (e: AuditEvent): keyof typeof CTX_TAG => {
+    if (e.flags.length > 0) return 'critical';
+    switch (e.category) {
+        case 'doses': return 'success';
+        case 'stock': return 'warning';
+        case 'errors': return 'critical';
+        case 'controlled':
+        case 'clinical':
+        default: return 'info';
+    }
+};
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtShort = (d: Date) => d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
@@ -70,6 +96,31 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
     const [anchor, setAnchor] = useState(() => toYmd(new Date()));
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [selected, setSelected] = useState<AuditEvent | null>(null);
+    const [selectedSection, setSelectedSection] = useState<string | undefined>(undefined);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+
+    // Open the read-only detail drawer; `section` focuses a panel (e.g. integrity).
+    const openEvent = (e: AuditEvent, section?: string) => { setSelectedSection(section); setSelected(e); };
+
+    // Read-only / navigational right-click menu for an event row (parity with PRN/CD).
+    // No record/edit/delete items — this surface is append-only.
+    const openRowCtx = (ev: ReactMouseEvent, e: AuditEvent) => {
+        ev.preventDefault();
+        const link = eventPrimaryLink(e);
+        const med = typeof e.details?.medication === 'string' ? e.details.medication : null;
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View record', sub: e.description, tone: 'primary', onClick: () => openEvent(e) },
+            ...(e.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${e.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            { icon: <FileText className="h-3.5 w-3.5" />, label: `Open on ${link.label}`, onClick: () => router.visit(link.href) },
+            { icon: <Fingerprint className="h-3.5 w-3.5" />, label: 'Verify integrity', sub: 'Tamper-evidence check', onClick: () => openEvent(e, 'integrity') },
+            { sep: true },
+            { icon: <Download className="h-3.5 w-3.5" />, label: 'Export this event', sub: 'CSV', onClick: () => window.open(`/emar/audit/event/${encodeURIComponent(e.id)}/export`, '_blank') },
+            { icon: <Copy className="h-3.5 w-3.5" />, label: 'Copy event ID', onClick: () => { void navigator.clipboard?.writeText(e.id).then(() => toast.success('Event ID copied')).catch(() => toast.error('Could not copy')); } },
+        ];
+        const t = CTX_TAG[ctxToneFor(e)];
+        const meta = [e.client_name, med, fmtTime(e.timestamp)].filter(Boolean).join(' · ');
+        setCtx({ x: ev.clientX, y: ev.clientY, tag: eventMeta(e.event_type).label.toUpperCase(), tagBg: t.bg, tagColor: t.color, meta, items });
+    };
 
     const todayYmd = toYmd(new Date());
     const isToday = anchor === todayYmd;
@@ -266,7 +317,7 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                                 <div key={day}>
                                     <div className="mb-2 flex items-center gap-3"><span className="text-xs font-bold">{day}</span><span className="h-px flex-1 bg-border" /><span className="text-xs text-muted-foreground">{items.length} events</span></div>
                                     <div className="flex flex-col gap-2">
-                                        {items.map((e) => <TimelineRow key={e.id} e={e} onOpen={() => setSelected(e)} />)}
+                                        {items.map((e) => <TimelineRow key={e.id} e={e} onOpen={() => openEvent(e)} onCtx={(ev) => openRowCtx(ev, e)} />)}
                                     </div>
                                 </div>
                             ))}
@@ -281,7 +332,7 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                                 </thead>
                                 <tbody>
                                     {rows.map((e) => { const m = eventMeta(e.event_type); const Icon = m.icon; return (
-                                        <tr key={e.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setSelected(e)}>
+                                        <tr key={e.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => openEvent(e)} onContextMenu={(ev) => openRowCtx(ev, e)}>
                                             <td className="px-4 py-3 font-mono text-xs">{fmtTime(e.timestamp)}</td>
                                             <td className="px-4 py-3"><span className="inline-flex items-center gap-1.5"><span className={`flex h-5 w-5 items-center justify-center rounded ${m.cls}`}><Icon className="h-3 w-3" /></span>{m.label}</span></td>
                                             <td className="px-4 py-3">{e.client_name}</td>
@@ -301,11 +352,11 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                             </div>
                             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {rows.map((e) => { const m = eventMeta(e.event_type); const Icon = m.icon; return (
-                                    <div key={e.id} className="rounded-2xl border border-status-critical/30 bg-card p-4 shadow-sm">
+                                    <div key={e.id} className="rounded-2xl border border-status-critical/30 bg-card p-4 shadow-sm" onContextMenu={(ev) => openRowCtx(ev, e)}>
                                         <div className="flex items-center gap-2"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${m.cls}`}><Icon className="h-4 w-4" /></span><div className="text-sm font-semibold">{e.flags.map((f) => FLAG_META[f]?.label ?? f).join(' · ')}</div></div>
                                         <div className="mt-2 text-sm">{e.description}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">{e.performed_by ?? 'Unattributed'} · {new Date(e.timestamp).toLocaleDateString('en-NZ')}</div>
-                                        <div className="mt-3"><Button size="sm" variant="outline" onClick={() => setSelected(e)}>View record</Button></div>
+                                        <div className="mt-3"><Button size="sm" variant="outline" onClick={() => openEvent(e)}>View record</Button></div>
                                     </div>
                                 ); })}
                             </div>
@@ -314,17 +365,25 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                 </div>
             </div>
 
-            {selected && <MedicationEventDrawer event={selected} onClose={() => setSelected(null)} />}
+            {selected && (
+                <MedicationEventDrawer
+                    key={`${selected.id}-${selectedSection ?? 'what'}`}
+                    event={selected}
+                    initialSection={selectedSection}
+                    onClose={() => { setSelected(null); setSelectedSection(undefined); }}
+                />
+            )}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
 
-function TimelineRow({ e, onOpen }: { e: AuditEvent; onOpen: () => void }) {
+function TimelineRow({ e, onOpen, onCtx }: { e: AuditEvent; onOpen: () => void; onCtx: (ev: ReactMouseEvent) => void }) {
     const m = eventMeta(e.event_type);
     const Icon = m.icon;
     const isGap = e.flags.length > 0;
     return (
-        <button onClick={onOpen} className={`flex w-full items-center gap-3 rounded-[14px] border bg-card px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-muted/30 ${isGap ? 'border-dashed border-status-critical/50' : ''}`}>
+        <button onClick={onOpen} onContextMenu={onCtx} className={`flex w-full items-center gap-3 rounded-[14px] border bg-card px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-muted/30 ${isGap ? 'border-dashed border-status-critical/50' : ''}`}>
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${m.cls}`}><Icon className="h-4 w-4" /></span>
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">

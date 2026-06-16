@@ -108,7 +108,12 @@ const CATEGORY_LINK: Record<string, { href: string; label: string }> = {
 
 const HIDDEN_DETAIL_KEYS = new Set(['changes', 'scheduled_for']);
 
-export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; onClose: () => void }) {
+/** The primary cross-link for an event (MAR chart / CD register / Reviews / …),
+ *  shared by the drawer footer and the row context menu so both stay in sync. */
+export const eventPrimaryLink = (event: AuditEvent): { href: string; label: string } =>
+    CATEGORY_LINK[event.category] ?? { href: '/emar', label: 'eMAR' };
+
+export function MedicationEventDrawer({ event, onClose, initialSection }: { event: AuditEvent; onClose: () => void; initialSection?: string }) {
     const meta = eventMeta(event.event_type);
     const Icon = meta.icon;
     const changes = (event.details?.changes as Change[] | undefined) ?? [];
@@ -130,7 +135,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
 
     const bodyRef = useRef<HTMLDivElement>(null);
     const sectionEls = useRef<Record<string, HTMLDivElement | null>>({});
-    const [active, setActive] = useState('what');
+    const [active, setActive] = useState(initialSection ?? 'what');
     const [integrity, setIntegrity] = useState<Integrity | null>(null);
     const [flagging, setFlagging] = useState(false);
     const [flash, setFlash] = useState<string | null>(null);
@@ -183,6 +188,13 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
         if (flashTimer.current) clearTimeout(flashTimer.current);
         flashTimer.current = setTimeout(() => setFlash(null), 1300);
     };
+
+    // When opened from a "Verify integrity" affordance, focus the integrity panel
+    // on mount (the drawer is keyed per open, so this runs once per opening).
+    useEffect(() => {
+        if (initialSection && initialSection !== 'what') goToSection(initialSection);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const onFlag = () => {
         setFlagging(true);

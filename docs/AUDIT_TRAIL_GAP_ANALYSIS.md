@@ -1,0 +1,77 @@
+# eMAR Audit Trail — cross-module parity gap analysis
+
+Single source of truth for the `/emar/audit` parity `/loop`. Scope is **only** the
+Audit Trail page, its filters, and its read-only detail drawer. This surface is
+**append-only / immutable** — no create/edit/delete affordances may be added; the
+immutability is a compliance feature (CQC / NICE SC1).
+
+- **Page:** `resources/js/pages/emar/AuditLog.tsx`
+- **Drawer:** `resources/js/components/emar/medication-event-drawer.tsx`
+- **Controller:** `app/Http/Controllers/Emar/AuditLogController.php` → `index()`
+- **Endpoints (all pre-existing — front-end only, no new endpoints):**
+  integrity `GET /emar/audit/event/{id}/integrity`, per-event export
+  `GET /emar/audit/event/{id}/export`, flag `POST /emar/audit/event/{id}/flag`,
+  audit-pack export `GET /emar/audit/export`.
+
+Reuse idioms (copy, don't hand-roll): `ShiftContextMenu`/`ShiftCtxItem`/`ShiftCtxState`
+(`@/components/rostering/shift-context-menu`, template = PrnRecords `openRowCtx`);
+`EntityFilter` (`@/components/rostering`); options-bar idiom = `prn-detail-dialog.tsx`;
+client jump = `router.visit('/operations/clients/${id}/care')`; alert strip mirrors
+`ControlledDrugs.tsx`. Semantic tokens only.
+
+---
+
+## A. Right-click context menu (read-only) + "View client"  — priority 1
+
+- [x] A1. Added `onContextMenu` → `ShiftContextMenu` to all three event-row surfaces
+      (timeline rows, table rows, compliance-gap cards) via `openRowCtx`. Read-only items only:
+      View record (primary → drawer), View client (→ `/operations/clients/{id}/care`),
+      Open on {MAR chart/CD register/…} (via `eventPrimaryLink`), Verify integrity (opens the
+      drawer focused on the integrity panel — new `initialSection` prop on the drawer), sep,
+      Export this event (→ `/event/{id}/export`), Copy event ID (clipboard + toast). Tag =
+      event-type label pill (`CTX_TAG` token map); meta = client · medication · timestamp.
+      Files: `resources/js/pages/emar/AuditLog.tsx`,
+      `resources/js/components/emar/medication-event-drawer.tsx` (exports `eventPrimaryLink`,
+      accepts `initialSection`). types + lint clean.
+
+## B. Detail drawer — Options bar + Verify integrity action  — priority 2
+
+- [ ] B1. Add a footer Options bar to `MedicationEventDrawer` (adapt `prn-detail-dialog.tsx`;
+      read-only/navigational only): **View client · Open on MAR · Verify integrity · Export event**
+      (+ Close, + contextual Resolve-gap primary when the event is flagged). "View client" →
+      `/operations/clients/{id}/care`. "Verify integrity" focuses + re-fetches the lazy
+      integrity panel (`/event/{id}/integrity`). Keep the existing append-only
+      "Flag for investigation" governance action.
+
+## C. Convert secondary filters to EntityFilter  — priority 3
+
+- [ ] C1. Replace the raw shadcn `Select`s for **Client**, **Staff** and **Source** with
+      `EntityFilter` (label · count ▾) for cross-module consistency with PRN/Reviews.
+      Range stays a `Select`. Keep the existing client-side query wiring
+      (`clientId`, `staffName`, `source`, date window, `cat`).
+
+## D. Integrity / omission alert strip  — priority 4 (optional)
+
+- [ ] D1. Add a dismissible (per-session) alert strip below the hero, mirroring
+      `/emar/controlled`, surfacing the compliance signals already on the payload:
+      **N MAR omissions in this window** (critical → gaps view) and **N CD entries missing a
+      witness** (critical → controlled gaps). Each: icon + count + message + a "Review" jump +
+      dismiss. `TODO(Gx)`: "N events edited since recording" is **not** on the index payload —
+      `integrity.edit_count` is lazy-loaded per event from the integrity endpoint — so it is
+      omitted (would need a payload/aggregate change, out of front-end scope).
+
+---
+
+## Loop exit (§6)
+Every box `[x]`; `npm run types` / `npm run lint` / `npm run build` all pass; event rows
+have a read-only right-click menu with View client; the drawer has an Options bar
+(View client · Open MAR · Verify integrity · Export); Client/Staff/Source are EntityFilters;
+the page remains strictly append-only (no create/edit/delete anywhere); interactions are
+navigational/read-only with Inertia partial reloads where applicable.
+
+## Pass log
+- (pass 0) Created this file from the seed gaps; audited the live page + reference
+  components. Confirmed all of A1/B1/C1 are still open (raw Selects present; no row context
+  menu; drawer footer has Flag/Export/Resolve only — no View-client / Verify-integrity).
+  Confirmed the `.design-drops` prototype is not checked into this worktree; using
+  `docs/emar-redesign/audit-design-review.md` + the cross-module standard as the reference.
