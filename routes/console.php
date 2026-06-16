@@ -72,6 +72,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
 
+// Controlled-drug balance checks not done in ≥7 days → dashboard alert: 07:30 NZ
+app(Schedule::class)
+    ->command('emar:escalate-overdue-cd-checks')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:30');
+
 // High severity incidents that have not been reviewed: hourly (internal ops)
 app(Schedule::class)
     ->command('incidents:remind-high-unreviewed')

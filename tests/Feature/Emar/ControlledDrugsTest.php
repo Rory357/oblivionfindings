@@ -7,6 +7,7 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ControlledDrugLossReport;
+use App\Models\MedicationDashboardAlert;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -200,6 +201,35 @@ class ControlledDrugsTest extends TestCase
         $discrepancy = ClientControlledDrugDiscrepancy::first();
         $this->assertNotNull($discrepancy);
         $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
+    }
+
+    public function test_overdue_cd_check_command_raises_then_balance_check_resolves_alert(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
+
+        // No balance check on record → escalation command raises an overdue alert.
+        $this->artisan('emar:escalate-overdue-cd-checks')->assertExitCode(0);
+
+        $alert = MedicationDashboardAlert::query()
+            ->where('alert_type', 'controlled_overdue_check')
+            ->where('client_medication_id', $med->id)
+            ->where('status', 'active')
+            ->first();
+        $this->assertNotNull($alert, 'Command should raise an overdue-check alert for an unchecked CD.');
+
+        // Recording a balance check clears the standing alert.
+        $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/balance-check', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'expected_balance' => 5,
+                'actual_balance' => 5,
+                'witnessed_by' => $witness->id,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('resolved', $alert->fresh()->status);
     }
 
     protected function makeRoleUser(string $roleName): User

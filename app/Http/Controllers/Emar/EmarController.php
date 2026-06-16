@@ -4349,7 +4349,7 @@ class EmarController extends Controller
                 'reason' => 'Balance check',
                 'recorded_by' => auth()->id(),
                 'witnessed_by' => $validated['witnessed_by'],
-                'notes' => $validated['discrepancy_notes'],
+                'notes' => $validated['discrepancy_notes'] ?? null,
                 'recorded_at' => now(),
             ]);
 
@@ -4375,12 +4375,24 @@ class EmarController extends Controller
                     'reason' => 'Balance check discrepancy',
                     'reported_by' => auth()->id(),
                     'witnessed_by' => $validated['witnessed_by'],
-                    'notes' => $validated['discrepancy_notes'],
+                    'notes' => $validated['discrepancy_notes'] ?? null,
                     'status' => 'open',
                     'reported_at' => now(),
                 ]);
             }
         });
+
+        // Recording a balance check clears any standing overdue-check escalation
+        // (raised by emar:escalate-overdue-cd-checks) for this controlled drug.
+        if ($medication) {
+            MedicationDashboardAlert::query()
+                ->where('client_id', $validated['client_id'])
+                ->where('client_medication_id', $medication->id)
+                ->where('alert_type', 'controlled_overdue_check')
+                ->where('status', 'active')
+                ->get()
+                ->each(fn ($alert) => $alert->resolve('Balance check recorded.'));
+        }
 
         if ($discrepancy) {
             $incident = app(MedicationIncidentIntegrationService::class)

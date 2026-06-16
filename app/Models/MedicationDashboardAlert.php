@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\MedicationSignalService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,14 +23,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  *             The canonical operational lifecycle (triage, SLA, escalation,
  *             playbooks, evidence) lives on ControlRoomAlert.
- *
- * @see \App\Services\Medication\MedicationSignalService — canonical signal emission
- * @see \App\Models\ControlRoomAlert — canonical operational alert
+ * @see MedicationSignalService — canonical signal emission
+ * @see ControlRoomAlert — canonical operational alert
  */
 class MedicationDashboardAlert extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'client_id',
@@ -54,6 +54,7 @@ class MedicationDashboardAlert extends Model
         'prn_near_limit' => 'PRN Near Limit',
         'prn_over_limit' => 'PRN Over Limit',
         'controlled_discrepancy' => 'Controlled Drug Discrepancy',
+        'controlled_overdue_check' => 'Controlled Drug Balance Check Overdue',
         'expiring_soon' => 'Medication Expiring',
         'expired' => 'Medication Expired',
         'high_risk' => 'High Risk Medication',
@@ -191,6 +192,7 @@ class MedicationDashboardAlert extends Model
             $existing->severity = $severity;
             $existing->message = $message;
             $existing->save();
+
             return $existing;
         }
 
