@@ -87,13 +87,21 @@ un-regressed.
   banner is stubbed `// TODO(F):` and wired when Gap F lands. eMAR-only.*
 
 ## E. Auto-surface the shift's medication state  *(the real win — expand the module)*
-- [ ] **E1** In `EmarController@handovers` (+ the wizard's meds step), auto-populate the
-  medication picture for the **outgoing shift's window** instead of relying on manual
-  `medications_due`: meds due/pending in the window, PRN given + effectiveness reviews
-  outstanding, MAR omissions/refusals during the shift, stock/CD alerts. Reuse
-  `EnhancedMarService` / `MarScheduleService` / the PRN+stock payload builders. Surface as a
-  pre-filled, **editable** "Medications this shift" panel in the wizard and a read-only summary
-  in the detail dialog. `// TODO(Gx):` anything the data layer doesn't expose.
+- [x] **E1a** Backend snapshot + **wizard** "Medications this shift" panel. — *Done: new
+  `app/Services/Emar/ShiftMedicationSnapshotService::forShift(Shift)` reuses
+  `EnhancedMarService::build()` (the MAR/board pipeline) and `MarOmissionService`, narrowing to the
+  outgoing shift's `[starts_at, ends_at]` window → counts (due/given/missed/refused/cd_due/prn_given/
+  reviews_outstanding/omissions), a `due[]` pre-fill list, and stock/attention `alerts[]`. New
+  on-demand endpoint `EmarController@shiftMedicationSnapshot` + route `emar.handovers.shift_medications`
+  (GET `/emar/handovers/shift-medications?shift_id=`, `permission:medications.view`, site-access-gated)
+  — computed one shift at a time (build() is heavy → no index-time N+1). The shared wizard
+  (`handover-wizard.tsx`, **`medicationFocus`-gated** so Operations stays inert) fetches it via axios
+  on outgoing-shift select, shows a read-only stat panel (`ShiftMedPanel`), and pre-fills the meds
+  list once when empty (never clobbering an edit). Frontend tsc/eslint green; **PHP feature-tests
+  environmentally blocked** in the bare worktree (no php/vendor/.env — like `npm run build`).*
+- [ ] **E1b** Detail-dialog **read-only** "Medications this shift" summary — fetch the same
+  snapshot on open (gated by a `medicationLens`-style prop so Operations is unaffected) and render a
+  read-only version of the stat panel. `// TODO(Gx):` anything the data layer doesn't expose.
 
 ## F. Controlled-drug count at handover  *(domain + compliance)*
 - [ ] **F1** Add a CD count verification to the wizard (two-person check: result + witness),

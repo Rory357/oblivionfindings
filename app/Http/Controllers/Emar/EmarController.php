@@ -39,6 +39,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
 use App\Services\Emar\MedsBoardPayloadService;
+use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
@@ -3811,6 +3812,40 @@ class EmarController extends Controller
         $this->handoverService->acknowledge($handover, $auth);
 
         return redirect()->back()->with('success', 'Medication handover acknowledged.');
+    }
+
+    /**
+     * Live "Medications this shift" snapshot for the handover wizard / detail
+     * dialog — meds due/given/missed/refused in the outgoing shift's window, PRN
+     * given + effectiveness reviews outstanding, MAR omissions and stock/CD
+     * alerts. Computed on demand (one shift at a time) so the heavy MAR build is
+     * never fanned across the handover index. eMAR-only (the medication lens).
+     */
+    public function shiftMedicationSnapshot(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+
+        $validated = $request->validate([
+            'shift_id' => ['required', 'integer', 'exists:shifts,id'],
+        ]);
+
+        // Full client (not a column subset) — EnhancedMarService::build() reads
+        // many client columns/relations downstream.
+        $shift = Shift::query()
+            ->with('client')
+            ->findOrFail($validated['shift_id']);
+
+        $this->siteAccess()->assertCanAccessShift(
+            $auth,
+            $shift,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to view medications for this site.',
+        );
+
+        return response()->json([
+            'snapshot' => app(ShiftMedicationSnapshotService::class)->forShift($shift),
+        ]);
     }
 
     // ─── Pharmacy Orders + Stock CRUD ───────────────────────
