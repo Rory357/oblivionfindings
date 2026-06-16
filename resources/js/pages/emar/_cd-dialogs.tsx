@@ -283,10 +283,14 @@ export function ReportLossDialog({ medications, onClose }: { medications: CdMedi
         quantity_lost: '',
         unit: '',
         circumstances: '',
+        accountable_officer_name: '',
         reported_to_police: false,
         police_reference: '',
         reported_to_pharmacy: false,
         pharmacy_name: '',
+        reported_to_regulator: false,
+        regulator_name: '',
+        regulator_reference: '',
     });
     const pickMed = (id: string) => {
         const m = medications.find((x) => String(x.id) === id);
@@ -312,6 +316,9 @@ export function ReportLossDialog({ medications, onClose }: { medications: CdMedi
                         <Field label="Circumstances" required span error={form.errors.circumstances}>
                             <Input value={form.data.circumstances} onChange={(e) => form.setData('circumstances', e.target.value)} placeholder="How the loss occurred / was discovered" />
                         </Field>
+                        <Field label="CD Accountable Officer" span error={form.errors.accountable_officer_name}>
+                            <Input value={form.data.accountable_officer_name} onChange={(e) => form.setData('accountable_officer_name', e.target.value)} placeholder="Officer overseeing the loss" />
+                        </Field>
                     </div>
                 </>
             )}
@@ -323,6 +330,13 @@ export function ReportLossDialog({ medications, onClose }: { medications: CdMedi
                         {form.data.reported_to_police && <Field label="Police reference"><Input value={form.data.police_reference} onChange={(e) => form.setData('police_reference', e.target.value)} /></Field>}
                         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4" checked={form.data.reported_to_pharmacy} onChange={(e) => form.setData('reported_to_pharmacy', e.target.checked)} />Reported to pharmacy</label>
                         {form.data.reported_to_pharmacy && <Field label="Pharmacy name"><Input value={form.data.pharmacy_name} onChange={(e) => form.setData('pharmacy_name', e.target.value)} /></Field>}
+                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4" checked={form.data.reported_to_regulator} onChange={(e) => form.setData('reported_to_regulator', e.target.checked)} />Notified regulator (Medsafe / Ministry of Health)</label>
+                        {form.data.reported_to_regulator && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field label="Regulator"><Input value={form.data.regulator_name} onChange={(e) => form.setData('regulator_name', e.target.value)} placeholder="e.g. Medsafe" /></Field>
+                                <Field label="Reference"><Input value={form.data.regulator_reference} onChange={(e) => form.setData('regulator_reference', e.target.value)} /></Field>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
@@ -332,7 +346,9 @@ export function ReportLossDialog({ medications, onClose }: { medications: CdMedi
                     <div className="rounded-lg border px-4">
                         <SummaryRow label="Drug" value={form.data.medication_name} />
                         <SummaryRow label="Quantity lost" value={`${form.data.quantity_lost} ${form.data.unit}`} tone="crit" />
+                        <SummaryRow label="Accountable Officer" value={form.data.accountable_officer_name || '—'} />
                         <SummaryRow label="Police" value={form.data.reported_to_police ? form.data.police_reference || 'Reported' : 'No'} />
+                        <SummaryRow label="Regulator" value={form.data.reported_to_regulator ? [form.data.regulator_name, form.data.regulator_reference].filter(Boolean).join(' · ') || 'Notified' : 'No'} />
                     </div>
                 </>
             )}

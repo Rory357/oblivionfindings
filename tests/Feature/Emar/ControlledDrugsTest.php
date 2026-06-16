@@ -5,6 +5,7 @@ namespace Tests\Feature\Emar;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
+use App\Models\ControlledDrugLossReport;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -150,6 +151,33 @@ class ControlledDrugsTest extends TestCase
                 ->where('is_today', false)
                 ->has('recentEntries', 0)
             );
+    }
+
+    public function test_loss_report_captures_accountable_officer_and_regulator(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/loss-reports', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'quantity_lost' => 2,
+                'unit' => 'tablets',
+                'circumstances' => 'Vial dropped and broke during the count.',
+                'accountable_officer_name' => 'Jane CDAO',
+                'reported_to_regulator' => true,
+                'regulator_name' => 'Medsafe',
+                'regulator_reference' => 'MS-123',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $report = ControlledDrugLossReport::first();
+        $this->assertSame('Jane CDAO', $report->accountable_officer_name);
+        $this->assertTrue((bool) $report->reported_to_regulator);
+        $this->assertSame('Medsafe', $report->regulator_name);
+        $this->assertSame('MS-123', $report->regulator_reference);
+        $this->assertNotNull($report->regulator_notified_at);
     }
 
     protected function makeRoleUser(string $roleName): User

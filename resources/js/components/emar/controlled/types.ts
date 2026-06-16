@@ -87,10 +87,15 @@ export interface CdLossReport {
     quantity_lost: number | string | null;
     unit: string | null;
     circumstances: string | null;
+    accountable_officer_name?: string | null;
     reported_to_police: boolean;
     police_reference: string | null;
     reported_to_pharmacy: boolean;
     pharmacy_name: string | null;
+    reported_to_regulator?: boolean;
+    regulator_name?: string | null;
+    regulator_reference?: string | null;
+    regulator_notified_at?: string | null;
     discovered_at: string | null;
     discovered_by_name?: string | null;
     investigation_status: string;

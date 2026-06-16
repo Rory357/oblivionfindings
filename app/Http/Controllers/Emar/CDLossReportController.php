@@ -33,10 +33,14 @@ class CDLossReportController extends Controller
             'quantity_lost' => ['required', 'numeric', 'min:0.01'],
             'unit' => ['nullable', 'string', 'max:50'],
             'circumstances' => ['required', 'string'],
+            'accountable_officer_name' => ['nullable', 'string', 'max:255'],
             'reported_to_police' => ['boolean'],
             'police_reference' => ['nullable', 'string', 'max:100'],
             'reported_to_pharmacy' => ['boolean'],
             'pharmacy_name' => ['nullable', 'string', 'max:255'],
+            'reported_to_regulator' => ['boolean'],
+            'regulator_name' => ['nullable', 'string', 'max:255'],
+            'regulator_reference' => ['nullable', 'string', 'max:100'],
             'client_request_uuid' => ['nullable', 'uuid'],
             'captured_offline_at' => ['nullable', 'date'],
             'origin_device_id' => ['nullable', 'string', 'max:255'],
@@ -55,12 +59,16 @@ class CDLossReportController extends Controller
         $validated['discovered_by'] = $request->user()->id;
         $validated['discovered_at'] = now();
 
-        if (!empty($validated['reported_to_police'])) {
+        if (! empty($validated['reported_to_police'])) {
             $validated['police_reported_at'] = now();
         }
 
-        if (!empty($validated['reported_to_pharmacy'])) {
+        if (! empty($validated['reported_to_pharmacy'])) {
             $validated['pharmacy_notified_at'] = now();
+        }
+
+        if (! empty($validated['reported_to_regulator'])) {
+            $validated['regulator_notified_at'] = now();
         }
 
         $report = ControlledDrugLossReport::create($validated);

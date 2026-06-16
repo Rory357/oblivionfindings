@@ -323,10 +323,12 @@ function LossBody({ loss: l }: { loss: CdLossReport }) {
                     <ReviewRow label="Circumstances" value={l.circumstances} />
                 </ReviewCard>
                 <ReviewCard icon={ShieldCheck} title="Escalation & investigation">
+                    <ReviewRow label="Accountable Officer" value={l.accountable_officer_name} />
                     <ReviewRow label="Discovered by" value={l.discovered_by_name} />
                     <ReviewRow label="Discovered at" value={fmtTs(l.discovered_at)} />
                     <ReviewRow label="Police" value={l.reported_to_police ? l.police_reference || 'Reported' : 'No'} />
                     <ReviewRow label="Pharmacy" value={l.reported_to_pharmacy ? l.pharmacy_name || 'Reported' : 'No'} />
+                    <ReviewRow label="Regulator" value={l.reported_to_regulator ? [l.regulator_name, l.regulator_reference].filter(Boolean).join(' · ') || 'Notified' : 'No'} />
                     {l.investigation_notes ? <ReviewRow label="Findings" value={l.investigation_notes} /> : null}
                     {l.resolution_outcome ? <ReviewRow label="Outcome" value={l.resolution_outcome} /> : null}
                 </ReviewCard>
