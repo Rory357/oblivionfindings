@@ -12,6 +12,7 @@ use App\Models\LoneWorkerAlert;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\SiteHazard;
+use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Services\HealthSafety\HsDashboardService;
@@ -226,6 +227,10 @@ class HealthSafetyDashboardController extends Controller
             'sites' => Site::orderBy('name')->get(['id', 'name']),
             'clients' => Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])
                 ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
+            'staff' => User::query()
+                ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteId),
             'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteId),
             'worklists' => [

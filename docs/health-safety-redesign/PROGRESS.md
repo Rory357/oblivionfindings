@@ -32,7 +32,7 @@
 | 4 | **Worklists + detail modal + context menu** | **done** | _(this commit)_ | `worklists-plan.md` |
 | 5 | **Charts — pixel-faithful** (7 of 8; site league → WS8) | **done** | _(this commit)_ | `charts-plan.md` |
 | 6 | **Report launcher + Report-incident wizard** (reference flow) | **done** | _(this commit)_ | `incident-wizard-plan.md` |
-| 7 | **The other 8 wizards** | todo | — | `wizards-plan.md` |
+| 7 | **The other 8 wizards** (config-driven engine + batches) | **in-progress** (engine + first-aid + drill done; 6 left) | _(batch 1 this commit)_ | `wizards-plan.md` |
 | 8 | **Governance exports + site league** | todo | — | `governance-plan.md` |
 
 ## Key decisions / facts (from the audits)

@@ -61,8 +61,10 @@ import {
     RoleLensBanner,
 } from './components/dashboard-tabs';
 import { LaggingCharts, LeadingCharts } from './components/charts';
+import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
+import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 
 type Props = {
@@ -137,6 +139,7 @@ type Props = {
     lens: string;
     sites: Array<{ id: number; name: string }>;
     clients: Array<{ id: number; name: string }>;
+    staff: Array<{ id: number; name: string }>;
     leading_lagging: HeroLeadingLagging;
     frequency_trends: Array<{
         month: string;
@@ -556,6 +559,7 @@ export default function HealthSafetyDashboard({
     filters,
     sites,
     clients,
+    staff,
     leading_lagging,
     frequency_trends,
     frequency_operands,
@@ -565,7 +569,7 @@ export default function HealthSafetyDashboard({
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
     const [launcherOpen, setLauncherOpen] = useState(false);
-    const [incidentOpen, setIncidentOpen] = useState(false);
+    const [activeWizard, setActiveWizard] = useState<string | null>(null);
     const tabItems = buildHsTabItems(
         worklists.open_investigations.length,
         worklists.expiring.length,
@@ -1734,17 +1738,23 @@ export default function HealthSafetyDashboard({
                 <ReportLauncher
                     open={launcherOpen}
                     onClose={() => setLauncherOpen(false)}
-                    onIncident={() => {
+                    onWorkflow={(key) => {
                         setLauncherOpen(false);
-                        setIncidentOpen(true);
+                        setActiveWizard(key);
                     }}
                 />
-                <ReportIncidentDialog
-                    open={incidentOpen}
-                    onClose={() => setIncidentOpen(false)}
-                    clients={clients}
-                    sites={sites}
-                />
+                {activeWizard === 'incident' ? (
+                    <ReportIncidentDialog open onClose={() => setActiveWizard(null)} clients={clients} sites={sites} />
+                ) : null}
+                {activeWizard && WIZARD_CONFIGS[activeWizard] ? (
+                    <HsFormWizard
+                        key={activeWizard}
+                        config={WIZARD_CONFIGS[activeWizard]}
+                        refData={{ sites, clients, staff }}
+                        open
+                        onClose={() => setActiveWizard(null)}
+                    />
+                ) : null}
             </div>
         </AppLayout>
     );

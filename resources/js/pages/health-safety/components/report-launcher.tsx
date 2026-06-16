@@ -1,7 +1,6 @@
-/* ＋Report launcher (WS6) — the chooser opened from the hero. A 9-workflow grid; the
- * incident tile opens the in-place ReportIncidentDialog (the reference flow). The other 8
- * navigate to their existing register/create pages for now — WS7 converts them to in-place
- * wizards on the same WizardShell chrome. Tokens only; plain string URLs. */
+/* ＋Report launcher (WS6/WS7) — the chooser opened from the hero. A 9-workflow grid.
+ * `inPlace` tiles open their wizard in place via onWorkflow(key); the rest navigate to their
+ * register/create pages until their wizard is built (WS7 progressively flips them). Tokens only. */
 import {
     Dialog,
     DialogContent,
@@ -28,16 +27,18 @@ type Workflow = {
     label: string;
     desc: string;
     icon: LucideIcon;
-    incident?: boolean;
+    /** Opens its wizard in place via onWorkflow(key). */
+    inPlace?: boolean;
+    /** Interim navigate-away target until the in-place wizard is built. */
     href?: string;
 };
 
 const WORKFLOWS: Workflow[] = [
-    { key: 'incident', label: 'Report incident / near-miss', desc: 'Events register · WorkSafe check', icon: ShieldAlert, incident: true },
+    { key: 'incident', label: 'Report incident / near-miss', desc: 'Events register · WorkSafe check', icon: ShieldAlert, inPlace: true },
     { key: 'hazard', label: 'Log hazard + risk assessment', desc: 'L×C matrix · hierarchy of control', icon: AlertOctagon, href: '/compliance/hazards' },
-    { key: 'first_aid', label: 'Record first-aid treatment', desc: 'First-aid register', icon: HeartPulse, href: '/health-safety/first-aid' },
+    { key: 'first_aid', label: 'Record first-aid treatment', desc: 'First-aid register', icon: HeartPulse, inPlace: true },
     { key: 'restraint', label: 'Log restraint event', desc: 'Least-restrictive · debrief', icon: Clipboard, href: '/health-safety/restraints' },
-    { key: 'drill', label: 'Record emergency drill', desc: 'Fire / evacuation / lockdown', icon: Siren, href: '/health-safety/drills/create' },
+    { key: 'drill', label: 'Record emergency drill', desc: 'Fire / evacuation / lockdown', icon: Siren, inPlace: true },
     { key: 'rtw', label: 'Injury → return-to-work', desc: 'ACC claim · RTW plan', icon: Activity, href: '/health-safety/injuries/create' },
     { key: 'substance', label: 'Add hazardous substance', desc: 'SDS · Hazardous Substances Regs 2017', icon: FlaskConical, href: '/health-safety/substances/create' },
     { key: 'lone', label: 'Lone-worker check-in', desc: 'Check-in / escalate to on-call', icon: PersonStanding, href: '/health-safety/lone-workers' },
@@ -47,11 +48,11 @@ const WORKFLOWS: Workflow[] = [
 export function ReportLauncher({
     open,
     onClose,
-    onIncident,
+    onWorkflow,
 }: {
     open: boolean;
     onClose: () => void;
-    onIncident: () => void;
+    onWorkflow: (key: string) => void;
 }) {
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -69,8 +70,8 @@ export function ReportLauncher({
                             key={w.key}
                             type="button"
                             onClick={() => {
-                                if (w.incident) {
-                                    onIncident();
+                                if (w.inPlace) {
+                                    onWorkflow(w.key);
                                 } else if (w.href) {
                                     onClose();
                                     router.visit(w.href);
