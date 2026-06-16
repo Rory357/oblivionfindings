@@ -9,9 +9,11 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
+use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
 use App\Services\Eligibility\EligibilityResult;
+use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -551,7 +553,7 @@ class JobBoardControllerTest extends TestCase
             'claimed_at' => now(),
         ]);
 
-        app(\App\Services\ShiftReplacementService::class)->cancel($replacement->fresh(['openPosition', 'shift.client']), $this->manager);
+        app(ShiftReplacementService::class)->cancel($replacement->fresh(['openPosition', 'shift.client']), $this->manager);
 
         Notification::assertSentTo($requester, AppEventNotification::class, function (AppEventNotification $notification) {
             return $notification->payload['title'] === 'Shift replacement cancelled';
@@ -657,6 +659,50 @@ class JobBoardControllerTest extends TestCase
         Notification::assertSentTo($this->manager, AppEventNotification::class, function (AppEventNotification $notification) {
             return $notification->payload['title'] === 'Replacement claim awaiting approval';
         });
+    }
+
+    public function test_expire_positions_re_nudges_without_duplicating_timeline_event(): void
+    {
+        Notification::fake();
+
+        $staleClaim = $this->positionForShift($this->shiftForOrg(), [
+            'status' => 'claimed',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now()->subDays(3),
+        ]);
+
+        // A nudge recorded more than a day ago: recentNudgeExists() lets the command
+        // remind again, but timeline_events has a unique (type, source) key — a plain
+        // insert used to throw and abort the whole run. Re-running must refresh the
+        // existing event, not duplicate it (regression for the nightly cron crash).
+        TimelineEvent::create([
+            'source_type' => ShiftOpenPosition::class,
+            'source_id' => $staleClaim->id,
+            'shift_id' => $staleClaim->shift_id,
+            'type' => 'shift_replacement_claim_pending_nudged',
+            'occurred_at' => now()->subDays(2),
+            'subject' => 'Replacement claim reminder sent',
+            'body' => 'Earlier reminder',
+            'visibility' => 'internal',
+        ]);
+
+        $this->artisan('shifts:expire-positions')
+            ->expectsOutput('Cancelled 0 expired open position(s). Nudged managers for 1 stale claim(s).')
+            ->assertSuccessful();
+
+        // Still exactly one nudge event for the position — refreshed, not duplicated.
+        $this->assertSame(1, TimelineEvent::query()
+            ->where('source_type', ShiftOpenPosition::class)
+            ->where('source_id', $staleClaim->id)
+            ->where('type', 'shift_replacement_claim_pending_nudged')
+            ->count());
+
+        // And its timestamp was bumped to now, so the 24h guard holds again.
+        $this->assertTrue(TimelineEvent::query()
+            ->where('source_id', $staleClaim->id)
+            ->where('type', 'shift_replacement_claim_pending_nudged')
+            ->where('occurred_at', '>=', now()->subDay())
+            ->exists());
     }
 
     private function userWithPermissions(array $permissionKeys, array $attributes = []): User

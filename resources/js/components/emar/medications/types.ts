@@ -35,6 +35,41 @@ export interface MedRow {
     start_date: string | null;
     stock: MedStock | null;
     interaction_severity: string | null;
+    // Verification / lifecycle audit (from EmarController@medications).
+    created_by_name: string | null;
+    created_at: string | null;
+    verified_by_name: string | null;
+    verified_at: string | null;
+    ceased_by_name: string | null;
+    ceased_at: string | null;
+    ceased_reason: string | null;
+    review_date: string | null;
+}
+
+/** One stock-affecting event in the detail-modal history (lazy-loaded). */
+export interface MedStockMovement {
+    type: 'administration' | 'count';
+    at: string | null;
+    status: string | null;
+    label: string;
+    by: string | null;
+    note: string | null;
+}
+
+/** One real per-client interaction record (lazy-loaded). */
+export interface MedInteractionDetail {
+    other: string;
+    severity: string | null;
+    severity_label: string;
+    description: string | null;
+    clinical_effects: string | null;
+    management: string | null;
+}
+
+/** Payload of GET /emar/medications/{id}/detail. */
+export interface MedDetailPayload {
+    movements: MedStockMovement[];
+    interactions: MedInteractionDetail[];
 }
 
 export interface ClientOption {

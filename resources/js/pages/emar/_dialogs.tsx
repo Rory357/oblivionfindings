@@ -5,11 +5,11 @@ import { Field, InfoCard, SelectInput, Segmented, StepHead } from '@/components/
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type { ClientOption, MedRow } from '@/components/emar/medications/types';
+import type { ClientOption, MedDetailPayload, MedRow } from '@/components/emar/medications/types';
 import { previewDoseTimes } from '@/components/emar/medications/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, Ban, CheckCircle2, ClipboardList, FileUp, HeartPulse, Pill, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, ClipboardList, FileText, FileUp, HeartPulse, History, Pencil, Pill, Printer, ShieldCheck, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -364,6 +364,34 @@ export function MedicationDetailDialog({
 }) {
     const pending = medication.approval_status === 'pending_verification';
     const rejected = medication.approval_status === 'rejected';
+    const flags =
+        [
+            medication.is_prn && 'PRN',
+            medication.controlled_drug && 'Controlled drug',
+            medication.high_risk && 'High-risk',
+            medication.witness_required && 'Witness required',
+            medication.interaction_severity && `Interaction: ${medication.interaction_severity}`,
+        ]
+            .filter(Boolean)
+            .join(' · ') || 'None';
+
+    // Stock-movement history + per-client interaction detail are lazy-loaded on
+    // open (kept off the whole-register payload), mirroring the allergies fetch.
+    const [detail, setDetail] = useState<MedDetailPayload | null>(null);
+    const [loadingDetail, setLoadingDetail] = useState(true);
+    useEffect(() => {
+        let cancelled = false;
+        setLoadingDetail(true);
+        axios
+            .get<MedDetailPayload>(`/emar/medications/${medication.id}/detail`)
+            .then((r) => !cancelled && setDetail(r.data))
+            .catch(() => !cancelled && setDetail({ movements: [], interactions: [] }))
+            .finally(() => !cancelled && setLoadingDetail(false));
+        return () => {
+            cancelled = true;
+        };
+    }, [medication.id]);
+
     return (
         <MedsWizardDialog
             open
@@ -378,34 +406,44 @@ export function MedicationDetailDialog({
             onStepClick={() => {}}
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
-                    {medication.state === 'active' && (
-                        <Button variant="outline" onClick={onDiscontinue}>
-                            <Ban className="h-4 w-4" />
-                            Discontinue
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {pending && canVerify && (
+                            <>
+                                <Button variant="outline" onClick={onReject}>
+                                    <Ban className="h-4 w-4" /> Reject
+                                </Button>
+                                <Button onClick={onVerify}>
+                                    <BadgeCheck className="h-4 w-4" /> Verify order
+                                </Button>
+                            </>
+                        )}
+                        <Button variant={pending && canVerify ? 'outline' : 'default'} onClick={onEdit}>
+                            <Pencil className="h-4 w-4" /> Edit
                         </Button>
-                    )}
-                    <Button onClick={onEdit}>Edit</Button>
+                        {medication.state === 'active' && (
+                            <Button variant="outline" onClick={onDiscontinue}>
+                                <Ban className="h-4 w-4 text-status-critical" /> Discontinue
+                            </Button>
+                        )}
+                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${medication.client_id}/care`)}>
+                            <User className="h-4 w-4" /> Client
+                        </Button>
+                        <Button variant="ghost" onClick={() => router.visit(`/emar/mar?client_id=${medication.client_id}`)}>
+                            <FileText className="h-4 w-4" /> MAR
+                        </Button>
+                        <Button variant="ghost" onClick={() => window.print()}>
+                            <Printer className="h-4 w-4" /> Print
+                        </Button>
+                    </div>
                 </>
             }
         >
             {pending && (
                 <InfoCard icon={ShieldCheck} tone="warn">
-                    <div className="flex items-center justify-between gap-3">
-                        <span>Awaiting prescriber verification — not administrable until verified.</span>
-                        {canVerify && (
-                            <span className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={onReject}>
-                                    Reject
-                                </Button>
-                                <Button size="sm" onClick={onVerify}>
-                                    Verify order
-                                </Button>
-                            </span>
-                        )}
-                    </div>
+                    Awaiting prescriber verification — not administrable until verified.{canVerify ? ' Use Verify order below to confirm, or Reject to decline.' : ''}
                 </InfoCard>
             )}
             {rejected && (
@@ -419,6 +457,7 @@ export function MedicationDetailDialog({
                 <SummaryRow label="Route / form" value={[medication.route, medication.form].filter(Boolean).join(' · ') || '—'} />
                 <SummaryRow label="Indication" value={medication.indication ?? '—'} />
                 <SummaryRow label="Prescriber" value={medication.prescriber ?? '—'} />
+                <SummaryRow label="Flags" value={flags} tone={medication.controlled_drug || medication.high_risk ? 'crit' : undefined} />
                 {medication.is_prn && <SummaryRow label="PRN limit" value={medication.max_per_day ? `${medication.max_per_day} per 24h` : '—'} />}
                 <SummaryRow label="Stock" value={medication.stock ? `${medication.stock.on_hand ?? '—'} ${medication.stock.unit ?? ''}${medication.stock.low ? ' · low' : ''}` : '—'} />
             </div>
@@ -428,10 +467,91 @@ export function MedicationDetailDialog({
                     <p className="text-muted-foreground">{medication.instructions}</p>
                 </div>
             )}
-            <div className="mt-3">
-                <a href={`/emar/mar?client_id=${medication.client_id}`} className="text-sm font-medium text-primary hover:underline">
-                    Open on MAR chart →
-                </a>
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                    <FileText className="h-4 w-4 text-muted-foreground" /> Audit trail
+                </div>
+                <SummaryRow label="Charted by" value={[medication.created_by_name, medication.created_at].filter(Boolean).join(' · ') || '—'} />
+                <SummaryRow
+                    label="Verification"
+                    value={
+                        pending
+                            ? 'Awaiting prescriber verification'
+                            : rejected
+                              ? `Rejected${medication.rejection_reason ? ` — ${medication.rejection_reason}` : ''}`
+                              : [medication.verified_by_name, medication.verified_at].filter(Boolean).join(' · ') || 'Verified'
+                    }
+                    tone={pending ? undefined : rejected ? 'crit' : 'success'}
+                />
+                {medication.review_date && <SummaryRow label="Review due" value={medication.review_date} />}
+                {medication.state === 'ceased' && (
+                    <SummaryRow label="Ceased" value={[medication.ceased_by_name, medication.ceased_at, medication.ceased_reason].filter(Boolean).join(' · ') || '—'} tone="crit" />
+                )}
+            </div>
+
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                    <History className="h-4 w-4 text-muted-foreground" /> Recent stock activity
+                </div>
+                {loadingDetail ? (
+                    <p className="text-[13px] text-muted-foreground">Loading…</p>
+                ) : detail && detail.movements.length > 0 ? (
+                    <ul className="flex flex-col gap-2">
+                        {detail.movements.map((m, i) => (
+                            <li key={i} className="flex items-start gap-2.5 text-[13px]">
+                                <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', movementDot(m.status))} />
+                                <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-baseline gap-x-2">
+                                        <span className="font-medium">{m.label}</span>
+                                        <span className="text-xs text-muted-foreground">{m.at ?? '—'}</span>
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {[m.type === 'count' ? 'Stock count' : 'Administration', m.by, m.note].filter(Boolean).join(' · ')}
+                                    </span>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-[13px] text-muted-foreground">No recorded stock activity yet — doses given and completed stock counts will appear here.</p>
+                )}
+            </div>
+
+            <div className="mt-3 rounded-lg border bg-background p-4">
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" /> Interactions
+                </div>
+                {loadingDetail ? (
+                    <p className="text-[13px] text-muted-foreground">Loading…</p>
+                ) : detail && detail.interactions.length > 0 ? (
+                    <ul className="flex flex-col gap-2.5">
+                        {detail.interactions.map((it, i) => (
+                            <li key={i} className="rounded-md border px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[13px] font-medium">with {it.other}</span>
+                                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', severityTone(it.severity))}>{it.severity_label}</span>
+                                </div>
+                                {it.description && <p className="mt-1 text-xs text-muted-foreground">{it.description}</p>}
+                                {it.clinical_effects && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">Effects:</span> {it.clinical_effects}
+                                    </p>
+                                )}
+                                {it.management && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">Manage:</span> {it.management}
+                                    </p>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                ) : medication.interaction_severity ? (
+                    <p className="text-[13px] text-muted-foreground">
+                        Flagged <span className="font-medium text-status-warning">{medication.interaction_severity}</span> interaction — no further detail recorded.
+                    </p>
+                ) : (
+                    <p className="text-[13px] text-muted-foreground">No interactions recorded against the client's other current medications.</p>
+                )}
             </div>
         </MedsWizardDialog>
     );
@@ -626,7 +746,16 @@ export function InteractionsDialog({ medications, onClose }: { medications: MedR
 
 function severityTone(severity: string | null): string {
     const s = (severity ?? '').toLowerCase();
-    if (s.includes('major') || s.includes('severe') || s.includes('high')) return 'bg-status-critical-bg text-status-critical';
+    if (s.includes('contraindicated') || s.includes('major') || s.includes('severe') || s.includes('high')) return 'bg-status-critical-bg text-status-critical';
     if (s.includes('moderate')) return 'bg-status-warning-bg text-status-warning';
     return 'bg-status-info-bg text-status-info';
+}
+
+/** Stock-activity timeline dot colour by movement status (semantic tokens). */
+function movementDot(status: string | null): string {
+    const s = (status ?? '').toLowerCase();
+    if (s === 'given' || s === 'counted') return 'bg-status-success';
+    if (s === 'refused' || s === 'discrepancy') return 'bg-status-critical';
+    if (s === 'missed') return 'bg-status-warning';
+    return 'bg-muted-foreground';
 }

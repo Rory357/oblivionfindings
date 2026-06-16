@@ -116,24 +116,34 @@ class ExpireStaleOpenPositions extends Command
 
     private function recordTimeline(ShiftOpenPosition $position, string $type, string $subject, string $body): void
     {
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
-            'source_type' => ShiftOpenPosition::class,
-            'source_id' => $position->id,
-            'occurred_at' => now(),
-            'type' => $type,
-            'actor_user_id' => null,
-            'client_id' => $position->shift?->client_id,
-            'shift_id' => $position->shift_id,
-            'site_id' => $position->shift?->client?->site_id,
-            'subject' => $subject,
-            'body' => $body,
-            'meta' => [
-                'shift_open_position_id' => $position->id,
-                'status' => $position->fresh()?->status ?? $position->status,
-                'claimed_by' => $position->claimed_by,
+        // timeline_events has a unique key on (type, source_type, source_id), so a
+        // position can only ever carry ONE event of a given type. The 24h window in
+        // recentNudgeExists() lets a stale claim be reminded again the next day —
+        // so this must REFRESH the existing event, not insert a duplicate. A plain
+        // create() here threw a unique-constraint violation that aborted the whole
+        // shifts:expire-positions run.
+        TimelineEvent::updateOrCreate(
+            [
+                'type' => $type,
+                'source_type' => ShiftOpenPosition::class,
+                'source_id' => $position->id,
             ],
-            'visibility' => 'internal',
-            'created_by' => null,
-        ]);
+            [
+                'occurred_at' => now(),
+                'actor_user_id' => null,
+                'client_id' => $position->shift?->client_id,
+                'shift_id' => $position->shift_id,
+                'site_id' => $position->shift?->client?->site_id,
+                'subject' => $subject,
+                'body' => $body,
+                'meta' => [
+                    'shift_open_position_id' => $position->id,
+                    'status' => $position->fresh()?->status ?? $position->status,
+                    'claimed_by' => $position->claimed_by,
+                ],
+                'visibility' => 'internal',
+                'created_by' => null,
+            ],
+        );
     }
 }

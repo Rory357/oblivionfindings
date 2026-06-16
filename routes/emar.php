@@ -85,6 +85,11 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.view')
         ->name('emar.medications');
 
+    // Lazy detail (stock-movement history + per-client interaction detail) for the register row modal.
+    Route::get('/medications/{medication}/detail', [EmarController::class, 'medicationDetail'])
+        ->middleware('permission:medications.view')
+        ->name('emar.medications.detail');
+
     // Stock Management
     Route::get('/stock', [EmarController::class, 'stock'])
         ->middleware('permission:medications.view')

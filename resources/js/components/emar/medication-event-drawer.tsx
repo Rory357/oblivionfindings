@@ -29,6 +29,7 @@ import {
     Pill,
     Shield,
     Trash2,
+    User,
     Users,
     X,
     XCircle,
@@ -108,7 +109,12 @@ const CATEGORY_LINK: Record<string, { href: string; label: string }> = {
 
 const HIDDEN_DETAIL_KEYS = new Set(['changes', 'scheduled_for']);
 
-export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; onClose: () => void }) {
+/** The primary cross-link for an event (MAR chart / CD register / Reviews / …),
+ *  shared by the drawer footer and the row context menu so both stay in sync. */
+export const eventPrimaryLink = (event: AuditEvent): { href: string; label: string } =>
+    CATEGORY_LINK[event.category] ?? { href: '/emar', label: 'eMAR' };
+
+export function MedicationEventDrawer({ event, onClose, initialSection }: { event: AuditEvent; onClose: () => void; initialSection?: string }) {
     const meta = eventMeta(event.event_type);
     const Icon = meta.icon;
     const changes = (event.details?.changes as Change[] | undefined) ?? [];
@@ -130,9 +136,10 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
 
     const bodyRef = useRef<HTMLDivElement>(null);
     const sectionEls = useRef<Record<string, HTMLDivElement | null>>({});
-    const [active, setActive] = useState('what');
+    const [active, setActive] = useState(initialSection ?? 'what');
     const [integrity, setIntegrity] = useState<Integrity | null>(null);
     const [flagging, setFlagging] = useState(false);
+    const [verifying, setVerifying] = useState(false);
     const [flash, setFlash] = useState<string | null>(null);
     const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
@@ -184,6 +191,13 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
         flashTimer.current = setTimeout(() => setFlash(null), 1300);
     };
 
+    // When opened from a "Verify integrity" affordance, focus the integrity panel
+    // on mount (the drawer is keyed per open, so this runs once per opening).
+    useEffect(() => {
+        if (initialSection && initialSection !== 'what') goToSection(initialSection);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const onFlag = () => {
         setFlagging(true);
         router.post(
@@ -196,6 +210,25 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                 onFinish: () => setFlagging(false),
             },
         );
+    };
+
+    // Read-only integrity re-check: focus the integrity panel and re-fetch its
+    // tamper-evidence fingerprint from the append-only audit log (no mutation).
+    const verifyIntegrity = () => {
+        goToSection('integrity');
+        setVerifying(true);
+        setIntegrity(null);
+        fetch(`/emar/audit/event/${encodeURIComponent(event.id)}/integrity`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d: Integrity | null) => {
+                setIntegrity(d);
+                toast.success(d?.backed ? 'Integrity re-checked' : 'No integrity record for this event');
+            })
+            .catch(() => { setIntegrity(null); toast.error('Could not verify integrity'); })
+            .finally(() => setVerifying(false));
     };
 
     return (
@@ -358,27 +391,34 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                             </Section>
                         </div>
 
-                        {/* Footer actions */}
+                        {/* Footer Options bar — read-only / navigational actions only
+                            (adapts the prn-detail-dialog pattern): Close · View client ·
+                            Open on … · Verify integrity · Export event · Flag · Resolve gap. */}
                         <footer className={WIZARD_FOOTER_CLASS}>
-                            <div className="flex items-center gap-1.5">
-                                {integrity?.backed && (
-                                    <>
-                                        <Button variant="ghost" size="sm" onClick={onFlag} disabled={flagging}>
-                                            <Flag className="h-4 w-4" />Flag for investigation
-                                        </Button>
-                                        <a href={`/emar/audit/event/${encodeURIComponent(event.id)}/export`}>
-                                            <Button variant="ghost" size="sm"><Download className="h-4 w-4" />Export this record</Button>
-                                        </a>
-                                    </>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="ghost" onClick={onClose}>Close</Button>
+                            <Button variant="outline" onClick={onClose}>Close</Button>
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {event.client_id ? (
+                                    <Button variant="ghost" size="sm" onClick={() => router.visit(`/operations/clients/${event.client_id}/care`)}>
+                                        <User className="h-4 w-4" />View client
+                                    </Button>
+                                ) : null}
+                                <Button variant="ghost" size="sm" onClick={() => router.visit(primaryHref)}>
+                                    <Eye className="h-4 w-4" />Open on {link?.label ?? 'eMAR'}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={verifyIntegrity} disabled={verifying}>
+                                    <Fingerprint className="h-4 w-4" />Verify integrity
+                                </Button>
+                                <a href={`/emar/audit/event/${encodeURIComponent(event.id)}/export`}>
+                                    <Button variant="ghost" size="sm"><Download className="h-4 w-4" />Export event</Button>
+                                </a>
+                                {integrity?.backed ? (
+                                    <Button variant="ghost" size="sm" onClick={onFlag} disabled={flagging}>
+                                        <Flag className="h-4 w-4" />Flag for investigation
+                                    </Button>
+                                ) : null}
                                 {isGap ? (
-                                    <a href={resolveHref}><Button><Check className="h-4 w-4" />Resolve gap</Button></a>
-                                ) : (
-                                    <a href={primaryHref}><Button><Eye className="h-4 w-4" />Open in {link?.label ?? 'eMAR'}</Button></a>
-                                )}
+                                    <a href={resolveHref}><Button size="sm"><Check className="h-4 w-4" />Resolve gap</Button></a>
+                                ) : null}
                             </div>
                         </footer>
                     </div>

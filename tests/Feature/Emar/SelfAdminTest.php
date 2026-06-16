@@ -67,6 +67,43 @@ class SelfAdminTest extends TestCase
             );
     }
 
+    public function test_payload_carries_detail_enrichment_fields(): void
+    {
+        // The enriched detail modal (Options bar + read-only body) needs the
+        // capacity sub-scores, capability checks, agreement status and per-med
+        // scope — confirm serializeSelfAdmin() returns the whole contract.
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedSelfAdmin();
+        MedicationSelfAdminAssessment::query()->create(array_merge($this->basePayload($client), [
+            'status' => 'completed', 'outcome' => 'independent', 'assessment_date' => now()->toDateString(),
+            'people_involved' => ['Person', 'Pharmacist'], 'support_adjustments' => ['Large-print labels'],
+            'storage_location' => 'lockable_drawer', 'safe_storage_notes' => 'Lockable bedside drawer',
+            'agreement_signed_at' => now(), 'ordering_responsibility' => 'self',
+        ]));
+
+        $this->actingAs($user)
+            ->get('/emar/self-admin?site_id='.$site->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/SelfAdmin')
+                ->has('assessments.0', fn (Assert $a) => $a
+                    ->where('cognitive_capacity', 5)
+                    ->where('physical_dexterity', 5)
+                    ->where('total_score', 25)
+                    ->where('can_identify_medications', true)
+                    ->where('willing_to_self_admin', true)
+                    ->where('storage_location', 'lockable_drawer')
+                    ->where('safe_storage_notes', 'Lockable bedside drawer')
+                    ->where('ordering_responsibility', 'self')
+                    ->whereNot('agreement_signed_at', null)
+                    ->has('people_involved')
+                    ->has('support_adjustments')
+                    ->has('med_scope')
+                    ->has('client_medications')
+                    ->etc()
+                )
+            );
+    }
+
     public function test_consent_first_forces_administered(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedSelfAdmin();

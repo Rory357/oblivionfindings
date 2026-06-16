@@ -97,6 +97,11 @@ class ClientMedication extends Model
         return $this->belongsTo(User::class, 'ceased_by');
     }
 
+    public function verifiedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
     public function stock(): HasOne
     {
         return $this->hasOne(ClientMedicationStock::class, 'client_medication_id');

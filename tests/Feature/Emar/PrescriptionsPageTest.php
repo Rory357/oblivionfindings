@@ -108,6 +108,37 @@ class PrescriptionsPageTest extends TestCase
         $this->assertSame('confirmed', $order->status);
     }
 
+    public function test_order_creation_defaults_prescriber_type_when_posted_blank(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $user = $this->makeRoleUser('admin');
+        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'clients.update']);
+        $client = Client::factory()->create(['status' => 'active']);
+
+        // The create dialog posts an empty prescriber_type; ConvertEmptyStringsToNull
+        // turns it into null. The column is NOT NULL with a 'gp' default, so a blank
+        // prescriber type must fall back to the default instead of a 500 (regression
+        // for the integrity-constraint violation on every browser-submitted order).
+        $this->actingAs($user)
+            ->post('/emar/prescriptions', [
+                'client_id' => $client->id,
+                'order_type' => 'new',
+                'prescriber_name' => 'Dr Lee',
+                'prescriber_type' => '',
+                'medication_name' => 'Paracetamol',
+                'dose' => '1g',
+                'route' => 'Oral',
+                'frequency' => 'Twice daily',
+                'order_date' => '2026-06-15',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $order = MedicationPrescriberOrder::where('medication_name', 'Paracetamol')->first();
+        $this->assertNotNull($order);
+        $this->assertSame('gp', $order->prescriber_type);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);

@@ -1,45 +1,15 @@
 /* eslint-disable no-restricted-syntax -- register tab tables/report cards are custom-layout
    bordered surfaces (not Card/Button); all colours are semantic tokens. */
+import { DestructionDetailDialog, type DestructionRow } from '@/components/emar/destruction-detail-dialog';
 import { type CdMedication, type StaffOption } from '@/components/emar/controlled/types';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { CdPill, RecordDestructionDialog, VoidDestructionDialog } from '@/pages/emar/_cd-dialogs';
 import { Head, router } from '@inertiajs/react';
-import { ClipboardCheck, Download, FileText, Lock, Package, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-
-type DestructionRow = {
-    id: number;
-    client_id: number | null;
-    client_name: string;
-    site_id: number | null;
-    site_name: string | null;
-    medication_name: string | null;
-    form: string | null;
-    strength: string | null;
-    quantity: number | string | null;
-    unit: string | null;
-    batch_number: string | null;
-    expiry_date: string | null;
-    reason: string | null;
-    reason_label: string | null;
-    disposal_method: string | null;
-    disposal_method_label: string | null;
-    is_controlled_drug: boolean;
-    controlled_drug_class: string | null;
-    authorised_by_name: string | null;
-    destroyed_at: string | null;
-    destroyed_by_name: string | null;
-    witness_1_name: string | null;
-    witness_2_name: string | null;
-    notes: string | null;
-    voided_at: string | null;
-    void_reason: string | null;
-    voided_by_name: string | null;
-    is_voided: boolean;
-};
+import { AlertTriangle, Ban, ClipboardCheck, Download, Eye, FileText, Lock, Package, Plus, Search, Trash2, User, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Props = {
     destructions: DestructionRow[];
@@ -51,7 +21,29 @@ type Props = {
     site_brand_colour: string | null;
 };
 
-type Modal = { type: 'record' } | { type: 'void'; row: DestructionRow } | null;
+type Modal = { type: 'record' } | { type: 'void'; row: DestructionRow } | { type: 'detail'; row: DestructionRow } | null;
+
+type Alert = { kind: string; tone: 'info' | 'warning'; icon: typeof AlertTriangle; message: string; tab: string };
+
+const DISMISSED_ALERTS_KEY = 'destructions-dismissed-alerts';
+
+/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
+function readDismissedAlerts(): string[] {
+    try {
+        const raw = sessionStorage.getItem(DISMISSED_ALERTS_KEY);
+        return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+        return [];
+    }
+}
+function persistDismissedAlerts(kinds: string[]): string[] {
+    try {
+        sessionStorage.setItem(DISMISSED_ALERTS_KEY, JSON.stringify(kinds));
+    } catch {
+        /* ignore */
+    }
+    return kinds;
+}
 
 const DAY = 1000 * 60 * 60 * 24;
 
@@ -94,21 +86,84 @@ function exportCsv(rows: DestructionRow[]) {
     URL.revokeObjectURL(url);
 }
 
-export default function Destructions({ destructions, medications, staff, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function Destructions({ destructions, medications, staff, clients, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
     const [activeTab, setActiveTab] = useState('log');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [dismissed, setDismissed] = useState<string[]>(() => readDismissedAlerts());
+    const dismiss = (kind: string) => setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
 
     const live = useMemo(() => destructions.filter((d) => !d.is_voided), [destructions]);
     const controlled = useMemo(() => destructions.filter((d) => d.is_controlled_drug), [destructions]);
 
+    // Client + text search face the loaded register client-side (the Site filter
+    // round-trips to the server). One standardised control row drives every tab.
+    const matches = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return (d: DestructionRow) => {
+            if (clientFilter && d.client_id !== clientFilter) return false;
+            if (q) {
+                const hay = `${d.client_name} ${d.medication_name ?? ''} ${d.batch_number ?? ''} ${d.witness_1_name ?? ''} ${d.witness_2_name ?? ''} ${d.authorised_by_name ?? ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        };
+    }, [search, clientFilter]);
+
+    const logRows = useMemo(() => destructions.filter(matches), [destructions, matches]);
+    const controlledRows = useMemo(() => controlled.filter(matches), [controlled, matches]);
+    const liveFiltered = useMemo(() => live.filter(matches), [live, matches]);
+    const isFiltered = clientFilter !== null || search.trim() !== '';
+
     const destroyed30 = live.filter((d) => withinDays(d.destroyed_at, 30)).length;
     const cd30 = controlled.filter((d) => !d.is_voided && withinDays(d.destroyed_at, 30)).length;
+    const voidedCount = destructions.length - live.length;
     const lastAt = live.map((d) => d.destroyed_at).filter(Boolean).sort().slice(-1)[0] ?? null;
 
-    // Report aggregates (live records only).
-    const byReason = useMemo(() => tally(live.map((d) => d.reason_label ?? d.reason ?? 'Unspecified')), [live]);
-    const byMethod = useMemo(() => tally(live.map((d) => d.disposal_method_label ?? d.disposal_method ?? 'Unspecified')), [live]);
+    // Report aggregates respect the active client/search facet (live records only).
+    const byReason = useMemo(() => tally(liveFiltered.map((d) => d.reason_label ?? d.reason ?? 'Unspecified')), [liveFiltered]);
+    const byMethod = useMemo(() => tally(liveFiltered.map((d) => d.disposal_method_label ?? d.disposal_method ?? 'Unspecified')), [liveFiltered]);
+
+    // Stacked, dismissible (per session) alert strip built from already-loaded data.
+    const alerts: Alert[] = [
+        cd30 > 0 && { kind: 'cd30', tone: 'info' as const, icon: Lock, message: `${cd30} controlled-drug destruction${cd30 === 1 ? '' : 's'} in the last 30 days.`, tab: 'controlled' },
+        voidedCount > 0 && { kind: 'voided', tone: 'warning' as const, icon: Ban, message: `${voidedCount} record${voidedCount === 1 ? '' : 's'} voided — review.`, tab: 'log' },
+    ].filter((a): a is Alert => Boolean(a) && !dismissed.includes((a as Alert).kind));
+
+    const openDetail = (row: DestructionRow) => setModal({ type: 'detail', row });
+
+    const openRowCtx = (e: ReactMouseEvent, d: DestructionRow) => {
+        e.preventDefault();
+        const t = d.is_voided
+            ? { tag: 'VOIDED', bg: 'var(--muted)', color: 'var(--muted-foreground)' }
+            : d.is_controlled_drug
+              ? { tag: 'CD', bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' }
+              : { tag: 'MED', bg: 'var(--status-info-bg)', color: 'var(--status-info)' };
+        // Immutable-safe items only — append-only register (MoD Regs 1977). No
+        // edit/delete; Void is the sole correction path and only while live.
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: `${d.medication_name ?? 'Destruction'}${d.destroyed_at ? ` · ${fmtDate(d.destroyed_at)}` : ''}`, tone: 'primary', onClick: () => openDetail(d) },
+            ...(d.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${d.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            { icon: <Download className="h-3.5 w-3.5" />, label: 'Export this record', onClick: () => exportCsv([d]) },
+            ...(d.is_voided
+                ? []
+                : [{ sep: true } as ShiftCtxItem, { icon: <Ban className="h-3.5 w-3.5" />, label: 'Void record', sub: 'The only correction path', tone: 'critical', onClick: () => setModal({ type: 'void', row: d }) } satisfies ShiftCtxItem]),
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: t.tag, tagBg: t.bg, tagColor: t.color, meta: `${d.client_name} · ${d.medication_name ?? 'Destruction'} · ${fmtDate(d.destroyed_at)}`, items });
+    };
+
+    // Shared row interactivity: click → detail, right-click → menu, keyboard-focusable.
+    const rowProps = (d: DestructionRow) => ({
+        tabIndex: 0,
+        role: 'button' as const,
+        onClick: () => openDetail(d),
+        onContextMenu: (e: ReactMouseEvent) => openRowCtx(e, d),
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(d); } },
+        className: `${cnRow(d)} cursor-pointer transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none`,
+    });
 
     const TABS: RosterTabItem[] = [
         { id: 'log', label: 'Destruction log', icon: ClipboardCheck, tone: 'primary', badge: live.length || undefined },
@@ -162,40 +217,74 @@ export default function Destructions({ destructions, medications, staff, sites, 
                         </>
                     }
                     footer={
-                        sites.length > 0 ? (
-                            <div className="flex items-center justify-end py-3">
-                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={(id) => { setSiteFilter(id); router.get('/emar/destructions', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); }} onDark />
+                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-end">
+                            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
+                                <div className="relative w-full max-w-xs md:w-[280px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per the design handoff. */}
+                                    <input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Search client, medication, batch or witness…"
+                                        aria-label="Search the destruction register"
+                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                    />
+                                    {search ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
+                                        <button
+                                            type="button"
+                                            aria-label="Clear search"
+                                            onClick={() => setSearch('')}
+                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    ) : null}
+                                </div>
+                                {sites.length > 0 ? (
+                                    <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={(id) => { setSiteFilter(id); router.get('/emar/destructions', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); }} onDark />
+                                ) : null}
+                                <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`.trim() }))} value={clientFilter} onChange={setClientFilter} onDark />
                             </div>
-                        ) : undefined
+                        </div>
                     }
                 />
+
+                {alerts.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        {alerts.map((a) => (
+                            <AlertRow key={a.kind} alert={a} onReview={() => setActiveTab(a.tab)} onDismiss={() => dismiss(a.kind)} />
+                        ))}
+                    </div>
+                )}
 
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Destruction register views" />
 
                 {activeTab === 'log' && (
-                    <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Method', 'Destroyed by', 'Witness', '']} empty={destructions.length === 0 ? 'No destruction records yet.' : null}>
-                        {destructions.map((d) => (
-                            <LogRow key={d.id} d={d} onVoid={() => setModal({ type: 'void', row: d })} />
+                    <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Method', 'Destroyed by', 'Witness', '']} empty={emptyLabel(logRows.length, destructions.length, 'No destruction records yet.')}>
+                        {logRows.map((d) => (
+                            <LogRow key={d.id} d={d} rowProps={rowProps(d)} onVoid={() => setModal({ type: 'void', row: d })} />
                         ))}
                     </TableCard>
                 )}
 
                 {activeTab === 'controlled' && (
-                    <TableCard head={['Date', 'Client', 'Controlled drug', 'Qty', 'Witness 1', 'Witness 2', 'Authorised by', '']} empty={controlled.length === 0 ? 'No controlled-drug destructions recorded.' : null}>
-                        {controlled.map((d) => (
-                            <tr key={d.id} className={cnRow(d)}>
+                    <TableCard head={['Date', 'Client', 'Controlled drug', 'Qty', 'Witness 1', 'Witness 2', 'Authorised by', '']} empty={emptyLabel(controlledRows.length, controlled.length, 'No controlled-drug destructions recorded.')}>
+                        {controlledRows.map((d) => (
+                            <tr key={d.id} {...rowProps(d)}>
                                 <td className="px-4 py-3 text-muted-foreground">{fmtDate(d.destroyed_at)}</td>
                                 <td className="px-4 py-3">{d.client_name}</td>
                                 <td className="px-4 py-3 font-medium">
-                                    {d.medication_name}
+                                    <span className={d.is_voided ? 'line-through' : ''}>{d.medication_name}</span>
                                     {d.controlled_drug_class && <CdPill label={`Class ${d.controlled_drug_class}`} tone="ml-2 bg-status-critical-bg text-status-critical" />}
+                                    {d.is_voided && <span className="ml-2 align-middle"><CdPill label="Voided" tone="bg-muted text-muted-foreground" /></span>}
                                 </td>
                                 <td className="px-4 py-3 tabular-nums">{d.quantity} {d.unit}</td>
                                 <td className="px-4 py-3 text-muted-foreground">{d.witness_1_name ?? '—'}</td>
                                 <td className="px-4 py-3 text-muted-foreground">{d.witness_2_name ?? '—'}</td>
                                 <td className="px-4 py-3 text-muted-foreground">{d.authorised_by_name ?? '—'}</td>
                                 <td className="px-4 py-3 text-right">
-                                    {d.is_voided ? <CdPill label="Voided" tone="bg-muted text-muted-foreground" /> : <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'void', row: d })}>Void</Button>}
+                                    {d.is_voided ? <CdPill label="Voided" tone="bg-muted text-muted-foreground" /> : <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setModal({ type: 'void', row: d }); }}>Void</Button>}
                                 </td>
                             </tr>
                         ))}
@@ -205,10 +294,10 @@ export default function Destructions({ destructions, medications, staff, sites, 
                 {activeTab === 'reports' && (
                     <div className="flex flex-col gap-4">
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <StatCard label="Live records" value={live.length} hint="Excludes voided" />
-                            <StatCard label="Controlled-drug disposals" value={controlled.filter((d) => !d.is_voided).length} hint="All time" />
-                            <StatCard label="Destroyed (30 days)" value={destroyed30} hint="Rolling" />
-                            <StatCard label="Voided records" value={destructions.length - live.length} hint="Retained, superseded" />
+                            <StatCard label="Live records" value={liveFiltered.length} hint={isFiltered ? 'Matching filters' : 'Excludes voided'} />
+                            <StatCard label="Controlled-drug disposals" value={controlledRows.filter((d) => !d.is_voided).length} hint={isFiltered ? 'Matching filters' : 'All time'} />
+                            <StatCard label="Destroyed (30 days)" value={liveFiltered.filter((d) => withinDays(d.destroyed_at, 30)).length} hint="Rolling" />
+                            <StatCard label="Voided records" value={logRows.filter((d) => d.is_voided).length} hint="Retained, superseded" />
                         </div>
                         <div className="grid gap-4 lg:grid-cols-2">
                             <BreakdownCard title="By reason" rows={byReason} />
@@ -230,13 +319,28 @@ export default function Destructions({ destructions, medications, staff, sites, 
 
             {modal?.type === 'record' && <RecordDestructionDialog medications={medications} staff={staff} sites={sites} defaultSiteId={siteFilter} onClose={() => setModal(null)} />}
             {modal?.type === 'void' && <VoidDestructionDialog destruction={modal.row} onClose={() => setModal(null)} />}
+            {modal?.type === 'detail' && (
+                <DestructionDetailDialog
+                    record={modal.row}
+                    onClose={() => setModal(null)}
+                    onVoid={() => setModal({ type: 'void', row: modal.row })}
+                    onExport={() => exportCsv([modal.row])}
+                />
+            )}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }
 
-function LogRow({ d, onVoid }: { d: DestructionRow; onVoid: () => void }) {
+/** Empty-state message: nothing yet vs. nothing matching the active filters. */
+function emptyLabel(shown: number, total: number, none: string): string | null {
+    if (shown > 0) return null;
+    return total === 0 ? none : 'No records match these filters.';
+}
+
+function LogRow({ d, rowProps, onVoid }: { d: DestructionRow; rowProps: React.HTMLAttributes<HTMLTableRowElement> & { tabIndex: number }; onVoid: () => void }) {
     return (
-        <tr className={cnRow(d)}>
+        <tr {...rowProps}>
             <td className="px-4 py-3 text-muted-foreground">{fmtDate(d.destroyed_at)}</td>
             <td className="px-4 py-3">{d.client_name}</td>
             <td className="px-4 py-3 font-medium">
@@ -251,13 +355,36 @@ function LogRow({ d, onVoid }: { d: DestructionRow; onVoid: () => void }) {
             <td className="px-4 py-3 text-muted-foreground">{d.destroyed_by_name ?? '—'}</td>
             <td className="px-4 py-3 text-muted-foreground">{[d.witness_1_name, d.witness_2_name].filter(Boolean).join(', ') || '—'}</td>
             <td className="px-4 py-3 text-right">
-                {d.is_voided ? <span className="text-xs text-muted-foreground">{fmtDate(d.voided_at)}</span> : <Button size="sm" variant="ghost" onClick={onVoid}>Void</Button>}
+                {d.is_voided ? <span className="text-xs text-muted-foreground">{fmtDate(d.voided_at)}</span> : <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onVoid(); }}>Void</Button>}
             </td>
         </tr>
     );
 }
 
 const cnRow = (d: DestructionRow) => `border-b last:border-b-0${d.is_voided ? ' bg-muted/30 text-muted-foreground' : ''}`;
+
+/** One row of the hero alert strip — icon + message + Review jump + per-session dismiss. */
+function AlertRow({ alert, onReview, onDismiss }: { alert: Alert; onReview: () => void; onDismiss: () => void }) {
+    const Icon = alert.icon;
+    const tone = alert.tone === 'warning'
+        ? 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning'
+        : 'border-status-info/30 bg-status-info-bg/60 text-status-info';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4 shrink-0" />
+                {alert.message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>Review</Button>
+                {/* eslint-disable-next-line no-restricted-syntax -- inline dismiss affordance on the alert strip. */}
+                <button type="button" aria-label="Dismiss alert" onClick={onDismiss} className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100">
+                    <X className="h-4 w-4" />
+                </button>
+            </span>
+        </div>
+    );
+}
 
 function tally(values: string[]): { label: string; count: number }[] {
     const map = new Map<string, number>();
@@ -269,7 +396,10 @@ function TableCard({ head, empty, children }: { head: string[]; empty: string | 
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             {empty ? (
-                <div className="px-5 py-12 text-center text-sm text-muted-foreground">{empty}</div>
+                <div className="flex flex-col items-center gap-2 px-5 py-12 text-center text-sm text-muted-foreground">
+                    <Trash2 className="h-8 w-8 text-muted-foreground/50" aria-hidden />
+                    {empty}
+                </div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[720px] text-sm">

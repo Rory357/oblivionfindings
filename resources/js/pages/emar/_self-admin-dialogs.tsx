@@ -6,8 +6,8 @@ import { Field, SelectInput, Segmented, StepHead } from '@/components/wizard/pri
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { router } from '@inertiajs/react';
-import { CheckCircle2, ClipboardCheck, FileSignature, Gauge, Package, Pill, ShieldCheck, User } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, ClipboardCheck, FileSignature, Gauge, Package, Pill, RotateCcw, ShieldCheck, User, XCircle } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 export type MedItem = { id: number; name: string; dosage: string | null; controlled: boolean; scope: string | null };
@@ -279,27 +279,129 @@ export function MedScopeDialog({ assessment, onClose }: { assessment: SelfAdminR
 }
 
 // ── View detail (read-only) ──────────────────────────────────────────────────
-export function ViewSelfAdminDialog({ assessment, onClose }: { assessment: SelfAdminRow; onClose: () => void }) {
-    const cat = categoryMeta(assessment.outcome);
+// Footer Options bar (Reassess · Sign agreement · Set scope · View client + Close)
+// mirrors components/emar/prn-detail-dialog.tsx — the wizard actions open in place;
+// View client navigates to the care page. Body surfaces the full assessment.
+export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSignAgreement, onSetScope }: {
+    assessment: SelfAdminRow;
+    onClose: () => void;
+    onReassess: () => void;
+    onSignAgreement: () => void;
+    onSetScope: () => void;
+}) {
+    const cat = categoryMeta(a.outcome);
+    const selfManaging = a.outcome === 'independent' || a.outcome === 'prompted';
+    const canSign = selfManaging && !a.agreement_signed_at;
+    const canScope = a.outcome !== 'administered' && a.client_medications.length > 0;
+    const capCount = CAPABILITIES.filter((c) => a[c.key]).length;
     return (
-        <MedsWizardDialog open onClose={onClose} title="Assessment detail" description={`${assessment.client_name} · ${cat.label}`} railIcon={ClipboardCheck} railTitle="Assessment" railSubtitle={assessment.client_name} steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]} stepIndex={0} onStepClick={() => {}} footer={<Button onClick={onClose}>Close</Button>}>
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Assessment detail"
+            description={`${a.client_name} · ${cat.label}`}
+            railIcon={ClipboardCheck}
+            railTitle={a.client_name}
+            railSubtitle={`${cat.label}${a.nhi ? ` · NHI ${a.nhi}` : ''}`}
+            steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button variant="outline" onClick={onClose}>Close</Button>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <Button onClick={onReassess}><RotateCcw className="h-4 w-4" /> Reassess</Button>
+                        {canSign && <Button variant="outline" onClick={onSignAgreement}><FileSignature className="h-4 w-4" /> Sign agreement</Button>}
+                        {canScope && <Button variant="outline" onClick={onSetScope}><Pill className="h-4 w-4" /> Set scope</Button>}
+                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${a.client_id}/care`)}><User className="h-4 w-4" /> Client</Button>
+                    </div>
+                </>
+            }
+        >
             <div className="rounded-lg border px-4">
                 <SummaryRow label="Category" value={cat.label} />
-                <SummaryRow label="Wishes to self-administer" value={assessment.wishes_to_self_administer ? 'Yes' : 'No'} />
-                <SummaryRow label="Capacity" value={`${assessment.total_score}/25`} />
-                <SummaryRow label="Storage" value={STORAGE.find((s) => s.value === assessment.storage_location)?.label ?? '—'} />
-                <SummaryRow label="Reassessment" value={assessment.reassessment_date ?? '—'} />
-                <SummaryRow label="Assessor" value={assessment.assessor_name ?? '—'} />
+                <SummaryRow label="Wishes to self-administer" value={a.wishes_to_self_administer ? 'Yes' : 'No'} />
+                <SummaryRow label="Capacity total" value={`${a.total_score}/25`} />
+                <SummaryRow label="Capability" value={`${capCount}/6`} />
+                <SummaryRow label="Storage" value={STORAGE.find((s) => s.value === a.storage_location)?.label ?? '—'} />
+                <SummaryRow
+                    label="Reassessment"
+                    value={<span className="inline-flex items-center gap-1.5">{a.reassessment_date ?? '—'}{a.reassessment_due && <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">Due</span>}</span>}
+                />
+                <SummaryRow label="Assessor" value={a.assessor_name ?? '—'} />
             </div>
-            {assessment.people_involved.length > 0 && <Detail label="Involved" value={assessment.people_involved.join(', ')} />}
-            {assessment.support_adjustments.length > 0 && <Detail label="Support adjustments" value={assessment.support_adjustments.join(', ')} />}
-            {assessment.risk_factors && <Detail label="Risk factors" value={assessment.risk_factors} />}
-            {assessment.reassessment_trigger && <Detail label="Early-review trigger" value={assessment.reassessment_trigger} />}
-            {assessment.agreement_signed_at && <div className="mt-4 rounded-lg border border-status-success/30 bg-status-success-bg/40 px-3 py-2 text-sm text-status-success">Agreement signed{assessment.agreement_signed_by_name ? ` by ${assessment.agreement_signed_by_name}` : ''}{assessment.ordering_responsibility ? ` · ordering: ${assessment.ordering_responsibility}` : ''}.</div>}
+
+            <DetailSection title="Capacity sub-scores" hint={`${a.total_score}/25`}>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {SCORES.map((s) => {
+                        const v = (a[s.key] as number | null) ?? null;
+                        return (
+                            <div key={s.key} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                                <span className="text-sm">{s.label}</span>
+                                <span className="flex items-center gap-2">
+                                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${((v ?? 0) / 5) * 100}%` }} /></span>
+                                    <span className="tabular-nums text-xs font-semibold">{v ?? '—'}/5</span>
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </DetailSection>
+
+            <DetailSection title="Capability checks" hint={`${capCount}/6`}>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {CAPABILITIES.map((c) => {
+                        const ok = !!a[c.key];
+                        return (
+                            <div key={c.key} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${ok ? 'border-status-success/40 bg-status-success-bg/30' : 'border-border'}`}>
+                                {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" /> : <XCircle className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                                {c.label}
+                            </div>
+                        );
+                    })}
+                </div>
+            </DetailSection>
+
+            {a.people_involved.length > 0 && <Detail label="Involved" value={a.people_involved.join(', ')} />}
+            {a.support_adjustments.length > 0 && <Detail label="Support adjustments" value={a.support_adjustments.join(', ')} />}
+            {a.safe_storage_notes && <Detail label="Storage notes" value={a.safe_storage_notes} />}
+            {a.risk_factors && <Detail label="Risk factors" value={a.risk_factors} />}
+            {a.reassessment_trigger && <Detail label="Early-review trigger" value={a.reassessment_trigger} />}
+
+            {a.agreement_signed_at ? (
+                <div className="mt-4 rounded-lg border border-status-success/30 bg-status-success-bg/40 px-3 py-2 text-sm text-status-success">Agreement signed{a.agreement_signed_by_name ? ` by ${a.agreement_signed_by_name}` : ''}{a.ordering_responsibility ? ` · ordering: ${a.ordering_responsibility}` : ''}.{a.agreement_responsibilities ? ` ${a.agreement_responsibilities}` : ''}</div>
+            ) : selfManaging ? (
+                <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-critical-bg/50 px-3 py-2 text-sm text-status-critical">Self-administration agreement not yet signed.</div>
+            ) : null}
+
+            {a.client_medications.length > 0 && (
+                <DetailSection title="Per-medication scope">
+                    <div className="flex flex-col gap-1.5">
+                        {a.client_medications.map((m) => { const sm = scopeMeta(m.scope); return (
+                            <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                                <span className="flex items-center gap-2 text-sm"><Pill className="h-4 w-4 text-muted-foreground" />{m.name}{m.controlled && <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">CD</span>}{m.dosage && <span className="text-xs text-muted-foreground">{m.dosage}</span>}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sm.cls}`}>{sm.label}</span>
+                            </div>
+                        ); })}
+                    </div>
+                </DetailSection>
+            )}
         </MedsWizardDialog>
     );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
     return <div className="mt-3"><div className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div><p className="text-sm">{value}</p></div>;
+}
+
+function DetailSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+    return (
+        <div className="mt-4">
+            <div className="mb-1.5 flex items-baseline justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+                {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+            </div>
+            {children}
+        </div>
+    );
 }
