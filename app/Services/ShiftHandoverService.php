@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Models\ClientMedication;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
@@ -88,11 +89,20 @@ class ShiftHandoverService
                 ? $existing
                 : new ShiftHandover();
 
+            $clientId = $data['client_id'] ?? $outgoingShift->client_id;
+
+            // Exact "controlled drugs are in play for this client" flag, so the eMAR
+            // "CD count unverified" alert is precise without an index-time per-row
+            // query. One cheap existence check per save.
+            $cdRequired = $clientId
+                ? ClientMedication::query()->where('client_id', $clientId)->active()->controlled()->exists()
+                : false;
+
             $handover->fill([
                 'organization_id' => $actor->organization_id,
                 'outgoing_shift_id' => $outgoingShift->id,
                 'incoming_shift_id' => $incomingShift?->id,
-                'client_id' => $data['client_id'] ?? $outgoingShift->client_id,
+                'client_id' => $clientId,
                 'outgoing_staff_id' => $outgoingShift->user_id ?: $actor->id,
                 'incoming_staff_id' => $incomingShift?->user_id ?? ($data['incoming_staff_id'] ?? null),
                 'handover_notes' => (string) $data['handover_notes'],
@@ -118,6 +128,7 @@ class ShiftHandoverService
                 'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
                 'observations_summary' => $this->buildObservationsSummary($outgoingShift),
                 'cd_verification' => $this->normalizeCdVerification($data['cd_verification_input'] ?? null, $actor),
+                'cd_required' => $cdRequired,
                 'version' => $existing && $existing->status === self::STATUS_DRAFT ? (int) $existing->version + 1 : 1,
                 'status' => self::STATUS_DRAFT,
             ]);

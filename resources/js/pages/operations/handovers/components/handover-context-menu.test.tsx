@@ -16,6 +16,7 @@ function makeHandover(over: Partial<Handover> = {}): Handover {
         client_mood: null,
         medications_due: [],
         cd_verification: null,
+        cd_required: false,
         version: 1,
         incidents_to_note: [],
         follow_up_items: [],

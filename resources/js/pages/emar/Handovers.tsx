@@ -89,11 +89,10 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
         openIncoming: handovers.filter((h) => h.incoming_staff == null).length,
         needsAck: handovers.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id).length,
         incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
-        // Submitted/acknowledged handovers that mention a controlled drug (the "(CD)"
-        // tag the wizard pre-fills from the live shift snapshot, or "controlled") but
-        // carry no two-person CD count check. TODO(Gx): a live per-handover CD-due
-        // query would be exact, but that is the index-time N+1 the snapshot avoids.
-        cdUnverified: handovers.filter((h) => (h.status === 'submitted' || h.status === 'acknowledged') && !h.cd_verification && (h.medications_due ?? []).some((m) => /\(cd\)|controlled/i.test(m))).length,
+        // Submitted/acknowledged handovers for a client with controlled drugs
+        // (cd_required, stamped exactly at save time) that carry no two-person CD
+        // count check.
+        cdUnverified: handovers.filter((h) => (h.status === 'submitted' || h.status === 'acknowledged') && h.cd_required && !h.cd_verification).length,
     }), [handovers, currentUser]);
 
     // Stacked, dismissible (per session) alert strip built from already-computed counts.

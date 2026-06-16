@@ -45,6 +45,9 @@ export type Handover = {
     client_mood: string | null;
     medications_due: string[];
     cd_verification: CdVerification | null;
+    /** True when the client has an active controlled medication (stamped at save) —
+     *  drives the exact "CD count unverified at handover" alert. */
+    cd_required: boolean;
     /** Optimistic-concurrency token — sent back on edit so the server can detect a
      *  concurrent save of the same shared draft. */
     version: number;

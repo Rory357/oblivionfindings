@@ -164,6 +164,52 @@ class HandoverMedicationLensTest extends TestCase
         $this->assertSame('First edit.', $handover->fresh()->handover_notes);
     }
 
+    public function test_cd_required_is_stamped_when_the_client_has_a_controlled_drug(): void
+    {
+        // A client with no controlled meds is not CD-required (DB default false).
+        $this->actingAs($this->worker)
+            ->post('/emar/handovers', ['shift_id' => $this->makeShift()->id, 'handover_notes' => 'No CDs.', 'submit' => false])
+            ->assertRedirect();
+        $this->assertFalse((bool) ShiftHandover::query()->latest('id')->firstOrFail()->cd_required);
+
+        // A second client that DOES have an active controlled medication → flagged.
+        $cdClient = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        ClientMedication::factory()->create([
+            'client_id' => $cdClient->id,
+            'name' => 'Morphine',
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+
+        $cdShift = Shift::factory()->create([
+            'client_id' => $cdClient->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->worker->id,
+            'starts_at' => now()->subHours(4),
+            'ends_at' => now()->subMinutes(15),
+            'actual_starts_at' => now()->subHours(4),
+            'status' => 'in_progress',
+            'started_by' => $this->worker->id,
+            'created_by' => $this->worker->id,
+        ]);
+
+        $this->actingAs($this->worker)
+            ->post('/emar/handovers', ['shift_id' => $cdShift->id, 'handover_notes' => 'CDs present.', 'submit' => false])
+            ->assertRedirect();
+
+        $handover = ShiftHandover::query()->where('outgoing_shift_id', $cdShift->id)->firstOrFail();
+        $this->assertTrue((bool) $handover->cd_required, 'cd_required should be true when the client has an active controlled drug');
+    }
+
     protected function makeShift(): Shift
     {
         return Shift::factory()->create([
