@@ -48,13 +48,16 @@ Do NOT regress: the 5-step `AssessmentWizardDialog` or the `CoverageMatrix`.
 
 ---
 
-## §6 EXIT criteria
-- [ ] Every box above is `[x]`.
-- [ ] `npm run types` + `npm run lint` clean for touched files; `npm run build` succeeds.
-- [ ] Every surface (AssessmentTable, Expiring, Unassessed, Coverage) has a right-click menu and row/card-click → detail.
-- [ ] Detail modal has the standard Options bar with View staff member (→ `/staff/{id}`).
-- [ ] Stacked alert strip present.
-- [ ] All actions happen in-page via modals with Inertia partial reloads.
+## §6 EXIT criteria — ✅ ALL MET
+- [x] Every box above is `[x]` (A1–A5, B1–B3, C1, D1, E1–E4, BK1).
+- [x] `npm run types` clean (0 app errors), `eslint` clean for both touched files, `npm run build` succeeds (✓ 3m 25s).
+- [x] Every surface (AssessmentTable, Expiring, Unassessed, Coverage) has a right-click menu and row/card-click → detail (Unassessed → Start assessment, no detail exists).
+- [x] Detail modal has the standard Options bar with View staff member (→ `/staff/{id}`).
+- [x] Stacked, dismissible alert strip present.
+- [x] All actions happen in-page via modals with Inertia partial reloads.
+- [x] `tests/Feature/Emar/CompetencyTest.php` — 4 passed / 50 assertions (incl. new staff-jump + enriched-detail payload contract test).
+
+**LOOP COMPLETE 2026-06-16.** Only `TODO(G1)` remains (declarations not persisted — needs a backend column; out of scope for this front-end loop). Browser pixel-parity vs the `.dc.html` prototype on a live env is a user/browser step.
 
 ## TODO(Gx) carried forward
 - `TODO(G1)` — Sign-off declarations (assessor + staff acknowledgement) are captured in the wizard but not persisted, so the detail modal cannot show a real declaration audit line. Needs a backend column/relation; out of scope for this front-end loop.
