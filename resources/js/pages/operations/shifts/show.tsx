@@ -1023,7 +1023,7 @@ export default function ShiftShow({
                                         className="gap-1.5"
                                     >
                                         <Shield className="h-4 w-4" />
-                                        Client care view
+                                        View client profile
                                     </Link>
                                 </Button>
                             ) : null}

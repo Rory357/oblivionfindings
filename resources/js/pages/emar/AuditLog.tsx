@@ -136,7 +136,7 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
         const med = typeof e.details?.medication === 'string' ? e.details.medication : null;
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View record', sub: e.description, tone: 'primary', onClick: () => openEvent(e) },
-            ...(e.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${e.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            ...(e.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${e.client_id}?tab=mar`) } satisfies ShiftCtxItem] : []),
             { icon: <FileText className="h-3.5 w-3.5" />, label: `Open on ${link.label}`, onClick: () => router.visit(link.href) },
             { icon: <Fingerprint className="h-3.5 w-3.5" />, label: 'Verify integrity', sub: 'Tamper-evidence check', onClick: () => openEvent(e, 'integrity') },
             { sep: true },

@@ -136,7 +136,7 @@ export function StockDetailDialog({
                         <ShoppingCart className="h-4 w-4" /> Order more
                     </Button>
                     {item.client_id ? (
-                        <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${item.client_id}/care`)}>
+                        <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${item.client_id}?tab=mar`)}>
                             <User className="h-4 w-4" /> Client
                         </Button>
                     ) : null}

@@ -66,8 +66,8 @@ export function WhatsNextRail({
     // org-wide care-plan list when an explicit `carePlanHref` is provided.
     const resolvedCarePlanHref =
         carePlanHref
-        ?? (activeResident ? `/clients/${activeResident.id}/care` : null)
-        ?? (residents.length === 1 ? `/clients/${residents[0].id}/care` : null);
+        ?? (activeResident ? `/clients/${activeResident.id}?tab=care_plans` : null)
+        ?? (residents.length === 1 ? `/clients/${residents[0].id}?tab=care_plans` : null);
 
     return (
         <section data-test="my-day-whats-next">

@@ -172,7 +172,7 @@ export default function ControlledDrugs(props: Props) {
     // → ShiftContextMenu, View client → care page. Shared across all 7 tabs. ──
     const medForEntry = (e: CdEntry) => medications.find((m) => m.client_id === e.client_id && m.name === e.medication_name);
     const openDetail = (subject: CdDetailSubject) => setModal({ type: 'detail', subject });
-    const viewClient = (id: number | null | undefined) => id && router.visit(`/operations/clients/${id}/care`);
+    const viewClient = (id: number | null | undefined) => id && router.visit(`/operations/clients/${id}?tab=mar`);
     const exportRegister = () => window.open('/emar/pdf/controlled-register', '_blank');
 
     /** Build + open the right-click menu for a row. `readOnly` (Audit tab) shows only

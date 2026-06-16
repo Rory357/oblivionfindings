@@ -146,7 +146,7 @@ export default function Destructions({ destructions, medications, staff, clients
         // edit/delete; Void is the sole correction path and only while live.
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: `${d.medication_name ?? 'Destruction'}${d.destroyed_at ? ` · ${fmtDate(d.destroyed_at)}` : ''}`, tone: 'primary', onClick: () => openDetail(d) },
-            ...(d.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${d.client_id}/care`) } satisfies ShiftCtxItem] : []),
+            ...(d.client_id ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${d.client_id}?tab=mar`) } satisfies ShiftCtxItem] : []),
             ...(d.mar_url ? [{ icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(d.mar_url!) } satisfies ShiftCtxItem] : []),
             { icon: <Download className="h-3.5 w-3.5" />, label: 'Export this record', onClick: () => exportCsv([d]) },
             ...(d.is_voided

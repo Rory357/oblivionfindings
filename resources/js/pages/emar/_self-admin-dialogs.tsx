@@ -313,7 +313,7 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
                         <Button onClick={onReassess}><RotateCcw className="h-4 w-4" /> Reassess</Button>
                         {canSign && <Button variant="outline" onClick={onSignAgreement}><FileSignature className="h-4 w-4" /> Sign agreement</Button>}
                         {canScope && <Button variant="outline" onClick={onSetScope}><Pill className="h-4 w-4" /> Set scope</Button>}
-                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${a.client_id}/care`)}><User className="h-4 w-4" /> Client</Button>
+                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${a.client_id}?tab=mar`)}><User className="h-4 w-4" /> Client</Button>
                     </div>
                 </>
             }

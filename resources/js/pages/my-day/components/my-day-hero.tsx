@@ -302,7 +302,7 @@ export function MyDayHero({
         ? `/clients/${singleResident.id}?tab=progress_notes`
         : '/clients';
     const carePlanHref = singleResident
-        ? `/clients/${singleResident.id}/care`
+        ? `/clients/${singleResident.id}?tab=care_plans`
         : null;
     const vitalsFallbackHref =
         !onOpenVitals && singleResident
@@ -430,7 +430,7 @@ export function MyDayHero({
                       {
                           icon: ShieldCheck,
                           label: t('res_care_plan'),
-                          href: `/clients/${r.id}/care`,
+                          href: `/clients/${r.id}?tab=care_plans`,
                       },
                       {
                           icon: Stethoscope,
@@ -480,7 +480,7 @@ export function MyDayHero({
                           {
                               icon: ShieldCheck,
                               label: t('res_care_plan'),
-                              href: `/clients/${singleResident.id}/care`,
+                              href: `/clients/${singleResident.id}?tab=care_plans`,
                           },
                           {
                               icon: Stethoscope,

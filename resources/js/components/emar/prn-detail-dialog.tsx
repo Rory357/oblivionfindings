@@ -136,7 +136,7 @@ export function PrnDetailDialog({
                     <Button type="button" variant="outline" onClick={onReRecordDose}>
                         <Pill className="h-4 w-4" /> Re-record dose
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${admin.client_id}/care`)}>
+                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${admin.client_id}?tab=mar`)}>
                         <User className="h-4 w-4" /> Client
                     </Button>
                     {admin.mar_url ? (

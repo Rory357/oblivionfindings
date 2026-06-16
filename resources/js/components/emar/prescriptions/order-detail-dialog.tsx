@@ -100,7 +100,7 @@ export function OrderDetailDialog({
                             <Link2 className="h-4 w-4" /> Link to MAR
                         </Button>
                     ) : null}
-                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${order.client_id}/care`)}>
+                    <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${order.client_id}?tab=mar`)}>
                         <User className="h-4 w-4" /> Client
                     </Button>
                     <Button type="button" variant="ghost" onClick={() => router.visit(`/clients/${order.client_id}/mar`)}>

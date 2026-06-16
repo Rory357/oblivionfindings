@@ -96,7 +96,7 @@ export function DestructionDetailDialog({
             footerEnd={
                 <>
                     {d.client_id ? (
-                        <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${d.client_id}/care`)}>
+                        <Button type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${d.client_id}?tab=mar`)}>
                             <User className="h-4 w-4" /> View client
                         </Button>
                     ) : null}

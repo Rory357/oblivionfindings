@@ -74,10 +74,10 @@ describe('ViewSelfAdminDialog', () => {
         expect(onSetScope).toHaveBeenCalledTimes(1);
     });
 
-    it('jumps to the client care page from the Options bar', () => {
+    it('jumps to the client profile MAR tab from the Options bar', () => {
         render(<ViewSelfAdminDialog assessment={baseRow} onClose={noop} onReassess={noop} onSignAgreement={noop} onSetScope={noop} />);
         fireEvent.click(screen.getByRole('button', { name: /^Client$/i }));
-        expect(visit).toHaveBeenCalledWith('/operations/clients/7/care');
+        expect(visit).toHaveBeenCalledWith('/operations/clients/7?tab=mar');
     });
 
     it('surfaces capacity sub-scores, capability checks and per-medication scope', () => {

@@ -109,7 +109,7 @@ export default function Reports(props: Props) {
         const band = r.compliance >= 95 ? 'success' : r.compliance >= 85 ? 'warning' : 'critical';
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View breakdown', sub: 'Read-only drill-in', tone: 'primary', onClick: () => setModal({ type: 'drill', row: r }) },
-            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}/care`) },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${r.client_id}?tab=mar`) },
             { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/emar/mar?client_id=${r.client_id}`) },
             { sep: true },
             { icon: <Download className="h-3.5 w-3.5" />, label: "Export this client's CSV", onClick: () => { window.location.href = clientExportUrl(r.client_id); } },
@@ -455,7 +455,7 @@ function PackCard({ icon: Icon, title, desc, href }: { icon: typeof FileText; ti
 }
 function DrillDialog({ row, onClose }: { row: ClientBreakdownRow; onClose: () => void }) {
     return (
-        <MedsWizardDialog open onClose={onClose} title={`${row.client_name} · administration`} description="Read-only summary for the selected period." railIcon={Activity} railTitle="Drill-in" railSubtitle={row.client_name} steps={[{ key: 'd', label: 'Summary', blurb: 'Read-only', icon: Activity }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose}>Close</Button><Button variant="outline" onClick={() => router.visit(`/operations/clients/${row.client_id}/care`)}><User className="h-4 w-4" />View client</Button><a href={`/emar/mar?client_id=${row.client_id}`}><Button>Open MAR chart</Button></a></>}>
+        <MedsWizardDialog open onClose={onClose} title={`${row.client_name} · administration`} description="Read-only summary for the selected period." railIcon={Activity} railTitle="Drill-in" railSubtitle={row.client_name} steps={[{ key: 'd', label: 'Summary', blurb: 'Read-only', icon: Activity }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose}>Close</Button><Button variant="outline" onClick={() => router.visit(`/operations/clients/${row.client_id}?tab=mar`)}><User className="h-4 w-4" />View client</Button><a href={`/emar/mar?client_id=${row.client_id}`}><Button>Open MAR chart</Button></a></>}>
             {/* TODO(G-reasons): enrich with top refusal/withhold reason codes once clientBreakdown carries
                 per-client reason data — see docs/REPORTS_GAP_ANALYSIS.md (front-end-only scope today). */}
             <div className="rounded-lg border px-4">

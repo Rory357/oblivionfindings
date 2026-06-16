@@ -1,5 +1,12 @@
 # Rostering → Clients/Care — production-readiness plan
 
+> **⚠️ SUPERSEDED (2026-06-16).** The mobile `/operations/clients/{client}/care`
+> page has been **retired** — this is a web-only app. The URL now 302-redirects to
+> the full client profile (`operations.clients.show`); all former callers point at
+> the profile (eMAR → `?tab=mar`, my-day "care plan" → `?tab=care_plans`), and the
+> `ClientCareController` plus its PRN endpoint are removed. The "do not unify
+> show/care" guidance below no longer applies. Retained for historical context only.
+>
 > Reference doc only. No code changes. Mirrors the structure of
 > [`docs/job-board-readiness-plan.md`](job-board-readiness-plan.md) and
 > [`docs/emar-meds-readiness-plan.md`](emar-meds-readiness-plan.md).

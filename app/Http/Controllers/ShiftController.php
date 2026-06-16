@@ -556,7 +556,7 @@ class ShiftController extends Controller
             ])->values(),
             'client_safety' => $shift->client ? ClientSafetyPayload::forClient($shift->client) : null,
             'links' => [
-                'client_care' => $shift->client ? route('operations.clients.care', $shift->client) : null,
+                'client_care' => $shift->client ? route('operations.clients.show', $shift->client) : null,
             ],
             'transports' => $transports->map(fn (FleetResidentTransport $transport) => [
                 'id' => $transport->id,

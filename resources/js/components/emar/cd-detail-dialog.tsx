@@ -150,7 +150,7 @@ export function CdDetailDialog({
         if (onLossAction && subject.loss.investigation_status === 'reported') footerEnd.push(<Button key="inv" type="button" variant="outline" onClick={() => onLossAction(subject.loss, 'investigate')}><FileWarning className="h-4 w-4" /> Investigate</Button>);
         if (onLossAction && subject.loss.investigation_status !== 'resolved') footerEnd.push(<Button key="resl" type="button" onClick={() => onLossAction(subject.loss, 'resolve')}><ShieldCheck className="h-4 w-4" /> Resolve</Button>);
     }
-    if (clientId) footerEnd.push(<Button key="client" type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${clientId}/care`)}><User className="h-4 w-4" /> Client</Button>);
+    if (clientId) footerEnd.push(<Button key="client" type="button" variant="ghost" onClick={() => router.visit(`/operations/clients/${clientId}?tab=mar`)}><User className="h-4 w-4" /> Client</Button>);
     footerEnd.push(<Button key="export" type="button" variant="ghost" onClick={() => window.open(CD_REGISTER_PDF, '_blank')}><Printer className="h-4 w-4" /> Export register</Button>);
 
     return (
