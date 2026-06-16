@@ -2,9 +2,8 @@
    custom-layout surfaces (not Card/Button); all colours are semantic tokens. */
 import { MED_TABS, matchesTab, type ClientOption, type MedCan, type MedRow } from '@/components/emar/medications/types';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -17,8 +16,8 @@ import {
     RejectOrderDialog,
 } from '@/pages/emar/_dialogs';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertTriangle, BadgeCheck, Ban, Clock, FileUp, Flame, Layers, Package, Pencil, Pill, Plus, Search, Shield, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Activity, AlertTriangle, BadgeCheck, Ban, Clock, Eye, FileText, FileUp, Flame, Layers, Package, Pencil, Pill, Plus, Search, Shield, User, Users, X } from 'lucide-react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Modal =
     | { type: 'add' }
@@ -73,15 +72,44 @@ function Flag({ label, tone }: { label: string; tone: string }) {
     return <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide ${tone}`}>{label}</span>;
 }
 
+/** Dismissible hero alert row — mirrors the /emar/controlled strip. The Review
+ *  action jumps to the relevant tab/filter; the ✕ hides it for the session. */
+function AlertStripRow({ tone, icon: Icon, message, onReview, onDismiss }: { tone: 'warning' | 'critical'; icon: typeof Layers; message: string; onReview: () => void; onDismiss: () => void }) {
+    const toneClass =
+        tone === 'critical'
+            ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+            : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${toneClass}`}>
+            <span className="flex items-center gap-2 text-sm font-medium">
+                <Icon className="h-4 w-4" />
+                {message}
+            </span>
+            <span className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={onReview}>
+                    Review
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Dismiss alert" onClick={onDismiss}>
+                    <X className="h-4 w-4" />
+                </Button>
+            </span>
+        </div>
+    );
+}
+
 export default function Medications(props: Props) {
     const { medications, clients, sites, active_site: activeSite, site_brand_colour: brandColour, can } = props;
 
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
-    const [clientFilter, setClientFilter] = useState<string>('all');
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [sort, setSort] = useState<'medication' | 'client' | 'stock'>('medication');
+    const [lowStockOnly, setLowStockOnly] = useState(false);
     const [modal, setModal] = useState<Modal>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    // Per-session dismissal of the hero alert strip (resets on reload).
+    const [alertDismissed, setAlertDismissed] = useState<{ awaiting: boolean; lowStock: boolean }>({ awaiting: false, lowStock: false });
 
     const counts = useMemo(
         () => ({
@@ -99,7 +127,8 @@ export default function Medications(props: Props) {
         const q = search.toLowerCase();
         const list = medications.filter((m) => {
             if (!matchesTab(m, activeTab)) return false;
-            if (clientFilter !== 'all' && String(m.client_id) !== clientFilter) return false;
+            if (clientFilter != null && m.client_id !== clientFilter) return false;
+            if (lowStockOnly && !m.stock?.low) return false;
             if (q && !`${m.name} ${m.brand_name ?? ''} ${m.client_name}`.toLowerCase().includes(q)) return false;
             return true;
         });
@@ -109,7 +138,7 @@ export default function Medications(props: Props) {
             return a.name.localeCompare(b.name);
         });
         return list;
-    }, [medications, activeTab, clientFilter, search, sort]);
+    }, [medications, activeTab, clientFilter, search, sort, lowStockOnly]);
 
     const TABS: RosterTabItem[] = MED_TABS.map((t) => ({
         id: t.id,
@@ -136,6 +165,45 @@ export default function Medications(props: Props) {
     const verify = (med: MedRow) => {
         router.post(`/emar/medications/${med.id}/verify`, {}, { preserveScroll: true });
         setModal(null);
+    };
+
+    // Right-click row menu — mirrors PRN's openRowCtx (PrnRecords.tsx). In-page
+    // actions (detail/edit/verify/reject/discontinue) open modals; only View
+    // client / Open on MAR / View stock navigate off-page.
+    const openRowCtx = (e: ReactMouseEvent, m: MedRow) => {
+        e.preventDefault();
+        const pending = m.approval_status === 'pending_verification';
+        const dose = [m.dosage, m.dose_unit].filter(Boolean).join(' ');
+        const tag = pending
+            ? { label: 'Awaiting', bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' }
+            : m.approval_status === 'rejected'
+              ? { label: 'Rejected', bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' }
+              : m.state === 'active'
+                ? { label: 'Active', bg: 'var(--status-success-bg)', color: 'var(--status-success)' }
+                : m.state === 'paused'
+                  ? { label: 'Paused', bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' }
+                  : { label: m.state, bg: 'var(--muted)', color: 'var(--muted-foreground)' };
+        const items: ShiftCtxItem[] = [
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View details', sub: dose || 'Order detail', tone: 'primary', onClick: () => setModal({ type: 'detail', med: m }) },
+            { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit order', onClick: () => setModal({ type: 'edit', med: m }) },
+            ...(pending && can.verify_orders
+                ? [
+                      { icon: <BadgeCheck className="h-3.5 w-3.5" />, label: 'Verify order', tone: 'primary', onClick: () => verify(m) } satisfies ShiftCtxItem,
+                      { icon: <Ban className="h-3.5 w-3.5" />, label: 'Reject order', tone: 'critical', onClick: () => setModal({ type: 'reject', med: m }) } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            { icon: <FileText className="h-3.5 w-3.5" />, label: 'Open on MAR chart', onClick: () => router.visit(`/emar/mar?client_id=${m.client_id}`) },
+            { sep: true },
+            { icon: <User className="h-3.5 w-3.5" />, label: 'View client', onClick: () => router.visit(`/operations/clients/${m.client_id}/care`) },
+            { icon: <Package className="h-3.5 w-3.5" />, label: 'View stock', onClick: () => router.visit('/emar/stock') },
+            ...(m.state === 'active'
+                ? [
+                      { sep: true } satisfies ShiftCtxItem,
+                      { icon: <Ban className="h-3.5 w-3.5" />, label: 'Discontinue', tone: 'critical', onClick: () => setModal({ type: 'discontinue', med: m }) } satisfies ShiftCtxItem,
+                  ]
+                : []),
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: tag.label, tagBg: tag.bg, tagColor: tag.color, meta: `${m.client_name} · ${m.name}${dose ? ` · ${dose}` : ''}`, items });
     };
 
     return (
@@ -179,8 +247,30 @@ export default function Medications(props: Props) {
                         </>
                     }
                     footer={
-                        sites.length > 0 ? (
-                            <div className="flex items-center justify-end py-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2 py-3">
+                            <div className="relative w-full max-w-xs md:w-[280px]">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero (shared eMAR filter-row idiom, mirrors /emar/prn). */}
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search medication, brand or client…"
+                                    aria-label="Search medications"
+                                    className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
+                                />
+                                {search ? (
+                                    // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
+                                    <button
+                                        type="button"
+                                        aria-label="Clear search"
+                                        onClick={() => setSearch('')}
+                                        className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
+                            </div>
+                            {sites.length > 0 ? (
                                 <EntityFilter
                                     label="Site"
                                     allLabel="All sites"
@@ -192,34 +282,53 @@ export default function Medications(props: Props) {
                                     }}
                                     onDark
                                 />
-                            </div>
-                        ) : undefined
+                            ) : null}
+                            <EntityFilter
+                                label="Client"
+                                allLabel="All clients"
+                                items={clients.map((c) => ({ id: c.id, name: `${c.last_name}, ${c.first_name}` }))}
+                                value={clientFilter}
+                                onChange={setClientFilter}
+                                onDark
+                            />
+                        </div>
                     }
                 />
+
+                {(counts.awaiting > 0 && !alertDismissed.awaiting) || (counts.lowStock > 0 && !alertDismissed.lowStock) ? (
+                    <div className="flex flex-col gap-2">
+                        {counts.awaiting > 0 && !alertDismissed.awaiting && (
+                            <AlertStripRow
+                                tone="warning"
+                                icon={BadgeCheck}
+                                message={`${counts.awaiting} order${counts.awaiting === 1 ? '' : 's'} awaiting prescriber verification.`}
+                                onReview={() => setActiveTab('awaiting')}
+                                onDismiss={() => setAlertDismissed((d) => ({ ...d, awaiting: true }))}
+                            />
+                        )}
+                        {counts.lowStock > 0 && !alertDismissed.lowStock && (
+                            <AlertStripRow
+                                tone="critical"
+                                icon={AlertTriangle}
+                                message={`${counts.lowStock} medication${counts.lowStock === 1 ? '' : 's'} low or out of stock.`}
+                                onReview={() => {
+                                    setLowStockOnly(true);
+                                    setSort('stock');
+                                    setActiveTab('all');
+                                }}
+                                onDismiss={() => setAlertDismissed((d) => ({ ...d, lowStock: true }))}
+                            />
+                        )}
+                    </div>
+                ) : null}
 
                 <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Medication register views" />
 
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medication, brand or client…" className="w-72 pl-8" />
-                        </div>
-                        <Select value={clientFilter} onValueChange={setClientFilter}>
-                            <SelectTrigger className="h-9 w-44">
-                                <SelectValue placeholder="All clients" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All clients</SelectItem>
-                                {clients.map((c) => (
-                                    <SelectItem key={c.id} value={String(c.id)}>
-                                        {c.last_name}, {c.first_name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <span className="text-sm font-semibold">Medication register</span>
                         <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-                            <SelectTrigger className="h-9 w-40">
+                            <SelectTrigger className="h-9 w-44">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -228,6 +337,17 @@ export default function Medications(props: Props) {
                                 <SelectItem value="stock">Sort: Stock (low first)</SelectItem>
                             </SelectContent>
                         </Select>
+                        {lowStockOnly && (
+                            <button
+                                type="button"
+                                onClick={() => setLowStockOnly(false)}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-status-critical/40 bg-status-critical-bg px-3 py-1 text-xs font-semibold text-status-critical transition-colors hover:bg-status-critical-bg/70"
+                                aria-label="Clear low-stock filter"
+                            >
+                                Low / out of stock
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
                         <div className="ml-auto flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
                                 {visible.length} of {medications.length}
@@ -240,9 +360,22 @@ export default function Medications(props: Props) {
                     </div>
 
                     {visible.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 px-5 py-14 text-center text-sm text-muted-foreground">
-                            <Pill className="h-6 w-6" />
-                            No medications match these filters.
+                        <div className="flex flex-col items-center gap-3 px-5 py-16 text-center">
+                            <span className="grid h-12 w-12 place-items-center rounded-full bg-muted text-muted-foreground">
+                                <Pill className="h-6 w-6" />
+                            </span>
+                            <div className="text-sm font-medium">
+                                {medications.length === 0 ? 'No medications in the register yet.' : 'No medications match these filters.'}
+                            </div>
+                            <p className="max-w-sm text-xs text-muted-foreground">
+                                {medications.length === 0
+                                    ? 'Chart the first medication order to start the register.'
+                                    : 'Try clearing the search, site or client filters — or chart a new order.'}
+                            </p>
+                            <Button onClick={() => setModal({ type: 'add' })}>
+                                <Plus className="h-4 w-4" />
+                                Add medication
+                            </Button>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -256,12 +389,23 @@ export default function Medications(props: Props) {
                                         <th className="px-4 py-2.5">Flags</th>
                                         <th className="px-4 py-2.5">State</th>
                                         <th className="px-4 py-2.5">Stock</th>
-                                        <th className="px-4 py-2.5"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {visible.map((m) => (
-                                        <tr key={m.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/60" onClick={() => setModal({ type: 'detail', med: m })}>
+                                        <tr
+                                            key={m.id}
+                                            tabIndex={0}
+                                            className="cursor-pointer border-b last:border-b-0 hover:bg-muted/60 focus:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                                            onClick={() => setModal({ type: 'detail', med: m })}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    setModal({ type: 'detail', med: m });
+                                                }
+                                            }}
+                                            onContextMenu={(e) => openRowCtx(e, m)}
+                                        >
                                             <td className="px-4 py-3">
                                                 <div className="font-medium">{m.name}</div>
                                                 <div className="truncate text-xs text-muted-foreground">{[m.brand_name, m.instructions].filter(Boolean).join(' · ')}</div>
@@ -302,18 +446,6 @@ export default function Medications(props: Props) {
                                                     <span className="text-muted-foreground">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => setModal({ type: 'edit', med: m })}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    {m.state === 'active' && (
-                                                        <Button size="icon" variant="ghost" aria-label="Discontinue" onClick={() => setModal({ type: 'discontinue', med: m })}>
-                                                            <Ban className="h-4 w-4 text-status-critical" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -341,6 +473,7 @@ export default function Medications(props: Props) {
                     onVerify={() => verify(modal.med)}
                 />
             )}
+            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
     );
 }

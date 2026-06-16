@@ -1646,7 +1646,13 @@ class EmarController extends Controller
         // facet counts, so the whole register is served at once.
         $meds = ClientMedication::query()
             ->current()
-            ->with(['client:id,first_name,last_name,site_id', 'stock'])
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'stock',
+                'createdByUser:id,name',
+                'verifiedByUser:id,name',
+                'ceasedByUser:id,name',
+            ])
             ->when($clientFilter, fn ($q, $id) => $q->where('client_id', $id))
             ->orderBy('name')
             ->get();
@@ -1718,6 +1724,15 @@ class EmarController extends Controller
                 'rejection_reason' => $m->rejection_reason,
                 'pharmac_therapeutic_group' => $m->pharmac_therapeutic_group,
                 'start_date' => $start,
+                // Verification / lifecycle audit (all pre-existing columns — no migration).
+                'created_by_name' => $m->createdByUser?->name,
+                'created_at' => $m->created_at?->format('j M Y, g:ia'),
+                'verified_by_name' => $m->verifiedByUser?->name,
+                'verified_at' => $m->verified_at?->format('j M Y, g:ia'),
+                'ceased_by_name' => $m->ceasedByUser?->name,
+                'ceased_at' => $m->ceased_at?->format('j M Y'),
+                'ceased_reason' => $m->ceased_reason,
+                'review_date' => $m->review_date?->format('j M Y'),
                 'stock' => $m->stock ? [
                     'on_hand' => $m->stock->on_hand,
                     'unit' => $m->stock->unit,
