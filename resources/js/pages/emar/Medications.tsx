@@ -328,7 +328,7 @@ export default function Medications(props: Props) {
                     <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
                         <span className="text-sm font-semibold">Medication register</span>
                         <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
-                            <SelectTrigger className="h-9 w-44">
+                            <SelectTrigger className="h-9 w-44" aria-label="Sort medications">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -412,7 +412,7 @@ export default function Medications(props: Props) {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className="flex items-center gap-2">
-                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground" style={{ backgroundColor: `oklch(0.62 0.16 ${hue(m.client_id)})` }}>
+                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground" style={{ backgroundColor: `oklch(0.52 0.16 ${hue(m.client_id)})` }}>
                                                         {initials(m.client_name)}
                                                     </span>
                                                     {m.client_name}

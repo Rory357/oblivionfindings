@@ -83,7 +83,7 @@ function initials(name: string): string {
 }
 function Avatar({ id, name }: { id: number; name: string }) {
     return (
-        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground" style={{ backgroundColor: `oklch(0.62 0.16 ${hue(id)})` }}>
+        <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground" style={{ backgroundColor: `oklch(0.52 0.16 ${hue(id)})` }}>
             {initials(name)}
         </span>
     );
