@@ -201,14 +201,22 @@ Every box **A–H** is `[x]` (10 passes, one reviewable commit per gap). Final s
   (`medicationFocus` / `medicationSnapshotUrl` / data-gated by a null field). Full-project `tsc` is
   green for **both** entry pages after every pass.
 
-### ⚠️ Verification done vs. deferred (environmental — this is a bare worktree)
-- **Done every pass:** `npm run types` (full project, **0 errors**) + `npm run lint` (touched files
-  clean) + read-verified backend against real signatures/columns/relations + Operations non-regression
-  reasoning.
-- **Deferred to a built environment (NOT gaps — no `php`/`vendor`/`.env`/dev-server here):**
-  (1) PHP **feature-tests** (`MedicationHandoversTest` + new coverage for the snapshot endpoint, CD
-  persistence, and the version conflict) and running the **3 new migrations**;
-  (2) full `npm run build` (the wayfinder vite plugin shells out to `php artisan`);
-  (3) **live browser** check of `/emar/handovers` **and** `/operations/handovers` (right-click menus,
-  detail jumps, the meds panel, CD record→register, version-conflict toast, alert-strip jumps).
-  Recommend running these on `oblivionfindings.com` / a full local env before merge.
+### ✅ Verification — all complete (merged to main + LIVE)
+Merged into `origin/main` (merge `80e1ff06`, integrated concurrent loops conflict-free; pushed
+`a0f56421`) and verified in the **parent** repo (which has `vendor`/`node_modules`):
+- `npm run types` **0 errors** + `npm run lint` clean (every pass).
+- Full **`npm run build`** succeeds (wayfinder route-gen included; needs PHP `memory_limit=1024M`).
+- **PHP feature tests** — the existing **54 handover tests pass** (incl. `ShiftHandoverWorkflowTest`
+  exercising the `save()` path the `version`/`cd_verification` changes touch) AND **new
+  `HandoverMedicationLensTest` (4 tests)** covering the snapshot endpoint (422 + window-scoped shape +
+  PRN counts), CD persistence, and the version-conflict block. RefreshDatabase applies the **3 new
+  migrations** cleanly. (Pushed in `3d010b21` → main.)
+- **Frontend tests** — new `handover-context-menu.test.tsx` + `shift-med-snapshot.test.tsx`
+  (**10 vitest tests**) cover the context-menu permission guards + the `ShiftMedSummary` panel.
+  (Pushed `184682d7` → main.)
+- **Live on oblivionfindings.com (Chrome):** new route `/emar/handovers/shift-medications` returns 422
+  (old code 404 → deploy confirmed); the wizard's "Medications this shift" panel + the CD two-person
+  check render and toggle correctly; both `/emar/handovers` + `/operations/handovers` render un-regressed.
+- ⚠️ Note: `vendor/bin/pint` is **not enforced** in CI (`lint.yml` runs `pint` with the auto-commit step
+  commented out; the codebase is broadly non-conformant). New files were kept Pint-clean; pre-existing
+  violations in shared files were left untouched (fixing them would reformat unrelated code).

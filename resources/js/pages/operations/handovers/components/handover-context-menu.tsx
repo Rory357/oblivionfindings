@@ -43,7 +43,9 @@ const STATUS_TAG: Record<string, { bg: string; color: string }> = {
     },
 };
 
-function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtxItem[] {
+/** Build the right-click menu items for a handover, guarded by its `can_*`
+ *  flags + which related entities exist. Exported for unit testing. */
+export function buildItems(h: Handover, handlers: HandoverCtxHandlers): ShiftCtxItem[] {
     const client = h.client;
     const outShift = h.outgoing_shift;
     const outStaff = h.outgoing_staff;
