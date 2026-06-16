@@ -128,13 +128,21 @@ un-regressed.
   tsc/eslint green.*
 
 ## G. Clarify roles + edit-locking (dedupe the 3 write paths)
-- [ ] **G1** Three UIs (eMAR / Operations / Attendance clock-out) write one `ShiftHandover`
-  with no concurrency control. Add optimistic-concurrency / edit-locking in
-  `ShiftHandoverService` (submitted handovers already lock via the 7-day `editPermission`
-  window; add a `locked_by`/`locked_at` *or* version check so a second concurrent editor of a
-  draft is blocked / told who holds it). In the eMAR UI, show a "same handover as Operations"
-  cross-link and disable editing when another module/user holds it. Keep eMAR on the medication
-  slice; defer the full narrative to Operations.
+- [x] **G1** Optimistic-concurrency / edit-locking. — *Done: new `version` column (migration
+  `2026_06_16_000300…`, unsignedInteger default 0) + `ShiftHandover` fillable/cast.
+  `ShiftHandoverService::save()` now re-reads a reused draft under `lockForUpdate()` and, when the
+  caller passes a stale `expected_version`, throws a "changed by {name} after you opened it" conflict
+  instead of silently overwriting; `version` increments on every draft save. eMAR `storeHandover`/
+  `updateHandover` validate `version` + pass `expected_version`; the wizard sends `version:
+  editing.version` on the edit PUT and its `onError` now surfaces the server's `handover` conflict
+  message. `HandoverPresenter` exposes `version`; shared `Handover` type gained it. The eMAR detail
+  dialog shows a "Same record as Operations handovers" cross-link (gated by `medicationSnapshotUrl`).
+  Submitted/acknowledged handovers were already blocked by `save()` status guards + the 7-day
+  `editPermission` window. Frontend tsc/eslint green; PHP feature-tests environmentally blocked.
+  TODO(Gx): live presence-based "who holds it right now" pessimistic locking (disable-on-open) is
+  deferred — the optimistic block-on-save is the robust standard guard; `applyEdit()` (Operations
+  submitted-edit path) keeps its in-txn `lockForUpdate` and doesn't bump `version` (drafts only
+  mutate via `save()`).
 
 ## H. Remove dead `MedicationHandover` code
 - [ ] **H1** `app/Models/MedicationHandover.php` + the `medication_handovers` table + its

@@ -3747,6 +3747,7 @@ class EmarController extends Controller
             'cd_result' => ['nullable', 'in:verified,discrepancy'],
             'cd_witness_id' => ['nullable', 'integer', 'exists:users,id'],
             'cd_notes' => ['nullable', 'string', 'max:2000'],
+            'version' => ['nullable', 'integer', 'min:0'],
             'submit' => ['nullable', 'boolean'],
         ]);
 
@@ -3779,6 +3780,7 @@ class EmarController extends Controller
                 'witness_id' => $validated['cd_witness_id'] ?? null,
                 'notes' => $validated['cd_notes'] ?? null,
             ],
+            'expected_version' => $validated['version'] ?? null,
             'submit' => (bool) ($validated['submit'] ?? true),
         ]);
 
@@ -4631,6 +4633,7 @@ class EmarController extends Controller
             'cd_result' => ['nullable', 'in:verified,discrepancy'],
             'cd_witness_id' => ['nullable', 'integer', 'exists:users,id'],
             'cd_notes' => ['nullable', 'string', 'max:2000'],
+            'version' => ['nullable', 'integer', 'min:0'],
             'submit' => ['nullable', 'boolean'],
         ]);
 
@@ -4648,6 +4651,7 @@ class EmarController extends Controller
                 'witness_id' => $validated['cd_witness_id'] ?? null,
                 'notes' => $validated['cd_notes'] ?? null,
             ],
+            'expected_version' => $validated['version'] ?? null,
             'submit' => (bool) ($validated['submit'] ?? false),
         ]);
 

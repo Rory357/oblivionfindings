@@ -26,6 +26,7 @@ class ShiftHandover extends Model
         'follow_up_items',
         'observations_summary',
         'cd_verification',
+        'version',
         'submitted_at',
         'submitted_by',
         'acknowledged_at',
@@ -39,6 +40,7 @@ class ShiftHandover extends Model
         'follow_up_items' => 'array',
         'observations_summary' => 'array',
         'cd_verification' => 'array',
+        'version' => 'integer',
         'submitted_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];

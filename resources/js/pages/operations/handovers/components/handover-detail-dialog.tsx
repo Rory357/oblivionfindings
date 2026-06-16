@@ -380,6 +380,17 @@ export function HandoverDetailDialog({
                         </span>
                     </div>
 
+                    {medicationSnapshotUrl ? (
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                            Same shift-handover record as{' '}
+                            <Link href="/operations/handovers" className="font-semibold text-primary hover:underline">
+                                Operations handovers
+                            </Link>{' '}
+                            — the eMAR view focuses on the medication slice; concurrent edits are version-locked.
+                        </div>
+                    ) : null}
+
                     {/* Narrative */}
                     <div>
                         <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">

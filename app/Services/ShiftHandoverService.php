@@ -64,6 +64,26 @@ class ShiftHandoverService
         return DB::transaction(function () use ($outgoingShift, $actor, $data, $submit, $existing) {
             $incomingShift = $this->resolveIncomingShift($outgoingShift, $data['incoming_shift_id'] ?? null);
 
+            // Reusing an existing draft? Re-read it under a row lock and enforce
+            // optimistic concurrency — if the caller's expected version is stale,
+            // another worker saved in between, so block instead of overwriting.
+            if ($existing && $existing->status === self::STATUS_DRAFT) {
+                $existing = ShiftHandover::query()
+                    ->with('outgoingStaff:id,name')
+                    ->lockForUpdate()
+                    ->findOrFail($existing->id);
+
+                $expectedVersion = $data['expected_version'] ?? null;
+                if ($expectedVersion !== null && (int) $existing->version !== (int) $expectedVersion) {
+                    throw ValidationException::withMessages([
+                        'handover' => sprintf(
+                            'This handover was changed by %s after you opened it. Reload to see their version, then re-apply your edits.',
+                            $existing->outgoingStaff?->name ?? 'another worker',
+                        ),
+                    ]);
+                }
+            }
+
             $handover = $existing && $existing->status === self::STATUS_DRAFT
                 ? $existing
                 : new ShiftHandover();
@@ -98,6 +118,7 @@ class ShiftHandoverService
                 'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
                 'observations_summary' => $this->buildObservationsSummary($outgoingShift),
                 'cd_verification' => $this->normalizeCdVerification($data['cd_verification_input'] ?? null, $actor),
+                'version' => $existing && $existing->status === self::STATUS_DRAFT ? (int) $existing->version + 1 : 1,
                 'status' => self::STATUS_DRAFT,
             ]);
 

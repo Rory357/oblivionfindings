@@ -45,6 +45,9 @@ export type Handover = {
     client_mood: string | null;
     medications_due: string[];
     cd_verification: CdVerification | null;
+    /** Optimistic-concurrency token — sent back on edit so the server can detect a
+     *  concurrent save of the same shared draft. */
+    version: number;
     incidents_to_note: string[];
     follow_up_items: string[];
     tasks_pending: string[];

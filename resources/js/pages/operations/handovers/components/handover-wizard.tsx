@@ -519,13 +519,15 @@ export function HandoverWizard({
                 );
                 onSubmitted(targetWeek);
             },
-            onError: () =>
-                toast.error('Could not save the handover. Please review and retry.'),
+            onError: (errors: Record<string, string>) =>
+                // Surface the server's concurrency message (someone else saved this
+                // shared draft) rather than a generic error.
+                toast.error(errors?.handover ?? 'Could not save the handover. Please review and retry.'),
             onFinish: () => setSubmitting(false),
         };
 
         if (editing) {
-            router.put(`${basePath}/${editing.id}`, payload, opts);
+            router.put(`${basePath}/${editing.id}`, { ...payload, version: editing.version }, opts);
         } else {
             router.post(
                 basePath,
