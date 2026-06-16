@@ -12,7 +12,7 @@ import { HandoverRail } from '@/pages/operations/handovers/components/handover-r
 import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
 import { clientName, ymd, type Catalogue, type Handover } from '@/pages/operations/handovers/components/shared';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeftRight, BellRing, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FilePenLine, History, Layers, Pill, Plus, Search, Send, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BellRing, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FilePenLine, History, Layers, Pill, Plus, Search, Send, ShieldAlert, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -42,6 +42,10 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
     const [tab, setTab] = useState('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    // Client + staff are filtered client-side over the loaded week (Site round-trips
+    // to the server for its query scope + brand colour; mirror Operations' baseFiltered).
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
+    const [staffFilter, setStaffFilter] = useState<number | null>(null);
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [detailId, setDetailId] = useState<number | null>(null);
@@ -58,11 +62,30 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
         incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
     }), [handovers, currentUser]);
 
+    // Unique clients + staff present in this week's handovers, for the hero filters.
+    const clientItems = useMemo(() => {
+        const map = new Map<number, string>();
+        handovers.forEach((h) => { if (h.client) map.set(h.client.id, clientName(h.client)); });
+        return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [handovers]);
+    const staffItems = useMemo(() => {
+        const map = new Map<number, string>();
+        handovers.forEach((h) => {
+            if (h.outgoing_staff) map.set(h.outgoing_staff.id, h.outgoing_staff.name);
+            if (h.incoming_staff) map.set(h.incoming_staff.id, h.incoming_staff.name);
+        });
+        return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [handovers]);
+
     const searched = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return handovers;
-        return handovers.filter((h) => [h.handover_notes, clientName(h.client), h.outgoing_staff?.name, h.incoming_staff?.name, h.site?.name, h.client_mood, ...(h.medications_due ?? []), ...(h.incidents_to_note ?? [])].filter(Boolean).join(' ').toLowerCase().includes(q));
-    }, [handovers, search]);
+        return handovers.filter((h) => {
+            if (clientFilter != null && h.client?.id !== clientFilter) return false;
+            if (staffFilter != null && h.outgoing_staff?.id !== staffFilter && h.incoming_staff?.id !== staffFilter && h.acknowledger?.id !== staffFilter) return false;
+            if (q && ![h.handover_notes, clientName(h.client), h.outgoing_staff?.name, h.incoming_staff?.name, h.site?.name, h.client_mood, ...(h.medications_due ?? []), ...(h.incidents_to_note ?? [])].filter(Boolean).join(' ').toLowerCase().includes(q)) return false;
+            return true;
+        });
+    }, [handovers, search, clientFilter, staffFilter]);
 
     const filtered = useMemo(() => {
         switch (tab) {
@@ -159,11 +182,16 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                                 <button onClick={() => stepWeek(1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronRight className="h-3.5 w-3.5" /></button>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, staff or note…" className="w-52 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                <div className="relative w-full sm:w-[240px]">
+                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, staff or note…" aria-label="Search handovers" className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50" />
+                                    {search ? (
+                                        <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+                                    ) : null}
                                 </div>
                                 {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                                {clientItems.length > 0 && <EntityFilter label="Client" allLabel="All clients" items={clientItems} value={clientFilter} onChange={setClientFilter} onDark />}
+                                {staffItems.length > 0 && <EntityFilter label="Staff" allLabel="All staff" pluralLabel="staff" items={staffItems} value={staffFilter} onChange={setStaffFilter} onDark />}
                             </div>
                         </div>
                     }

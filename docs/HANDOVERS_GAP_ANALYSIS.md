@@ -65,11 +65,16 @@ un-regressed.
   with no prop changes (un-regressed). `<Link>`-based, so no new raw-button lint.*
 
 ## C. Hero footer filters (eMAR only)
-- [ ] **C1** Add a **Client** `EntityFilter` and a **Staff** filter (outgoing/incoming) to the
+- [x] **C1** Add a **Client** `EntityFilter` and a **Staff** filter (outgoing/incoming) to the
   eMAR hero footer beside Site (`emar/Handovers.tsx`); align the hand-rolled search pill to the
   shared meds/today pill. **Keep the week-stepper** (Wk · {range} + prev/next) — do **not** add
   a day-stepper. Client/Staff can filter client-side over the loaded week (mirror Operations'
-  `baseFiltered`).
+  `baseFiltered`). — *Done: `emar/Handovers.tsx` — `clientFilter`/`staffFilter` state + derived
+  `clientItems`/`staffItems` (unique clients/staff present in the week); `searched` memo now applies
+  both (staff matches outgoing/incoming/acknowledger). Two `EntityFilter onDark` pills added beside
+  Site (Staff uses `pluralLabel="staff"`). Search pill re-aligned to the PRN/meds-today convention
+  (relative + absolute Search icon + h-8 `rounded-full` white pill + inline clear `X`). Week-stepper
+  unchanged. Site stays server-side; Client/Staff are client-side. eMAR-only — no shared component.*
 
 ## D. Alert strip (eMAR only)
 - [ ] **D1** Replace the single needs-ack banner with a **stacked, dismissible** strip (mirror
