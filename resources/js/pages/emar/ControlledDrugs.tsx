@@ -412,7 +412,7 @@ export default function ControlledDrugs(props: Props) {
                             return (
                                 <tr key={m.id} {...rowProps({ kind: 'medication', med: m })}>
                                     <td className="px-4 py-3">{m.client_name}</td>
-                                    <td className="px-4 py-3 font-medium"><DrugCell name={m.name} controlled={m.controlled_drug} /></td>
+                                    <td className="px-4 py-3 font-medium"><DrugCell name={m.name} controlled={m.controlled_drug} schedule={m.schedule} /></td>
                                     <td className="px-4 py-3 tabular-nums"><div>{m.stock ? `${m.stock.on_hand ?? '—'} ${m.stock.unit ?? ''}` : '—'}</div><ExpiryNote value={m.stock?.expiry_date} /></td>
                                     <td className="px-4 py-3">{rec?.overdue ? <span className="text-status-warning">{rec.days === null ? 'Never' : `${rec.days}d ago`}</span> : <span className="text-muted-foreground">{rec?.days}d ago</span>}</td>
                                     <td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setModal({ type: 'balanceMed', medId: m.id }); }}><ClipboardCheck className="h-3.5 w-3.5" />Check balance</Button></td>
@@ -428,7 +428,7 @@ export default function ControlledDrugs(props: Props) {
                             <tr key={e.id} {...rowProps({ kind: 'entry', entry: e, med: medForEntry(e) })}>
                                 <td className="px-4 py-3 text-muted-foreground">{e.recorded_at ? new Date(e.recorded_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-3">{e.client_name}</td>
-                                <td className="px-4 py-3 font-medium"><DrugCell name={e.medication_name} controlled={e.controlled_drug ?? true} /><ExpiryNote value={e.expiry_date} /></td>
+                                <td className="px-4 py-3 font-medium"><DrugCell name={e.medication_name} controlled={e.controlled_drug ?? true} schedule={medForEntry(e)?.schedule} /><ExpiryNote value={e.expiry_date} /></td>
                                 <td className="px-4 py-3 capitalize text-muted-foreground">{e.entry_type.replace('_', ' ')}</td>
                                 <td className="px-4 py-3 tabular-nums">{e.quantity} {e.unit}</td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{e.on_hand_before ?? '—'} → {e.on_hand_after ?? '—'}</td>
@@ -444,7 +444,7 @@ export default function ControlledDrugs(props: Props) {
                         {reconciliation.map((r) => (
                             <tr key={r.med.id} {...rowProps({ kind: 'medication', med: r.med })}>
                                 <td className="px-4 py-3">{r.med.client_name}</td>
-                                <td className="px-4 py-3 font-medium"><DrugCell name={r.med.name} controlled={r.med.controlled_drug} /></td>
+                                <td className="px-4 py-3 font-medium"><DrugCell name={r.med.name} controlled={r.med.controlled_drug} schedule={r.med.schedule} /></td>
                                 <td className="px-4 py-3 tabular-nums"><div>{r.med.stock ? `${r.med.stock.on_hand ?? '—'} ${r.med.stock.unit ?? ''}` : '—'}</div><ExpiryNote value={r.med.stock?.expiry_date} /></td>
                                 <td className="px-4 py-3 text-muted-foreground">{r.lastAt ? new Date(r.lastAt).toLocaleDateString('en-NZ') : 'Never'}</td>
                                 <td className="px-4 py-3">{r.overdue ? <CdPill label="Overdue" tone="bg-status-warning-bg text-status-warning" /> : <CdPill label="Current" tone="bg-status-success-bg text-status-success" />}</td>
@@ -604,13 +604,14 @@ function TableCard({ head, empty, title, count, action, cta, children }: { head:
     );
 }
 
-/** Drug name with the controlled-drug lock glyph + CD badge (semantic tokens). */
-function DrugCell({ name, controlled }: { name: string | null; controlled?: boolean }) {
+/** Drug name with the controlled-drug lock glyph + CD badge + schedule chip (semantic tokens). */
+function DrugCell({ name, controlled, schedule }: { name: string | null; controlled?: boolean; schedule?: number | null }) {
     return (
         <span className="inline-flex items-center gap-1.5">
             {controlled ? <Lock className="h-3 w-3 shrink-0 text-status-critical" aria-label="Controlled drug" /> : null}
             <span>{name ?? '—'}</span>
             {controlled ? <span className="rounded bg-status-critical-bg px-1 py-0.5 text-[9px] font-bold text-status-critical">CD</span> : null}
+            {schedule ? <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-bold text-muted-foreground" title={`Controlled Drug Schedule ${schedule}`}>S{schedule}</span> : null}
         </span>
     );
 }

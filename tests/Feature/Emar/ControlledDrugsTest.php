@@ -232,6 +232,27 @@ class ControlledDrugsTest extends TestCase
         $this->assertSame('resolved', $alert->fresh()->status);
     }
 
+    public function test_cd_entry_classifies_schedule_on_medication(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/entries', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'entry_type' => 'administration',
+                'quantity' => 2,
+                'on_hand_before' => 10,
+                'on_hand_after' => 8,
+                'witnessed_by' => $witness->id,
+                'cd_schedule' => 2,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(2, $med->fresh()->cd_schedule);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);

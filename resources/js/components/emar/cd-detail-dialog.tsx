@@ -205,6 +205,7 @@ function MedicationBody({ med }: { med: CdMedication }) {
         <div className="grid gap-4 sm:grid-cols-2">
             <ReviewCard icon={Lock} title="Controlled drug">
                 <ReviewRow label="Name" value={<DrugName name={med.name} controlled={med.controlled_drug} />} />
+                <ReviewRow label="CD schedule" value={med.schedule ? `Schedule ${med.schedule}` : null} />
                 <ReviewRow label="Form" value={med.form} />
                 <ReviewRow label="Strength" value={med.strength} />
                 <ReviewRow label="Resident" value={med.client_name} />

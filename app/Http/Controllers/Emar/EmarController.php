@@ -1516,9 +1516,8 @@ class EmarController extends Controller
                         'batch_number' => $m->stock->batch_number,
                         'reorder_level' => $m->stock->reorder_level,
                     ] : null,
-                    // TODO(G-F): no Schedule (2/3/4) column on client_medications — chip omitted
-                    // until a `cd_schedule` field exists. See docs/CONTROLLED_GAP_ANALYSIS.md (BK-schedule).
-                    'schedule' => null,
+                    // CD schedule (2/3/4) — set when recording a movement; null until classified.
+                    'schedule' => $m->cd_schedule,
                 ];
             })->values(),
             'recentEntries' => $recentEntries->map(fn (ClientControlledDrugEntry $e) => [
@@ -4165,6 +4164,7 @@ class EmarController extends Controller
             'witnessed_by' => 'required|exists:users,id|different:'.auth()->id(),
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
+            'cd_schedule' => 'nullable|integer|in:2,3,4',
             'notes' => 'nullable|string|max:2000',
             'client_request_uuid' => 'nullable|uuid',
             'captured_offline_at' => 'nullable|date',
@@ -4249,6 +4249,11 @@ class EmarController extends Controller
                 'expiry_date' => $validated['expiry_date'] ?? $stock->expiry_date,
                 'last_counted_at' => now(),
             ]);
+        }
+
+        // Classify the drug's CD schedule (2/3/4) in context, if supplied.
+        if ($medication && ! empty($validated['cd_schedule'])) {
+            $medication->forceFill(['cd_schedule' => (int) $validated['cd_schedule']])->save();
         }
 
         $refreshedStock = $medication?->stock()->first();

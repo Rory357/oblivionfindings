@@ -37,6 +37,7 @@ export function RecordCdEntryDialog({ medications, staff, currentUserId, onClose
         on_hand_after: '',
         batch_number: '',
         expiry_date: '',
+        cd_schedule: '',
         witnessed_by: '',
         notes: '',
     });
@@ -59,6 +60,7 @@ export function RecordCdEntryDialog({ medications, staff, currentUserId, onClose
             medication_name: m?.name ?? '',
             unit: m?.stock?.unit ?? '',
             on_hand_before: m?.stock?.on_hand != null ? String(m.stock.on_hand) : '',
+            cd_schedule: m?.schedule != null ? String(m.schedule) : '',
         });
     };
 
@@ -131,6 +133,9 @@ export function RecordCdEntryDialog({ medications, staff, currentUserId, onClose
                         </Field>
                         <Field label="Unit">
                             <Input value={form.data.unit} onChange={(e) => form.setData('unit', e.target.value)} placeholder="tablets / mL" />
+                        </Field>
+                        <Field label="CD schedule" error={form.errors.cd_schedule}>
+                            <SelectInput value={form.data.cd_schedule} onChange={(v) => form.setData('cd_schedule', v)} placeholder="Classify…" options={[{ value: '2', label: 'Schedule 2' }, { value: '3', label: 'Schedule 3' }, { value: '4', label: 'Schedule 4' }]} />
                         </Field>
                     </div>
                 </>
