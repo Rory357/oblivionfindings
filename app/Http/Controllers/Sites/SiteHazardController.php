@@ -148,6 +148,10 @@ class SiteHazardController extends Controller
             'due_date' => $validated['due_date'] ?? now()->addDays($this->riskCalculator->suggestedDueDays($riskRating))->toDateString(),
         ]);
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Hazard logged successfully.');
+        }
+
         return redirect()
             ->route('sites.hazards.show', $hazard->id)
             ->with('success', 'Hazard logged successfully.');

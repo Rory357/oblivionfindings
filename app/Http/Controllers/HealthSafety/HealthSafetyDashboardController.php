@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
@@ -11,9 +12,11 @@ use App\Models\LoneWorkerAlert;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\SiteHazard;
+use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Services\HealthSafety\HsDashboardService;
+use App\Services\HealthSafety\HsKpiService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +26,7 @@ class HealthSafetyDashboardController extends Controller
 {
     public function __construct(
         private readonly HsDashboardService $dashboardService,
+        private readonly HsKpiService $kpiService,
     ) {}
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
@@ -33,6 +37,18 @@ class HealthSafetyDashboardController extends Controller
         $thirtyDaysAgo = $now->copy()->subDays(30);
         $startOfYear = $now->copy()->startOfYear();
         $sixMonthsAgo = $now->copy()->subMonths(6);
+
+        // Period range (G4), site filter (G4) and role lens (G3) — replace the fixed snapshot.
+        $from = $request->input('from')
+            ? Carbon::parse($request->input('from'))->startOfDay()
+            : $thirtyDaysAgo;
+        $to = $request->input('to')
+            ? Carbon::parse($request->input('to'))->endOfDay()
+            : $now;
+        $siteId = $request->integer('site') ?: null;
+        $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
+            ? $request->input('lens')
+            : 'manager';
 
         // -- KPIs --
         $totalIncidents30d = ClientIncident::where('occurred_at', '>=', $thirtyDaysAgo)->count();
@@ -91,7 +107,8 @@ class HealthSafetyDashboardController extends Controller
             'open_safeguarding' => $openSafeguarding,
             'fleet_incidents_30d' => $fleetIncidents30d,
             'fleet_unresolved' => $fleetUnresolved,
-            'staff_compliance_pct' => 0,
+            'staff_compliance_pct' => (int) round($this->kpiService->trainingAuditCompliancePct() ?? 0),
+            'days_since_lti' => $this->kpiService->daysSinceLostTimeInjury($siteId),
         ];
 
         // -- Incident Trends (12 months) --
@@ -121,83 +138,49 @@ class HealthSafetyDashboardController extends Controller
             })
             ->values();
 
-        // -- Severity Breakdown --
-        $severityBreakdown = ClientIncident::select('severity', DB::raw('COUNT(*) as count'))
-            ->whereIn('status', ['submitted', 'reviewed', 'draft'])
-            ->groupBy('severity')
-            ->pluck('count', 'severity');
-
-        // -- Hazard Summary --
-        $hazardSummary = SiteHazard::select('risk_rating', DB::raw('COUNT(*) as count'))
-            ->whereIn('status', ['open', 'in_progress'])
-            ->groupBy('risk_rating')
-            ->pluck('count', 'risk_rating');
-
-        // -- Site Drill Compliance --
-        $siteDrillCompliance = Site::select('id', 'name')
-            ->orderBy('name')
-            ->get()
-            ->map(function ($site) use ($sixMonthsAgo, $now) {
-                $lastDrillAt = EmergencyDrill::where('site_id', $site->id)
-                    ->whereNotNull('completed_at')
-                    ->max('completed_at');
-
-                $lastDrill = $lastDrillAt ? Carbon::parse($lastDrillAt) : null;
-                $daysSince = $lastDrill ? (int) $lastDrill->diffInDays($now) : null;
-
-                if ($lastDrill && $lastDrill->gte($sixMonthsAgo)) {
-                    $status = 'compliant';
-                } elseif ($lastDrill && $lastDrill->gte($sixMonthsAgo->copy()->subMonth())) {
-                    $status = 'due_soon';
-                } else {
-                    $status = 'overdue';
-                }
-
-                return [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'last_drill_date' => $lastDrillAt,
-                    'days_since' => $daysSince,
-                    'status' => $status,
-                ];
-            });
-
-        // -- Recent Activity --
-        $recentIncidents = ClientIncident::select('id', 'type', 'severity', 'status', 'occurred_at', 'title', 'description')
-            ->orderByDesc('occurred_at')
-            ->limit(10)
-            ->get();
-
-        $recentHazards = SiteHazard::with('site:id,name')
-            ->select('id', 'hazard_type', 'risk_rating', 'status', 'site_id', 'created_at')
-            ->orderByDesc('created_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($h) => [
-                'id' => $h->id,
-                'type' => $h->hazard_type,
-                'risk_rating' => $h->risk_rating,
-                'status' => $h->status,
-                'site_name' => $h->site?->name,
-            ]);
-
         // ── H&S Backbone summary (PR5 addition — additive) ──
         $backboneSummary = $this->dashboardService->getDashboardSummary($thirtyDaysAgo);
 
         return Inertia::render('health-safety/dashboard', [
             'kpis' => $kpis,
             'incident_trends' => $incidentTrends,
-            'severity_breakdown' => $severityBreakdown,
-            'hazard_summary' => $hazardSummary,
-            'site_drill_compliance' => $siteDrillCompliance,
-            'recent_incidents' => $recentIncidents,
-            'recent_hazards' => $recentHazards,
-            'recent_fleet_incidents' => FleetIncident::with('asset:id,name')
-                ->select('id', 'incident_type', 'severity', 'status', 'occurred_at', 'location')
-                ->orderByDesc('occurred_at')
-                ->limit(5)
-                ->get(),
             'backbone' => $backboneSummary,
+
+            // ── Command-centre additions — period/site/lens-aware (G3/G4/G5/G6) ──
+            'filters' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'site' => $siteId,
+                'lens' => $lens,
+            ],
+            'lens' => $lens,
+            'sites' => Site::orderBy('name')->get(['id', 'name']),
+            'clients' => Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
+            'staff' => User::query()
+                ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'leading_lagging' => $this->kpiService->leadingLagging($from, $to, $siteId),
+            'frequency_trends' => $this->kpiService->monthlyFrequencyRates(12, $siteId),
+            'worklists' => [
+                'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteId),
+                'open_investigations' => $this->dashboardService->openInvestigations($siteId),
+                'notifiable_events' => $this->dashboardService->notifiableEvents(),
+                'expiring' => $this->dashboardService->expiringFeed($siteId),
+            ],
+            'frequency_operands' => $this->kpiService->nearMissOperands($from, $to, $siteId),
+            'hazard_burndown' => $this->kpiService->hazardBurndown(6, $siteId),
+            'incidents_by_category' => ClientIncident::select('type', DB::raw('COUNT(*) as count'))
+                ->whereBetween('occurred_at', [$from, $to])
+                ->where('type', '!=', 'near_miss')
+                ->when($siteId, fn ($q) => $q->whereHas('shift', fn ($s) => $s->where('site_id', $siteId)))
+                ->groupBy('type')
+                ->orderByDesc('count')
+                ->limit(6)
+                ->get()
+                ->map(fn ($r) => ['label' => $r->type, 'count' => (int) $r->count]),
+            'site_league' => $this->dashboardService->siteLeague($from, $to),
         ]);
     }
 
@@ -243,6 +226,9 @@ class HealthSafetyDashboardController extends Controller
         // -- Site Comparison --
         $sixMonthsAgo = Carbon::now()->subMonths(6);
         $siteComparison = Site::orderBy('name')->get(['id', 'name'])->map(function ($site) use ($from, $to, $sixMonthsAgo) {
+            // NOTE: site_comparison.total_incidents is unscoped (a known bug) — left as-is here
+            // because the concurrent /health-safety/analytics rebuild (branch claude/sharp-hypatia-*)
+            // owns analytics() and fixes it via client.site_id. Avoid a cross-branch conflict.
             $totalIncidents = ClientIncident::whereBetween('occurred_at', [$from, $to])->count();
 
             $openHazards = SiteHazard::where('site_id', $site->id)

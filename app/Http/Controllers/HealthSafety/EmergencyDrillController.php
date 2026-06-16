@@ -135,6 +135,10 @@ class EmergencyDrillController extends Controller
             'created_by' => $request->user()->id,
         ]));
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Emergency drill scheduled successfully.');
+        }
+
         return redirect()->route('health-safety.drills.index')
             ->with('success', 'Emergency drill scheduled successfully.');
     }
