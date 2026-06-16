@@ -362,9 +362,11 @@ function Heatmap({ sites, onCell }: { sites: SiteRow[]; onCell: (s: SiteRow) => 
                             {HEAT_COLS.map(([key, , invert]) => {
                                 const raw = Number(s[key] ?? 0);
                                 const norm = raw / maxes[key as string];
-                                // darker = higher burden; compliance inverts (low compliance = worse)
-                                const burden = invert ? 1 - raw / 100 : norm;
-                                const intensity = 0.1 + 0.62 * Math.min(1, Math.max(0, burden));
+                                // darker = higher burden; compliance inverts (low compliance = worse).
+                                // Bake intensity into the bg COLOUR (not button opacity, which would
+                                // fade the value text below WCAG AA); cap the mix so dark text stays ≥4.5:1.
+                                const burden = Math.min(1, Math.max(0, invert ? 1 - raw / 100 : norm));
+                                const mixPct = Math.round(8 + 44 * burden);
                                 return (
                                     <td key={key as string} className="p-0">
                                         {/* eslint-disable-next-line no-restricted-syntax -- heatmap intensity cell, custom shaded surface */}
@@ -373,9 +375,9 @@ function Heatmap({ sites, onCell }: { sites: SiteRow[]; onCell: (s: SiteRow) => 
                                             onClick={() => onCell(s)}
                                             title={`${s.name} · ${String(key).replace(/_/g, ' ')}: ${fmt(s[key] as number)}`}
                                             className="flex h-9 w-full min-w-[68px] items-center justify-center rounded-md font-semibold tabular-nums text-foreground transition-transform hover:scale-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                            style={{ backgroundColor: 'var(--status-critical)', opacity: intensity }}
+                                            style={{ backgroundColor: `color-mix(in oklab, var(--status-critical) ${mixPct}%, var(--card))` }}
                                         >
-                                            <span style={{ opacity: 1 / Math.max(0.35, intensity) }}>{key === 'compliance_score' ? `${raw}%` : fmt(s[key] as number)}</span>
+                                            {key === 'compliance_score' ? `${raw}%` : fmt(s[key] as number)}
                                         </button>
                                     </td>
                                 );
