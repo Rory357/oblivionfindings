@@ -776,12 +776,10 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                     <GovernanceTab scorecard={scorecard} trends={trends} reportUrl={reportUrl} exportUrl={() => (window.location.href = queryFor('incidents'))} />
                 ) : null}
 
-                {/* hours-worked honesty footnote */}
-                {hours_meta.source !== 'timesheets' ? (
+                {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
+                {hours_meta.total_hours < 1000 ? (
                     <p className="text-[11px] text-muted-foreground">
-                        {hours_meta.source === 'rostered_fallback'
-                            ? 'LTIFR / TRIFR use rostered shift hours (no approved timesheets in this window) — treat as indicative.'
-                            : 'LTIFR / TRIFR need recorded hours-worked data to be truthful for this window.'}
+                        LTIFR / TRIFR need ≥1,000 worked hours in the trailing-12-month basis to report a meaningful rate (standard frequency-rate convention); they show “—” until then.
                     </p>
                 ) : null}
 
@@ -795,7 +793,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                     <span aria-hidden>·</span>
                     <span>ACC</span>
                     <span aria-hidden>·</span>
-                    <span>{Math.round(hours_meta.total_hours).toLocaleString()} hours worked in window</span>
+                    <span>{Math.round(hours_meta.total_hours).toLocaleString()} hours worked (12-month basis)</span>
                 </div>
             </div>
 

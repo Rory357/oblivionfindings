@@ -89,6 +89,14 @@ class HealthSafetyDemoSeeder extends Seeder
             $this->command->info('Worker Participation already seeded, skipping.');
         }
 
+        // ── 7. Governance backbone (investigations + corrective actions) ──
+        if (!DB::table('hs_corrective_actions')->where('description', 'like', '%' . self::DEMO_MARKER . '%')->exists()) {
+            $this->command->info('Seeding Governance backbone (investigations + corrective actions)...');
+            $this->seedGovernanceBacklog($userIds, $now);
+        } else {
+            $this->command->info('Governance backbone already seeded, skipping.');
+        }
+
         $this->command->info('Health & Safety demo data seeded successfully.');
     }
 
@@ -900,5 +908,98 @@ class HealthSafetyDemoSeeder extends Seeder
         }
         DB::table('hs_consultations')->insert($consultations);
         $this->command->info('  -> ' . count($consultations) . ' consultations created.');
+    }
+
+    /* ==================================================================
+     *  7. GOVERNANCE BACKBONE  (investigations + corrective actions)
+     *
+     *  Powers the Overview "Overdue corrective actions" and the Lagging
+     *  "Open investigations" worklists, which read HsCorrectiveAction::overdue()
+     *  and HsInvestigation::active() linked to the HsEvent backbone. Links to
+     *  events that already exist (the demo server has them) rather than creating
+     *  morph-sourced events; skips cleanly if none are present.
+     * ================================================================*/
+    private function seedGovernanceBacklog(array $userIds, Carbon $now): void
+    {
+        $events = DB::table('hs_events')
+            ->orderByRaw('site_id IS NULL') // prefer events that carry a site
+            ->orderByDesc('occurred_at')
+            ->limit(15)
+            ->get(['id', 'site_id', 'client_id', 'staff_id', 'organization_id', 'reference_number'])
+            ->values();
+
+        if ($events->isEmpty()) {
+            $this->command->warn('  -> No HsEvent backbone rows to attach to — skipping investigations + corrective actions.');
+            return;
+        }
+
+        $year = $now->year;
+
+        // ── Investigations (all active; #1 and #4 past-due → flagged overdue) ──
+        $investigationConfigs = [
+            ['type' => 'standard', 'status' => 'in_progress',       'methodology' => '5_whys',   'targetOffset' => -2, 'startedDaysAgo' => 6],
+            ['type' => 'full',     'status' => 'under_review',      'methodology' => 'icam',     'targetOffset' => 4,  'startedDaysAgo' => 11],
+            ['type' => 'standard', 'status' => 'findings_recorded', 'methodology' => 'fishbone', 'targetOffset' => 9,  'startedDaysAgo' => 4],
+            ['type' => 'standard', 'status' => 'in_progress',       'methodology' => '5_whys',   'targetOffset' => -6, 'startedDaysAgo' => 9],
+        ];
+
+        $investigationRows = [];
+        foreach ($investigationConfigs as $i => $c) {
+            $event = $events[$i % $events->count()];
+            $startedAt = $now->copy()->subDays($c['startedDaysAgo']);
+            $investigationRows[] = [
+                'hs_event_id'            => $event->id,
+                'organization_id'        => $event->organization_id,
+                'reference_number'       => "INV-{$year}-" . str_pad(9001 + $i, 4, '0', STR_PAD_LEFT),
+                'investigation_type'     => $c['type'],
+                'status'                 => $c['status'],
+                'methodology'            => $c['methodology'],
+                'lead_investigator_id'   => $userIds[array_rand($userIds)],
+                'team_member_ids'        => json_encode(array_slice($userIds, 0, min(3, count($userIds)))),
+                'started_at'             => $startedAt,
+                'target_completion_date' => $now->copy()->addDays($c['targetOffset'])->toDateString(),
+                'findings_summary'       => 'Investigation underway — interim findings being collated. ' . self::DEMO_MARKER,
+                'created_by'             => $userIds[0],
+                'created_at'             => $startedAt,
+                'updated_at'             => $now,
+            ];
+        }
+        DB::table('hs_investigations')->insert($investigationRows);
+
+        // ── Corrective actions (4 overdue + 2 upcoming) ──
+        $caConfigs = [
+            ['title' => 'Replace worn stair tread — main stairwell',  'priority' => 'high',   'status' => 'open',        'dueOffset' => -2],
+            ['title' => 'Update lone-worker check-in procedure',      'priority' => 'high',   'status' => 'in_progress', 'dueOffset' => -5],
+            ['title' => 'Service ceiling hoist (room 4)',             'priority' => 'medium', 'status' => 'open',        'dueOffset' => -1],
+            ['title' => 'Re-train staff on medication double-check',  'priority' => 'high',   'status' => 'open',        'dueOffset' => -8],
+            ['title' => 'Install anti-slip matting at main entrance', 'priority' => 'medium', 'status' => 'in_progress', 'dueOffset' => 6],
+            ['title' => 'Review chemical storage SDS folder',         'priority' => 'low',    'status' => 'open',        'dueOffset' => 14],
+        ];
+
+        $caRows = [];
+        foreach ($caConfigs as $i => $c) {
+            $event = $events[$i % $events->count()];
+            $assignedAt = $now->copy()->subDays(rand(7, 30));
+            $caRows[] = [
+                'hs_event_id'         => $event->id,
+                'organization_id'     => $event->organization_id,
+                'reference_number'    => "CA-{$year}-" . str_pad(9001 + $i, 4, '0', STR_PAD_LEFT),
+                'action_type'         => 'corrective',
+                'priority'            => $c['priority'],
+                'title'               => $c['title'],
+                'description'         => 'Corrective action arising from event ' . ($event->reference_number ?: ('#' . $event->id)) . '. ' . self::DEMO_MARKER,
+                'status'              => $c['status'],
+                'assigned_to_user_id' => $userIds[array_rand($userIds)],
+                'assigned_by_user_id' => $userIds[0],
+                'assigned_at'         => $assignedAt,
+                'due_date'            => $now->copy()->addDays($c['dueOffset'])->toDateString(),
+                'created_by'          => $userIds[0],
+                'created_at'          => $assignedAt,
+                'updated_at'          => $now,
+            ];
+        }
+        DB::table('hs_corrective_actions')->insert($caRows);
+
+        $this->command->info('  -> ' . count($investigationRows) . ' investigations + ' . count($caRows) . ' corrective actions created.');
     }
 }

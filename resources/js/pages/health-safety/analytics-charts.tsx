@@ -200,8 +200,8 @@ export function LtifrTrifrChart({ trends, height = 240 }: { trends: TrendPoint[]
             <ComposedChart data={trends} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
                 <defs>
                     <linearGradient id="ltifr-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={TOKEN.primary} stopOpacity={0.26} />
-                        <stop offset="100%" stopColor={TOKEN.primary} stopOpacity={0.01} />
+                        <stop offset="0%" stopColor={TOKEN.warning} stopOpacity={0.26} />
+                        <stop offset="100%" stopColor={TOKEN.warning} stopOpacity={0.01} />
                     </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={TOKEN.grid} vertical={false} />
@@ -213,11 +213,11 @@ export function LtifrTrifrChart({ trends, height = 240 }: { trends: TrendPoint[]
                     type="monotone"
                     dataKey="ltifr"
                     name="LTIFR"
-                    stroke={TOKEN.primary}
+                    stroke={TOKEN.warning}
                     strokeWidth={2.5}
                     fill="url(#ltifr-grad)"
                     connectNulls
-                    dot={lastBigDot(TOKEN.primary, trends.length)}
+                    dot={lastBigDot(TOKEN.warning, trends.length)}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
                 />
@@ -225,10 +225,10 @@ export function LtifrTrifrChart({ trends, height = 240 }: { trends: TrendPoint[]
                     type="monotone"
                     dataKey="trifr"
                     name="TRIFR"
-                    stroke={TOKEN.c2}
+                    stroke={TOKEN.critical}
                     strokeWidth={2}
                     connectNulls
-                    dot={lastBigDot(TOKEN.c2, trends.length)}
+                    dot={lastBigDot(TOKEN.critical, trends.length)}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
                 />

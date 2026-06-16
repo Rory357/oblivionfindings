@@ -143,6 +143,10 @@ class LoneWorkerController extends Controller
             'updated_by' => $request->user()->id,
         ]));
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Lone worker session started successfully.');
+        }
+
         return redirect()->route('health-safety.lone-workers.index')
             ->with('success', 'Lone worker session started successfully.');
     }

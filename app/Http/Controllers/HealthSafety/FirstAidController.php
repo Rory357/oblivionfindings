@@ -84,6 +84,10 @@ class FirstAidController extends Controller
 
         FirstAidRecord::create($validated);
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'First aid record created.');
+        }
+
         return redirect()->route('health-safety.first-aid.index')
             ->with('success', 'First aid record created.');
     }

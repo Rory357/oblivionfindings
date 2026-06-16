@@ -99,6 +99,10 @@ class RestraintController extends Controller
 
         RestraintEvent::create($validated);
 
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Restraint event recorded.');
+        }
+
         return redirect()->route('health-safety.restraints.index')
             ->with('success', 'Restraint event recorded.');
     }

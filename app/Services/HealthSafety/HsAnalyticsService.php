@@ -11,12 +11,10 @@ use App\Models\HsCorrectiveAction;
 use App\Models\SiteHazard;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
-use App\Models\Timesheet;
 use App\Models\WorkplaceInjury;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Builds the Health & Safety Analytics payload — trend / root-cause /
@@ -30,18 +28,19 @@ use Illuminate\Support\Facades\DB;
  * Data sources are verified in docs/HEALTH_SAFETY_ANALYTICS_BACKEND_AUDIT.md.
  * No invented schema — every series maps to a real column.
  *
- * Honesty rule (audit §9): LTIFR is truthful (lost_time_days > 0 over real
- * timesheet hours). TRIFR uses a documented "recordable" heuristic because
- * workplace_injuries has no clean recordable flag. When hours = 0 for a
- * period the rate is null (UI shows "needs hours data"), never a fake number.
+ * Frequency rates (LTIFR/TRIFR), the leading-vs-lagging scorecard and the
+ * hours-worked basis are delegated to {@see HsKpiService} so this page and the
+ * H&S dashboard report identical numbers (same BillingEntry hours denominator
+ * + the MIN_RATE_HOURS floor that prevents one injury extrapolating to a
+ * six-figure rate; rates return null — UI shows "—" — below that floor). This
+ * service owns the analytics-only series: monthly trends, root-cause Pareto,
+ * hazard burn-down, breakdowns, the site league and CSV/JSON exports.
  */
 class HsAnalyticsService
 {
-    /** Recordable-injury heuristic for TRIFR (audit §9). */
-    private const RECORDABLE_TREATMENT = ['medical_centre', 'hospital', 'ambulance'];
-
-    /** Timesheet statuses that count as confirmed worked hours. */
-    private const HOURS_STATUSES = ['submitted', 'approved'];
+    public function __construct(
+        private readonly HsKpiService $kpi,
+    ) {}
 
     /**
      * @param  int|null  $siteId  null = all sites
@@ -58,12 +57,13 @@ class HsAnalyticsService
         $trendFrom = $from->copy()->startOfMonth()->min($to->copy()->subMonths(11)->startOfMonth());
         $months = $this->monthsBetween($trendFrom, $to);
 
-        $hours = $this->hoursByMonth($siteId, $trendFrom, $to, $months);
-        $trends = $this->buildTrends($siteId, $trendFrom, $to, $months, $hours['by_month']);
+        // LTIFR/TRIFR come from HsKpiService (shared with the dashboard). Map
+        // its rolling 12-month series onto our month list by 'Y-m' key.
+        $freq = collect($this->kpi->monthlyFrequencyRates(count($months), $siteId))->keyBy('month');
+        $trends = $this->buildTrends($siteId, $trendFrom, $to, $months, $freq);
 
-        $windowHours = $this->windowHours($siteId, $from, $to);
-        $heroStats = $this->heroStats($siteId, $from, $to, $windowHours, $trends);
-        $scorecard = $this->scorecard($siteId, $from, $to, $heroStats, $trends);
+        $heroStats = $this->heroStats($siteId, $from, $to, $trends);
+        $scorecard = $this->scorecard($siteId, $from, $to, $trends);
 
         return [
             'incident_data' => $this->incidentsByType($siteId, $from, $to),
@@ -81,8 +81,8 @@ class HsAnalyticsService
             'period_summary' => $this->periodSummary($siteId, $from, $to),
             'worksafe_notifiable' => $this->worksafeTotals($from, $to),
             'hours_meta' => [
-                'source' => $hours['source'],
-                'total_hours' => round($windowHours, 0),
+                'source' => 'billing_entries',
+                'total_hours' => round($this->kpi->totalHoursWorked(null, null, $siteId), 0),
             ],
             'role_note' => $this->roleNote($lens),
         ];
@@ -92,14 +92,11 @@ class HsAnalyticsService
 
     /**
      * @param  array<int,string>  $months
-     * @param  array<string,float>  $hoursByMonth
+     * @param  Collection<string,array{month:string,ltifr:float|null,trifr:float|null}>  $freq
      * @return array<int,array<string,mixed>>
      */
-    private function buildTrends(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $months, array $hoursByMonth): array
+    private function buildTrends(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $months, Collection $freq): array
     {
-        $lti = $this->injuryCountsByMonth($siteId, $from, $to, lostTimeOnly: true);
-        $recordable = $this->injuryCountsByMonth($siteId, $from, $to, recordableOnly: true);
-
         $incidents = $this->incidentCountsByMonth($siteId, $from, $to);
         $hazOpened = $this->hazardOpenedByMonth($siteId, $from, $to);
         $hazClosed = $this->hazardClosedByMonth($siteId, $from, $to);
@@ -112,21 +109,19 @@ class HsAnalyticsService
         $worksafe = $this->worksafeByMonth($from, $to);
 
         return collect($months)->map(function (string $m) use (
-            $hoursByMonth, $lti, $recordable, $incidents, $hazOpened, $hazClosed,
+            $freq, $incidents, $hazOpened, $hazClosed,
             $runningOpen, $ca, $compliance, $engagement, $consultation, $worksafe
         ) {
-            $hrs = $hoursByMonth[$m] ?? 0.0;
-            $ltiN = $lti[$m] ?? 0;
-            $recN = $recordable[$m] ?? 0;
             $inc = $incidents[$m] ?? ['total' => 0, 'near_miss' => 0];
             $nm = $inc['near_miss'];
             $other = max($inc['total'] - $nm, 0);
+            $rates = $freq->get($m) ?? [];
 
             return [
                 'month' => $m,
                 'label' => Carbon::parse($m.'-01')->format('M y'),
-                'ltifr' => $hrs > 0 ? round($ltiN * 1_000_000 / $hrs, 1) : null,
-                'trifr' => $hrs > 0 ? round($recN * 1_000_000 / $hrs, 1) : null,
+                'ltifr' => $rates['ltifr'] ?? null,
+                'trifr' => $rates['trifr'] ?? null,
                 'incidents' => $inc['total'],
                 'near_miss_ratio' => $other > 0 ? round($nm / $other, 1) : ($nm > 0 ? (float) $nm : 0.0),
                 'hazards_opened' => $hazOpened[$m] ?? 0,
@@ -143,89 +138,7 @@ class HsAnalyticsService
         })->all();
     }
 
-    // ── Hours worked (LTIFR/TRIFR denominator) ──────────────────────────
-
-    /**
-     * @param  array<int,string>  $months
-     * @return array{by_month: array<string,float>, source: string}
-     */
-    private function hoursByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $months): array
-    {
-        $ts = Timesheet::query()
-            ->whereIn('status', self::HOURS_STATUSES)
-            ->whereBetween('work_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->selectRaw("DATE_FORMAT(work_date, '%Y-%m') as m, SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0), 0)) as mins")
-            ->groupBy('m')
-            ->pluck('mins', 'm');
-
-        if ($ts->sum() > 0) {
-            return ['by_month' => $ts->map(fn ($mins) => (float) $mins / 60)->all(), 'source' => 'timesheets'];
-        }
-
-        // Fallback: rostered shift hours (flagged honestly in the payload).
-        // `shifts` is not soft-deletable (no deleted_at column).
-        $shifts = DB::table('shifts')
-            ->whereBetween('starts_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->selectRaw("DATE_FORMAT(starts_at, '%Y-%m') as m, SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(expected_break_minutes, 0), 0)) as mins")
-            ->groupBy('m')
-            ->pluck('mins', 'm');
-
-        return [
-            'by_month' => $shifts->map(fn ($mins) => (float) $mins / 60)->all(),
-            'source' => $shifts->sum() > 0 ? 'rostered_fallback' : 'none',
-        ];
-    }
-
-    private function windowHours(?int $siteId, CarbonInterface $from, CarbonInterface $to): float
-    {
-        $mins = Timesheet::query()
-            ->whereIn('status', self::HOURS_STATUSES)
-            ->whereBetween('work_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->selectRaw('SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0), 0)) as mins')
-            ->value('mins');
-
-        if ((float) $mins > 0) {
-            return (float) $mins / 60;
-        }
-
-        $shiftMins = DB::table('shifts')
-            ->whereBetween('starts_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->selectRaw('SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(expected_break_minutes, 0), 0)) as mins')
-            ->value('mins');
-
-        return (float) ($shiftMins ?? 0) / 60;
-    }
-
     // ── Injuries ────────────────────────────────────────────────────────
-
-    /** @return array<string,int> month => count */
-    private function injuryCountsByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to, bool $lostTimeOnly = false, bool $recordableOnly = false): array
-    {
-        return WorkplaceInjury::query()
-            ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->when($lostTimeOnly, fn ($q) => $q->where('lost_time_days', '>', 0))
-            ->when($recordableOnly, fn ($q) => $this->applyRecordable($q))
-            ->selectRaw("DATE_FORMAT(injury_date, '%Y-%m') as m, COUNT(*) as c")
-            ->groupBy('m')
-            ->pluck('c', 'm')
-            ->map(fn ($c) => (int) $c)
-            ->all();
-    }
-
-    /** Recordable = lost-time OR notifiable OR medical-treatment-beyond-first-aid (audit §9). */
-    private function applyRecordable($query)
-    {
-        return $query->where(function ($q) {
-            $q->where('lost_time_days', '>', 0)
-                ->orWhere('worksafe_notifiable', true)
-                ->orWhereIn('medical_treatment_type', self::RECORDABLE_TREATMENT);
-        });
-    }
 
     /** @return array<int,array{type:string,count:int}> */
     private function injuriesByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
@@ -573,32 +486,11 @@ class HsAnalyticsService
             ->selectRaw('site_id, SUM(lost_time_days) as d')
             ->pluck('d', 'site_id');
 
-        $ltiBySite = WorkplaceInjury::query()
-            ->where('lost_time_days', '>', 0)
-            ->whereBetween('injury_date', [$from, $to])
-            ->groupBy('site_id')
-            ->selectRaw('site_id, COUNT(*) as c')
-            ->pluck('c', 'site_id');
-
-        $recBySite = $this->applyRecordable(WorkplaceInjury::query())
-            ->whereBetween('injury_date', [$from, $to])
-            ->groupBy('site_id')
-            ->selectRaw('site_id, COUNT(*) as c')
-            ->pluck('c', 'site_id');
-
-        $hoursBySite = Timesheet::query()
-            ->whereIn('status', self::HOURS_STATUSES)
-            ->whereBetween('work_date', [$from, $to])
-            ->groupBy('site_id')
-            ->selectRaw('site_id, SUM(GREATEST(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0), 0)) as mins')
-            ->pluck('mins', 'site_id');
-
         $drillBySite = $this->drillStatusBySite();
 
         return Site::query()->orderBy('name')->get(['id', 'name'])->map(function ($site) use (
-            $incidentsBySite, $openHazardsBySite, $lostDaysBySite, $ltiBySite, $recBySite, $hoursBySite, $drillBySite
+            $incidentsBySite, $openHazardsBySite, $lostDaysBySite, $drillBySite
         ) {
-            $hours = (float) ($hoursBySite[$site->id] ?? 0) / 60;
             $incidents = (int) ($incidentsBySite[$site->id] ?? 0);
             $openHazards = (int) ($openHazardsBySite[$site->id] ?? 0);
             $drillStatus = $drillBySite[$site->id] ?? 'overdue';
@@ -614,8 +506,10 @@ class HsAnalyticsService
                 'total_incidents' => $incidents,
                 'open_hazards' => $openHazards,
                 'lost_time_days' => (int) ($lostDaysBySite[$site->id] ?? 0),
-                'ltifr' => $hours > 0 ? round((int) ($ltiBySite[$site->id] ?? 0) * 1_000_000 / $hours, 1) : null,
-                'trifr' => $hours > 0 ? round((int) ($recBySite[$site->id] ?? 0) * 1_000_000 / $hours, 1) : null,
+                // Per-site LTIFR/TRIFR from HsKpiService (12-month annualised
+                // basis, BillingEntry hours, floored) — identical to the dashboard.
+                'ltifr' => $this->kpi->ltifr(null, null, $site->id),
+                'trifr' => $this->kpi->trifr(null, null, $site->id),
                 'drill_status' => $drillStatus,
                 'compliance_score' => max(0, $score),
             ];
@@ -648,39 +542,26 @@ class HsAnalyticsService
      * @param  array<int,array<string,mixed>>  $trends
      * @return array<string,mixed>
      */
-    private function heroStats(?int $siteId, CarbonInterface $from, CarbonInterface $to, float $windowHours, array $trends): array
+    private function heroStats(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
     {
-        $lti = (int) WorkplaceInjury::query()->where('lost_time_days', '>', 0)
-            ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count();
-        $rec = (int) $this->applyRecordable(WorkplaceInjury::query())
-            ->whereBetween('injury_date', [$from, $to])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count();
-
-        $nm = (int) ClientIncident::query()->where('type', 'near_miss')
-            ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))->count();
-        $other = (int) ClientIncident::query()->where('type', '!=', 'near_miss')
-            ->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))->count();
-
-        $latestCompliance = collect($trends)->reverse()->firstWhere('compliance_pct', '!==', null)['compliance_pct'] ?? null;
-
+        // Headline frequency/leading numbers come from HsKpiService so they
+        // match the dashboard exactly (12-month annualised basis + floor); the
+        // delta is the month-over-month direction from our own trend series.
         return [
             'ltifr' => array_merge(
-                ['value' => $windowHours > 0 ? round($lti * 1_000_000 / $windowHours, 1) : null],
+                ['value' => $this->kpi->ltifr(null, null, $siteId)],
                 $this->deltaFor($trends, 'ltifr', lowerIsBetter: true)
             ),
             'trifr' => array_merge(
-                ['value' => $windowHours > 0 ? round($rec * 1_000_000 / $windowHours, 1) : null],
+                ['value' => $this->kpi->trifr(null, null, $siteId)],
                 $this->deltaFor($trends, 'trifr', lowerIsBetter: true)
             ),
             'near_miss_ratio' => array_merge(
-                ['value' => $other > 0 ? round($nm / $other, 1) : (float) $nm],
+                ['value' => $this->kpi->nearMissToIncidentRatio($from, $to, $siteId)],
                 $this->deltaFor($trends, 'near_miss_ratio', lowerIsBetter: false)
             ),
             'compliance_pct' => array_merge(
-                ['value' => $latestCompliance],
+                ['value' => $this->kpi->trainingAuditCompliancePct()],
                 $this->deltaFor($trends, 'compliance_pct', lowerIsBetter: false)
             ),
         ];
@@ -713,43 +594,41 @@ class HsAnalyticsService
     }
 
     /**
-     * Leading-vs-lagging scorecard (board-ready).
+     * Leading-vs-lagging scorecard (board-ready). The shared numbers come from
+     * HsKpiService->leadingLagging() so they match the dashboard exactly; the
+     * month-over-month delta direction comes from our own trend series.
      *
-     * @param  array<string,mixed>  $heroStats
      * @param  array<int,array<string,mixed>>  $trends
      * @return array{leading:array<int,array<string,mixed>>,lagging:array<int,array<string,mixed>>}
      */
-    private function scorecard(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $heroStats, array $trends): array
+    private function scorecard(?int $siteId, CarbonInterface $from, CarbonInterface $to, array $trends): array
     {
+        $ll = $this->kpi->leadingLagging($from, $to, $siteId);
+        $lag = $ll['lagging'];
+        $lead = $ll['leading'];
         $latest = collect($trends)->last() ?? [];
 
-        $openHazards = (int) SiteHazard::query()->whereIn('status', ['open', 'in_progress'])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count();
-        $incidents = (int) ClientIncident::query()->whereBetween('occurred_at', [$from, $to])
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))->count();
         $lostDays = (int) WorkplaceInjury::query()->whereBetween('injury_date', [$from, $to])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->sum('lost_time_days');
 
-        $lastLti = WorkplaceInjury::query()->where('lost_time_days', '>', 0)
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->max('injury_date');
-        $daysSinceLti = $lastLti ? (int) Carbon::parse($lastLti)->diffInDays(Carbon::now()) : null;
+        $d = fn (string $key, bool $lower): array => $this->deltaFor($trends, $key, $lower);
 
         $leading = [
-            ['key' => 'near_miss_ratio', 'label' => 'Near-miss reporting ratio', 'value' => $heroStats['near_miss_ratio']['value'], 'suffix' => ':1', 'delta' => $heroStats['near_miss_ratio']['delta'], 'dir' => $heroStats['near_miss_ratio']['dir']],
-            ['key' => 'ca_pct_on_time', 'label' => 'Corrective actions on time', 'value' => $latest['ca_pct_on_time'] ?? null, 'suffix' => '%', 'delta' => $this->deltaFor($trends, 'ca_pct_on_time', false)['delta'], 'dir' => $this->deltaFor($trends, 'ca_pct_on_time', false)['dir']],
-            ['key' => 'compliance_pct', 'label' => 'Training & audit compliance', 'value' => $heroStats['compliance_pct']['value'], 'suffix' => '%', 'delta' => $heroStats['compliance_pct']['delta'], 'dir' => $heroStats['compliance_pct']['dir']],
-            ['key' => 'worker_engagement', 'label' => 'Worker participation', 'value' => $latest['worker_engagement'] ?? null, 'suffix' => '%', 'delta' => $this->deltaFor($trends, 'worker_engagement', false)['delta'], 'dir' => $this->deltaFor($trends, 'worker_engagement', false)['dir']],
-            ['key' => 'hazards_open', 'label' => 'Open hazards', 'value' => $openHazards, 'suffix' => '', 'delta' => $this->deltaFor($trends, 'hazards_open', true)['delta'], 'dir' => $this->deltaFor($trends, 'hazards_open', true)['dir']],
-            ['key' => 'worker_consultation', 'label' => 'Consultation completion', 'value' => $latest['worker_consultation'] ?? null, 'suffix' => '%', 'delta' => $this->deltaFor($trends, 'worker_consultation', false)['delta'], 'dir' => $this->deltaFor($trends, 'worker_consultation', false)['dir']],
+            ['key' => 'near_miss_ratio', 'label' => 'Near-miss reporting ratio', 'value' => $lead['near_miss_ratio'], 'suffix' => ':1', ...$d('near_miss_ratio', false)],
+            ['key' => 'actions_on_time_pct', 'label' => 'Corrective actions on time', 'value' => $lead['actions_on_time_pct'], 'suffix' => '%', ...$d('ca_pct_on_time', false)],
+            ['key' => 'training_pct', 'label' => 'Training & audit compliance', 'value' => $lead['training_pct'], 'suffix' => '%', ...$d('compliance_pct', false)],
+            ['key' => 'worker_engagement', 'label' => 'Worker participation', 'value' => $latest['worker_engagement'] ?? null, 'suffix' => '%', ...$d('worker_engagement', false)],
+            ['key' => 'open_hazards', 'label' => 'Open hazards', 'value' => $lead['open_hazards'], 'suffix' => '', ...$d('hazards_open', true)],
+            ['key' => 'worker_consultation', 'label' => 'Consultation completion', 'value' => $latest['worker_consultation'] ?? null, 'suffix' => '%', ...$d('worker_consultation', false)],
         ];
 
         $lagging = [
-            ['key' => 'ltifr', 'label' => 'LTIFR', 'value' => $heroStats['ltifr']['value'], 'suffix' => '', 'delta' => $heroStats['ltifr']['delta'], 'dir' => $heroStats['ltifr']['dir']],
-            ['key' => 'trifr', 'label' => 'TRIFR', 'value' => $heroStats['trifr']['value'], 'suffix' => '', 'delta' => $heroStats['trifr']['delta'], 'dir' => $heroStats['trifr']['dir']],
-            ['key' => 'incidents', 'label' => 'Incidents', 'value' => $incidents, 'suffix' => '', 'delta' => $this->deltaFor($trends, 'incidents', true)['delta'], 'dir' => $this->deltaFor($trends, 'incidents', true)['dir']],
+            ['key' => 'ltifr', 'label' => 'LTIFR', 'value' => $lag['ltifr'], 'suffix' => '', ...$d('ltifr', true)],
+            ['key' => 'trifr', 'label' => 'TRIFR', 'value' => $lag['trifr'], 'suffix' => '', ...$d('trifr', true)],
+            ['key' => 'incidents', 'label' => 'Incidents', 'value' => $lag['incidents'], 'suffix' => '', ...$d('incidents', true)],
+            ['key' => 'injury_severity_rate', 'label' => 'Injury severity rate', 'value' => $lag['injury_severity_rate'], 'suffix' => '', 'delta' => null, 'dir' => 'flat'],
             ['key' => 'lost_time_days', 'label' => 'Lost-time days', 'value' => $lostDays, 'suffix' => '', 'delta' => null, 'dir' => 'flat'],
-            ['key' => 'days_since_lti', 'label' => 'Days since last LTI', 'value' => $daysSinceLti, 'suffix' => 'd', 'delta' => null, 'dir' => 'flat'],
-            ['key' => 'worksafe_awaiting', 'label' => 'WorkSafe awaiting', 'value' => $this->worksafeTotals($from, $to)['awaiting'], 'suffix' => '', 'delta' => null, 'dir' => 'flat'],
+            ['key' => 'days_since_lti', 'label' => 'Days since last LTI', 'value' => $lag['days_since_lti'], 'suffix' => 'd', 'delta' => null, 'dir' => 'flat'],
         ];
 
         return ['leading' => $leading, 'lagging' => $lagging];

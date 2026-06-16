@@ -8,6 +8,7 @@ use App\Models\ClientIncidentAttachment;
 use App\Models\IncidentTemplate;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -141,7 +142,7 @@ class IncidentController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, NotifiableEventClassifier $classifier)
     {
         abort_unless($request->user()?->canDo('incidents.create'), 403);
 
@@ -172,7 +173,21 @@ class IncidentController extends Controller
 
             // WorkSafe
             'is_notifiable' => ['sometimes', 'boolean'],
+            'site_preserved' => ['sometimes', 'boolean'],
+            'worksafe_reference' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Server-side notifiable enforcement (NZ HSWA, G2) — escalate-only: a
+        // hospitalisation / ambulance treatment, or a "notifiable" injury classification,
+        // forces the WorkSafe-notifiable flag regardless of the client-side determination.
+        $harmProxy = in_array($data['medical_treatment_type'] ?? null, ['hospital', 'ambulance'], true)
+            ? NotifiableEventClassifier::HARM_HOSPITALISATION
+            : null;
+        $severityProxy = ($data['injury_classification'] ?? null) === 'notifiable'
+            ? NotifiableEventClassifier::SEVERITY_CRITICAL
+            : null;
+        $isNotifiable = $classifier->isNotifiable($harmProxy, $severityProxy)
+            || (bool) ($data['is_notifiable'] ?? false);
 
         $client = Client::query()->findOrFail($data['client_id']);
         $this->authorize('view', $client);
@@ -216,7 +231,10 @@ class IncidentController extends Controller
             'medical_treatment_type' => $data['medical_treatment_type'] ?? null,
 
             // WorkSafe
-            'is_notifiable' => (bool)($data['is_notifiable'] ?? false),
+            'is_notifiable' => $isNotifiable,
+            'site_preserved' => (bool) ($data['site_preserved'] ?? false),
+            'worksafe_reference' => $data['worksafe_reference'] ?? null,
+            'worksafe_notification_status' => $isNotifiable ? 'pending' : null,
         ]);
 
         // Auto-escalate abuse/neglect incidents to safeguarding
@@ -255,6 +273,12 @@ class IncidentController extends Controller
                     'include_assigned_workers' => false,
                 ]
             );
+        }
+
+        // In-place wizard (e.g. the H&S command-centre Report flow): stay on the
+        // referring page so its props refresh and the success pane can show.
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Incident recorded.');
         }
 
         if ($request->boolean('continue_wizard')) {
