@@ -360,9 +360,22 @@ export default function Medications(props: Props) {
                     </div>
 
                     {visible.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 px-5 py-14 text-center text-sm text-muted-foreground">
-                            <Pill className="h-6 w-6" />
-                            No medications match these filters.
+                        <div className="flex flex-col items-center gap-3 px-5 py-16 text-center">
+                            <span className="grid h-12 w-12 place-items-center rounded-full bg-muted text-muted-foreground">
+                                <Pill className="h-6 w-6" />
+                            </span>
+                            <div className="text-sm font-medium">
+                                {medications.length === 0 ? 'No medications in the register yet.' : 'No medications match these filters.'}
+                            </div>
+                            <p className="max-w-sm text-xs text-muted-foreground">
+                                {medications.length === 0
+                                    ? 'Chart the first medication order to start the register.'
+                                    : 'Try clearing the search, site or client filters — or chart a new order.'}
+                            </p>
+                            <Button onClick={() => setModal({ type: 'add' })}>
+                                <Plus className="h-4 w-4" />
+                                Add medication
+                            </Button>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
