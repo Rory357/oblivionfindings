@@ -463,16 +463,20 @@ class SafeguardingConcernController extends Controller
             return back()->withErrors(['close' => 'This concern is already closed.']);
         }
 
-        // W7: soft-block closure while investigations or action-plan items are
-        // still open — allowed only with an explicit override reason.
-        if ($lifecycle->hasOpenWork($concern) && blank($validated['override_reason'] ?? null)) {
+        // W7: soft-block closure while investigations / action-plan items are still
+        // open, or a referral was indicated but never logged — allowed only with an
+        // explicit override reason. (Subject-not-informed is a warning, not a block.)
+        $referralUnlogged = $concern->requires_external_referral && $concern->externalReports()->count() === 0;
+        $needsOverride = $lifecycle->hasOpenWork($concern) || $referralUnlogged;
+
+        if ($needsOverride && blank($validated['override_reason'] ?? null)) {
             return back()->withErrors([
-                'override_reason' => 'There is open work on this concern. Give a reason to close it anyway.',
+                'override_reason' => 'Open work or an unlogged referral remains — record why you are closing anyway.',
             ]);
         }
 
         $closureSummary = $validated['closure_summary'];
-        if ($lifecycle->hasOpenWork($concern) && filled($validated['override_reason'] ?? null)) {
+        if ($needsOverride && filled($validated['override_reason'] ?? null)) {
             $closureSummary .= "\n\nClosed with open work. Override reason: " . trim($validated['override_reason']);
         }
 

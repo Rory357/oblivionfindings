@@ -16,8 +16,8 @@
 | 2 | Lifecycle guards + triage action — transition guard + gates on `updateStatus`/`close` (W3/W6/W7); dedicated `triage` (W4) | ✅ done | `a78358cd` |
 | 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | ✅ done | _(this commit)_ |
 | 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | ✅ done (4a `8a6ed4c7` + 4b action panes) | 4b _(this commit)_ |
-| 5 | Triage modal + gated Close modal | in-progress (next) | — |
-| 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | todo | — |
+| 5 | Triage modal + gated Close modal | ✅ done | _(this commit)_ |
+| 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | in-progress (next) | — |
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | todo | — |
 | 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | todo | — |
 
@@ -89,6 +89,17 @@ steps 1, 7, (maybe) 8.
   investigation guard + triaged-advances + risk/report store). tsc/eslint/build green; 20 tests green.
   **Triage + Close NOT in the Options bar yet → Step 5** adds them (prototype-faithful decision screen +
   gated close checklist).
+- 2026-06-17 — **Step 5 done.** `TriagePane` (W4): substantiate `TilePicker` (Substantiated/Needs
+  enquiry/Not substantiated) · initial-risk `Segmented` · lead `SelectInput` · path `TilePicker`
+  (Investigate/Refer/No further action) with refer/investigate InfoCards + required rationale on no-action;
+  adaptive submit; posts `/triage`. `ClosePane` (W7): 4-item closure checklist computed from `detail`
+  (investigations · actions · subject-informed[warn] · referral), soft-block (override-reason required)
+  when investigations/actions open **or referral indicated+unlogged**, closure_summary required, lessons
+  optional, subject-not-informed warning; posts `/close`. Options bar: primary **Triage** when reported
+  (+ Overview "Triage now" CTA), **Close** when past triage. Backend `@close` extended so the soft-block
+  also fires on an unlogged-but-indicated referral (matches the prototype's `closeChecks` gating) +
+  lifecycle test. tsc/eslint/build green; 13 lifecycle tests green. **The lifecycle is now fully drivable
+  from the modal.** Step 6 = raise wizard (retire create/edit.tsx).
 
 ## Shared-file edits (watch at integration / merge time)
 - _(none yet)_

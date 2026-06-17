@@ -57,6 +57,13 @@ place (same `onSuccessGuard` idiom as `ActionPane`/`EditPane`). Safeguarding del
 (assign/risk/investigation/referral/action) + direct mark-informed. **No inconsistencies found; no shared
 primitives modified.**
 
+### Step 5 (Triage + gated Close panes) — matched 1:1
+Same `ActionPane`-on-`WizardShell` idiom + `useForm` + `back()`/flash-guard. Triage uses the shared
+`TilePicker` (substantiate + path) + `Segmented` (risk) + `SelectInput` (lead) + `InfoCard` path notes;
+Close uses a computed checklist + `InfoCard` warnings + `Field`/`Textarea`/`Input`. These two surfaces are
+Safeguarding-specific (Incidents has review/close/reopen instead) but built entirely on the same wizard
+primitives, so they read as one product. **No inconsistencies found; no shared primitives modified.**
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - _(none yet)_
 

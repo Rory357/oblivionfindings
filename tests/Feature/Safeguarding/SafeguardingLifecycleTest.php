@@ -297,4 +297,26 @@ class SafeguardingLifecycleTest extends TestCase
         $this->assertNotNull($concern->closed_at);
         $this->assertSame($this->user->id, $concern->closed_by_user_id);
     }
+
+    public function test_close_is_soft_blocked_when_referral_indicated_but_unlogged(): void
+    {
+        // No open investigations/actions, but a referral was indicated and never logged.
+        $concern = SafeguardingConcern::factory()->create([
+            'status' => 'monitoring',
+            'requires_external_referral' => true,
+        ]);
+
+        $this->actingAs($this->user)
+            ->post("/safeguarding/{$concern->id}/close", ['closure_summary' => 'Closing.'])
+            ->assertSessionHasErrors('override_reason');
+        $this->assertSame('monitoring', $concern->fresh()->status);
+
+        $this->actingAs($this->user)
+            ->post("/safeguarding/{$concern->id}/close", [
+                'closure_summary' => 'Closing.',
+                'override_reason' => 'Referral handled verbally with the duty officer; logging not required.',
+            ])
+            ->assertRedirect();
+        $this->assertSame('closed', $concern->fresh()->status);
+    }
 }

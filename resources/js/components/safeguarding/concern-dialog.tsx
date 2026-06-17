@@ -2,13 +2,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
+import { Field, InfoCard, Segmented, SelectInput, StepHead, TilePicker } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
+    AlertTriangle,
     BadgeCheck,
     CheckCircle2,
+    CircleSlash,
     ClipboardCheck,
     Clock,
     ExternalLink,
@@ -17,7 +19,6 @@ import {
     LinkIcon,
     ListTodo,
     Lock,
-    Plus,
     RadioTower,
     Search,
     Shield,
@@ -25,6 +26,7 @@ import {
     User as UserIcon,
     UserCog,
     Users,
+    X,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
 
@@ -81,7 +83,7 @@ export type ConcernDetail = {
     assignable_staff?: Array<{ id: number; name: string }>;
 };
 
-type ActionKey = 'assign' | 'investigation' | 'report' | 'risk' | 'action';
+type ActionKey = 'triage' | 'assign' | 'investigation' | 'report' | 'risk' | 'action' | 'close';
 
 type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'linked';
 
@@ -187,12 +189,18 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
             <Link href={`/safeguarding/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
                 <ExternalLink className="h-4 w-4" /> Open full page
             </Link>
+            {can.update && reported ? (
+                <Button size="sm" onClick={() => setAction('triage')}>
+                    <ClipboardCheck className="mr-1.5 h-4 w-4" /> Triage
+                </Button>
+            ) : null}
             {can.update && !terminal ? <OptionBtn icon={UserCog} label="Assign" onClick={() => setAction('assign')} /> : null}
             {can.update && !terminal ? <OptionBtn icon={Activity} label="Add risk" onClick={() => setAction('risk')} /> : null}
             {can.investigate && !terminal ? <OptionBtn icon={Search} label="Start investigation" onClick={() => setAction('investigation')} disabled={reported} reason={triageFirst} /> : null}
             {can.report_external && !terminal ? <OptionBtn icon={Landmark} label="Log referral" onClick={() => setAction('report')} disabled={reported} reason={triageFirst} /> : null}
             {can.update && !terminal ? <OptionBtn icon={ListTodo} label="Add action" onClick={() => setAction('action')} disabled={reported} reason={triageFirst} /> : null}
             {can.update && !terminal && !d.subject_informed ? <OptionBtn icon={BadgeCheck} label="Mark informed" onClick={markInformed} /> : null}
+            {can.update && !terminal && !reported ? <OptionBtn icon={CheckCircle2} label="Close" onClick={() => setAction('close')} /> : null}
         </div>
     );
 
@@ -211,7 +219,11 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {action === 'assign' ? (
+            {action === 'triage' ? (
+                <TriagePane d={d} onDone={() => setAction(null)} />
+            ) : action === 'close' ? (
+                <ClosePane d={d} onDone={() => setAction(null)} />
+            ) : action === 'assign' ? (
                 <AssignPane d={d} onDone={() => setAction(null)} />
             ) : action === 'investigation' ? (
                 <InvestigationPane d={d} onDone={() => setAction(null)} />
@@ -223,7 +235,7 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
                 <ActionItemPane d={d} onDone={() => setAction(null)} />
             ) : (
                 <>
-                    {section === 'overview' ? <OverviewSection d={d} subjectName={subjectName} /> : null}
+                    {section === 'overview' ? <OverviewSection d={d} subjectName={subjectName} onTriage={can.update && reported ? () => setAction('triage') : undefined} /> : null}
                     {section === 'timeline' ? <TimelineSection d={d} /> : null}
                     {section === 'risk' ? <RiskSection d={d} /> : null}
                     {section === 'investigation' ? <InvestigationSection d={d} /> : null}
@@ -506,6 +518,160 @@ function ActionItemPane({ d, onDone }: { d: ConcernDetail; onDone: () => void })
     );
 }
 
+const SUBSTANTIATE = [
+    { key: 'substantiated', label: 'Substantiated', description: 'Evidence supports it' },
+    { key: 'needs_enquiry', label: 'Needs enquiry', description: 'Unclear — look into it' },
+    { key: 'not_substantiated', label: 'Not substantiated', description: 'No basis found' },
+];
+const TRIAGE_PATHS = [
+    { key: 'investigate', label: 'Investigate', description: 'Open an internal enquiry', icon: Search },
+    { key: 'refer', label: 'Refer externally', description: 'Notify an authority', icon: Landmark },
+    { key: 'no_action', label: 'No further action', description: 'Close with rationale', icon: CircleSlash },
+];
+
+function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const staff = d.assignable_staff ?? [];
+    const form = useForm<{ substantiation: string; initial_risk: string; lead_user_id: string; path: string; notes: string }>({
+        substantiation: '',
+        initial_risk: d.current_risk_level ?? '',
+        lead_user_id: '',
+        path: '',
+        notes: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.substantiation) {
+            form.setError('substantiation', 'Record a substantiation judgement.');
+            return;
+        }
+        if (!form.data.initial_risk) {
+            form.setError('initial_risk', 'Set the initial risk level.');
+            return;
+        }
+        if (!form.data.path) {
+            form.setError('path', 'Decide the path.');
+            return;
+        }
+        if (form.data.path === 'no_action' && !form.data.notes.trim()) {
+            form.setError('notes', 'Record why no further action is required.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/triage`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    const cta = form.data.path === 'investigate' ? 'Triage → investigate' : form.data.path === 'refer' ? 'Triage → refer' : form.data.path === 'no_action' ? 'Triage → no action' : 'Confirm triage';
+    return (
+        <>
+            <StepHead icon={ClipboardCheck} title="Triage concern" blurb="The first gate. Substantiate, set the initial risk, assign a lead, and decide the path." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta={cta} processing={form.processing}>
+                <Field label="1 · Is the concern substantiated?" required error={form.errors.substantiation}>
+                    <TilePicker cols={3} value={form.data.substantiation} onChange={(v) => form.setData('substantiation', v)} options={SUBSTANTIATE} />
+                </Field>
+                <Field label="2 · Initial risk level" required error={form.errors.initial_risk}>
+                    <Segmented value={form.data.initial_risk} onChange={(v) => form.setData('initial_risk', v)} options={RISK_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
+                </Field>
+                <Field label="3 · Assign a safeguarding lead" hint="Optional">
+                    <SelectInput value={form.data.lead_user_id} onChange={(v) => form.setData('lead_user_id', v)} placeholder="Select a lead" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                </Field>
+                <Field label="4 · Decide the path" required error={form.errors.path}>
+                    <TilePicker cols={3} value={form.data.path} onChange={(v) => form.setData('path', v)} options={TRIAGE_PATHS} />
+                </Field>
+                {form.data.path === 'refer' ? (
+                    <InfoCard icon={Landmark} tone="crit">
+                        Referring externally requires a report to an authority — you'll log it next, before the concern moves to <b>Referred external</b>.
+                    </InfoCard>
+                ) : null}
+                {form.data.path === 'investigate' ? (
+                    <InfoCard icon={Search} tone="info">
+                        An investigation record opens automatically — the concern can't enter <b>Investigating</b> without one.
+                    </InfoCard>
+                ) : null}
+                {form.data.path === 'no_action' ? (
+                    <Field label="Rationale" required error={form.errors.notes}>
+                        <Textarea rows={2} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="Why does this need no further safeguarding action?" />
+                    </Field>
+                ) : null}
+            </PaneShell>
+        </>
+    );
+}
+
+function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const invOpen = (d.investigations ?? []).some((i) => !['completed', 'abandoned'].includes(i.status));
+    const actOpen = (d.action_plans ?? []).some((a) => !['completed', 'cancelled'].includes(a.status));
+    const refOk = !d.requires_external_referral || (d.external_reports?.length ?? 0) > 0;
+    const infOk = !!d.subject_informed;
+    const blocked = invOpen || actOpen || !refOk;
+
+    const checks = [
+        { ok: !invOpen, label: 'Investigations complete', detail: invOpen ? 'An investigation is still in progress' : 'No open investigation' },
+        { ok: !actOpen, label: 'Action plan complete', detail: actOpen ? 'One or more actions are still open' : 'No open actions' },
+        { ok: infOk, label: 'Subject informed (or recorded N/A)', detail: infOk ? 'Recorded' : 'Subject not recorded as informed' },
+        { ok: refOk, label: 'External referral logged (if required)', detail: refOk ? 'Not required or logged' : 'Referral indicated but no report logged' },
+    ];
+
+    const form = useForm<{ closure_summary: string; lessons_learned: string; override_reason: string }>({ closure_summary: '', lessons_learned: '', override_reason: '' });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.closure_summary.trim()) {
+            form.setError('closure_summary', 'A closure summary is required.');
+            return;
+        }
+        if (blocked && !form.data.override_reason.trim()) {
+            form.setError('override_reason', 'Record why you are closing with open work.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/close`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+
+    return (
+        <>
+            <StepHead icon={CheckCircle2} title="Close concern" blurb="Confirm the closure checks, summarise how it was resolved, and capture any lessons." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Close concern" processing={form.processing}>
+                <div>
+                    <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Closure checks</p>
+                    <div className="overflow-hidden rounded-xl border border-border">
+                        {checks.map((c, i) => (
+                            <div key={i} className="flex items-center gap-3 border-b border-border px-3.5 py-2.5 last:border-0">
+                                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${c.ok ? 'bg-status-success-bg text-status-success' : 'bg-status-warning-bg text-status-warning'}`}>
+                                    {c.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-medium text-foreground">{c.label}</p>
+                                    <p className="text-[11.5px] text-muted-foreground">{c.detail}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {blocked ? (
+                    <>
+                        <InfoCard icon={AlertTriangle} tone="warn">
+                            <b>Open work remains.</b> Closing now is soft-blocked. You can override and close anyway, but you must record why below.
+                        </InfoCard>
+                        <Field label="Override reason" required error={form.errors.override_reason}>
+                            <Input value={form.data.override_reason} onChange={(e) => form.setData('override_reason', e.target.value)} placeholder="Why are you closing with open work?" />
+                        </Field>
+                    </>
+                ) : null}
+
+                <Field label="Closure summary" required error={form.errors.closure_summary}>
+                    <Textarea rows={3} value={form.data.closure_summary} onChange={(e) => form.setData('closure_summary', e.target.value)} placeholder="How was the concern resolved and what makes it safe to close?" />
+                </Field>
+                <Field label="Lessons learned" hint="Optional">
+                    <Textarea rows={2} value={form.data.lessons_learned} onChange={(e) => form.setData('lessons_learned', e.target.value)} placeholder="What would prevent or improve handling of a similar concern?" />
+                </Field>
+
+                {!infOk ? (
+                    <InfoCard icon={AlertTriangle} tone="warn">
+                        The subject has not been recorded as informed. Confirm whether telling them is appropriate (it isn't always — e.g. an active Police matter) before closing.
+                    </InfoCard>
+                ) : null}
+            </PaneShell>
+        </>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Lifecycle stage tracker                                            */
 /* ------------------------------------------------------------------ */
@@ -552,7 +718,7 @@ function LifecycleTracker({ d }: { d: ConcernDetail }) {
 /*  Sections                                                           */
 /* ------------------------------------------------------------------ */
 
-function OverviewSection({ d, subjectName }: { d: ConcernDetail; subjectName: string }) {
+function OverviewSection({ d, subjectName, onTriage }: { d: ConcernDetail; subjectName: string; onTriage?: () => void }) {
     const informedLabel = d.subject_informed ? `Yes${d.subject_informed_at ? ` · ${formatDateTime(d.subject_informed_at)}` : ''}` : 'Not yet';
     return (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -560,7 +726,16 @@ function OverviewSection({ d, subjectName }: { d: ConcernDetail; subjectName: st
 
             {d.status === 'reported' ? (
                 <InfoCard icon={ClipboardCheck} tone="warn">
-                    <span className="font-semibold">Awaiting triage.</span> Triage decides the path — investigate, refer externally, or no further action.
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                            <span className="font-semibold">Awaiting triage.</span> Triage decides the path — investigate, refer externally, or no further action.
+                        </span>
+                        {onTriage ? (
+                            <Button size="sm" onClick={onTriage}>
+                                <ClipboardCheck className="mr-1.5 h-4 w-4" /> Triage now
+                            </Button>
+                        ) : null}
+                    </div>
                 </InfoCard>
             ) : null}
 
