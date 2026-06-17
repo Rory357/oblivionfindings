@@ -44,6 +44,8 @@ Route::middleware(['auth'])->group(function () {
     // Workflow actions
     Route::post('/safeguarding/{concern}/assign', [SafeguardingConcernController::class, 'assign'])
         ->name('safeguarding.assign');
+    Route::post('/safeguarding/{concern}/triage', [SafeguardingConcernController::class, 'triage'])
+        ->name('safeguarding.triage');
     Route::patch('/safeguarding/{concern}/status', [SafeguardingConcernController::class, 'updateStatus'])
         ->name('safeguarding.updateStatus');
     Route::post('/safeguarding/{concern}/close', [SafeguardingConcernController::class, 'close'])

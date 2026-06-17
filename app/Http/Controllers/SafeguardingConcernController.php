@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\SafeguardingConcern;
+use App\Models\SafeguardingInvestigation;
 use App\Models\Client;
 use App\Models\User;
 use App\Models\Site;
+use App\Services\Safeguarding\SafeguardingLifecycle;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -248,46 +250,158 @@ class SafeguardingConcernController extends Controller
     /**
      * Update concern status.
      */
-    public function updateStatus(Request $request, SafeguardingConcern $concern): RedirectResponse
+    public function updateStatus(Request $request, SafeguardingConcern $concern, SafeguardingLifecycle $lifecycle): RedirectResponse
     {
         $this->authorize('update', $concern);
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'required|in:reported,triaged,investigating,action_plan,monitoring,closed,referred_external,no_action_required',
         ]);
 
+        // Enforce the §4 state machine (W3/W6 + legal transitions). Closing and
+        // leaving `reported` have their own actions (close / triage).
+        $guard = $lifecycle->guardTransition($concern, $validated['status']);
+
+        if (! $guard['allowed']) {
+            return back()->withErrors(['status' => $guard['reason']]);
+        }
+
         $concern->update([
-            'status' => $request->status,
+            'status' => $validated['status'],
             'updated_by' => auth()->id(),
         ]);
 
-        return back()->with('success', 'Status updated successfully.');
+        return back()->with('success', 'Status updated to ' . $lifecycle->label($validated['status']) . '.');
+    }
+
+    /**
+     * Triage a reported concern (W4): record substantiation + initial risk +
+     * lead, then act on the chosen path — investigate (opens an investigation
+     * record automatically → `investigating`), refer (flags the concern for an
+     * external referral, awaiting the report → stays `triaged`), or no further
+     * action (`no_action_required`, terminal, rationale required).
+     */
+    public function triage(Request $request, SafeguardingConcern $concern): RedirectResponse
+    {
+        $this->authorize('update', $concern);
+
+        if ($concern->status !== 'reported') {
+            return back()->withErrors(['triage' => 'This concern has already been triaged.']);
+        }
+
+        $validated = $request->validate([
+            'substantiation' => 'required|in:' . implode(',', SafeguardingLifecycle::SUBSTANTIATIONS),
+            'initial_risk' => 'required|in:low,medium,high,critical',
+            'lead_user_id' => 'nullable|exists:users,id',
+            'path' => 'required|in:' . implode(',', SafeguardingLifecycle::TRIAGE_PATHS),
+            'notes' => 'nullable|string',
+            // For the "investigate" path we may capture an investigation type up front.
+            'investigation_type' => 'nullable|string',
+        ]);
+
+        // "No further action" must carry a rationale.
+        if ($validated['path'] === 'no_action' && blank($validated['notes'] ?? null)) {
+            return back()->withErrors(['notes' => 'Record why no further action is required.']);
+        }
+
+        $attributes = [
+            'triaged_at' => now(),
+            'triaged_by_user_id' => auth()->id(),
+            'triage_substantiation' => $validated['substantiation'],
+            'triage_decision' => $validated['path'],
+            'triage_notes' => $validated['notes'] ?? null,
+            'current_risk_level' => $validated['initial_risk'],
+            'updated_by' => auth()->id(),
+        ];
+
+        if (! empty($validated['lead_user_id'])) {
+            $attributes['assigned_to_user_id'] = $validated['lead_user_id'];
+            $attributes['assigned_at'] = now();
+        }
+
+        $message = 'Concern triaged.';
+
+        switch ($validated['path']) {
+            case 'investigate':
+                // Opening the investigation record is what satisfies the W3 gate
+                // for entering the `investigating` stage.
+                SafeguardingInvestigation::create([
+                    'safeguarding_concern_id' => $concern->id,
+                    'investigation_type' => $validated['investigation_type'] ?? 'internal',
+                    'lead_investigator_id' => $validated['lead_user_id'] ?? auth()->id(),
+                    'started_at' => now(),
+                    'status' => 'planned',
+                    'created_by' => auth()->id(),
+                ]);
+                $attributes['status'] = 'investigating';
+                $message = 'Concern triaged — investigation opened.';
+                break;
+
+            case 'refer':
+                // Referral indicated; the concern waits at `triaged` until an
+                // external report is logged (W6), which advances it to referred.
+                $attributes['requires_external_referral'] = true;
+                $attributes['status'] = 'triaged';
+                $message = 'Concern triaged — log the external referral to continue.';
+                break;
+
+            case 'no_action':
+                $attributes['status'] = 'no_action_required';
+                $message = 'Concern triaged — no further safeguarding action required.';
+                break;
+        }
+
+        $concern->update($attributes);
+
+        return back()->with('success', $message);
     }
 
     /**
      * Close the concern.
      */
-    public function close(Request $request, SafeguardingConcern $concern): RedirectResponse
+    public function close(Request $request, SafeguardingConcern $concern, SafeguardingLifecycle $lifecycle): RedirectResponse
     {
         $this->authorize('update', $concern);
 
-        $request->validate([
+        $validated = $request->validate([
             'closure_summary' => 'required|string',
             'lessons_learned' => 'nullable|string',
+            'override_reason' => 'nullable|string',
         ]);
+
+        // A concern must be triaged before it can be closed (a reported concern
+        // with no safeguarding response is resolved via triage → no further action).
+        if ($concern->status === 'reported') {
+            return back()->withErrors(['close' => 'Triage the concern before closing.']);
+        }
+
+        if (in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true)) {
+            return back()->withErrors(['close' => 'This concern is already closed.']);
+        }
+
+        // W7: soft-block closure while investigations or action-plan items are
+        // still open — allowed only with an explicit override reason.
+        if ($lifecycle->hasOpenWork($concern) && blank($validated['override_reason'] ?? null)) {
+            return back()->withErrors([
+                'override_reason' => 'There is open work on this concern. Give a reason to close it anyway.',
+            ]);
+        }
+
+        $closureSummary = $validated['closure_summary'];
+        if ($lifecycle->hasOpenWork($concern) && filled($validated['override_reason'] ?? null)) {
+            $closureSummary .= "\n\nClosed with open work. Override reason: " . trim($validated['override_reason']);
+        }
 
         $concern->update([
             'status' => 'closed',
-            'closure_summary' => $request->closure_summary,
-            'lessons_learned' => $request->lessons_learned,
+            'closure_summary' => $closureSummary,
+            'lessons_learned' => $validated['lessons_learned'] ?? null,
             'closed_by_user_id' => auth()->id(),
             'closed_at' => now(),
             'updated_by' => auth()->id(),
         ]);
 
-        return redirect()
-            ->route('safeguarding.show', $concern)
-            ->with('success', 'Concern closed successfully.');
+        return back()->with('success', 'Concern closed.');
     }
 
     /**

@@ -94,16 +94,20 @@ class SafeguardingStatusEnumTest extends TestCase
         ]);
     }
 
-    public function test_update_status_accepts_no_action_required(): void
+    public function test_update_status_does_not_set_no_action_required(): void
     {
+        // The enum value is valid (validation passes), but `no_action_required`
+        // is reached through triage — not a generic status change. The Step 2
+        // lifecycle guard rejects it here. (Triage coverage lives in
+        // SafeguardingLifecycleTest.)
         $user = $this->makeSafeguardingUser(['safeguarding.update']);
         $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
 
         $this->actingAs($user)
             ->patch("/safeguarding/{$concern->id}/status", ['status' => 'no_action_required'])
-            ->assertRedirect();
+            ->assertSessionHasErrors('status');
 
-        $this->assertSame('no_action_required', $concern->fresh()->status);
+        $this->assertSame('reported', $concern->fresh()->status);
     }
 
     public function test_update_status_rejects_unknown_value(): void

@@ -454,16 +454,17 @@ class SafeguardingConcernControllerTest extends TestCase
 
     public function test_safeguarding_update_status(): void
     {
-        $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
+        // action_plan -> monitoring is a legal, ungated forward transition.
+        $concern = SafeguardingConcern::factory()->create(['status' => 'action_plan']);
 
         $this->actingAs($this->admin)
             ->patch("/safeguarding/{$concern->id}/status", [
-                'status' => 'investigating',
+                'status' => 'monitoring',
             ])
             ->assertRedirect();
 
         $concern->refresh();
-        $this->assertEquals('investigating', $concern->status);
+        $this->assertEquals('monitoring', $concern->status);
     }
 
     public function test_safeguarding_update_status_validates(): void
@@ -477,19 +478,31 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertSessionHasErrors(['status']);
     }
 
-    public function test_safeguarding_valid_status_transitions(): void
+    public function test_safeguarding_legal_transitions_are_enforced(): void
     {
-        $validStatuses = ['reported', 'triaged', 'investigating', 'action_plan', 'monitoring', 'closed', 'referred_external'];
-
-        foreach ($validStatuses as $status) {
-            $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
+        // Legal forward transitions succeed.
+        foreach ([
+            ['action_plan', 'monitoring'],
+            ['monitoring', 'action_plan'],
+            ['investigating', 'action_plan'],
+        ] as [$from, $to]) {
+            $concern = SafeguardingConcern::factory()->create(['status' => $from]);
 
             $this->actingAs($this->admin)
-                ->patch("/safeguarding/{$concern->id}/status", [
-                    'status' => $status,
-                ])
+                ->patch("/safeguarding/{$concern->id}/status", ['status' => $to])
                 ->assertRedirect();
+
+            $this->assertEquals($to, $concern->fresh()->status);
         }
+
+        // Illegal: a reported concern can't be advanced by updateStatus (triage first).
+        $reported = SafeguardingConcern::factory()->create(['status' => 'reported']);
+
+        $this->actingAs($this->admin)
+            ->patch("/safeguarding/{$reported->id}/status", ['status' => 'monitoring'])
+            ->assertSessionHasErrors('status');
+
+        $this->assertEquals('reported', $reported->fresh()->status);
     }
 
     // ──────────────────────────────────────

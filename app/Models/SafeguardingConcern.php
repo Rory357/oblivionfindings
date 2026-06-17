@@ -36,6 +36,11 @@ class SafeguardingConcern extends Model
         'reporter_notes',
         'witnesses',
         'status',
+        'triaged_at',
+        'triaged_by_user_id',
+        'triage_substantiation',
+        'triage_decision',
+        'triage_notes',
         'immediate_actions',
         'subject_informed',
         'subject_informed_at',
@@ -59,6 +64,7 @@ class SafeguardingConcern extends Model
         'witnesses' => 'array',
         'reported_at' => 'datetime',
         'occurred_at' => 'datetime',
+        'triaged_at' => 'datetime',
         'subject_informed_at' => 'datetime',
         'assigned_at' => 'datetime',
         'closed_at' => 'datetime',
@@ -143,6 +149,14 @@ class SafeguardingConcern extends Model
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
+
+    /**
+     * User who triaged the concern.
+     */
+    public function triagedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'triaged_by_user_id');
     }
 
     /**
