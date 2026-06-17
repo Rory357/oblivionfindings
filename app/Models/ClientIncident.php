@@ -85,16 +85,13 @@ class ClientIncident extends Model implements EmitsToTimeline
         'injury_classification',
         'medical_treatment_type',
 
-        // Investigation fields
+        // Investigation tracking (the incident's denormalised status; the full
+        // investigation + root cause + corrective actions + lessons now live in the
+        // H&S register — HsInvestigation / HsCorrectiveAction — per Option B).
         'investigation_status',
         'investigation_assigned_to',
         'investigation_started_at',
         'investigation_completed_at',
-        'root_cause_category',
-        'root_cause_description',
-        'contributing_factors',
-        'corrective_actions',
-        'lessons_learned',
     ];
 
     protected $casts = [
@@ -113,7 +110,6 @@ class ClientIncident extends Model implements EmitsToTimeline
         'injured_person_age' => 'integer',
         'investigation_started_at' => 'datetime',
         'investigation_completed_at' => 'datetime',
-        'corrective_actions' => 'array',
     ];
 
     /**

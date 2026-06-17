@@ -114,7 +114,18 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] Removed investigation/remediation fields (`investigation_status`/`investigation_assigned_to`/`root_cause_*`/`contributing_factors`/`corrective_actions`/`lessons_learned`) from `update()` validation — H&S is the source of truth going forward (investigation editing lives at `/health-safety/events/{id}`). Stale comments fixed.
 - [x] Show tests rewritten to the `detail` payload; obsolete Dusk "manage corrective actions from the show page" test removed (used the soon-dropped column).
 - [x] *Verified:* `tsc` clean + **9 show/update feature tests** (57 assertions).
-**7c (NEXT) — historical data migration + drop columns:** move existing inline `corrective_actions`(JSON)/`root_cause_*`/`contributing_factors`/`lessons_learned` → `HsInvestigation`+`HsCorrectiveAction`, then drop the columns. ⚠️ destructive — write the data-move first; run local (verify migrate/rollback); flag for human review vs prod data before deploy.
+**7c (DONE) — historical data migration + drop columns:**
+- [x] Migration `2026_06_17_130000_retire_inline_remediation_from_client_incidents.php`: fail-safe per-row data-move (legacy `corrective_actions` JSON → `HsCorrectiveAction` rows; `root_cause_*`/`contributing_factors`/`lessons_learned` → an `HsInvestigation`) on each incident's HsEvent, **then drops the 5 columns**. Kept `investigation_status`/`investigation_assigned_to`/`investigation_started_at`/`investigation_completed_at` (still used by the Under-investigation tab + close guardrail). Model `$fillable`/`$casts` updated.
+- [x] *Verified with seeded data:* migrate → INV-2026-0001 created (root causes + lessons) + 2 HsCorrectiveActions (open/completed mapped) + 5 columns dropped + `investigation_status` kept; rollback → columns restored; re-migrate → clean. 5 representative incident tests pass post-migration.
+- [x] ⚠️ **DESTRUCTIVE — committed to the branch, flagged for human review before merge/deploy.** Verified locally (empty/seeded); the data-move can't be validated against production data here. down() re-adds empty columns (dropped data not restored).
+
+---
+
+## ✅ BUILD COMPLETE (Steps 1–7) — 2026-06-17
+
+All seven steps shipped on `incidents-control-room-redesign`. **Pending: human review (esp. the destructive 7c migration) → merge to main → deploy → Chrome-verify on .com.**
+- 1 Schema · 2 Nav · 3 List page · 4 Detail modal (view+lifecycle+followups+attachments+edit) · 5 Report wizard (incident + near-miss) · 6 Cross-module (flag / sensor confirm-dismiss / state-sync + modals) · 7 Corrective actions Option B + retired show.tsx + inline remediation.
+- Verified throughout: `tsc --noEmit` clean; ~45 incident/CR feature tests added/updated, all green; migrations run + rollback-verified locally.
 
 ---
 
@@ -135,4 +146,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 6c (Gap D): first-class alert FK on bridge path + close→resolve-linked-alert state-sync. php -l + 1 test.
 - 2026-06-17 — Step 6d: flag-incident + sensor-triage modal components (ready-to-mount, tsc clean). **Step 6 cross-module workflows COMPLETE.**
 - 2026-06-17 — Step 7a (Option B): `raiseCorrectiveAction` endpoint + dialog "+ Raise corrective action" form → `createStandalone` linked to the incident's HsEvent. tsc + 2 tests. (Observer afterCommit DOES fire in tests.)
-- 2026-06-17 — Step 7b: `show()`→detail; `show.tsx` 2196→23-line thin shell over `<IncidentDetailDialog>`; investigation/remediation fields removed from `update()`. tsc + 9 show/update tests. Next 7c: historical data migration + drop inline columns (final piece).
+- 2026-06-17 — Step 7b: `show()`→detail; `show.tsx` 2196→23-line thin shell over `<IncidentDetailDialog>`; investigation/remediation fields removed from `update()`. tsc + 9 show/update tests.
+- 2026-06-17 — Step 7c: retire-inline-remediation migration (data-move legacy → H&S, then drop 5 columns) + model update. Verified with seeded data (migrate/rollback/re-migrate) + 5 tests. **⚠️ DESTRUCTIVE — flagged for review. BUILD COMPLETE (Steps 1–7).** Next: human review → merge → deploy → live verify.
