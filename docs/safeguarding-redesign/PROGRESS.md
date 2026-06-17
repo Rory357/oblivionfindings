@@ -21,6 +21,37 @@
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | ✅ done (7a evidence `de7670f0` + 7b auto-advance/reminders) | 7b _(this commit)_ |
 | 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | ✅ done | _(this commit)_ |
 
+## Post-merge remediation — "make it real" pass (live audit, 2026-06-18)
+After merge `0d2d98a3` (live on `.com`), a 3-agent audit + user-reported bugs found the chrome was
+high-fidelity but several surfaces were **inert/dead**. Fixed on `feat/safeguarding-redesign`
+(commits `f5424faf` + `c888c281`); safeguarding suite **48 green (255 assertions)**, tsc/eslint/pint/build clean.
+
+- **Stuck modal (P0):** clicking a rail section now clears any open action pane (`concern-dialog.tsx`).
+- **Right-click rebuilt:** mirrors the detail Options bar 1:1 (every item → a real backend), opens the
+  dialog on the target pane (new `initialAction`/`initialSection` props + per-row `can` flags), fixes
+  "View subject" (deep-links `/operations/clients/{id}`), adds direct "Mark informed".
+- **Lifecycle now flows from the UI** (was create-only; the `update`/`complete` verbs had no callers):
+  complete an investigation (→ W5 auto-advance), complete action items (→ unblocks a clean close),
+  record an authority acknowledgement, and **Move to monitoring** (`action_plan`→`monitoring`, wires the
+  uncalled `PATCH /status`).
+- **W6 real:** logging the authority report on a concern parked at triage now performs the promised
+  `triaged`→`referred_external` transition (`SafeguardingExternalReportController@store`, guarded so it
+  never regresses a concern past triage).
+- **Need-to-know is live:** `is_sensitive` was never settable → all redaction was inert. Added a
+  raise-wizard toggle + `store()` persistence + a detail "Mark sensitive / Remove restriction" action
+  (`POST /safeguarding/{concern}/sensitivity`).
+- **Dead UI killed:** `control_room_alert_id` resolved from the linked HsEvent on the detail (was
+  hardcoded `null`); "Viewing is logged" backed by a real `GovernanceAuditService::log('viewed', …)`
+  write; removed dead `serializeConcernForShow/Form/serializeUser`.
+- **Design-fidelity + a11y:** keyboard-operable rows (tab/Enter/Space + focus ring), concern-row
+  description snippet + evidence-count chip, reviews worklist **Owner** column + open-at-section
+  (Review / Record ack), explicit "All" period.
+- **+6 tests** (`SafeguardingRemediationTest`) lock W6, sensitivity raise+toggle, the row `can`/href
+  payload, and the CR-alert resolution.
+- **Still deferred (documented, not dead):** X2 operator card (Control Room drop owns it); W9 reminders
+  are log-only; no full read-audit "accessed by" timeline (access *is* now logged, just not surfaced as
+  a timeline row).
+
 ## Migration policy
 Per established loop policy for this user (Incidents near-twin loop): **run local migrations autonomously**
 in the worktree (shared dev DB via copied `.env`), always with a clean `down()`. Migrations land in
