@@ -1223,6 +1223,25 @@ class IncidentControllerTest extends TestCase
         $this->assertEquals('No issues remain.', $incident->closed_notes);
     }
 
+    public function test_closing_incident_resolves_linked_control_room_alert(): void
+    {
+        $this->mockNotificationService();
+
+        $alert = \App\Models\ControlRoomAlert::factory()->open()->create();
+        $incident = ClientIncident::factory()->reviewed()->create(['control_room_alert_id' => $alert->id]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/close", [
+                'closed_outcome' => 'Resolved',
+            ])
+            ->assertRedirect();
+
+        // State-sync (Gap D): the linked alert resolves with the incident.
+        $alert->refresh();
+        $this->assertSame('resolved', $alert->status);
+        $this->assertSame('incident_closed', $alert->resolution_code);
+    }
+
     public function test_close_requires_closed_outcome(): void
     {
         $incident = ClientIncident::factory()->reviewed()->create();

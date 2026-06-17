@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
 use App\Models\Shift;
@@ -902,6 +903,10 @@ class IncidentController extends Controller
             'closed_notes' => $data['closed_notes'] ?? null,
         ]);
 
+        // State-sync (Gap D): closing the system-of-record resolves the linked
+        // Control Room alert so the two stay coherent and it leaves the live queue.
+        $this->resolveLinkedAlertOnClose($incident, $request->user()?->id);
+
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
 
@@ -928,6 +933,35 @@ class IncidentController extends Controller
         );
 
         return back()->with('success', 'Incident closed.');
+    }
+
+    /**
+     * Resolve the Control Room alert linked to a just-closed incident (Gap D).
+     * Only an actionable alert is transitioned; failures never block the close.
+     */
+    private function resolveLinkedAlertOnClose(ClientIncident $incident, ?int $userId): void
+    {
+        if (! $incident->control_room_alert_id) {
+            return;
+        }
+
+        try {
+            $alert = ControlRoomAlert::find($incident->control_room_alert_id);
+            if ($alert && $alert->isActionable() && $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+                $alert->update([
+                    'status' => ControlRoomAlert::STATUS_RESOLVED,
+                    'resolved_at' => now(),
+                    'resolved_by_user_id' => $userId,
+                    'resolution_code' => $alert->resolution_code ?? 'incident_closed',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('IncidentController: failed to resolve linked alert on incident close', [
+                'incident_id' => $incident->id,
+                'alert_id' => $incident->control_room_alert_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function reopen(Request $request, ClientIncident $incident)

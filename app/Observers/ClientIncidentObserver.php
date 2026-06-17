@@ -208,9 +208,14 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
             } else {
                 $alert = $this->bridge->bridgeClientIncident($incident);
 
-                // Link Control Room alert back to HsEvent
+                // Link Control Room alert back to HsEvent + populate the first-class
+                // incident->alert FK (Gap D) so the link is direct, not only via HsEvent.
+                // updateQuietly avoids re-firing this observer.
                 if ($alert) {
                     $this->linkAlertToHsEvent($incident, $alert->id);
+                    if (! $incident->control_room_alert_id) {
+                        $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
+                    }
                 }
             }
         } catch (\Throwable $e) {
