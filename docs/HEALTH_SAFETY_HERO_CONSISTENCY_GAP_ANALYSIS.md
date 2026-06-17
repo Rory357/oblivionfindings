@@ -182,8 +182,16 @@ primary gradient (no `brandColour`).
 behaviour, not stubbed against new schema (SDS expiry → "SDS current"; due-soon vs overdue drills
 → non-compliant = overdue) — see **C2 / BK1**.
 
-**Final gate (needs a deploy — out of the loop's local reach):** the §5 *live* side-by-side
-screenshot diff (`/health-safety` vs `/health-safety/analytics`) + the dashboard non-regression
-screenshot. The work is on branch `hs-hero-consistency` (3 commits); per this repo's pattern it
-merges to `main` → the deploy webhook builds it (~5–8 min) → Chrome-verify on `.com` as demo
-admin. Awaiting the merge decision.
+**Final gate — ✅ MERGED + DEPLOYED + LIVE-VERIFIED 2026-06-17.** Branch `hs-hero-consistency`
+(3 commits) merged to `main` (merge `ae41a7bc`) → pushed to origin → deploy webhook built (~3–4
+min, new chunk `assets/analytics-DBzXwyja.js`). Chrome-verified on `.com` as Demo Admin:
+- **Dashboard** (`/health-safety`) renders correctly, matches its command-centre design — non-regressed.
+- **Analytics** (`/health-safety/analytics`) hero now reads as identical chrome: green-dot eyebrow
+  pill, BarChart3 medallion, sentence-case title, the five canonical badges (incl. `Ngā Paerewa NZS
+  8134:2021` + lowercase `Hazardous substances`; Fire correctly **red "5 drills overdue"** here vs
+  the dashboard's **amber "6 drills due"** — the one-component/two-threshold behaviour), Leading/
+  Lagging clusters **with deltas** (Incidents 129 ▲23, TRIFR 20 ▲0.9, Near-miss 8× ▲0.1, Open hazards
+  22 ▼3), `HeroSegmented` period (YTD)/lens controls, dot-led summary strip + Hide toggle, shared
+  `RoleLensBanner`, primary gradient.
+- **"Board reports" popover** (D1) opens with all five governance reports. **0 console errors** on
+  both pages.
