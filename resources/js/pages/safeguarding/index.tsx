@@ -63,10 +63,12 @@ type ConcernRow = {
     reported_at: string | null;
     concern_type: string;
     abuse_category: string | null;
+    description: string | null;
     severity: string;
     status: string;
     current_risk_level: string | null;
     restricted: boolean;
+    attachments_count: number;
     subject: { name: string | null; site: string | null; href: string | null } | null;
     subject_informed: boolean;
     assigned_to: { name: string } | null;
@@ -87,8 +89,10 @@ type ReviewRow = {
     reference_number: string;
     restricted: boolean;
     subject: string | null;
+    owner: string | null;
     kind: 'risk' | 'ack';
     detail: string;
+    open_section?: SectionKey;
     due_at: string | null;
     overdue: boolean;
 };
@@ -270,7 +274,7 @@ export default function SafeguardingIndex({
 
     /* ---- date range (footer pills) ---- */
     const activeRange = !filters.from
-        ? ''
+        ? 'all'
         : filters.from === daysAgoStr(7)
           ? 'week'
           : filters.from === daysAgoStr(30)
@@ -279,11 +283,16 @@ export default function SafeguardingIndex({
               ? 'quarter'
               : 'custom';
     const RANGE_ITEMS = [
+        { key: 'all', label: 'All' },
         { key: 'week', label: 'This week' },
         { key: '30d', label: '30 days' },
         { key: 'quarter', label: 'Quarter' },
     ];
     const onRange = (key: string) => {
+        if (key === 'all') {
+            go({ from: null, to: null });
+            return;
+        }
         const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
         go({ from: daysAgoStr(map[key]), to: todayStr() });
     };
@@ -548,10 +557,18 @@ function ConcernTable({
                                 key={c.id}
                                 onClick={() => (c.restricted ? undefined : onOpen(c.id))}
                                 onContextMenu={(e) => onRowCtx(e, c)}
+                                tabIndex={c.restricted ? -1 : 0}
+                                aria-label={c.restricted ? undefined : `Open concern ${c.reference_number}`}
+                                onKeyDown={(e) => {
+                                    if (!c.restricted && (e.key === 'Enter' || e.key === ' ')) {
+                                        e.preventDefault();
+                                        onOpen(c.id);
+                                    }
+                                }}
                                 className={
                                     c.restricted
                                         ? 'bg-[repeating-linear-gradient(45deg,transparent,transparent_9px,var(--muted)_9px,var(--muted)_10px)]'
-                                        : 'cursor-pointer transition-colors hover:bg-muted/40'
+                                        : 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
                                 }
                             >
                                 <td className="px-4 py-3 align-top whitespace-nowrap">
@@ -575,8 +592,9 @@ function ConcernTable({
                                             <div className="flex items-center gap-2">
                                                 <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`} />
                                                 <span className="font-medium">{titleCase(c.concern_type)}</span>
+                                                {c.abuse_category ? <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{titleCase(c.abuse_category)}</span> : null}
                                             </div>
-                                            {c.abuse_category ? <p className="mt-0.5 text-xs text-muted-foreground">{titleCase(c.abuse_category)}</p> : null}
+                                            {c.description ? <p className="mt-0.5 line-clamp-1 max-w-[28rem] text-xs text-muted-foreground/80">{c.description}</p> : null}
                                         </td>
                                         <td className="px-4 py-3 align-top">
                                             {c.subject?.name ? (
@@ -627,6 +645,12 @@ function ConcernTable({
                                         ) : null}
                                         {c.flags.review_due ? <Clock className="h-3.5 w-3.5 text-status-warning" aria-label="Risk review due" /> : null}
                                         {c.flags.action_overdue ? <ListTodo className="h-3.5 w-3.5 text-status-critical" aria-label="Overdue action" /> : null}
+                                        {c.attachments_count > 0 ? (
+                                            <span className="inline-flex items-center gap-0.5" aria-label={`${c.attachments_count} evidence file${c.attachments_count === 1 ? '' : 's'}`}>
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                                <span className="text-[10px] font-medium">{c.attachments_count}</span>
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </td>
                             </tr>
@@ -642,7 +666,7 @@ function ConcernTable({
 /*  Reviews / monitoring worklist                                      */
 /* ------------------------------------------------------------------ */
 
-function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number) => void }) {
+function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => void }) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -660,51 +684,69 @@ function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number)
                         <th className="px-4 py-2.5">Reference</th>
                         <th className="px-4 py-2.5">What's due</th>
                         <th className="px-4 py-2.5">Subject</th>
+                        <th className="px-4 py-2.5">Owner</th>
                         <th className="px-4 py-2.5">Due</th>
                         <th className="px-4 py-2.5"></th>
                     </tr>
                 </thead>
                 <tbody className="divide-y">
-                    {rows.map((r, i) => (
-                        <tr key={`${r.id}-${r.kind}-${i}`} onClick={() => onOpen(r.id)} className="cursor-pointer transition-colors hover:bg-muted/40">
-                            <td className="px-4 py-3 align-top font-medium whitespace-nowrap">{r.reference_number}</td>
-                            <td className="px-4 py-3 align-top">
-                                <div className="flex items-start gap-2">
-                                    {r.kind === 'risk' ? (
-                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                    {rows.map((r, i) => {
+                        const open = () => onOpen(r.id, r.open_section ? { section: r.open_section } : undefined);
+                        const actionLabel = r.kind === 'risk' ? 'Review' : 'Record ack';
+                        return (
+                            <tr
+                                key={`${r.id}-${r.kind}-${i}`}
+                                onClick={open}
+                                tabIndex={0}
+                                aria-label={`${actionLabel} for ${r.reference_number}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        open();
+                                    }
+                                }}
+                                className="cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                            >
+                                <td className="px-4 py-3 align-top font-medium whitespace-nowrap">{r.reference_number}</td>
+                                <td className="px-4 py-3 align-top">
+                                    <div className="flex items-start gap-2">
+                                        {r.kind === 'risk' ? (
+                                            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                                        ) : (
+                                            <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
+                                        )}
+                                        <span>{r.detail}</span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 align-top">
+                                    {r.restricted ? (
+                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Lock className="h-3 w-3" /> Restricted
+                                        </span>
                                     ) : (
-                                        <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
+                                        r.subject ?? '—'
                                     )}
-                                    <span>{r.detail}</span>
-                                </div>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                                {r.restricted ? (
-                                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Lock className="h-3 w-3" /> Restricted
+                                </td>
+                                <td className="px-4 py-3 align-top text-xs text-muted-foreground">{r.owner ?? 'Unassigned'}</td>
+                                <td className="px-4 py-3 align-top whitespace-nowrap">
+                                    {r.due_at ? (
+                                        <span className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
+                                            <Clock className="h-3.5 w-3.5" />
+                                            {formatDateTime(r.due_at)}
+                                            {r.overdue ? ' · overdue' : ''}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 align-top text-right">
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                                        <Eye className="h-3.5 w-3.5" /> {actionLabel}
                                     </span>
-                                ) : (
-                                    r.subject ?? '—'
-                                )}
-                            </td>
-                            <td className="px-4 py-3 align-top whitespace-nowrap">
-                                {r.due_at ? (
-                                    <span className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatDateTime(r.due_at)}
-                                        {r.overdue ? ' · overdue' : ''}
-                                    </span>
-                                ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                )}
-                            </td>
-                            <td className="px-4 py-3 align-top text-right">
-                                <span className="inline-flex items-center gap-1 text-xs text-primary">
-                                    <Eye className="h-3.5 w-3.5" /> Open
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
