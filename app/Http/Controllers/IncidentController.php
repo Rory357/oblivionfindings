@@ -7,7 +7,6 @@ use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
-use App\Models\IncidentTemplate;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
@@ -249,6 +248,13 @@ class IncidentController extends Controller
             'clients' => $clients,
             'reportClients' => $reportClients,
             'reportStaff' => $reportStaff,
+            // Auto-open the report wizard when arriving from /incidents/create
+            // (redirected here with ?report= + optional prefill).
+            'report' => in_array($request->get('report'), ['incident', 'near_miss'], true) ? $request->get('report') : null,
+            'reportPrefill' => [
+                'client_id' => $request->filled('report_client_id') ? (int) $request->get('report_client_id') : null,
+                'shift_id' => $request->filled('report_shift_id') ? (int) $request->get('report_shift_id') : null,
+            ],
             'can' => [
                 'create' => $user->canDo('incidents.create'),
                 'templatesManage' => $user->canDo('incidents.templates.manage'),
@@ -403,70 +409,38 @@ class IncidentController extends Controller
         ];
     }
 
+    /**
+     * The report flow is now a modal-first wizard living over the register, so
+     * /incidents/create redirects to the index with a `report=` param (plus any
+     * prefill) that auto-opens the wizard. Resuming a draft is now editing it, so
+     * `?incident=` opens the detail dialog. Keeps the /my-day + rostering deep
+     * links (?shift_id / ?client_id) working.
+     */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user?->canDo('incidents.create'), 403);
 
-        $clients = Client::query()
-            ->when(! $user->canDo('clients.viewAny'), function ($query) use ($user) {
-                $query->whereHas('supportWorkers', fn ($staff) => $staff->whereKey($user->id));
-            })
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
-
-        $templates = IncidentTemplate::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        // Wizard continuation: if an incident id was passed back after Step 2 create,
-        // hydrate the draft so Step 3 (optional detail) can pick up without re-creating.
-        $resumeIncident = null;
         if ($request->filled('incident')) {
-            $incident = ClientIncident::query()->find((int) $request->query('incident'));
-            if ($incident && $request->user()?->can('update', $incident) && $incident->status === 'draft') {
-                $resumeIncident = $incident->only([
-                    'id', 'client_id', 'type', 'severity', 'occurred_at', 'description',
-                    'immediate_action_taken', 'witnesses', 'injured_person_name',
-                    'injured_person_role', 'injury_body_part', 'injury_nature',
-                    'medical_treatment_type',
-                ]);
-            }
+            return redirect()->route('incidents.index', ['incident' => (int) $request->query('incident')]);
         }
 
-        // Prefill from query params used by /my-day: ?shift_id=... ?client_id=...
-        // The hero passes shift_id; resident cards pass client_id. We surface the
-        // values so the wizard can both pre-select the client and forward the
-        // shift_id with the draft create so the audit trail keeps the link.
-        $prefill = [
-            'client_id' => null,
-            'shift_id' => null,
-        ];
+        $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident'];
+
         if ($request->filled('shift_id')) {
             $shift = Shift::query()->find((int) $request->query('shift_id'));
             if ($shift && ($shift->user_id === $user->id || $user->canDo('incidents.viewAny'))) {
-                $prefill['shift_id'] = $shift->id;
-                // Default to the shift's primary client unless an explicit
-                // client_id overrides below.
+                $params['report_shift_id'] = $shift->id;
                 if ($shift->client_id) {
-                    $prefill['client_id'] = (int) $shift->client_id;
+                    $params['report_client_id'] = (int) $shift->client_id;
                 }
             }
         }
         if ($request->filled('client_id')) {
-            $clientId = (int) $request->query('client_id');
-            if ($clients->contains('id', $clientId)) {
-                $prefill['client_id'] = $clientId;
-            }
+            $params['report_client_id'] = (int) $request->query('client_id');
         }
 
-        return inertia('incidents/create', [
-            'clients' => $clients,
-            'templates' => $templates,
-            'resumeIncident' => $resumeIncident,
-            'prefill' => $prefill,
-        ]);
+        return redirect()->route('incidents.index', $params);
     }
 
     public function store(Request $request, NotifiableEventClassifier $classifier)

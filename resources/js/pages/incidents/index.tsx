@@ -131,6 +131,8 @@ type Props = {
     clients?: Array<{ id: number; first_name: string; last_name: string }> | null;
     reportClients?: Array<{ id: number; first_name: string; last_name: string }> | null;
     reportStaff?: Array<{ id: number; name: string }> | null;
+    report?: 'incident' | 'near_miss' | null;
+    reportPrefill?: { client_id: number | null; shift_id: number | null };
     can: { create: boolean; templatesManage: boolean };
     detail: IncidentDetail | null;
 };
@@ -218,11 +220,13 @@ export default function IncidentsIndex({
     clients,
     reportClients,
     reportStaff,
+    report,
+    reportPrefill,
     can,
     detail,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [reportMode, setReportMode] = useState<'incident' | 'near_miss' | null>(null);
+    const [reportMode, setReportMode] = useState<'incident' | 'near_miss' | null>(report ?? null);
     const [launcherOpen, setLauncherOpen] = useState(false);
     const openReport = (m: 'incident' | 'near_miss') => {
         setLauncherOpen(false);
@@ -332,7 +336,7 @@ export default function IncidentsIndex({
         const clientName = i.client ? `${i.client.first_name} ${i.client.last_name}`.trim() : 'No client';
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View incident', sub: `${titleCase(i.type)}${i.occurred_at ? ` · ${formatDateTime(i.occurred_at)}` : ''}`, tone: 'primary', onClick: () => openDetail(i.id) },
-            ...(i.status === 'draft' ? [{ icon: <FileEdit className="h-3.5 w-3.5" />, label: 'Continue draft', onClick: () => router.visit(`/incidents/create?incident=${i.id}`) } satisfies ShiftCtxItem] : []),
+            ...(i.status === 'draft' ? [{ icon: <FileEdit className="h-3.5 w-3.5" />, label: 'Continue draft', sub: 'Edit & submit', onClick: () => openDetail(i.id) } satisfies ShiftCtxItem] : []),
             { sep: true },
             ...(i.client ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', sub: clientName, onClick: () => router.visit(`/operations/clients/${i.client!.id}/care`) } satisfies ShiftCtxItem] : []),
             ...(i.control_room_alert_id ? [{ icon: <RadioTower className="h-3.5 w-3.5" />, label: 'View Control Room alert', onClick: () => router.visit(`/control-room/alerts/${i.control_room_alert_id}`) } satisfies ShiftCtxItem] : []),
@@ -486,6 +490,7 @@ export default function IncidentsIndex({
                     mode={reportMode}
                     clients={reportClients}
                     staff={reportStaff ?? []}
+                    prefill={reportPrefill}
                     onClose={() => setReportMode(null)}
                     onOpenIncident={(id) => {
                         setReportMode(null);

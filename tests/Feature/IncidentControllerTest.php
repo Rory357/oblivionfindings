@@ -475,54 +475,36 @@ class IncidentControllerTest extends TestCase
         $this->get('/incidents/create')->assertRedirect('/login');
     }
 
-    public function test_create_accessible_by_admin(): void
+    public function test_create_redirects_to_modal_report_wizard(): void
     {
+        // The report flow is now a modal over the register: /incidents/create
+        // redirects to the index with ?report= so the wizard auto-opens.
         $this->actingAs($this->admin)
             ->get('/incidents/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('incidents/create')
-                ->has('clients')
-                ->has('templates')
-            );
+            ->assertRedirect(route('incidents.index', ['report' => 'incident']));
     }
 
-    public function test_create_accessible_by_coordinator(): void
-    {
-        $this->actingAs($this->coordinator)
-            ->get('/incidents/create')
-            ->assertOk();
-    }
-
-    public function test_create_accessible_by_staff(): void
+    public function test_create_near_miss_redirects_with_near_miss_report(): void
     {
         $this->actingAs($this->staff)
-            ->get('/incidents/create')
-            ->assertOk();
+            ->get('/incidents/create?type=near_miss')
+            ->assertRedirect(route('incidents.index', ['report' => 'near_miss']));
     }
 
-    public function test_create_returns_only_active_templates(): void
+    public function test_create_forwards_client_prefill(): void
     {
-        IncidentTemplate::create([
-            'name' => 'Active Template',
-            'type' => 'fall',
-            'severity' => 'high',
-            'is_active' => true,
-        ]);
-        IncidentTemplate::create([
-            'name' => 'Inactive Template',
-            'type' => 'other',
-            'severity' => 'low',
-            'is_active' => false,
-        ]);
+        $this->actingAs($this->admin)
+            ->get('/incidents/create?client_id=' . $this->client->id)
+            ->assertRedirect(route('incidents.index', ['report' => 'incident', 'report_client_id' => $this->client->id]));
+    }
+
+    public function test_create_resume_draft_redirects_to_detail(): void
+    {
+        $incident = ClientIncident::factory()->create(['status' => 'draft']);
 
         $this->actingAs($this->admin)
-            ->get('/incidents/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('templates', 1)
-                ->where('templates.0.name', 'Active Template')
-            );
+            ->get('/incidents/create?incident=' . $incident->id)
+            ->assertRedirect(route('incidents.index', ['incident' => $incident->id]));
     }
 
     // ──────────────────────────────────────────────────────────────

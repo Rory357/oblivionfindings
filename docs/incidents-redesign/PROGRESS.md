@@ -74,7 +74,13 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] `store()` extended: `source='manual'`, `hazard`→`metadata.hazard`, `followups[]` created in one submit, `stay`→`back()` + flashes `created_incident_id`. Success pane "Open incident" → `openDetail`.
 - [x] Wired the hero **"+ Report"** launcher (An incident / A near miss) to open the wizard over the list; `reportClients` (scoped) + `reportStaff` added to the index payload.
 - [x] *Verified:* `tsc` clean + **3 store feature tests** (source=manual + followups[] created; near-miss potential+hazard→metadata).
-**5b (NEXT):** retire `incidents/create.tsx` + `wizard/*` + custom `WizardStepper`; make `/incidents/create` render the wizard (or redirect to `/incidents?report=…`); **prefill** (`?shift_id`/`?client_id` from /my-day) + **resume** (`?incident=` draft). Photo capture in step ② (deferred — addable via the detail dialog now).
+**5b (DONE):** legacy create flow retired.
+- [x] `create()` now **redirects** to `/incidents?report={incident|near_miss}` (+ `report_client_id`/`report_shift_id` prefill); `?incident=` → `/incidents?incident=` (resume = edit via detail). Keeps /my-day + rostering deep links working. `IncidentTemplate` import dropped.
+- [x] index() reads `report` + `report_*` → payload `report`/`reportPrefill`; `index.tsx` auto-opens the wizard from `report` with prefill. Ctx "Continue draft" → `openDetail` (edit pane).
+- [x] **Deleted** `incidents/create.tsx` + `incidents/wizard/{step-describe,step-optional-detail,step-who-what}.tsx` (kept the shared `@/components/wizard-stepper` — sites pages use it). Deleted obsolete `tests/e2e/incident-create.spec.ts` (tested the retired 2-step page + a removed mobile view); updated the Dusk `IncidentIndexTest` create test to expect the redirect→wizard.
+- [x] *Verified:* `tsc` clean + **5 create feature tests** (redirect incident/near-miss, client prefill, draft resume→detail, auth).
+
+**Step 5 = report wizard COMPLETE** (modal-first, both branches, legacy retired, deep-links preserved). Only deferred bit: in-wizard photo capture (step ②) — attachments are addable from the detail dialog meanwhile.
 
 ### ☐ Step 6 — Cross-module workflows (Gaps A, B, D, E)
 - [ ] `flagAsIncident`; `SensorIncidentBridgeService` (confirm→incident/HsEvent; dismiss→false-positive); alert confirm/dismiss states; alert↔incident state-sync observers.
@@ -96,4 +102,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 4b-i: lifecycle action panes (review/close/reopen) added to the dialog (in-body pane, existing endpoints). tsc clean.
 - 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green.
 - 2026-06-17 — Step 4b-iii: edit pane (core fields, drafts) added. **Step 4 modal-first detail functionally complete** (view+lifecycle+followups+attachments+edit). show.tsx retirement deferred → Step 7 (investigation migration).
-- 2026-06-17 — Step 5a: report wizard `IncidentReportDialog` (WizardShell, 6 steps + near-miss branch + review + success) over the list, launched from "+ Report"; `store()` extended (source/hazard/followups[]). tsc + 3 store tests. Next 5b: retire create.tsx/wizard/WizardStepper + prefill/resume.
+- 2026-06-17 — Step 5a: report wizard `IncidentReportDialog` (WizardShell, 6 steps + near-miss branch + review + success) over the list, launched from "+ Report"; `store()` extended (source/hazard/followups[]). tsc + 3 store tests.
+- 2026-06-17 — Step 5b: `/incidents/create` → redirect to `/incidents?report=` (auto-opens wizard) + prefill/resume; deleted create.tsx + wizard/* + obsolete e2e spec; Dusk test updated. **Step 5 report wizard COMPLETE.** tsc + 5 create tests. Next: Step 6 cross-module (Control Room).
