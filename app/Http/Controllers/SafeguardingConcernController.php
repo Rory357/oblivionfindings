@@ -214,11 +214,15 @@ class SafeguardingConcernController extends Controller
             'witnesses' => 'nullable',
             'immediate_actions' => 'nullable|string',
             'requires_external_referral' => 'boolean',
+            // Need-to-know: a raiser can mark an allegation sensitive so it is redacted
+            // to everyone but the lead, the reporter and viewSensitive-cleared staff.
+            'is_sensitive' => 'boolean',
             'site_id' => 'nullable|exists:sites,id',
             'related_incident_id' => 'nullable|exists:client_incidents,id',
         ]);
 
         $validated = $this->normalizeConcernInput($request, $validated);
+        $validated['is_sensitive'] = $request->boolean('is_sensitive');
 
         $validated['reported_by_user_id'] = auth()->id();
         $validated['reported_at'] = now();
@@ -511,6 +515,27 @@ class SafeguardingConcernController extends Controller
         return back()->with('success', 'Subject marked as informed.');
     }
 
+    /**
+     * Toggle need-to-know restriction on a concern. Marking it sensitive redacts
+     * the subject/category/evidence to everyone but the lead, the reporter and
+     * viewSensitive-cleared staff; lifting it restores normal visibility.
+     */
+    public function setSensitivity(Request $request, SafeguardingConcern $concern): RedirectResponse
+    {
+        $this->authorize('update', $concern);
+
+        $validated = $request->validate(['is_sensitive' => 'required|boolean']);
+
+        $concern->update([
+            'is_sensitive' => $validated['is_sensitive'],
+            'updated_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', $validated['is_sensitive']
+            ? 'Concern restricted to need-to-know.'
+            : 'Need-to-know restriction removed.');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Index helpers (rows, redaction, worklist, counts)                  */
     /* ------------------------------------------------------------------ */
@@ -563,7 +588,9 @@ class SafeguardingConcernController extends Controller
             'subject' => $restricted ? null : [
                 'name' => $this->subjectDisplayName($concern),
                 'site' => $concern->site?->name,
+                'href' => $this->subjectHref($concern),
             ],
+            'subject_informed' => (bool) $concern->subject_informed,
             'assigned_to' => $concern->assignedTo ? ['name' => $concern->assignedTo->name] : null,
             'flags' => [
                 'has_alert' => ($concern->active_alerts_count ?? 0) > 0,
@@ -575,8 +602,25 @@ class SafeguardingConcernController extends Controller
                 'action_overdue' => ($concern->overdue_actions_count ?? 0) > 0,
             ],
             'related_incident_id' => $concern->related_incident_id,
-            'control_room_alert_id' => null, // wired in Step 8 (Control Room cross-module)
+            // The active Control Room alert id is resolved (via the linked HsEvent) on the
+            // detail payload only — see buildConcernDetail — to keep the list free of a
+            // per-row HsEvent lookup. The row context menu jumps to it via the detail.
+            'control_room_alert_id' => null,
+            // Lifecycle gates for the row's right-click menu, mirroring the detail Options bar.
+            'can' => [
+                'update' => $user->can('update', $concern),
+                'investigate' => $user->can('investigate', $concern),
+                'report_external' => $user->can('reportExternal', $concern),
+            ],
         ];
+    }
+
+    /** Deep-link to a Client subject's profile (no `/care` — that route 302-redirects). */
+    private function subjectHref(SafeguardingConcern $concern): ?string
+    {
+        $subject = $concern->subject;
+
+        return $subject instanceof Client ? "/operations/clients/{$subject->id}" : null;
     }
 
     /** Non-terminal concern ids — the universe for "needs attention" worklists. */
@@ -749,12 +793,15 @@ class SafeguardingConcernController extends Controller
         ]);
 
         // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
+        // The same event carries the Control Room alert id, so we surface both from one lookup.
         $hsEvent = null;
+        $controlRoomAlertId = null;
         try {
             $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
             $ev = HsEvent::query()->where('idempotency_key', $key)->first();
             if ($ev) {
                 $hsEvent = ['id' => $ev->id, 'reference_number' => $ev->reference_number, 'status' => $ev->status];
+                $controlRoomAlertId = $ev->control_room_alert_id;
             }
         } catch (\Throwable $e) {
             // H&S link is best-effort; never block the detail on it.
@@ -769,6 +816,7 @@ class SafeguardingConcernController extends Controller
             'immediate_actions' => $concern->immediate_actions,
             'subject_informed' => (bool) $concern->subject_informed,
             'subject_informed_at' => $concern->subject_informed_at?->toISOString(),
+            'is_sensitive' => (bool) $concern->is_sensitive,
             'requires_external_referral' => (bool) $concern->requires_external_referral,
             'current_risk_level' => $concern->current_risk_level,
             'triage' => $concern->triaged_at ? [
@@ -865,7 +913,7 @@ class SafeguardingConcernController extends Controller
             })->values()->all(),
             'related_incident_id' => $concern->related_incident_id,
             'hs_event' => $hsEvent,
-            'control_room_alert_id' => null, // wired in Step 8
+            'control_room_alert_id' => $controlRoomAlertId,
             'can' => [
                 'update' => $user->can('update', $concern),
                 'investigate' => $user->can('investigate', $concern),
@@ -884,10 +932,9 @@ class SafeguardingConcernController extends Controller
         }
 
         $subject = $concern->subject;
-        $href = $subject instanceof Client ? "/operations/clients/{$subject->id}/care" : null;
         $type = $subject instanceof Client ? 'client' : ($subject instanceof User ? 'staff' : 'other');
 
-        return ['name' => $name, 'href' => $href, 'type' => $type];
+        return ['name' => $name, 'href' => $this->subjectHref($concern), 'type' => $type];
     }
 
     private function perpetratorName(SafeguardingConcern $concern): ?string

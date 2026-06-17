@@ -20,13 +20,14 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { SafeguardingConcernDialog, type ConcernDetail } from '@/components/safeguarding/concern-dialog';
+import { SafeguardingConcernDialog, type ConcernDetail, type ActionKey, type SectionKey } from '@/components/safeguarding/concern-dialog';
 import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
     Activity,
+    BadgeCheck,
     Bell,
     Calendar,
     CheckCircle2,
@@ -39,6 +40,7 @@ import {
     LayoutList,
     ListTodo,
     Lock,
+    Paperclip,
     Plus,
     RadioTower,
     Search,
@@ -46,6 +48,7 @@ import {
     ShieldAlert,
     User as UserIcon,
     UserCheck,
+    UserCog,
     X,
 } from 'lucide-react';
 
@@ -64,7 +67,8 @@ type ConcernRow = {
     status: string;
     current_risk_level: string | null;
     restricted: boolean;
-    subject: { name: string | null; site: string | null } | null;
+    subject: { name: string | null; site: string | null; href: string | null } | null;
+    subject_informed: boolean;
     assigned_to: { name: string } | null;
     flags: {
         has_alert: boolean;
@@ -75,6 +79,7 @@ type ConcernRow = {
     };
     related_incident_id: number | null;
     control_room_alert_id: number | null;
+    can: { update: boolean; investigate: boolean; report_external: boolean };
 };
 
 type ReviewRow = {
@@ -216,6 +221,8 @@ export default function SafeguardingIndex({
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [raiseOpen, setRaiseOpen] = useState(raise);
+    // Which pane the detail dialog should open on (set by the row right-click menu).
+    const [pendingOpen, setPendingOpen] = useState<{ action?: ActionKey; section?: SectionKey } | null>(null);
 
     const go = (next: Partial<Filters>) =>
         router.get('/safeguarding', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -224,10 +231,14 @@ export default function SafeguardingIndex({
 
     // Detail-over-list: fetch only the `detail` prop and open the dialog without
     // navigating away; closing drops the param so `detail` comes back null.
-    const openConcern = (id: number) =>
+    const openConcern = (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => {
+        setPendingOpen(opts ?? null);
         router.get('/safeguarding', { ...filters, concern: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
-    const closeDetail = () =>
+    };
+    const closeDetail = () => {
+        setPendingOpen(null);
         router.get('/safeguarding', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
 
     const clearFilters = () =>
         router.get('/safeguarding', { tab }, { preserveState: true, preserveScroll: true, replace: true });
@@ -286,18 +297,45 @@ export default function SafeguardingIndex({
     ];
 
     /* ---- right-click context menu (concern rows) ---- */
+    // The menu mirrors the detail dialog's Options bar 1:1 — same permission + lifecycle
+    // gates — so every item shown maps to a real backend action. Workflow items open the
+    // dialog on the matching pane; "Mark informed" posts directly (no pane needed).
     const openRowCtx = (e: ReactMouseEvent, c: ConcernRow) => {
         e.preventDefault();
         if (c.restricted) return; // need-to-know: no actions exposed on a restricted row
         const sev = SEV[c.severity] ?? SEV.low;
         const subjectName = c.subject?.name ?? 'Subject withheld';
+        const can = c.can;
+        const terminal = c.status === 'closed' || c.status === 'no_action_required';
+        const reported = c.status === 'reported';
+        const markInformed = () => router.post(`/safeguarding/${c.id}/subject-informed`, {}, { preserveScroll: true });
+
+        // Navigation (always-available views).
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View concern', sub: c.reference_number, tone: 'primary', onClick: () => openConcern(c.id) },
-            { sep: true },
-            ...(c.subject ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => openConcern(c.id) } satisfies ShiftCtxItem] : []),
-            ...(c.related_incident_id ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents/${c.related_incident_id}`) } satisfies ShiftCtxItem] : []),
-            ...(c.control_room_alert_id ? [{ icon: <RadioTower className="h-3.5 w-3.5" />, label: 'View Control Room alert', onClick: () => router.visit(`/control-room/alerts/${c.control_room_alert_id}`) } satisfies ShiftCtxItem] : []),
+            ...(c.subject?.href
+                ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => router.visit(c.subject!.href!) } satisfies ShiftCtxItem]
+                : []),
+            ...(c.related_incident_id
+                ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents?incident=${c.related_incident_id}`) } satisfies ShiftCtxItem]
+                : []),
         ];
+
+        // Workflow actions — gated identically to the dialog Options bar.
+        const workflow: ShiftCtxItem[] = [];
+        if (can.update && reported) workflow.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Triage', onClick: () => openConcern(c.id, { action: 'triage' }) });
+        if (can.update && !terminal) workflow.push({ icon: <UserCog className="h-3.5 w-3.5" />, label: 'Assign lead', onClick: () => openConcern(c.id, { action: 'assign' }) });
+        if (can.update && !terminal) workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Add risk assessment', onClick: () => openConcern(c.id, { action: 'risk' }) });
+        if (can.investigate && !terminal && !reported) workflow.push({ icon: <Search className="h-3.5 w-3.5" />, label: 'Start investigation', onClick: () => openConcern(c.id, { action: 'investigation' }) });
+        if (can.report_external && !terminal && !reported) workflow.push({ icon: <Landmark className="h-3.5 w-3.5" />, label: 'Log external referral', onClick: () => openConcern(c.id, { action: 'report' }) });
+        if (can.update && !terminal && !reported) workflow.push({ icon: <ListTodo className="h-3.5 w-3.5" />, label: 'Add action', onClick: () => openConcern(c.id, { action: 'action' }) });
+        if (can.update && !terminal) workflow.push({ icon: <Paperclip className="h-3.5 w-3.5" />, label: 'Add evidence', onClick: () => openConcern(c.id, { section: 'evidence' }) });
+        if (can.update && !terminal && !c.subject_informed) workflow.push({ icon: <BadgeCheck className="h-3.5 w-3.5" />, label: 'Mark subject informed', onClick: markInformed });
+        if (can.update && c.status === 'action_plan') workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Move to monitoring', onClick: () => router.patch(`/safeguarding/${c.id}/status`, { status: 'monitoring' }, { preserveScroll: true }) });
+        if (can.update && !terminal && !reported) workflow.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close concern', tone: 'critical', onClick: () => openConcern(c.id, { action: 'close' }) });
+
+        if (workflow.length) items.push({ sep: true }, ...workflow);
+
         setCtx({ x: e.clientX, y: e.clientY, tag: sev.label.toUpperCase(), meta: `${c.reference_number} · ${titleCase(c.concern_type)}`, items });
     };
 
@@ -436,7 +474,16 @@ export default function SafeguardingIndex({
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
-            {detail ? <SafeguardingConcernDialog detail={detail} open onClose={closeDetail} /> : null}
+            {detail ? (
+                <SafeguardingConcernDialog
+                    key={detail.id}
+                    detail={detail}
+                    open
+                    onClose={closeDetail}
+                    initialAction={pendingOpen?.action ?? null}
+                    initialSection={pendingOpen?.section ?? 'overview'}
+                />
+            ) : null}
 
             {raiseOpen && can.create ? (
                 <SafeguardingRaiseWizard

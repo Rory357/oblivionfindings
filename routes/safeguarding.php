@@ -53,6 +53,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('safeguarding.close');
     Route::post('/safeguarding/{concern}/subject-informed', [SafeguardingConcernController::class, 'markSubjectInformed'])
         ->name('safeguarding.markSubjectInformed');
+    Route::post('/safeguarding/{concern}/sensitivity', [SafeguardingConcernController::class, 'setSensitivity'])
+        ->name('safeguarding.setSensitivity');
 
     // Investigations (require investigate permission)
     Route::middleware('permission:safeguarding.investigate')->group(function () {

@@ -58,6 +58,7 @@ export type ConcernDetail = {
     immediate_actions?: string | null;
     subject_informed?: boolean;
     subject_informed_at?: string | null;
+    is_sensitive?: boolean;
     requires_external_referral?: boolean;
     current_risk_level?: string | null;
     triage?: { at: string | null; by: string | null; substantiation: string | null; decision: string | null; notes: string | null } | null;
@@ -100,9 +101,9 @@ export type ConcernDetail = {
     assignable_staff?: Array<{ id: number; name: string }>;
 };
 
-type ActionKey = 'triage' | 'assign' | 'investigation' | 'report' | 'risk' | 'action' | 'close';
+export type ActionKey = 'triage' | 'assign' | 'investigation' | 'report' | 'risk' | 'action' | 'close';
 
-type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'evidence' | 'linked';
+export type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'evidence' | 'linked';
 
 /* ------------------------------------------------------------------ */
 /*  Tokens                                                             */
@@ -134,9 +135,23 @@ const todayStr = (): string => {
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
-export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: ConcernDetail; open: boolean; onClose: () => void }) {
-    const [section, setSection] = useState<SectionKey>('overview');
-    const [action, setAction] = useState<ActionKey | null>(null);
+export function SafeguardingConcernDialog({
+    detail,
+    open,
+    onClose,
+    initialAction = null,
+    initialSection = 'overview',
+}: {
+    detail: ConcernDetail;
+    open: boolean;
+    onClose: () => void;
+    initialAction?: ActionKey | null;
+    initialSection?: SectionKey;
+}) {
+    // The dialog is keyed by concern id in the list, so it mounts fresh on each open —
+    // the right-click menu uses initialAction/initialSection to land on a specific pane.
+    const [section, setSection] = useState<SectionKey>(initialSection);
+    const [action, setAction] = useState<ActionKey | null>(initialAction);
     const d = detail;
 
     if (d.restricted) {
@@ -218,6 +233,16 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
             {can.report_external && !terminal ? <OptionBtn icon={Landmark} label="Log referral" onClick={() => setAction('report')} disabled={reported} reason={triageFirst} /> : null}
             {can.update && !terminal ? <OptionBtn icon={ListTodo} label="Add action" onClick={() => setAction('action')} disabled={reported} reason={triageFirst} /> : null}
             {can.update && !terminal && !d.subject_informed ? <OptionBtn icon={BadgeCheck} label="Mark informed" onClick={markInformed} /> : null}
+            {can.update && !terminal ? (
+                <OptionBtn
+                    icon={Lock}
+                    label={d.is_sensitive ? 'Remove restriction' : 'Mark sensitive'}
+                    onClick={() => router.post(`/safeguarding/${d.id}/sensitivity`, { is_sensitive: !d.is_sensitive }, { preserveScroll: true })}
+                />
+            ) : null}
+            {can.update && d.status === 'action_plan' ? (
+                <OptionBtn icon={Activity} label="Move to monitoring" onClick={() => router.patch(`/safeguarding/${d.id}/status`, { status: 'monitoring' }, { preserveScroll: true })} />
+            ) : null}
             {can.update && !terminal && !reported ? <OptionBtn icon={CheckCircle2} label="Close" onClick={() => setAction('close')} /> : null}
         </div>
     );
@@ -233,7 +258,10 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
             railSub={`${d.reference_number} · ${titleCase(d.concern_type)}`}
             steps={SECTIONS}
             stepIndex={stepIndex}
-            onStepClick={(i) => setSection(SECTIONS[i].key)}
+            onStepClick={(i) => {
+                setAction(null); // leaving an open action pane back to its section
+                setSection(SECTIONS[i].key);
+            }}
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
@@ -861,6 +889,8 @@ function RiskSection({ d }: { d: ConcernDetail }) {
 }
 
 function InvestigationSection({ d }: { d: ConcernDetail }) {
+    const canInvestigate = !!d.can?.investigate;
+    const terminal = d.status === 'closed' || d.status === 'no_action_required';
     return (
         <div className="flex flex-col gap-4">
             {d.hs_event ? (
@@ -876,21 +906,84 @@ function InvestigationSection({ d }: { d: ConcernDetail }) {
             ) : null}
 
             {d.investigations?.length ? (
-                d.investigations.map((i) => (
-                    <ReviewCard key={i.id} icon={Search} title={`Investigation · ${titleCase(i.status)}`} span>
-                        <ReviewRow label="Type" value={titleCase(i.type)} />
-                        <ReviewRow label="Lead" value={i.lead} />
-                        <ReviewRow label="Started" value={i.started_at ? formatDateTime(i.started_at) : undefined} />
-                        <ReviewRow label="Completed" value={i.completed_at ? formatDateTime(i.completed_at) : undefined} />
-                        <ReviewRow label="Outcome" value={i.outcome ? titleCase(i.outcome) : undefined} />
-                        {i.findings ? <ReviewRow label="Findings" value={i.findings} /> : null}
-                        {i.recommendations ? <ReviewRow label="Recommendations" value={i.recommendations} /> : null}
-                    </ReviewCard>
-                ))
+                d.investigations.map((i) => {
+                    const open = !['completed', 'abandoned'].includes(i.status);
+                    return (
+                        <ReviewCard key={i.id} icon={Search} title={`Investigation · ${titleCase(i.status)}`} span>
+                            <ReviewRow label="Type" value={titleCase(i.type)} />
+                            <ReviewRow label="Lead" value={i.lead} />
+                            <ReviewRow label="Started" value={i.started_at ? formatDateTime(i.started_at) : undefined} />
+                            <ReviewRow label="Completed" value={i.completed_at ? formatDateTime(i.completed_at) : undefined} />
+                            <ReviewRow label="Outcome" value={i.outcome ? titleCase(i.outcome) : undefined} />
+                            {i.findings ? <ReviewRow label="Findings" value={i.findings} /> : null}
+                            {i.recommendations ? <ReviewRow label="Recommendations" value={i.recommendations} /> : null}
+                            {canInvestigate && open && !terminal ? <InvestigationCompleteForm concernId={d.id} investigationId={i.id} /> : null}
+                        </ReviewCard>
+                    );
+                })
             ) : (
                 <EmptyState icon={Search} text="No investigation opened. Completing an investigation auto-advances the concern." />
             )}
         </div>
+    );
+}
+
+const INVESTIGATION_OUTCOMES = [
+    { value: 'substantiated', label: 'Substantiated' },
+    { value: 'partially_substantiated', label: 'Partially substantiated' },
+    { value: 'unsubstantiated', label: 'Unsubstantiated' },
+    { value: 'inconclusive', label: 'Inconclusive' },
+];
+
+// Completing an investigation flips its status → the SafeguardingInvestigationObserver
+// auto-advances the concern to its action-plan stage (W5).
+function InvestigationCompleteForm({ concernId, investigationId }: { concernId: number; investigationId: number }) {
+    const [openForm, setOpenForm] = useState(false);
+    const form = useForm<{ status: string; outcome: string; findings: string; recommendations: string }>({
+        status: 'completed',
+        outcome: '',
+        findings: '',
+        recommendations: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.outcome) {
+            form.setError('outcome', 'Record the outcome.');
+            return;
+        }
+        form.put(`/safeguarding/${concernId}/investigations/${investigationId}`, { preserveScroll: true, onSuccess: () => setOpenForm(false) });
+    };
+    if (!openForm) {
+        return (
+            <div className="mt-2">
+                <Button size="sm" variant="outline" onClick={() => setOpenForm(true)}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete investigation
+                </Button>
+            </div>
+        );
+    }
+    return (
+        <form onSubmit={submit} className="mt-2 flex flex-col gap-2 rounded-xl border border-dashed border-border p-3">
+            <p className="text-xs font-semibold text-foreground">Complete investigation</p>
+            <p className="text-[11px] text-muted-foreground">Recording the outcome moves the concern on to its action-plan stage.</p>
+            <Field label="Outcome" required error={form.errors.outcome}>
+                <SelectInput value={form.data.outcome} onChange={(v) => form.setData('outcome', v)} placeholder="Outcome" options={INVESTIGATION_OUTCOMES} />
+            </Field>
+            <Field label="Findings" hint="Optional">
+                <Textarea rows={2} value={form.data.findings} onChange={(e) => form.setData('findings', e.target.value)} />
+            </Field>
+            <Field label="Recommendations" hint="Optional">
+                <Textarea rows={2} value={form.data.recommendations} onChange={(e) => form.setData('recommendations', e.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setOpenForm(false)}>
+                    Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={form.processing}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
+                </Button>
+            </div>
+        </form>
     );
 }
 
@@ -904,6 +997,7 @@ function ReportsSection({ d }: { d: ConcernDetail }) {
             />
         );
     }
+    const canReport = !!d.can?.report_external;
     return (
         <div className="flex flex-col gap-3">
             {d.external_reports.map((r) => (
@@ -913,9 +1007,59 @@ function ReportsSection({ d }: { d: ConcernDetail }) {
                     <ReviewRow label="Summary" value={r.summary} />
                     <ReviewRow label="Acknowledged" value={r.ack_received ? `Yes${r.acknowledged_at ? ` · ${formatDateTime(r.acknowledged_at)}` : ''}${r.ack_reference ? ` · ${r.ack_reference}` : ''}` : 'Awaiting'} />
                     <ReviewRow label="Authority outcome" value={r.authority_action ? titleCase(r.authority_action) : undefined} />
+                    {canReport && !r.ack_received ? <ReportAckForm concernId={d.id} reportId={r.id} /> : null}
                 </ReviewCard>
             ))}
         </div>
+    );
+}
+
+// Records an authority's acknowledgement of a logged report — clears the "Acks awaited"
+// worklist + hero count once an authority confirms receipt.
+function ReportAckForm({ concernId, reportId }: { concernId: number; reportId: number }) {
+    const [openForm, setOpenForm] = useState(false);
+    const form = useForm<{ acknowledgement_received: boolean; acknowledged_at: string; acknowledgement_reference: string; authority_action: string }>({
+        acknowledgement_received: true,
+        acknowledged_at: todayStr(),
+        acknowledgement_reference: '',
+        authority_action: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.put(`/safeguarding/${concernId}/external-reports/${reportId}`, { preserveScroll: true, onSuccess: () => setOpenForm(false) });
+    };
+    if (!openForm) {
+        return (
+            <div className="mt-1">
+                <Button size="sm" variant="outline" onClick={() => setOpenForm(true)}>
+                    <BadgeCheck className="mr-1.5 h-3.5 w-3.5" /> Record acknowledgement
+                </Button>
+            </div>
+        );
+    }
+    return (
+        <form onSubmit={submit} className="mt-2 flex flex-col gap-2 rounded-xl border border-dashed border-border p-3">
+            <p className="text-xs font-semibold text-foreground">Record authority acknowledgement</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+                <Field label="Acknowledged on" required error={form.errors.acknowledged_at}>
+                    <Input type="date" value={form.data.acknowledged_at} onChange={(e) => form.setData('acknowledged_at', e.target.value)} />
+                </Field>
+                <Field label="Reference" hint="Optional">
+                    <Input value={form.data.acknowledgement_reference} onChange={(e) => form.setData('acknowledgement_reference', e.target.value)} placeholder="e.g. case #" />
+                </Field>
+            </div>
+            <Field label="Authority outcome / action" hint="Optional">
+                <Input value={form.data.authority_action} onChange={(e) => form.setData('authority_action', e.target.value)} placeholder="What did the authority decide or do?" />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setOpenForm(false)}>
+                    Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={form.processing}>
+                    <BadgeCheck className="mr-1.5 h-3.5 w-3.5" /> Record
+                </Button>
+            </div>
+        </form>
     );
 }
 
@@ -923,22 +1067,34 @@ function ActionsSection({ d }: { d: ConcernDetail }) {
     if (!d.action_plans?.length) {
         return <EmptyState icon={ListTodo} text="No action-plan items yet." />;
     }
+    const canEdit = !!d.can?.update;
+    const terminal = d.status === 'closed' || d.status === 'no_action_required';
+    const complete = (id: number) => router.post(`/safeguarding/${d.id}/action-plans/${id}/complete`, {}, { preserveScroll: true });
     return (
         <div className="flex flex-col gap-2">
-            {d.action_plans.map((a) => (
-                <div key={a.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                    <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${a.completed_at ? 'text-status-success' : a.overdue ? 'text-status-critical' : 'text-status-warning'}`} />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm text-foreground">{a.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {a.assigned_to ?? 'Unassigned'}
-                            {a.due_date ? ` · due ${formatDateTime(a.due_date)}` : ''}
-                            {a.completed_at ? ` · completed ${formatDateTime(a.completed_at)}` : a.overdue ? ' · overdue' : ''}
-                        </p>
+            {d.action_plans.map((a) => {
+                const open = !['completed', 'cancelled'].includes(a.status);
+                return (
+                    <div key={a.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
+                        <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${a.completed_at ? 'text-status-success' : a.overdue ? 'text-status-critical' : 'text-status-warning'}`} />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm text-foreground">{a.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {a.assigned_to ?? 'Unassigned'}
+                                {a.due_date ? ` · due ${formatDateTime(a.due_date)}` : ''}
+                                {a.completed_at ? ` · completed ${formatDateTime(a.completed_at)}` : a.overdue ? ' · overdue' : ''}
+                            </p>
+                        </div>
+                        {canEdit && open && !terminal ? (
+                            <Button size="sm" variant="outline" onClick={() => complete(a.id)}>
+                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
+                            </Button>
+                        ) : (
+                            <span className="text-xs text-muted-foreground">{titleCase(a.status)}</span>
+                        )}
                     </div>
-                    <span className="text-xs text-muted-foreground">{titleCase(a.status)}</span>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -1043,7 +1199,7 @@ function LinkedSection({ d, subject }: { d: ConcernDetail; subject: Person }) {
     return (
         <div className="flex flex-col gap-2">
             {d.control_room_alert_id ? <LinkedRow icon={RadioTower} title="Control Room alert" sub="Active alert" href={`/control-room/alerts/${d.control_room_alert_id}`} /> : null}
-            {d.related_incident_id ? <LinkedRow icon={ShieldAlert} title="Originating incident" sub={`INC-${d.related_incident_id}`} href={`/incidents/${d.related_incident_id}`} /> : null}
+            {d.related_incident_id ? <LinkedRow icon={ShieldAlert} title="Originating incident" sub={`INC-${d.related_incident_id}`} href={`/incidents?incident=${d.related_incident_id}`} /> : null}
             {d.hs_event ? <LinkedRow icon={Shield} title="Health & Safety event" sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`} href={`/health-safety/events/${d.hs_event.id}`} /> : null}
             {subject?.href ? <LinkedRow icon={UserIcon} title="Subject record" sub={subject.name} href={subject.href} /> : null}
             {d.alerts?.length ? (
