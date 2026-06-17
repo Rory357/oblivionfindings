@@ -13,9 +13,9 @@
 | # | Step | Status | Commit |
 |---|------|--------|--------|
 | 1 | Schema & enum — `store()` sets `status='reported'` (W1); add `no_action_required` to status enum (W2); backfill | ✅ done | `e9fd0862` |
-| 2 | Lifecycle guards + triage action — transition guard + gates on `updateStatus`/`close` (W3/W6/W7); dedicated `triage` (W4) | ✅ done | _(this commit)_ |
-| 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | in-progress (next) | — |
-| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | todo | — |
+| 2 | Lifecycle guards + triage action — transition guard + gates on `updateStatus`/`close` (W3/W6/W7); dedicated `triage` (W4) | ✅ done | `a78358cd` |
+| 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | ✅ done | _(this commit)_ |
+| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | in-progress (next) | — |
 | 5 | Triage modal + gated Close modal | todo | — |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | todo | — |
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | todo | — |
@@ -52,6 +52,18 @@ steps 1, 7, (maybe) 8.
   (12) + updated 2 controller tests + adjusted 1 Step-1 test; full safeguarding suite green (59 tests).
   Gate reasons are returned as validation errors now; **Step 4/5 will mirror them as disabled-action
   tooltips**.
+- 2026-06-17 — **Step 3 done.** `/safeguarding` list rebuilt 1:1 on the Incidents template:
+  `hs-hero-kit` hero (ShieldAlert medallion, "need-to-know" eyebrow, **counts-only** Open-work +
+  Needs-attention clusters), footer filter band (period + Site/Subject `EntityFilter` onDark + Severity
+  segmented + Category select + search + clear), `TabStrip` (8 tabs + Assigned-to-me), right-click
+  `ShiftContextMenu` rows, **Restricted** hatched-row redaction, reviews/monitoring worklist tab,
+  external-referral banner. `@index` fully rewritten (filters/tab/tabCounts/rows+redaction/hero/reviews
+  worklist). Migration `2026_06_17_160000` adds `is_sensitive` (drives need-to-know — policy
+  `viewSensitive` existed but nothing flagged a concern). New `SafeguardingIndexRedactionTest` (4) +
+  rewrote 7 index tests to the new payload. **Verified:** tsc clean, eslint clean, `npm run build` ✓
+  (2m37s), 70 safeguarding tests green. Row click + ctx "View" → `/safeguarding/{id}` (show) for now;
+  **Step 4 swaps to the detail-over-list modal** + adds the action ctx items. **Visual parity deferred
+  to merge-time Chrome on .com** (established pattern; page mirrors verified-live Incidents components).
 
 ## Shared-file edits (watch at integration / merge time)
 - _(none yet)_

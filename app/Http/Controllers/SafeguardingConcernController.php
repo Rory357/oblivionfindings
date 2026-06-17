@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingInvestigation;
+use App\Models\SafeguardingExternalReport;
 use App\Models\Client;
 use App\Models\User;
 use App\Models\Site;
@@ -22,56 +23,129 @@ class SafeguardingConcernController extends Controller
     {
         $this->authorize('viewAny', SafeguardingConcern::class);
 
-        $query = SafeguardingConcern::query()
-            ->with([
-                'subject',
-                'reportedBy',
-                'assignedTo',
-                'site',
-                'latestRiskAssessment',
-            ]);
+        $user = $request->user();
+        $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
 
-        // Filters
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        $tab = (string) $request->get('tab', 'all');
+        $filters = [
+            'q' => $request->get('q') ?: null,
+            'tab' => $tab,
+            'severity' => $request->get('severity') ?: null,
+            'category' => $request->get('category') ?: null,
+            'site_id' => $request->integer('site_id') ?: null,
+            'subject_id' => $request->integer('subject_id') ?: null,
+            'from' => $request->get('from') ?: null,
+            'to' => $request->get('to') ?: null,
+        ];
+
+        // Footer filters applied to any concern query; tab scope is layered on top.
+        $applyFilters = function ($q) use ($filters) {
+            if ($filters['severity']) {
+                $q->where('severity', $filters['severity']);
+            }
+            if ($filters['category']) {
+                $q->where('abuse_category', $filters['category']);
+            }
+            if ($filters['site_id']) {
+                $q->where('site_id', $filters['site_id']);
+            }
+            if ($filters['subject_id']) {
+                $q->where('subject_type', Client::class)->where('subject_id', $filters['subject_id']);
+            }
+            if ($filters['from']) {
+                $q->whereDate('reported_at', '>=', $filters['from']);
+            }
+            if ($filters['to']) {
+                $q->whereDate('reported_at', '<=', $filters['to']);
+            }
+            if ($filters['q']) {
+                $term = $filters['q'];
+                $q->where(function ($w) use ($term) {
+                    $w->where('reference_number', 'like', "%{$term}%")
+                        ->orWhere('description', 'like', "%{$term}%")
+                        ->orWhere('subject_name', 'like', "%{$term}%");
+                });
+            }
+        };
+
+        $tabScopes = [
+            'all' => fn ($q) => $q,
+            'triage' => fn ($q) => $q->where('status', 'reported'),
+            'investigation' => fn ($q) => $q->where('status', 'investigating'),
+            'action_plan' => fn ($q) => $q->where('status', 'action_plan'),
+            'monitoring' => fn ($q) => $q->where('status', 'monitoring'),
+            'referrals' => fn ($q) => $q->where(fn ($w) => $w->where('requires_external_referral', true)->orHas('externalReports')),
+            'closed' => fn ($q) => $q->whereIn('status', SafeguardingConcern::TERMINAL_STATUSES),
+            'mine' => fn ($q) => $q->where('assigned_to_user_id', $user->id)->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES),
+        ];
+
+        $tabCounts = [];
+        foreach ($tabScopes as $key => $scope) {
+            $q = SafeguardingConcern::query();
+            $applyFilters($q);
+            $scope($q);
+            $tabCounts[$key] = $q->count();
         }
 
-        if ($request->filled('severity')) {
-            $query->where('severity', $request->severity);
+        // Reviews worklist source (footer-filtered, non-terminal).
+        $reviewBase = SafeguardingConcern::query()->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES);
+        $applyFilters($reviewBase);
+        $reviewConcernIds = $reviewBase->pluck('id');
+        $tabCounts['reviews'] = $this->riskReviewQuery($reviewConcernIds)->count()
+            + $this->acksAwaitedQuery($reviewConcernIds)->count();
+
+        if ($tab === 'reviews') {
+            $rows = $this->reviewWorklist($reviewConcernIds, $user, $canSensitive);
+            $rowsKind = 'reviews';
+        } else {
+            $scope = $tabScopes[$tab] ?? $tabScopes['all'];
+            $query = SafeguardingConcern::query()
+                ->with(['subject', 'assignedTo', 'site', 'latestRiskAssessment'])
+                ->withCount([
+                    'externalReports',
+                    'alerts as active_alerts_count' => fn ($q) => $q->where('active', true),
+                    'actionPlans as overdue_actions_count' => fn ($q) => $q->where('due_date', '<', now())->whereNotIn('status', ['completed', 'cancelled']),
+                ]);
+            $applyFilters($query);
+            $scope($query);
+            $query->orderByDesc('reported_at');
+
+            $paginated = $query->paginate(20)->withQueryString();
+            $paginated->getCollection()->transform(fn (SafeguardingConcern $c) => $this->mapConcernRow($c, $user, $canSensitive));
+            $rows = $paginated;
+            $rowsKind = 'concerns';
         }
-
-        if ($request->filled('concern_type')) {
-            $query->where('concern_type', $request->concern_type);
-        }
-
-        if ($request->filled('assigned_to')) {
-            $query->where('assigned_to_user_id', $request->assigned_to);
-        }
-
-        if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('reference_number', 'like', "%{$request->search}%")
-                    ->orWhere('description', 'like', "%{$request->search}%")
-                    ->orWhere('subject_name', 'like', "%{$request->search}%");
-            });
-        }
-
-        // Sorting
-        $sortBy = $request->get('sort_by', 'reported_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
-
-        $concerns = $query->paginate(20)->withQueryString();
 
         return Inertia::render('safeguarding/index', [
-            'concerns' => $concerns,
-            'filters' => $request->only(['status', 'severity', 'concern_type', 'assigned_to', 'search']),
-            'stats' => [
-                'open' => SafeguardingConcern::open()->count(),
-                'critical' => SafeguardingConcern::where('severity', 'critical')->open()->count(),
-                'requiring_referral' => SafeguardingConcern::requiringExternalReferral()->count(),
-                'assigned_to_me' => SafeguardingConcern::where('assigned_to_user_id', auth()->id())->open()->count(),
+            'filters' => $filters,
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'rows' => $rows,
+            'rowsKind' => $rowsKind,
+            'hero' => [
+                'openWork' => [
+                    'open' => ['value' => SafeguardingConcern::open()->count()],
+                    'awaitingTriage' => ['value' => SafeguardingConcern::where('status', 'reported')->count()],
+                    'investigating' => ['value' => SafeguardingConcern::where('status', 'investigating')->count()],
+                    'referred' => ['value' => SafeguardingConcern::where('status', 'referred_external')->count()],
+                ],
+                'attention' => [
+                    'overdueActions' => ['value' => $this->overdueActionsCount()],
+                    'reviewsDue' => ['value' => $this->riskReviewQuery($this->openConcernIds())->count()],
+                    'acksAwaited' => ['value' => $this->acksAwaitedQuery($this->openConcernIds())->count()],
+                    'criticalOpen' => ['value' => SafeguardingConcern::open()->where('severity', 'critical')->count()],
+                ],
             ],
+            'referralOverdueCount' => SafeguardingConcern::query()
+                ->where('requires_external_referral', true)
+                ->whereDoesntHave('externalReports')
+                ->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES)
+                ->count(),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'subjects' => Client::query()->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])
+                ->values(),
+            'can' => ['create' => $user->can('create', SafeguardingConcern::class)],
         ]);
     }
 
@@ -418,6 +492,163 @@ class SafeguardingConcernController extends Controller
         ]);
 
         return back()->with('success', 'Subject marked as informed.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Index helpers (rows, redaction, worklist, counts)                  */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Need-to-know: a sensitive concern is restricted for a viewer who lacks
+     * `viewSensitive` and is neither the assignee nor the reporter.
+     */
+    private function isConcernRestricted(SafeguardingConcern $concern, User $user, bool $canSensitive): bool
+    {
+        if (! $concern->is_sensitive || $canSensitive) {
+            return false;
+        }
+
+        return $concern->assigned_to_user_id !== $user->id
+            && $concern->reported_by_user_id !== $user->id;
+    }
+
+    private function subjectDisplayName(SafeguardingConcern $concern): ?string
+    {
+        $subject = $concern->subject;
+
+        if ($subject instanceof Client) {
+            return trim($subject->first_name . ' ' . $subject->last_name) ?: null;
+        }
+        if ($subject instanceof User) {
+            return $subject->name;
+        }
+
+        return $concern->subject_name;
+    }
+
+    private function mapConcernRow(SafeguardingConcern $concern, User $user, bool $canSensitive): array
+    {
+        $restricted = $this->isConcernRestricted($concern, $user, $canSensitive);
+        $review = $concern->latestRiskAssessment;
+        $reviewDue = $review && $review->next_review_date && $review->next_review_date->isPast();
+
+        return [
+            'id' => $concern->id,
+            'reference_number' => $concern->reference_number,
+            'occurred_at' => $concern->occurred_at?->toISOString(),
+            'reported_at' => $concern->reported_at?->toISOString(),
+            'concern_type' => $concern->concern_type,
+            'abuse_category' => $restricted ? null : $concern->abuse_category,
+            'severity' => $concern->severity,
+            'status' => $concern->status,
+            'current_risk_level' => $concern->current_risk_level,
+            'restricted' => $restricted,
+            'subject' => $restricted ? null : [
+                'name' => $this->subjectDisplayName($concern),
+                'site' => $concern->site?->name,
+            ],
+            'assigned_to' => $concern->assignedTo ? ['name' => $concern->assignedTo->name] : null,
+            'flags' => [
+                'has_alert' => ($concern->active_alerts_count ?? 0) > 0,
+                'requires_referral' => (bool) $concern->requires_external_referral,
+                'referral_overdue' => $concern->requires_external_referral
+                    && ($concern->external_reports_count ?? 0) === 0
+                    && ! in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true),
+                'review_due' => (bool) $reviewDue,
+                'action_overdue' => ($concern->overdue_actions_count ?? 0) > 0,
+            ],
+            'related_incident_id' => $concern->related_incident_id,
+            'control_room_alert_id' => null, // wired in Step 8 (Control Room cross-module)
+        ];
+    }
+
+    /** Non-terminal concern ids — the universe for "needs attention" worklists. */
+    private function openConcernIds()
+    {
+        return SafeguardingConcern::query()
+            ->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES)
+            ->pluck('id');
+    }
+
+    /** Concerns (within $ids) whose risk review is due/overdue. */
+    private function riskReviewQuery($concernIds)
+    {
+        return SafeguardingConcern::query()
+            ->whereIn('id', $concernIds)
+            ->whereHas('riskAssessments', fn ($q) => $q->whereNotNull('next_review_date')->where('next_review_date', '<=', now()));
+    }
+
+    /** External reports (for concerns within $ids) still awaiting acknowledgement. */
+    private function acksAwaitedQuery($concernIds)
+    {
+        return SafeguardingExternalReport::query()
+            ->where('acknowledgement_received', false)
+            ->whereIn('safeguarding_concern_id', $concernIds);
+    }
+
+    private function overdueActionsCount(): int
+    {
+        return \App\Models\SafeguardingActionPlan::query()
+            ->where('due_date', '<', now())
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereIn('safeguarding_concern_id', $this->openConcernIds())
+            ->count();
+    }
+
+    /**
+     * The Reviews-due worklist: risk reviews due + external-report acknowledgements
+     * awaited, each redaction-aware, shaped like a (single-page) paginator.
+     */
+    private function reviewWorklist($concernIds, User $user, bool $canSensitive): array
+    {
+        $riskItems = $this->riskReviewQuery($concernIds)
+            ->with(['subject', 'riskAssessments' => fn ($q) => $q->whereNotNull('next_review_date')->orderBy('next_review_date')])
+            ->get()
+            ->map(function (SafeguardingConcern $c) use ($user, $canSensitive) {
+                $review = $c->riskAssessments->first();
+                $restricted = $this->isConcernRestricted($c, $user, $canSensitive);
+
+                return [
+                    'id' => $c->id,
+                    'reference_number' => $c->reference_number,
+                    'restricted' => $restricted,
+                    'subject' => $restricted ? null : $this->subjectDisplayName($c),
+                    'kind' => 'risk',
+                    'detail' => 'Risk review',
+                    'due_at' => $review?->next_review_date?->toISOString(),
+                    'overdue' => (bool) ($review && $review->next_review_date && $review->next_review_date->isPast()),
+                ];
+            });
+
+        $ackItems = $this->acksAwaitedQuery($concernIds)
+            ->with(['concern.subject'])
+            ->get()
+            ->map(function (SafeguardingExternalReport $r) use ($user, $canSensitive) {
+                $c = $r->concern;
+                if (! $c) {
+                    return null;
+                }
+                $restricted = $this->isConcernRestricted($c, $user, $canSensitive);
+
+                return [
+                    'id' => $c->id,
+                    'reference_number' => $c->reference_number,
+                    'restricted' => $restricted,
+                    'subject' => $restricted ? null : $this->subjectDisplayName($c),
+                    'kind' => 'ack',
+                    'detail' => 'Acknowledgement awaited · ' . $r->authority_name,
+                    'due_at' => $r->reported_at?->toISOString(),
+                    'overdue' => (bool) ($r->reported_at && $r->reported_at->lt(now()->subDays(7))),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        return [
+            'data' => $riskItems->concat($ackItems)->values()->all(),
+            'links' => [],
+            'last_page' => 1,
+        ];
     }
 
     private function normalizeConcernInput(Request $request, array $validated): array

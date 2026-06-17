@@ -22,6 +22,7 @@ class SafeguardingConcern extends Model
         'concern_type',
         'abuse_category',
         'severity',
+        'is_sensitive',
         'description',
         'occurred_at',
         'location',
@@ -70,6 +71,7 @@ class SafeguardingConcern extends Model
         'closed_at' => 'datetime',
         'subject_informed' => 'boolean',
         'requires_external_referral' => 'boolean',
+        'is_sensitive' => 'boolean',
     ];
 
     /**

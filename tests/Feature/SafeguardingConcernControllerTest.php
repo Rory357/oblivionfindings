@@ -87,39 +87,44 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('safeguarding/index')
-                ->has('concerns')
+                ->has('rows')
                 ->has('filters')
-                ->has('stats')
+                ->has('tab')
+                ->has('tabCounts')
+                ->has('hero')
             );
     }
 
-    public function test_safeguarding_index_shows_stats(): void
+    public function test_safeguarding_index_shows_hero_counts(): void
     {
-        SafeguardingConcern::factory()->count(3)->create(['status' => 'reported']);
+        // Pin severities — the factory randomises severity, which would otherwise
+        // make the criticalOpen count non-deterministic.
+        SafeguardingConcern::factory()->count(3)->create(['status' => 'reported', 'severity' => 'medium']);
         SafeguardingConcern::factory()->critical()->count(2)->create(['status' => 'investigating']);
-        SafeguardingConcern::factory()->closed()->count(1)->create();
+        SafeguardingConcern::factory()->closed()->count(1)->create(['severity' => 'low']);
 
         $this->actingAs($this->admin)
             ->get('/safeguarding')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('stats.open')
-                ->has('stats.critical')
-                ->has('stats.requiring_referral')
-                ->has('stats.assigned_to_me')
+                ->where('hero.openWork.awaitingTriage.value', 3)
+                ->where('hero.openWork.investigating.value', 2)
+                ->where('hero.attention.criticalOpen.value', 2)
+                ->has('hero.attention.reviewsDue.value')
             );
     }
 
-    public function test_safeguarding_index_filter_by_status(): void
+    public function test_safeguarding_index_filter_by_tab(): void
     {
         SafeguardingConcern::factory()->count(3)->create(['status' => 'reported']);
         SafeguardingConcern::factory()->count(2)->create(['status' => 'investigating']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?status=reported')
+            ->get('/safeguarding?tab=triage')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 3)
+                ->where('rowsKind', 'concerns')
+                ->has('rows.data', 3)
             );
     }
 
@@ -132,7 +137,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get('/safeguarding?severity=critical')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 2)
+                ->has('rows.data', 2)
             );
     }
 
@@ -142,23 +147,34 @@ class SafeguardingConcernControllerTest extends TestCase
         SafeguardingConcern::factory()->create(['description' => 'Another concern']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?search=Unique')
+            ->get('/safeguarding?q=Unique')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 1)
+                ->has('rows.data', 1)
             );
     }
 
-    public function test_safeguarding_index_filter_by_concern_type(): void
+    public function test_safeguarding_index_filter_by_category(): void
     {
-        SafeguardingConcern::factory()->count(2)->create(['concern_type' => 'abuse']);
-        SafeguardingConcern::factory()->count(3)->create(['concern_type' => 'neglect']);
+        SafeguardingConcern::factory()->count(2)->create(['abuse_category' => 'financial']);
+        SafeguardingConcern::factory()->count(3)->create(['abuse_category' => 'physical']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?concern_type=abuse')
+            ->get('/safeguarding?category=financial')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 2)
+                ->has('rows.data', 2)
+            );
+    }
+
+    public function test_safeguarding_index_reviews_tab_returns_worklist(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/safeguarding?tab=reviews')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('rowsKind', 'reviews')
+                ->has('rows.data')
             );
     }
 
@@ -170,7 +186,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get('/safeguarding')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 20)
+                ->has('rows.data', 20)
             );
     }
 

@@ -17,6 +17,26 @@
 ### Step 1 (schema & enum) — no UI surface
 Backend-only; nothing to compare. Incidents-parity gate applies from Step 3 (list) onward.
 
+### Step 2 (lifecycle guards + triage) — no UI surface
+Backend-only. The service+controller+gate-reasons pattern mirrors how Incidents enforces its lifecycle;
+UI parity verified in Steps 4–5. Nothing to log.
+
+### Step 3 (list page) — matched 1:1, adopted as-is
+`safeguarding/index.tsx` was authored directly from `incidents/index.tsx`, reusing the **same** primitives
+(no forks):
+- `HeroShell` + `HeroMedallion` + `HeroStatusPill` + `HeroCluster`/`HeroClusterTile` + `HeroSegmented`
+  from `@/pages/health-safety/components/hs-hero-kit` — identical composition/spacing/footer band.
+- `TabStrip`/`RosterTabItem` + `EntityFilter` (onDark) + `ShiftContextMenu`/`ShiftCtxItem`/`ShiftCtxState`
+  from `@/components/rostering` — identical tab chip/badge API and the same `openRowCtx` right-click
+  mechanism + row click → open.
+- Same table anatomy (When/ref · subject avatar · severity pill · stage pill · assigned · flags),
+  same empty-state + `LaravelPagination` pattern, same `Card`/`CardContent` wrapper.
+Intentional safeguarding deltas (per spec, not divergences): `ShieldAlert` medallion vs `AlertTriangle`;
+"need-to-know" eyebrow; **counts-only** clusters (no compliance badges); Subject column is redactable
+(Restricted hatched row) vs Incidents' Client; 8 safeguarding stages; reviews/monitoring worklist
+instead of follow-ups; external-referral banner.
+**No inconsistencies found in Incidents.** No shared primitives modified (pure reuse).
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - _(none yet)_
 
