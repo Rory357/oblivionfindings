@@ -83,6 +83,12 @@ idiom. Safeguarding deltas: per-file `notes` + `is_sensitive` with **sensitivity
 (`viewSensitive`) + redaction-aware `locked` serialization (Incidents used `portal_visible` instead).
 **No inconsistencies found; no shared primitives modified.**
 
+### Step 7b (auto-advance + reminders) — backend, pattern-consistent
+`SafeguardingInvestigationObserver` follows the existing observer idiom (registered in AppServiceProvider
+beside `SafeguardingConcernObserver`); `safeguarding:review-reminders` mirrors the H&S/governance scheduled
+commands in `routes/console.php` (`->timezone('Pacific/Auckland')->dailyAt(...)`). No UI surface; nothing to
+compare. No inconsistencies; no shared primitives modified.
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - `IncidentReportDialog` "Open incident" reads `flash.created_incident_id`, never shared by
   `HandleInertiaRequests` → button never appears. Not fixed (would touch Incidents); Safeguarding shares

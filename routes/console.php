@@ -200,6 +200,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:15');
 
+// Safeguarding monitoring — risk reviews due + external-report acknowledgements awaited (daily)
+app(Schedule::class)
+    ->command('safeguarding:review-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:20');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)

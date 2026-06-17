@@ -18,8 +18,8 @@
 | 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | ✅ done (4a `8a6ed4c7` + 4b action panes) | 4b _(this commit)_ |
 | 5 | Triage modal + gated Close modal | ✅ done | _(this commit)_ |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | ✅ done | _(this commit)_ |
-| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | 🔄 7a evidence done, 7b (auto-advance + reminders) next | 7a _(this commit)_ |
-| 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | todo | — |
+| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | ✅ done (7a evidence `de7670f0` + 7b auto-advance/reminders) | 7b _(this commit)_ |
+| 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | in-progress (next — FINAL) | — |
 
 ## Migration policy
 Per established loop policy for this user (Incidents near-twin loop): **run local migrations autonomously**
@@ -125,6 +125,15 @@ steps 1, 7, (maybe) 8.
   upload needs forceFormData (breaks store()'s `boolean` validation) or a two-phase chain; evidence is one
   click away via the success pane → Open concern → Evidence (matches shipped Incidents wizard). **7b next:**
   W5 auto-advance on investigation-complete + W9 reminders job + W10 close-check verify.
+- 2026-06-18 — **Step 7b done → Step 7 complete.** W5: `SafeguardingInvestigationObserver::updated`
+  auto-advances a concern `investigating`→`action_plan` when its investigation completes (registered in
+  AppServiceProvider beside the concern observer). W9: `php artisan safeguarding:review-reminders {--days=7}`
+  command counts due risk reviews + stalled external-report acknowledgements + logs a summary; scheduled
+  daily 08:20 NZ in routes/console.php. W10: confirmed the subject-not-informed warning is already in the
+  ClosePane (+ backend close gate) — no code. `SafeguardingMonitoringTest` (3: completes-advances /
+  non-complete-leaves / reminders-counts). **Full safeguarding suite 77 tests green** (no regression from
+  the observer). No frontend touched. **Step 8 (FINAL) next:** X1 reverse incident relation, X2 Control
+  Room quick-actions, X3 state-sync, NZ authority currency (MSD-DSS) — then merge + deploy + Chrome-verify.
 
 ## Shared-file edits (watch at integration / merge time)
 - **Step 6** — `app/Http/Middleware/HandleInertiaRequests.php`: added one flash key `created_concern_id`
