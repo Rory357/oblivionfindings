@@ -15,8 +15,8 @@
 | 1 | Schema & enum — `store()` sets `status='reported'` (W1); add `no_action_required` to status enum (W2); backfill | ✅ done | `e9fd0862` |
 | 2 | Lifecycle guards + triage action — transition guard + gates on `updateStatus`/`close` (W3/W6/W7); dedicated `triage` (W4) | ✅ done | `a78358cd` |
 | 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | ✅ done | _(this commit)_ |
-| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | 🔄 4a done (read-only + retire show), 4b next (action panes) | 4a _(this commit)_ |
-| 5 | Triage modal + gated Close modal | todo | — |
+| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | ✅ done (4a `8a6ed4c7` + 4b action panes) | 4b _(this commit)_ |
+| 5 | Triage modal + gated Close modal | in-progress (next) | — |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | todo | — |
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | todo | — |
 | 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | todo | — |
@@ -78,6 +78,17 @@ steps 1, 7, (maybe) 8.
   tests green. **4b next:** Options bar action panes (assign/investigation/external report/risk/action/
   mark-informed). **Step 5:** Triage decision screen + gated Close checklist. (Dead `serializeConcernForShow`
   + `serializeUser` left in controller — cleanup candidate.)
+- 2026-06-17 — **Step 4b done.** Gated Options bar wired into `SafeguardingConcernDialog` (footer, like
+  IncidentDetailDialog's ActionPane): `OptionBtn` buttons hide on missing permission, disable+reason when
+  the lifecycle forbids (e.g. "Triage the concern first" on a reported concern). Five action panes on the
+  shell — Assign · Add risk · Start investigation · Log referral · Add action — plus a direct Mark-informed
+  POST; all `back()`+flash-error-guard so the detail-over-list refreshes in place. `buildConcernDetail`
+  now serializes `assignable_staff`. Server hardening: `SafeguardingInvestigationController@store` rejects
+  starting an investigation on a `reported` (un-triaged) concern (matches the gated UI button; triage's own
+  investigate path creates the record directly so it's unaffected). New `SafeguardingSubRecordTest` (4:
+  investigation guard + triaged-advances + risk/report store). tsc/eslint/build green; 20 tests green.
+  **Triage + Close NOT in the Options bar yet → Step 5** adds them (prototype-faithful decision screen +
+  gated close checklist).
 
 ## Shared-file edits (watch at integration / merge time)
 - _(none yet)_

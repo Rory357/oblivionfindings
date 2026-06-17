@@ -48,6 +48,15 @@ tracker + Risk/External-reports; **Restricted locked state** + "Viewing is logge
 `show.tsx` retired to a thin `concern.tsx` shell (kept off viewAny for reporter/assignee deep links) vs Incidents
 which deferred its show retirement. **No inconsistencies found; no shared primitives modified.**
 
+### Step 4b (detail Options-bar action panes) — matched 1:1
+Same `IncidentDetailDialog` pattern: the gated Options bar lives in `footerEnd` (suppressed while a pane
+owns the body), action panes are `useForm` forms on the shared `Field`/`SelectInput`/`StepHead`/`Textarea`
+primitives, and every submit uses the `back()` + `flash.error` guard so the detail-over-list refreshes in
+place (same `onSuccessGuard` idiom as `ActionPane`/`EditPane`). Safeguarding deltas: permission-aware hide
++ lifecycle disable-with-reason on each button (incidents mostly conditionally-renders); five panes
+(assign/risk/investigation/referral/action) + direct mark-informed. **No inconsistencies found; no shared
+primitives modified.**
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - _(none yet)_
 

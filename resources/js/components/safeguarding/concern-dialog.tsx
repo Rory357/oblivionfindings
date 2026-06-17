@@ -1,9 +1,13 @@
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { InfoCard } from '@/components/wizard/primitives';
+import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
+    BadgeCheck,
     CheckCircle2,
     ClipboardCheck,
     Clock,
@@ -13,14 +17,16 @@ import {
     LinkIcon,
     ListTodo,
     Lock,
+    Plus,
     RadioTower,
     Search,
     Shield,
     ShieldAlert,
     User as UserIcon,
+    UserCog,
     Users,
 } from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors SafeguardingConcernController::buildConcernDetail() */
@@ -72,7 +78,10 @@ export type ConcernDetail = {
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
     can?: { update: boolean; investigate: boolean; report_external: boolean };
+    assignable_staff?: Array<{ id: number; name: string }>;
 };
+
+type ActionKey = 'assign' | 'investigation' | 'report' | 'risk' | 'action';
 
 type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'linked';
 
@@ -97,12 +106,18 @@ function titleCase(s: string | null | undefined): string {
     return (s ?? '').replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const todayStr = (): string => {
+    const dt = new Date();
+    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
 /* ------------------------------------------------------------------ */
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
 export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: ConcernDetail; open: boolean; onClose: () => void }) {
     const [section, setSection] = useState<SectionKey>('overview');
+    const [action, setAction] = useState<ActionKey | null>(null);
     const d = detail;
 
     if (d.restricted) {
@@ -157,10 +172,28 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
         </div>
     );
 
-    const footerEnd = (
-        <Link href={`/safeguarding/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
-            <ExternalLink className="h-4 w-4" /> Open full page
-        </Link>
+    // Gated Options bar — buttons hide when the viewer lacks permission and
+    // disable (with a one-line reason) when the lifecycle forbids the action.
+    // Triage + Close are added in Step 5. Suppressed while an action pane owns the body.
+    const terminal = d.status === 'closed' || d.status === 'no_action_required';
+    const reported = d.status === 'reported';
+    const can = d.can ?? { update: false, investigate: false, report_external: false };
+    const triageFirst = 'Triage the concern first.';
+
+    const markInformed = () => router.post(`/safeguarding/${d.id}/subject-informed`, {}, { preserveScroll: true });
+
+    const footerEnd = action ? null : (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link href={`/safeguarding/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
+                <ExternalLink className="h-4 w-4" /> Open full page
+            </Link>
+            {can.update && !terminal ? <OptionBtn icon={UserCog} label="Assign" onClick={() => setAction('assign')} /> : null}
+            {can.update && !terminal ? <OptionBtn icon={Activity} label="Add risk" onClick={() => setAction('risk')} /> : null}
+            {can.investigate && !terminal ? <OptionBtn icon={Search} label="Start investigation" onClick={() => setAction('investigation')} disabled={reported} reason={triageFirst} /> : null}
+            {can.report_external && !terminal ? <OptionBtn icon={Landmark} label="Log referral" onClick={() => setAction('report')} disabled={reported} reason={triageFirst} /> : null}
+            {can.update && !terminal ? <OptionBtn icon={ListTodo} label="Add action" onClick={() => setAction('action')} disabled={reported} reason={triageFirst} /> : null}
+            {can.update && !terminal && !d.subject_informed ? <OptionBtn icon={BadgeCheck} label="Mark informed" onClick={markInformed} /> : null}
+        </div>
     );
 
     return (
@@ -178,14 +211,298 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {section === 'overview' ? <OverviewSection d={d} subjectName={subjectName} /> : null}
-            {section === 'timeline' ? <TimelineSection d={d} /> : null}
-            {section === 'risk' ? <RiskSection d={d} /> : null}
-            {section === 'investigation' ? <InvestigationSection d={d} /> : null}
-            {section === 'reports' ? <ReportsSection d={d} /> : null}
-            {section === 'actions' ? <ActionsSection d={d} /> : null}
-            {section === 'linked' ? <LinkedSection d={d} subject={subject} /> : null}
+            {action === 'assign' ? (
+                <AssignPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'investigation' ? (
+                <InvestigationPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'report' ? (
+                <ReportPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'risk' ? (
+                <RiskPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'action' ? (
+                <ActionItemPane d={d} onDone={() => setAction(null)} />
+            ) : (
+                <>
+                    {section === 'overview' ? <OverviewSection d={d} subjectName={subjectName} /> : null}
+                    {section === 'timeline' ? <TimelineSection d={d} /> : null}
+                    {section === 'risk' ? <RiskSection d={d} /> : null}
+                    {section === 'investigation' ? <InvestigationSection d={d} /> : null}
+                    {section === 'reports' ? <ReportsSection d={d} /> : null}
+                    {section === 'actions' ? <ActionsSection d={d} /> : null}
+                    {section === 'linked' ? <LinkedSection d={d} subject={subject} /> : null}
+                </>
+            )}
         </WizardShell>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Options bar button + action panes                                  */
+/* ------------------------------------------------------------------ */
+
+function OptionBtn({ icon: Icon, label, onClick, disabled, reason }: { icon: ComponentType<{ className?: string }>; label: string; onClick: () => void; disabled?: boolean; reason?: string }) {
+    return (
+        <Button size="sm" variant="outline" onClick={onClick} disabled={disabled} title={disabled ? reason : undefined}>
+            <Icon className="mr-1.5 h-4 w-4" /> {label}
+        </Button>
+    );
+}
+
+/** Shared submit handler: post, keep the pane open if the server flashed an error. */
+function onSuccessGuard(onDone: () => void) {
+    return (page: { props: Record<string, unknown> }) => {
+        const flash = page.props.flash as { error?: string } | undefined;
+        if (!flash?.error) onDone();
+    };
+}
+
+function PaneShell({ children, onCancel, onSubmit, cta, processing }: { children: ReactNode; onCancel: () => void; onSubmit: (e: FormEvent) => void; cta: string; processing: boolean }) {
+    return (
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            {children}
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={processing}>
+                    {cta}
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const staff = d.assignable_staff ?? [];
+    const form = useForm<{ assigned_to_user_id: string }>({ assigned_to_user_id: '' });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.assigned_to_user_id) {
+            form.setError('assigned_to_user_id', 'Choose a lead.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/assign`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    return (
+        <>
+            <StepHead icon={UserCog} title="Assign a lead" blurb="The lead owns the concern through triage, investigation and closure." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Assign lead" processing={form.processing}>
+                <Field label="Lead" required error={form.errors.assigned_to_user_id}>
+                    <SelectInput value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} placeholder="Select a lead" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                </Field>
+            </PaneShell>
+        </>
+    );
+}
+
+function InvestigationPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const staff = d.assignable_staff ?? [];
+    const form = useForm<{ investigation_type: string; lead_investigator_id: string; started_at: string; terms_of_reference: string; methodology: string }>({
+        investigation_type: 'internal',
+        lead_investigator_id: '',
+        started_at: todayStr(),
+        terms_of_reference: '',
+        methodology: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.lead_investigator_id) {
+            form.setError('lead_investigator_id', 'Choose a lead investigator.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/investigations`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    return (
+        <>
+            <StepHead icon={Search} title="Start an investigation" blurb="Opening an investigation record moves the concern to Under investigation. Completing it auto-advances the concern." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Open investigation" processing={form.processing}>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Type" required>
+                        <SelectInput value={form.data.investigation_type} onChange={(v) => form.setData('investigation_type', v)} placeholder="Type" options={[{ value: 'internal', label: 'Internal' }, { value: 'external', label: 'External' }, { value: 'joint', label: 'Joint' }]} />
+                    </Field>
+                    <Field label="Lead investigator" required error={form.errors.lead_investigator_id}>
+                        <SelectInput value={form.data.lead_investigator_id} onChange={(v) => form.setData('lead_investigator_id', v)} placeholder="Select" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                    </Field>
+                </div>
+                <Field label="Started" required error={form.errors.started_at}>
+                    <Input type="date" value={form.data.started_at} onChange={(e) => form.setData('started_at', e.target.value)} />
+                </Field>
+                <Field label="Terms of reference" hint="Optional">
+                    <Textarea rows={2} value={form.data.terms_of_reference} onChange={(e) => form.setData('terms_of_reference', e.target.value)} />
+                </Field>
+                <Field label="Methodology" hint="Optional">
+                    <Input value={form.data.methodology} onChange={(e) => form.setData('methodology', e.target.value)} />
+                </Field>
+            </PaneShell>
+        </>
+    );
+}
+
+const AUTHORITIES = [
+    { value: 'police', label: 'NZ Police' },
+    { value: 'oranga_tamariki', label: 'Oranga Tamariki' },
+    { value: 'hdc', label: 'Health & Disability Commissioner' },
+    { value: 'health_nz', label: 'Te Whatu Ora – Health NZ' },
+    { value: 'whaikaha', label: 'Whaikaha' },
+    { value: 'privacy_commissioner', label: 'Privacy Commissioner' },
+    { value: 'worksafe', label: 'WorkSafe' },
+    { value: 'other', label: 'Other' },
+];
+
+function ReportPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const form = useForm<{ authority_type: string; authority_name: string; report_method: string; reported_at: string; report_summary: string }>({
+        authority_type: '',
+        authority_name: '',
+        report_method: 'phone',
+        reported_at: todayStr(),
+        report_summary: '',
+    });
+    const pickAuthority = (v: string) => {
+        form.setData('authority_type', v);
+        const label = AUTHORITIES.find((a) => a.value === v)?.label ?? '';
+        if (!form.data.authority_name || AUTHORITIES.some((a) => a.label === form.data.authority_name)) {
+            form.setData('authority_name', label);
+        }
+    };
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/safeguarding/${d.id}/external-reports`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    return (
+        <>
+            <StepHead icon={Landmark} title="Log an external referral" blurb="Record a report to an external authority. NZ has no single adult-safeguarding statute — you choose the right authority." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Log report" processing={form.processing}>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Authority" required error={form.errors.authority_type}>
+                        <SelectInput value={form.data.authority_type} onChange={pickAuthority} placeholder="Select authority" options={AUTHORITIES} />
+                    </Field>
+                    <Field label="Authority name" required error={form.errors.authority_name}>
+                        <Input value={form.data.authority_name} onChange={(e) => form.setData('authority_name', e.target.value)} placeholder="e.g. NZ Police — Central" />
+                    </Field>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Method">
+                        <SelectInput value={form.data.report_method} onChange={(v) => form.setData('report_method', v)} placeholder="Method" options={[{ value: 'phone', label: 'Phone' }, { value: 'email', label: 'Email' }, { value: 'online_form', label: 'Online form' }, { value: 'in_person', label: 'In person' }, { value: 'letter', label: 'Letter' }]} />
+                    </Field>
+                    <Field label="Reported" required error={form.errors.reported_at}>
+                        <Input type="date" value={form.data.reported_at} onChange={(e) => form.setData('reported_at', e.target.value)} />
+                    </Field>
+                </div>
+                <Field label="What was reported" required error={form.errors.report_summary}>
+                    <Textarea rows={3} value={form.data.report_summary} onChange={(e) => form.setData('report_summary', e.target.value)} />
+                </Field>
+            </PaneShell>
+        </>
+    );
+}
+
+const RISK_OPTS = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+];
+
+function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const form = useForm<{ overall_risk_level: string; risk_to_self: string; risk_to_others: string; risk_from_others: string; mental_capacity: string; protective_measures: string; next_review_date: string; assessment_notes: string }>({
+        overall_risk_level: d.current_risk_level ?? '',
+        risk_to_self: '',
+        risk_to_others: '',
+        risk_from_others: '',
+        mental_capacity: '',
+        protective_measures: '',
+        next_review_date: '',
+        assessment_notes: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.overall_risk_level) {
+            form.setError('overall_risk_level', 'Set the overall risk level.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/risk-assessments`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    return (
+        <>
+            <StepHead icon={Activity} title="Risk assessment" blurb="Record the current risk picture and when it should next be reviewed." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Save assessment" processing={form.processing}>
+                <Field label="Overall risk" required error={form.errors.overall_risk_level}>
+                    <SelectInput value={form.data.overall_risk_level} onChange={(v) => form.setData('overall_risk_level', v)} placeholder="Overall risk" options={RISK_OPTS} />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="To self">
+                        <SelectInput value={form.data.risk_to_self} onChange={(v) => form.setData('risk_to_self', v)} placeholder="—" options={RISK_OPTS} />
+                    </Field>
+                    <Field label="To others">
+                        <SelectInput value={form.data.risk_to_others} onChange={(v) => form.setData('risk_to_others', v)} placeholder="—" options={RISK_OPTS} />
+                    </Field>
+                    <Field label="From others">
+                        <SelectInput value={form.data.risk_from_others} onChange={(v) => form.setData('risk_from_others', v)} placeholder="—" options={RISK_OPTS} />
+                    </Field>
+                </div>
+                <Field label="Protective measures" hint="One per line">
+                    <Textarea rows={2} value={form.data.protective_measures} onChange={(e) => form.setData('protective_measures', e.target.value)} />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Mental capacity" hint="Optional">
+                        <SelectInput value={form.data.mental_capacity} onChange={(v) => form.setData('mental_capacity', v)} placeholder="—" options={[{ value: 'has_capacity', label: 'Has capacity' }, { value: 'lacks_capacity', label: 'Lacks capacity' }, { value: 'fluctuating', label: 'Fluctuating' }, { value: 'not_assessed', label: 'Not assessed' }]} />
+                    </Field>
+                    <Field label="Next review">
+                        <Input type="date" value={form.data.next_review_date} onChange={(e) => form.setData('next_review_date', e.target.value)} />
+                    </Field>
+                </div>
+                <Field label="Notes" hint="Optional">
+                    <Textarea rows={2} value={form.data.assessment_notes} onChange={(e) => form.setData('assessment_notes', e.target.value)} />
+                </Field>
+            </PaneShell>
+        </>
+    );
+}
+
+function ActionItemPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+    const staff = d.assignable_staff ?? [];
+    const form = useForm<{ action_description: string; action_type: string; assigned_to_user_id: string; due_date: string }>({
+        action_description: '',
+        action_type: 'protective_measure',
+        assigned_to_user_id: '',
+        due_date: '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.action_description.trim()) {
+            form.setError('action_description', 'Describe the action.');
+            return;
+        }
+        if (!form.data.assigned_to_user_id) {
+            form.setError('assigned_to_user_id', 'Assign an owner.');
+            return;
+        }
+        if (!form.data.due_date) {
+            form.setError('due_date', 'Set a due date.');
+            return;
+        }
+        form.post(`/safeguarding/${d.id}/action-plans`, { preserveScroll: true, onSuccess: onSuccessGuard(onDone) });
+    };
+    return (
+        <>
+            <StepHead icon={ListTodo} title="Add a protective action" blurb="Track a protective measure or corrective action with an owner and due date." />
+            <PaneShell onCancel={onDone} onSubmit={submit} cta="Add action" processing={form.processing}>
+                <Field label="Action" required error={form.errors.action_description}>
+                    <Textarea rows={2} value={form.data.action_description} onChange={(e) => form.setData('action_description', e.target.value)} placeholder="e.g. Increase observations and review the support plan" />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Type">
+                        <SelectInput value={form.data.action_type} onChange={(v) => form.setData('action_type', v)} placeholder="Type" options={[{ value: 'protective_measure', label: 'Protective measure' }, { value: 'support_service', label: 'Support service' }, { value: 'supervision', label: 'Supervision' }, { value: 'monitoring', label: 'Monitoring' }, { value: 'training', label: 'Training' }, { value: 'policy_change', label: 'Policy change' }, { value: 'referral', label: 'Referral' }, { value: 'other', label: 'Other' }]} />
+                    </Field>
+                    <Field label="Owner" required error={form.errors.assigned_to_user_id}>
+                        <SelectInput value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} placeholder="Owner" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                    </Field>
+                    <Field label="Due" required error={form.errors.due_date}>
+                        <Input type="date" value={form.data.due_date} onChange={(e) => form.setData('due_date', e.target.value)} />
+                    </Field>
+                </div>
+            </PaneShell>
+        </>
     );
 }
 

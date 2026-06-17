@@ -809,6 +809,8 @@ class SafeguardingConcernController extends Controller
                 'investigate' => $user->can('investigate', $concern),
                 'report_external' => $user->can('reportExternal', $concern),
             ],
+            'assignable_staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
+                ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values()->all(),
         ];
     }
 

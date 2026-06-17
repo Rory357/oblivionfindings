@@ -17,6 +17,13 @@ class SafeguardingInvestigationController extends Controller
     {
         $this->authorize('investigate', $concern);
 
+        // An investigation can only be opened once the concern has been triaged
+        // (the UI disables "Start investigation" until then). Triage's own
+        // "investigate" path creates the record directly, so it isn't blocked here.
+        if ($concern->status === 'reported') {
+            return back()->withErrors(['investigation' => 'Triage the concern first.']);
+        }
+
         $validated = $request->validate([
             'investigation_type' => 'required|string',
             'lead_investigator_id' => 'required|exists:users,id',
