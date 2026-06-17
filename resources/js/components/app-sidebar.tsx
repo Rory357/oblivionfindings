@@ -1168,7 +1168,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
         incidents.push({
             title: 'Near Misses',
-            href: '/incidents?type=near_miss',
+            href: '/incidents?tab=near_misses',
             icon: AlertTriangle,
         });
     if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.incidents?.viewAny)
@@ -1185,6 +1185,25 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (incidents.length > 0)
         groups.push({ label: 'Incidents & Safeguarding', items: incidents });
+
+    // Investigate & Remediate — surfaces the two registers that govern the
+    // report → triage → investigate → remediate lifecycle. Both pages exist
+    // but were previously unreachable from the nav.
+    const investigate: NavItem[] = [];
+    if (can?.hazards?.view || can?.compliance?.view)
+        investigate.push({
+            title: 'Investigations',
+            href: '/health-safety/events',
+            icon: ClipboardCheck,
+        });
+    if (can?.hazards?.view || can?.compliance?.view)
+        investigate.push({
+            title: 'Corrective Actions',
+            href: '/health-safety/corrective-actions',
+            icon: Wrench,
+        });
+    if (investigate.length > 0)
+        groups.push({ label: 'Investigate & Remediate', items: investigate });
 
     // H&S Management
     const hsManagement: NavItem[] = [];

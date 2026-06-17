@@ -21,11 +21,13 @@ class ClientIncident extends Model implements EmitsToTimeline
         'client_id',
         'reported_by',
         'shift_id',
+        'control_room_alert_id',
         'respite_stay_id',
         'service_context_id',
         'template_id',
 
         'type',
+        'source',   // manual|control_room|sensor|automated (interactive is derived)
         'severity', // low|medium|high
         'status',   // draft|submitted|reviewed|closed
 
@@ -83,16 +85,13 @@ class ClientIncident extends Model implements EmitsToTimeline
         'injury_classification',
         'medical_treatment_type',
 
-        // Investigation fields
+        // Investigation tracking (the incident's denormalised status; the full
+        // investigation + root cause + corrective actions + lessons now live in the
+        // H&S register — HsInvestigation / HsCorrectiveAction — per Option B).
         'investigation_status',
         'investigation_assigned_to',
         'investigation_started_at',
         'investigation_completed_at',
-        'root_cause_category',
-        'root_cause_description',
-        'contributing_factors',
-        'corrective_actions',
-        'lessons_learned',
     ];
 
     protected $casts = [
@@ -111,7 +110,14 @@ class ClientIncident extends Model implements EmitsToTimeline
         'injured_person_age' => 'integer',
         'investigation_started_at' => 'datetime',
         'investigation_completed_at' => 'datetime',
-        'corrective_actions' => 'array',
+    ];
+
+    /**
+     * `interactive` is derived from `source` (see accessor) and surfaced to the
+     * UI without a stored column, so it can never drift from the source.
+     */
+    protected $appends = [
+        'interactive',
     ];
 
     public function client(): BelongsTo
@@ -127,6 +133,11 @@ class ClientIncident extends Model implements EmitsToTimeline
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    public function controlRoomAlert(): BelongsTo
+    {
+        return $this->belongsTo(ControlRoomAlert::class, 'control_room_alert_id');
     }
 
     public function respiteStay(): BelongsTo
@@ -162,6 +173,15 @@ class ClientIncident extends Model implements EmitsToTimeline
     public function isShiftLinked(): bool
     {
         return ! empty($this->shift_id);
+    }
+
+    /**
+     * Interactive = a human raised it (staff report or operator flag). Sensor /
+     * automated detections are non-interactive. Derived from source, never stored.
+     */
+    public function getInteractiveAttribute(): bool
+    {
+        return in_array($this->source, ['manual', 'control_room'], true);
     }
 
     public function getCategoryAttribute(): ?string

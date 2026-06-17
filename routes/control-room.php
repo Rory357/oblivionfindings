@@ -89,6 +89,15 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.acknowledge');
 
+        // Sensor triage (Gap B): confirm a detection into an incident, or dismiss it.
+        Route::post('/control-room/alerts/{alert}/confirm', [ControlRoomAlertController::class, 'confirm'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.confirm');
+
+        Route::post('/control-room/alerts/{alert}/dismiss', [ControlRoomAlertController::class, 'dismiss'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.dismiss');
+
         Route::post('/control-room/alerts/{alert}/triage', [ControlRoomAlertController::class, 'triage'])
             ->whereNumber('alert')
             ->name('control-room.alerts.triage');
@@ -224,6 +233,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/control-room/incidents/create-alert', [ControlRoomIncidentController::class, 'createAlertFromIncident'])
         ->middleware('permission:controlRoom.alerts.create')
         ->name('control-room.incidents.create-alert');
+    // Operator quick-flag: raise an alert and create the incident together (Gap A).
+    Route::post('/control-room/incidents/flag', [ControlRoomIncidentController::class, 'flagAsIncident'])
+        ->middleware('permission:controlRoom.alerts.create')
+        ->name('control-room.incidents.flag');
 
     // Live Statistics
     Route::get('/control-room/stats', ControlRoomStatsController::class)
