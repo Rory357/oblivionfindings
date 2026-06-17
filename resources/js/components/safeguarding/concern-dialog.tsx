@@ -13,16 +13,20 @@ import {
     CircleSlash,
     ClipboardCheck,
     Clock,
+    Download,
     ExternalLink,
     FileText,
     Landmark,
     LinkIcon,
     ListTodo,
     Lock,
+    Paperclip,
     RadioTower,
     Search,
     Shield,
     ShieldAlert,
+    Trash2,
+    Upload,
     User as UserIcon,
     UserCog,
     Users,
@@ -76,6 +80,19 @@ export type ConcernDetail = {
     external_reports?: Array<{ id: number; authority_type: string; authority_name: string; reported_at: string | null; method: string; summary: string | null; ack_received: boolean; acknowledged_at: string | null; ack_reference: string | null; authority_action: string | null }>;
     action_plans?: Array<{ id: number; description: string; type: string; assigned_to: string | null; due_date: string | null; status: string; completed_at: string | null; overdue: boolean }>;
     alerts?: Array<{ id: number; alert_type: string; summary: string; severity: string; active: boolean }>;
+    attachments?: Array<{
+        id: number;
+        locked: boolean;
+        is_sensitive?: boolean;
+        name?: string;
+        mime?: string | null;
+        is_image?: boolean;
+        size?: number | null;
+        notes?: string | null;
+        uploaded_by?: string | null;
+        created_at?: string | null;
+        download_url?: string;
+    }>;
     related_incident_id?: number | null;
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
@@ -85,7 +102,7 @@ export type ConcernDetail = {
 
 type ActionKey = 'triage' | 'assign' | 'investigation' | 'report' | 'risk' | 'action' | 'close';
 
-type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'linked';
+type SectionKey = 'overview' | 'timeline' | 'risk' | 'investigation' | 'reports' | 'actions' | 'evidence' | 'linked';
 
 /* ------------------------------------------------------------------ */
 /*  Tokens                                                             */
@@ -157,6 +174,7 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
         { key: 'investigation', label: 'Investigation', blurb: d.hs_event ? d.hs_event.reference_number : `${d.investigations?.length ?? 0} record${(d.investigations?.length ?? 0) === 1 ? '' : 's'}`, icon: Search },
         { key: 'reports', label: 'External reports', blurb: `${d.external_reports?.length ?? 0} logged`, icon: Landmark },
         { key: 'actions', label: 'Action plan', blurb: `${d.action_plans?.length ?? 0} item${(d.action_plans?.length ?? 0) === 1 ? '' : 's'}`, icon: ListTodo },
+        { key: 'evidence', label: 'Evidence', blurb: `${d.attachments?.length ?? 0} file${(d.attachments?.length ?? 0) === 1 ? '' : 's'}`, icon: Paperclip },
         { key: 'linked', label: 'Linked records', blurb: 'incident · H&S · alerts', icon: LinkIcon },
     ];
     const stepIndex = SECTIONS.findIndex((s) => s.key === section);
@@ -241,6 +259,7 @@ export function SafeguardingConcernDialog({ detail, open, onClose }: { detail: C
                     {section === 'investigation' ? <InvestigationSection d={d} /> : null}
                     {section === 'reports' ? <ReportsSection d={d} /> : null}
                     {section === 'actions' ? <ActionsSection d={d} /> : null}
+                    {section === 'evidence' ? <EvidenceSection d={d} /> : null}
                     {section === 'linked' ? <LinkedSection d={d} subject={subject} /> : null}
                 </>
             )}
@@ -919,6 +938,100 @@ function ActionsSection({ d }: { d: ConcernDetail }) {
                 </div>
             ))}
         </div>
+    );
+}
+
+function fmtSize(b?: number | null): string {
+    if (!b) return '';
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function EvidenceSection({ d }: { d: ConcernDetail }) {
+    const atts = d.attachments ?? [];
+    const canEdit = !!d.can?.update;
+    return (
+        <div className="flex flex-col gap-3">
+            {canEdit ? <EvidenceUploadForm concernId={d.id} /> : null}
+            {atts.length ? (
+                <div className="flex flex-col gap-2">
+                    {atts.map((a) =>
+                        a.locked ? (
+                            <div key={a.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground">
+                                <Lock className="h-4 w-4 shrink-0" />
+                                <span className="text-sm">Sensitive evidence · restricted (need-to-know)</span>
+                            </div>
+                        ) : (
+                            <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
+                                {a.is_image && a.download_url ? (
+                                    <img src={a.download_url} alt={a.name ?? 'evidence'} loading="lazy" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                                ) : (
+                                    <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
+                                        {a.name}
+                                        {a.is_sensitive ? (
+                                            <span className="inline-flex items-center gap-0.5 rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
+                                                <Lock className="h-2.5 w-2.5" /> Sensitive
+                                            </span>
+                                        ) : null}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {fmtSize(a.size)}
+                                        {a.uploaded_by ? ` · ${a.uploaded_by}` : ''}
+                                        {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
+                                    </p>
+                                    {a.notes ? <p className="mt-0.5 text-xs text-muted-foreground">{a.notes}</p> : null}
+                                </div>
+                                {a.download_url ? (
+                                    <a href={a.download_url} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted">
+                                        <Download className="h-3.5 w-3.5" /> Download
+                                    </a>
+                                ) : null}
+                                {canEdit ? (
+                                    <Button variant="ghost" size="sm" onClick={() => router.delete(`/safeguarding/${d.id}/attachments/${a.id}`, { preserveScroll: true })} className="text-status-critical hover:text-status-critical">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                ) : null}
+                            </div>
+                        ),
+                    )}
+                </div>
+            ) : (
+                <EmptyState icon={Paperclip} text="No evidence attached." />
+            )}
+        </div>
+    );
+}
+
+function EvidenceUploadForm({ concernId }: { concernId: number }) {
+    const form = useForm<{ file: File | null; notes: string; is_sensitive: boolean }>({ file: null, notes: '', is_sensitive: false });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.file) return;
+        form.post(`/safeguarding/${concernId}/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => form.reset() });
+    };
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-2 rounded-xl border border-dashed border-border p-3">
+            <input
+                type="file"
+                onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)}
+                className="text-sm text-muted-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium"
+            />
+            <Input value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="Note (optional)" />
+            <div className="flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs text-foreground">
+                    <input type="checkbox" checked={form.data.is_sensitive} onChange={(e) => form.setData('is_sensitive', e.target.checked)} className="h-3.5 w-3.5 rounded border-border" />
+                    Sensitive — restrict to cleared staff
+                </label>
+                <Button type="submit" size="sm" disabled={!form.data.file || form.processing}>
+                    <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
+                </Button>
+            </div>
+            {form.errors.file ? <span className="text-xs text-status-critical">{form.errors.file}</span> : null}
+        </form>
     );
 }
 

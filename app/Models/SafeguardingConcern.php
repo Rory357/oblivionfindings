@@ -242,6 +242,14 @@ class SafeguardingConcern extends Model
     }
 
     /**
+     * Evidence attachments (photos/documents).
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SafeguardingAttachment::class);
+    }
+
+    /**
      * Get the latest investigation.
      */
     public function latestInvestigation()

@@ -75,6 +75,14 @@ but that key isn't shared in `HandleInertiaRequests`, so its "Open incident" but
 Safeguarding adds `created_concern_id` to the shared flash so "Open concern" works (logged below). Left
 Incidents as-is per §7.
 
+### Step 7a (evidence) — matched 1:1
+`SafeguardingAttachmentController` mirrors `IncidentController::uploadAttachment/downloadAttachment/
+removeAttachment` (validate file max:10240, `$file->store(...,'public')`, `Storage::disk->download`,
+`back()`); the detail Evidence section mirrors the Incidents `PhotosSection`/`UploadForm`/`AttachmentRow`
+idiom. Safeguarding deltas: per-file `notes` + `is_sensitive` with **sensitivity-gated download**
+(`viewSensitive`) + redaction-aware `locked` serialization (Incidents used `portal_visible` instead).
+**No inconsistencies found; no shared primitives modified.**
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - `IncidentReportDialog` "Open incident" reads `flash.created_incident_id`, never shared by
   `HandleInertiaRequests` → button never appears. Not fixed (would touch Incidents); Safeguarding shares

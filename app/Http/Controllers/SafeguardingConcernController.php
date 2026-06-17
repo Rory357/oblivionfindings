@@ -703,7 +703,7 @@ class SafeguardingConcernController extends Controller
         $concern->load([
             'subject', 'allegedPerpetrator', 'reportedBy', 'assignedTo', 'closedBy', 'triagedBy',
             'site', 'investigations.leadInvestigator', 'externalReports.reportedBy',
-            'riskAssessments.assessor', 'actionPlans.assignedTo', 'alerts',
+            'riskAssessments.assessor', 'actionPlans.assignedTo', 'alerts', 'attachments.uploader',
         ]);
 
         // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
@@ -801,6 +801,26 @@ class SafeguardingConcernController extends Controller
                 'severity' => $al->severity,
                 'active' => (bool) $al->active,
             ])->values()->all(),
+            'attachments' => $concern->attachments->map(function (\App\Models\SafeguardingAttachment $a) use ($concern, $canSensitive) {
+                // Need-to-know: sensitive evidence is locked for viewers without viewSensitive.
+                if ($a->is_sensitive && ! $canSensitive) {
+                    return ['id' => $a->id, 'locked' => true, 'is_sensitive' => true];
+                }
+
+                return [
+                    'id' => $a->id,
+                    'locked' => false,
+                    'name' => $a->original_name,
+                    'mime' => $a->mime,
+                    'is_image' => $a->isImage(),
+                    'size' => $a->size,
+                    'notes' => $a->notes,
+                    'is_sensitive' => (bool) $a->is_sensitive,
+                    'uploaded_by' => $a->uploader?->name,
+                    'created_at' => $a->created_at?->toISOString(),
+                    'download_url' => "/safeguarding/{$concern->id}/attachments/{$a->id}/download",
+                ];
+            })->values()->all(),
             'related_incident_id' => $concern->related_incident_id,
             'hs_event' => $hsEvent,
             'control_room_alert_id' => null, // wired in Step 8

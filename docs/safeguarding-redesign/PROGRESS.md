@@ -18,7 +18,7 @@
 | 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | ✅ done (4a `8a6ed4c7` + 4b action panes) | 4b _(this commit)_ |
 | 5 | Triage modal + gated Close modal | ✅ done | _(this commit)_ |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | ✅ done | _(this commit)_ |
-| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | in-progress (next) | — |
+| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | 🔄 7a evidence done, 7b (auto-advance + reminders) next | 7a _(this commit)_ |
 | 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | todo | — |
 
 ## Migration policy
@@ -113,6 +113,18 @@ steps 1, 7, (maybe) 8.
   safeguarding tests green. (Dead `serializeConcernForShow`/`serializeConcernForForm`/`serializeUser` in
   controller — cleanup candidate.) Step 7 = evidence (`SafeguardingAttachment`) + auto-advance (W5) +
   reminders (W9).
+- 2026-06-18 — **Step 7a done (evidence, W8).** `SafeguardingAttachment` model + migration
+  `2026_06_18_000001` (safeguarding_attachments: concern_id, uploaded_by, disk, original_name, path,
+  mime, size, notes, **is_sensitive**) + `SafeguardingAttachmentController` (store/download/destroy,
+  mirrors `IncidentController` attachments on the `public` disk) + 3 routes. **Need-to-know:** sensitive
+  evidence download is gated by `viewSensitive` (403 else); `buildConcernDetail` serialises `attachments`
+  redaction-aware (sensitive → `{locked:true}` for uncleared viewers). New **Evidence rail section** in
+  `SafeguardingConcernDialog` (upload form w/ note + sensitive flag · image thumbs lazy-loaded · doc rows
+  w/ download + delete · locked placeholders). `SafeguardingAttachmentTest` (5). migrate local + tsc +
+  eslint + build + tests green. **Wizard-inline upload deferred** (kept the honest InfoCard) — create-time
+  upload needs forceFormData (breaks store()'s `boolean` validation) or a two-phase chain; evidence is one
+  click away via the success pane → Open concern → Evidence (matches shipped Incidents wizard). **7b next:**
+  W5 auto-advance on investigation-complete + W9 reminders job + W10 close-check verify.
 
 ## Shared-file edits (watch at integration / merge time)
 - **Step 6** — `app/Http/Middleware/HandleInertiaRequests.php`: added one flash key `created_concern_id`
