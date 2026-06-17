@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
@@ -23,7 +24,6 @@ import {
     Send,
     ShieldAlert,
     Trash2,
-    Upload,
     User,
     Users,
 } from 'lucide-react';
@@ -498,7 +498,7 @@ function PhotosSection({ d }: { d: IncidentDetail }) {
     const canEdit = d.status === 'draft' && d.can.update;
     return (
         <div className="flex flex-col gap-3">
-            {canEdit ? <UploadForm incidentId={d.id} /> : null}
+            {canEdit ? <AttachmentUploader endpoint={`/incidents/${d.id}/attachments`} hint="PDF, Word, images — up to 10 MB each" /> : null}
 
             {d.attachments.length ? (
                 <div className="flex flex-col gap-2">
@@ -514,28 +514,6 @@ function PhotosSection({ d }: { d: IncidentDetail }) {
                 </div>
             )}
         </div>
-    );
-}
-
-function UploadForm({ incidentId }: { incidentId: number }) {
-    const form = useForm<{ file: File | null }>({ file: null });
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
-        if (!form.data.file) return;
-        form.post(`/incidents/${incidentId}/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => form.reset() });
-    };
-    return (
-        <form onSubmit={submit} className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-border p-3">
-            <input
-                type="file"
-                onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)}
-                className="text-sm text-muted-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium"
-            />
-            <Button type="submit" size="sm" disabled={!form.data.file || form.processing}>
-                <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
-            </Button>
-            {form.errors.file ? <span className="text-xs text-status-critical">{form.errors.file}</span> : null}
-        </form>
     );
 }
 
