@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
@@ -26,7 +27,6 @@ import {
     Shield,
     ShieldAlert,
     Trash2,
-    Upload,
     User as UserIcon,
     UserCog,
     Users,
@@ -1136,7 +1136,14 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
     const canEdit = !!d.can?.update;
     return (
         <div className="flex flex-col gap-3">
-            {canEdit ? <EvidenceUploadForm concernId={d.id} /> : null}
+            {canEdit ? (
+                <AttachmentUploader
+                    endpoint={`/safeguarding/${d.id}/attachments`}
+                    noteField="notes"
+                    sensitive={{ field: 'is_sensitive', label: 'Sensitive — restrict to cleared staff' }}
+                    hint="PDF, Word, images — up to 10 MB each"
+                />
+            ) : null}
             {atts.length ? (
                 <div className="flex flex-col gap-2">
                     {atts.map((a) =>
@@ -1186,35 +1193,6 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
                 <EmptyState icon={Paperclip} text="No evidence attached." />
             )}
         </div>
-    );
-}
-
-function EvidenceUploadForm({ concernId }: { concernId: number }) {
-    const form = useForm<{ file: File | null; notes: string; is_sensitive: boolean }>({ file: null, notes: '', is_sensitive: false });
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
-        if (!form.data.file) return;
-        form.post(`/safeguarding/${concernId}/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => form.reset() });
-    };
-    return (
-        <form onSubmit={submit} className="flex flex-col gap-2 rounded-xl border border-dashed border-border p-3">
-            <input
-                type="file"
-                onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)}
-                className="text-sm text-muted-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium"
-            />
-            <Input value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="Note (optional)" />
-            <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-xs text-foreground">
-                    <input type="checkbox" checked={form.data.is_sensitive} onChange={(e) => form.setData('is_sensitive', e.target.checked)} className="h-3.5 w-3.5 rounded border-border" />
-                    Sensitive — restrict to cleared staff
-                </label>
-                <Button type="submit" size="sm" disabled={!form.data.file || form.processing}>
-                    <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
-                </Button>
-            </div>
-            {form.errors.file ? <span className="text-xs text-status-critical">{form.errors.file}</span> : null}
-        </form>
     );
 }
 
