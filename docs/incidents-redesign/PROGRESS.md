@@ -31,12 +31,12 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 
 ## Build order (each step independently shippable + verifiable)
 
-### ☐ Step 1 — Schema (Gaps C, D) ⚠️ migration write-only until human-confirmed
-- [ ] Migration: `source` enum (`manual|control_room|sensor|automated`, default `manual`) + `interactive` bool on `client_incidents`.
-- [ ] Migration: first-class `control_room_alert_id` FK (nullOnDelete) on `client_incidents`.
-- [ ] Backfill existing rows `source='manual'`.
-- [ ] Model: add to `$fillable` + casts + `controlRoomAlert()` relation.
-- [ ] *Verify:* migrate + rollback clean; existing incidents unaffected. **(needs human OK to run)**
+### ◑ Step 1 — Schema (Gaps C, D) ⚠️ CODE WRITTEN — migration NOT yet run (needs human OK)
+- [x] Migration `2026_06_17_120000_add_source_and_control_room_alert_to_client_incidents.php`: `source` string (`manual|control_room|sensor|automated`, default `manual`, indexed) + first-class `control_room_alert_id` FK (nullOnDelete). `php -l` clean.
+- [x] Backfill: `source` default `manual` backfills existing rows automatically (non-nullable default).
+- [x] `interactive` = derived model accessor (`source ∈ {manual, control_room}`), `$appends`-ed — NOT a column (design note: "derived from source"). Safe pre-migration (returns false).
+- [x] Model: `source` + `control_room_alert_id` in `$fillable`; `controlRoomAlert()` BelongsTo. `php -l` clean.
+- [ ] ⚠️ **GATE:** run `php artisan migrate` + verify rollback clean. **Awaiting human confirmation to run.**
 
 ### ☑ Step 2 — Nav / IA (§4a)
 - [x] Add "Investigate & Remediate" group to `app-sidebar.tsx` (Investigations → `/health-safety/events`, Corrective Actions → `/health-safety/corrective-actions`), after the incidents group.
@@ -72,3 +72,4 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 ## Log
 - 2026-06-17 — Mapped spec + codebase (component kit + cross-module backend). Branch + tracker created.
 - 2026-06-17 — Step 2 (nav) shipped: "Investigate & Remediate" group (Investigations + Corrective Actions) + near-miss repoint. `tsc` clean.
+- 2026-06-17 — Step 1 CODE written (migration + model, both `php -l` clean). Migration RUN gated on human confirm. Asked the user the migration-run policy for the loop.
