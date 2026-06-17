@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { InfoCard } from '@/components/wizard/primitives';
+import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -21,7 +23,7 @@ import {
     User,
     Users,
 } from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { useState, type ComponentType, type FormEvent } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors IncidentController::buildIncidentDetail()           */
@@ -133,8 +135,11 @@ function fmtSize(bytes: number | null): string {
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
+type LifecycleAction = 'review' | 'close' | 'reopen';
+
 export function IncidentDetailDialog({ detail, open, onClose }: { detail: IncidentDetail; open: boolean; onClose: () => void }) {
     const [section, setSection] = useState<SectionKey>('overview');
+    const [action, setAction] = useState<LifecycleAction | null>(null);
 
     const d = detail;
     const clientName = d.client ? `${d.client.first_name} ${d.client.last_name}`.trim() : 'No client linked';
@@ -156,7 +161,9 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
     const submit = () => router.post(`/incidents/${d.id}/submit`, {}, { preserveScroll: true });
     const completeFollowup = (fid: number) => router.post(`/incidents/${d.id}/followups/${fid}/complete`, {}, { preserveScroll: true });
 
-    const footerEnd = (
+    // While a lifecycle action pane is open it owns the body + its own buttons,
+    // so the Options bar is suppressed.
+    const footerEnd = action ? null : (
         <div className="flex flex-wrap items-center gap-2">
             <Link href={`/incidents/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
                 <ExternalLink className="h-4 w-4" /> Open full page
@@ -164,6 +171,21 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             {d.can.submit && d.status === 'draft' ? (
                 <Button size="sm" onClick={submit}>
                     <Send className="mr-1.5 h-4 w-4" /> Submit for review
+                </Button>
+            ) : null}
+            {d.can.review && d.status === 'submitted' ? (
+                <Button size="sm" onClick={() => setAction('review')}>
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Review
+                </Button>
+            ) : null}
+            {d.can.close && d.status === 'reviewed' ? (
+                <Button size="sm" onClick={() => setAction('close')}>
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close
+                </Button>
+            ) : null}
+            {d.can.reopen && d.status === 'closed' ? (
+                <Button size="sm" variant="outline" onClick={() => setAction('reopen')}>
+                    <RotateCcw className="mr-1.5 h-4 w-4" /> Reopen
                 </Button>
             ) : null}
         </div>
@@ -194,13 +216,90 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {section === 'overview' ? <OverviewSection d={d} isNearMiss={isNearMiss} /> : null}
-            {section === 'timeline' ? <TimelineSection d={d} /> : null}
-            {section === 'photos' ? <PhotosSection d={d} /> : null}
-            {section === 'followups' ? <FollowupsSection d={d} onComplete={completeFollowup} /> : null}
-            {section === 'investigation' ? <InvestigationSection d={d} /> : null}
-            {section === 'linked' ? <LinkedSection d={d} clientName={clientName} /> : null}
+            {action ? (
+                <ActionPane incidentId={d.id} action={action} onDone={() => setAction(null)} />
+            ) : (
+                <>
+                    {section === 'overview' ? <OverviewSection d={d} isNearMiss={isNearMiss} /> : null}
+                    {section === 'timeline' ? <TimelineSection d={d} /> : null}
+                    {section === 'photos' ? <PhotosSection d={d} /> : null}
+                    {section === 'followups' ? <FollowupsSection d={d} onComplete={completeFollowup} /> : null}
+                    {section === 'investigation' ? <InvestigationSection d={d} /> : null}
+                    {section === 'linked' ? <LinkedSection d={d} clientName={clientName} /> : null}
+                </>
+            )}
         </WizardShell>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lifecycle action pane (review / close / reopen)                    */
+/* ------------------------------------------------------------------ */
+
+const ACTION_META: Record<LifecycleAction, { title: string; blurb: string; icon: ComponentType<{ className?: string }>; cta: string }> = {
+    review: { title: 'Review incident', blurb: 'Mark this incident as reviewed and add any notes.', icon: CheckCircle2, cta: 'Mark reviewed' },
+    close: { title: 'Close incident', blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.', icon: CheckCircle2, cta: 'Close incident' },
+    reopen: { title: 'Reopen incident', blurb: 'Reopen a closed incident — a reason is required for the audit trail.', icon: RotateCcw, cta: 'Reopen incident' },
+};
+
+function ActionPane({ incidentId, action, onDone }: { incidentId: number; action: LifecycleAction; onDone: () => void }) {
+    const meta = ACTION_META[action];
+    const form = useForm<{ review_notes: string; closed_outcome: string; closed_notes: string; reopened_reason: string }>({
+        review_notes: '',
+        closed_outcome: '',
+        closed_notes: '',
+        reopened_reason: '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        const url = `/incidents/${incidentId}/${action}`;
+        form.post(url, {
+            preserveScroll: true,
+            // Guardrail failures come back as flash.error on a 302 (Inertia onSuccess),
+            // not a 422 — keep the pane open in that case so the user can adjust.
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={meta.icon} title={meta.title} blurb={meta.blurb} />
+
+            {action === 'review' ? (
+                <Field label="Review notes" hint="Optional">
+                    <Textarea rows={4} value={form.data.review_notes} onChange={(e) => form.setData('review_notes', e.target.value)} placeholder="Notes from your review…" />
+                </Field>
+            ) : null}
+
+            {action === 'close' ? (
+                <>
+                    <Field label="Outcome" required error={form.errors.closed_outcome}>
+                        <Input value={form.data.closed_outcome} onChange={(e) => form.setData('closed_outcome', e.target.value)} placeholder="e.g. Resolved — care plan updated" />
+                    </Field>
+                    <Field label="Closing notes" hint="Optional">
+                        <Textarea rows={3} value={form.data.closed_notes} onChange={(e) => form.setData('closed_notes', e.target.value)} />
+                    </Field>
+                </>
+            ) : null}
+
+            {action === 'reopen' ? (
+                <Field label="Reason for reopening" required error={form.errors.reopened_reason}>
+                    <Textarea rows={4} value={form.data.reopened_reason} onChange={(e) => form.setData('reopened_reason', e.target.value)} placeholder="Why is this incident being reopened?" />
+                </Field>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    {meta.cta}
+                </Button>
+            </div>
+        </form>
     );
 }
 
