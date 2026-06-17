@@ -2221,14 +2221,16 @@ class IncidentControllerTest extends TestCase
 
     public function test_index_filters_are_echoed_back(): void
     {
+        // The redesign replaced the status/reviewed filters with tabs; the echoed
+        // filter set is now q / tab / severity / source / from / to (+ site/client).
         $this->actingAs($this->admin)
-            ->get('/incidents?q=test&status=draft&severity=high&reviewed=yes&from=2025-01-01&to=2025-12-31')
+            ->get('/incidents?q=test&tab=open&severity=high&source=sensor&from=2025-01-01&to=2025-12-31')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('filters.q', 'test')
-                ->where('filters.status', 'draft')
+                ->where('filters.tab', 'open')
                 ->where('filters.severity', 'high')
-                ->where('filters.reviewed', 'yes')
+                ->where('filters.source', 'sensor')
                 ->where('filters.from', '2025-01-01')
                 ->where('filters.to', '2025-12-31')
             );
