@@ -124,6 +124,9 @@ class SafeguardingConcernController extends Controller
         $validated['reported_by_user_id'] = auth()->id();
         $validated['reported_at'] = now();
         $validated['created_by'] = auth()->id();
+        // W1: every concern starts in the explicit 'reported' (awaiting triage) stage,
+        // rather than relying on the DB column default.
+        $validated['status'] = 'reported';
 
         $concern = SafeguardingConcern::create($validated);
 
@@ -250,7 +253,7 @@ class SafeguardingConcernController extends Controller
         $this->authorize('update', $concern);
 
         $request->validate([
-            'status' => 'required|in:reported,triaged,investigating,action_plan,monitoring,closed,referred_external',
+            'status' => 'required|in:reported,triaged,investigating,action_plan,monitoring,closed,referred_external,no_action_required',
         ]);
 
         $concern->update([

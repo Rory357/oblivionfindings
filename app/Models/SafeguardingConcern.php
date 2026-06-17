@@ -242,19 +242,26 @@ class SafeguardingConcern extends Model
     }
 
     /**
+     * Terminal statuses — a concern in one of these is no longer "open work".
+     * `no_action_required` is the "No further action" triage outcome (folds in
+     * with closed for list/hero purposes).
+     */
+    public const TERMINAL_STATUSES = ['closed', 'no_action_required'];
+
+    /**
      * Scope: Open concerns.
      */
     public function scopeOpen($query)
     {
-        return $query->whereNotIn('status', ['closed']);
+        return $query->whereNotIn('status', self::TERMINAL_STATUSES);
     }
 
     /**
-     * Scope: Closed concerns.
+     * Scope: Closed concerns (incl. no-further-action).
      */
     public function scopeClosed($query)
     {
-        return $query->where('status', 'closed');
+        return $query->whereIn('status', self::TERMINAL_STATUSES);
     }
 
     /**
@@ -279,7 +286,7 @@ class SafeguardingConcern extends Model
      */
     public function isOpen(): bool
     {
-        return $this->status !== 'closed';
+        return ! in_array($this->status, self::TERMINAL_STATUSES, true);
     }
 
     /**
