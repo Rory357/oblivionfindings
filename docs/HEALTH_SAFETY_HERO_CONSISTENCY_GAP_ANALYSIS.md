@@ -77,11 +77,11 @@ strip, medallion, gradient/shadow and role banner must read as identical chrome.
 
 ## D. Action row & gradient (P2)
 
-- [ ] **D1** Analytics folds its two loose outline buttons (Board pack / WorkSafe
-  register) into the dashboard's translucent **popover** idiom (or at least its
-  translucent-pill style); keep export-led verbs. White primary `Export` stays.
-  _Still open — actions relocated into the eyebrow row (B) but remain 3 flat buttons;
-  popover consolidation deferred to its own pass._
+- [x] **D1** Analytics folds its two loose outline buttons into the dashboard's translucent
+  **popover** idiom; export-led verbs kept, white primary `Export` stays. _Done — action row
+  now mirrors the dashboard: white primary `Export` + a translucent "Board reports ▾" popover
+  (same pill chrome + `w-60 p-1` content) listing the five governance reports; analytics opens
+  each dated report in a new tab (`window.open(reportUrl(...))`), the dashboard navigates._
 - [x] **D2** Analytics drops `brandColour={props.site_brand_colour}` — primary gradient
   only. _Done — `HeroShell` takes no `brandColour`, so the prop read is gone; both heroes
   render the primary gradient. The `site_brand_colour` payload field is now vestigial for
@@ -101,9 +101,14 @@ strip, medallion, gradient/shadow and role banner must read as identical chrome.
   `HeroSegmented label=`)._
 - [x] **E4** Preserve analytics' Custom-range popover (via `HeroSegmented` pill `popover`
   slot). _Done — `CustomRangeFields` embedded in the Custom pill's popover._
-- [ ] **E5** Swap the dashboard's hand-rolled period/lens pills to `HeroSegmented` too
-  (so the kit is the only implementation) — verify dashboard still pixel-identical.
-  _Still open — final consolidation pass (with D1)._
+- [x] **E5** Swap the dashboard's hand-rolled period/lens pills to `HeroSegmented` too. _Done
+  — the dashboard period (pill variant, custom-range popover in the pill) and lens (segmented
+  variant) now render via `HeroSegmented`; removed the page-local `pillBase`/`segBase` consts +
+  `PERIOD_ITEMS` + the dead `cn` import. **Pixel-identical by construction**: only `role="group"`,
+  `aria-pressed` and a keyboard-only focus ring were added (the focus ring is the §5 a11y
+  requirement). `HeroSegmented` made faithful: pill label keeps `mr-1`; segmented variant is a
+  fragment (label `ml-1` + box as siblings) so it slots beside the Site filter exactly. The kit
+  is now the **only** segmented implementation on both pages._
 
 ## F. Title polish (P3)
 
@@ -152,3 +157,33 @@ strip, medallion, gradient/shadow and role banner must read as identical chrome.
   clean · `test` 5/5 · `build` ✓. File: `resources/js/pages/health-safety/analytics.tsx`
   (+ tracker). **Remaining: D1** (fold analytics' 2 outline buttons into a popover) **+
   E5** (swap the dashboard's period/lens pills onto `HeroSegmented`) — final pass.
+- **Pass 3** — D1 + E5 ✅ (**all boxes now ticked**). Folded analytics' two outline buttons
+  into a translucent "Board reports ▾" popover (action row now mirrors the dashboard); moved
+  the dashboard's hand-rolled period/lens pills onto `HeroSegmented` (kit is now the only
+  segmented impl on both pages). Made `HeroSegmented` faithful to the dashboard's exact markup
+  (pill label `mr-1`; segmented = fragment with `ml-1` label) so the dashboard stays
+  pixel-identical (only `role`/`aria-pressed`/focus-ring added). Removed the dead `cn` import +
+  page-local pill/seg consts. Verified: `types` clean · `lint` (3 files) clean · `test` 5/5 ·
+  `build` ✓. Files: `hs-hero-kit.tsx`, `command-centre-hero.tsx`, `analytics.tsx` (+ tracker).
+
+---
+
+## ✅ Loop implementation complete
+
+Every checklist box is `[x]`; `npm run types` / `npm run lint` / `npm run build` all pass; the
+kit test (5 specs) is green. **Both heroes are composed entirely from `hs-hero-kit.tsx`** — no
+page hand-rolls a primitive the other also has. The dashboard is **pixel-identical by
+construction** (every kit-adoption pass preserved its Tailwind classes verbatim; only `role`/
+`aria-pressed`/focus-ring a11y attributes were added). Analytics now renders Leading/Lagging
+clusters with deltas, the five canonical compliance badges, the shared `RoleLensBanner`, and the
+primary gradient (no `brandColour`).
+
+**Open `TODO(Gx)`:** none. Two values analytics simply doesn't track were mapped to existing
+behaviour, not stubbed against new schema (SDS expiry → "SDS current"; due-soon vs overdue drills
+→ non-compliant = overdue) — see **C2 / BK1**.
+
+**Final gate (needs a deploy — out of the loop's local reach):** the §5 *live* side-by-side
+screenshot diff (`/health-safety` vs `/health-safety/analytics`) + the dashboard non-regression
+screenshot. The work is on branch `hs-hero-consistency` (3 commits); per this repo's pattern it
+merges to `main` → the deploy webhook builds it (~5–8 min) → Chrome-verify on `.com` as demo
+admin. Awaiting the merge decision.

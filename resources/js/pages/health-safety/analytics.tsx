@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WizardShell } from '@/components/wizard/shell';
 import type { WizardStep } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
@@ -23,6 +24,7 @@ import {
     BarChart3,
     Building2,
     Calendar,
+    ChevronDown,
     ClipboardList,
     Clock,
     Download,
@@ -96,6 +98,16 @@ const REGISTER: Record<string, string> = {
     sites: '/health-safety',
     root_cause: '/health-safety/events',
 };
+
+// Governance report set — same list as the dashboard's export popover; analytics opens each
+// dated report in a new tab (export-led), the dashboard navigates (report-led).
+const GOV_REPORTS: { name: string; label: string }[] = [
+    { name: 'board-summary', label: 'Board summary' },
+    { name: 'worksafe-register', label: 'WorkSafe register' },
+    { name: 'investigation-outcomes', label: 'Investigation outcomes' },
+    { name: 'corrective-action-traceability', label: 'Corrective-action traceability' },
+    { name: 'risk-assessment-register', label: 'Risk-assessment register' },
+];
 
 function rangeLabel(period: string): string {
     return { '30d': 'Last 30 days', q: 'This quarter', '6m': 'Last 6 months', ytd: 'Year to date', custom: 'Custom range' }[period] ?? 'Year to date';
@@ -645,16 +657,36 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                         <HeroStatusPill>Safety analytics · {rangeLabel(filters.period)}</HeroStatusPill>
                         <div className="flex flex-wrap items-center gap-2">
                             <a href={queryFor(tab === 'sites' ? 'sites' : 'incidents')} className="inline-flex">
-                                <Button size="sm" className="gap-1.5 bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                                <Button className="gap-1.5 bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90">
                                     <Download className="h-4 w-4" /> Export
                                 </Button>
                             </a>
-                            <Button size="sm" variant="outline" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => window.open(reportUrl('board-summary'), '_blank')}>
-                                <FileText className="h-4 w-4" /> Board pack
-                            </Button>
-                            <Button size="sm" variant="outline" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => window.open(reportUrl('worksafe-register'), '_blank')}>
-                                <Shield className="h-4 w-4" /> WorkSafe register
-                            </Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Board reports
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-60 p-1">
+                                    {GOV_REPORTS.map((r) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                                        <button
+                                            key={r.name}
+                                            type="button"
+                                            onClick={() => window.open(reportUrl(r.name), '_blank')}
+                                            className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                        >
+                                            {r.label}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     </div>
 

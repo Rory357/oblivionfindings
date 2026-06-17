@@ -283,14 +283,13 @@ export function HeroSegmented({
     ariaLabel: string;
     variant?: 'pill' | 'segmented';
 }) {
-    const labelEl = label ? (
-        <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">{label}</span>
-    ) : null;
-
     if (variant === 'pill') {
+        // Self-contained container (label + pills) — matches the dashboard's period block.
         return (
             <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-center gap-1.5">
-                {labelEl}
+                {label ? (
+                    <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">{label}</span>
+                ) : null}
                 {items.map((it) => {
                     const active = value === it.key;
                     const cls = cn(PILL_BASE, active ? PILL_ACTIVE : PILL_INACTIVE);
@@ -320,10 +319,15 @@ export function HeroSegmented({
         );
     }
 
+    // Segmented variant is a fragment so the label + bordered box sit as siblings in the
+    // caller's flex row (label `ml-1` then the box) — matches the dashboard's lens control
+    // sitting beside the Site filter exactly.
     return (
-        <div role="group" aria-label={ariaLabel} className="inline-flex items-center gap-1.5">
-            {labelEl}
-            <div className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
+        <>
+            {label ? (
+                <span className="ml-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">{label}</span>
+            ) : null}
+            <div role="group" aria-label={ariaLabel} className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
                 {items.map((it) => {
                     const active = value === it.key;
                     return (
@@ -340,7 +344,7 @@ export function HeroSegmented({
                     );
                 })}
             </div>
-        </div>
+        </>
     );
 }
 

@@ -10,7 +10,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 import { Link, router } from '@inertiajs/react';
 import {
     ChevronDown,
@@ -28,6 +27,8 @@ import {
     HeroClusterTile,
     HeroComplianceBadges,
     HeroMedallion,
+    type HeroSegItem,
+    HeroSegmented,
     HeroShell,
     HeroStatusPill,
     HeroSummaryMetric,
@@ -57,18 +58,11 @@ export type HeroFilters = {
     lens: string;
 };
 
-const PERIOD_ITEMS = [
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'custom', label: 'Custom range' },
-] as const;
-
-const LENS_ITEMS = [
+const LENS_ITEMS: HeroSegItem[] = [
     { key: 'governance', label: 'Governance' },
     { key: 'manager', label: 'Manager' },
     { key: 'frontline', label: 'Frontline' },
-] as const;
+];
 
 const GOV_REPORTS = [
     { label: 'Board summary', href: '/health-safety/reports/board-summary' },
@@ -149,52 +143,38 @@ export function CommandCentreHero({
     const activeSite = filters.site != null ? sites.find((s) => s.id === filters.site) : null;
     const siteLabel = activeSite ? activeSite.name : 'All sites';
 
-    const pillBase = 'rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors';
-    const pillActive = 'bg-primary-foreground/25 text-primary-foreground';
-    const pillInactive = 'bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20';
-    const segBase = 'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors';
-    const segActive = 'bg-primary-foreground text-primary';
-    const segInactive = 'text-primary-foreground/80 hover:text-primary-foreground';
+    const periodItems: HeroSegItem[] = [
+        { key: 'week', label: 'This week' },
+        { key: '30d', label: '30 days' },
+        { key: 'quarter', label: 'Quarter' },
+        {
+            key: 'custom',
+            label: 'Custom range',
+            popover: (
+                <>
+                    <div className="flex items-end gap-2">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            From
+                            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            To
+                            <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                        </label>
+                    </div>
+                    <Button size="sm" className="w-full" onClick={() => go({ from: customFrom, to: customTo })}>
+                        Apply range
+                    </Button>
+                </>
+            ),
+        },
+    ];
 
     const footer = (
         <>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 {/* Period range control */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Period</span>
-                    {PERIOD_ITEMS.map((p) =>
-                        p.key === 'custom' ? (
-                            <Popover key={p.key}>
-                                <PopoverTrigger asChild>
-                                    {/* eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button. */}
-                                    <button type="button" className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}>
-                                        {p.label}
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="start" className="w-auto space-y-2 p-3">
-                                    <div className="flex items-end gap-2">
-                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                            From
-                                            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
-                                        </label>
-                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                            To
-                                            <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
-                                        </label>
-                                    </div>
-                                    <Button size="sm" className="w-full" onClick={() => go({ from: customFrom, to: customTo })}>
-                                        Apply range
-                                    </Button>
-                                </PopoverContent>
-                            </Popover>
-                        ) : (
-                            // eslint-disable-next-line no-restricted-syntax -- segmented period pill on dark hero; not a shadcn Button.
-                            <button key={p.key} type="button" onClick={() => go(presetRange(p.key))} className={cn(pillBase, activePeriod === p.key ? pillActive : pillInactive)}>
-                                {p.label}
-                            </button>
-                        ),
-                    )}
-                </div>
+                <HeroSegmented variant="pill" label="Period" ariaLabel="Period range" items={periodItems} value={activePeriod} onChange={(k) => go(presetRange(k))} />
 
                 {/* Site filter + role lens */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -206,15 +186,7 @@ export function CommandCentreHero({
                         value={filters.site}
                         onChange={(v) => go({ site: v ?? undefined })}
                     />
-                    <span className="ml-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Lens</span>
-                    <div className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
-                        {LENS_ITEMS.map((l) => (
-                            // eslint-disable-next-line no-restricted-syntax -- segmented lens toggle on dark hero; not a shadcn Button.
-                            <button key={l.key} type="button" onClick={() => go({ lens: l.key })} aria-pressed={filters.lens === l.key} className={cn(segBase, filters.lens === l.key ? segActive : segInactive)}>
-                                {l.label}
-                            </button>
-                        ))}
-                    </div>
+                    <HeroSegmented variant="segmented" label="Lens" ariaLabel="Role lens" items={LENS_ITEMS} value={filters.lens} onChange={(k) => go({ lens: k })} />
                 </div>
             </div>
 
