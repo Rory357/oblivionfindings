@@ -105,6 +105,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:incidents.followups.complete|incidents.followups.manage')
         ->name('incidents.followups.complete');
 
+    // Corrective actions — Option B: raised from the incident, governed in H&S.
+    Route::post('/incidents/{incident}/corrective-actions', [IncidentController::class, 'raiseCorrectiveAction'])
+        ->whereNumber('incident')
+        ->middleware('permission:incidents.viewAny|compliance.view|hazards.view')
+        ->name('incidents.corrective-actions.store');
+
     // Shift-linked incident creation
     Route::post('/shifts/{shift}/incidents', [ShiftIncidentController::class, 'store'])
         ->whereNumber('shift')

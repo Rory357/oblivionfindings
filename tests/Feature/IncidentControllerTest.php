@@ -1242,6 +1242,43 @@ class IncidentControllerTest extends TestCase
         $this->assertSame('incident_closed', $alert->resolution_code);
     }
 
+    // ── Corrective actions (Option B: raised from the incident, governed in H&S) ──
+
+    public function test_raise_corrective_action_creates_hs_register_row(): void
+    {
+        $incident = ClientIncident::factory()->create();
+        // The ClientIncidentObserver records the HsEvent when the incident is created.
+        $hsEvent = \App\Models\HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->first();
+        $this->assertNotNull($hsEvent, 'Expected the observer to record an HsEvent for the incident.');
+
+        $this->actingAs($this->admin)
+            ->post("/incidents/{$incident->id}/corrective-actions", [
+                'title' => 'Install a grab rail in the bathroom',
+                'priority' => 'high',
+            ])
+            ->assertRedirect();
+
+        // No copy on the incident — it lives in the H&S register, linked to the event.
+        $this->assertDatabaseHas('hs_corrective_actions', [
+            'hs_event_id' => $hsEvent->id,
+            'title' => 'Install a grab rail in the bathroom',
+            'priority' => 'high',
+            'status' => 'open',
+        ]);
+    }
+
+    public function test_raise_corrective_action_requires_permission(): void
+    {
+        $incident = ClientIncident::factory()->create(['client_id' => $this->client->id]);
+
+        $this->actingAs($this->staff)
+            ->post("/incidents/{$incident->id}/corrective-actions", ['title' => 'X'])
+            ->assertForbidden();
+    }
+
     public function test_close_requires_closed_outcome(): void
     {
         $incident = ClientIncident::factory()->reviewed()->create();

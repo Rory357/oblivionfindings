@@ -11,6 +11,7 @@ use App\Models\IncidentFollowup;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -402,9 +403,10 @@ class IncidentController extends Controller
                 'followupsManage' => $user->canDo('incidents.followups.manage'),
                 'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
                 'portalManage' => $user->canDo('incidents.portal.manage'),
+                'raiseCorrectiveAction' => $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'),
             ],
-            // For the add-follow-up assignee select (managers only).
-            'assignable_staff' => $user->canDo('incidents.followups.manage')
+            // Assignee options for the add-follow-up + raise-corrective-action forms.
+            'assignable_staff' => ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'))
                 ? User::staff()->orderBy('name')->get(['id', 'name'])
                 : [],
         ];
@@ -1014,6 +1016,52 @@ class IncidentController extends Controller
         );
 
         return back()->with('success', 'Incident reopened.');
+    }
+
+    /**
+     * Raise a corrective action from the incident (Option B): creates an
+     * HsCorrectiveAction in the H&S Corrective Actions register, linked to this
+     * incident's HsEvent. No copy is stored on the incident — it is surfaced
+     * read-only on the detail from the H&S register.
+     */
+    public function raiseCorrectiveAction(Request $request, ClientIncident $incident, HsCorrectiveActionService $service)
+    {
+        $this->authorize('view', $incident);
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view')), 403);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'priority' => ['nullable', 'in:low,medium,high,critical'],
+            'due_date' => ['nullable', 'date'],
+            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $hsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->first();
+
+        if (! $hsEvent) {
+            return back()->with('error', 'No Health & Safety event exists for this incident yet.');
+        }
+        if (! $hsEvent->isOpen()) {
+            return back()->with('error', 'The Health & Safety event is closed; corrective actions can no longer be added.');
+        }
+
+        $service->createStandalone($hsEvent, [
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'action_type' => 'corrective',
+            'priority' => $data['priority'] ?? 'medium',
+            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+            'assigned_by_user_id' => $user->id,
+            'due_date' => $data['due_date'] ?? null,
+            'created_by' => $user->id,
+        ]);
+
+        return back()->with('success', 'Corrective action raised in the Health & Safety register.');
     }
 
     public function uploadAttachment(Request $request, ClientIncident $incident)

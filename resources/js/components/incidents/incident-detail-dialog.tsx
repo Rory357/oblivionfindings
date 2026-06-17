@@ -103,7 +103,7 @@ export type IncidentDetail = {
         } | null;
         corrective_actions: Array<{ id: number; reference_number: string; title: string; status: string; priority: string; assigned_to: string | null; due_date: string | null }>;
     } | null;
-    can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean };
+    can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean; raiseCorrectiveAction: boolean };
     assignable_staff: Array<{ id: number; name: string }>;
 };
 
@@ -724,8 +724,91 @@ function InvestigationSection({ d }: { d: IncidentDetail }) {
                 ) : (
                     <p className="text-xs text-muted-foreground">No corrective actions raised. Formal remediation is raised and governed in the Health &amp; Safety register.</p>
                 )}
+
+                {d.can.raiseCorrectiveAction ? <RaiseCorrectiveActionForm d={d} /> : null}
             </div>
         </div>
+    );
+}
+
+function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm<{ title: string; description: string; priority: string; due_date: string; assigned_to_user_id: string }>({
+        title: '',
+        description: '',
+        priority: 'medium',
+        due_date: '',
+        assigned_to_user_id: '',
+    });
+
+    if (!d.hs_event) {
+        return null; // need an H&S event to attach the action to
+    }
+
+    if (!open) {
+        return (
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => setOpen(true)}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Raise corrective action
+            </Button>
+        );
+    }
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.title.trim()) {
+            form.setError('title', 'Give the corrective action a title.');
+            return;
+        }
+        form.post(`/incidents/${d.id}/corrective-actions`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) {
+                    form.reset();
+                    setOpen(false);
+                }
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="mt-2 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">Creates a row in the H&amp;S Corrective Actions register, linked to {d.hs_event.reference_number}.</p>
+            <Field label="Action" required error={form.errors.title}>
+                <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="e.g. Install a grab rail in the bathroom" />
+            </Field>
+            <Field label="Detail" hint="Optional">
+                <Textarea rows={2} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Priority">
+                    <SelectInput
+                        value={form.data.priority}
+                        onChange={(v) => form.setData('priority', v)}
+                        placeholder="Priority"
+                        options={[
+                            { value: 'low', label: 'Low' },
+                            { value: 'medium', label: 'Medium' },
+                            { value: 'high', label: 'High' },
+                            { value: 'critical', label: 'Critical' },
+                        ]}
+                    />
+                </Field>
+                <Field label="Owner">
+                    <SelectInput value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} placeholder="Unassigned" options={d.assignable_staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                </Field>
+                <Field label="Due">
+                    <Input type="date" value={form.data.due_date} onChange={(e) => form.setData('due_date', e.target.value)} />
+                </Field>
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => { form.reset(); form.clearErrors(); setOpen(false); }}>
+                    Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={form.processing}>
+                    Raise in H&amp;S register
+                </Button>
+            </div>
+        </form>
     );
 }
 
