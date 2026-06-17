@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
-import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
+import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm } from '@inertiajs/react';
 import {
@@ -15,11 +15,14 @@ import {
     LinkIcon,
     ListTodo,
     Paperclip,
+    Plus,
     RadioTower,
     RotateCcw,
     Search,
     Send,
     ShieldAlert,
+    Trash2,
+    Upload,
     User,
     Users,
 } from 'lucide-react';
@@ -99,7 +102,8 @@ export type IncidentDetail = {
         } | null;
         corrective_actions: Array<{ id: number; reference_number: string; title: string; status: string; priority: string; assigned_to: string | null; due_date: string | null }>;
     } | null;
-    can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsComplete: boolean };
+    can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean };
+    assignable_staff: Array<{ id: number; name: string }>;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -378,74 +382,178 @@ function TimelineSection({ d }: { d: IncidentDetail }) {
 }
 
 function PhotosSection({ d }: { d: IncidentDetail }) {
-    if (!d.attachments.length) {
-        return (
-            <div className="rounded-xl border border-dashed border-border py-12 text-center">
-                <Paperclip className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No photos or documents attached.</p>
-                <p className="mt-1 text-xs text-muted-foreground/70">Upload from the full page while the incident is a draft.</p>
-            </div>
-        );
-    }
+    // Attachments are only mutable while the incident is a draft (server guardrail).
+    const canEdit = d.status === 'draft' && d.can.update;
     return (
-        <div className="flex flex-col gap-2">
-            {d.attachments.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                    <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">{a.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {fmtSize(a.size)}
-                            {a.uploaded_by ? ` · ${a.uploaded_by}` : ''}
-                            {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
-                            {a.portal_visible ? ' · shared to portal' : ''}
-                        </p>
-                        {a.notes ? <p className="mt-0.5 text-xs text-muted-foreground">{a.notes}</p> : null}
-                    </div>
-                    <a href={a.download_url} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted">
-                        <Download className="h-3.5 w-3.5" /> Download
-                    </a>
+        <div className="flex flex-col gap-3">
+            {canEdit ? <UploadForm incidentId={d.id} /> : null}
+
+            {d.attachments.length ? (
+                <div className="flex flex-col gap-2">
+                    {d.attachments.map((a) => (
+                        <AttachmentRow key={a.id} a={a} incidentId={d.id} canEdit={canEdit} canPortal={d.can.portalManage} />
+                    ))}
                 </div>
-            ))}
+            ) : (
+                <div className="rounded-xl border border-dashed border-border py-10 text-center">
+                    <Paperclip className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">No photos or documents attached.</p>
+                    {!canEdit ? <p className="mt-1 text-xs text-muted-foreground/70">Attachments can only be added while the incident is a draft.</p> : null}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function UploadForm({ incidentId }: { incidentId: number }) {
+    const form = useForm<{ file: File | null }>({ file: null });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.file) return;
+        form.post(`/incidents/${incidentId}/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => form.reset() });
+    };
+    return (
+        <form onSubmit={submit} className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-border p-3">
+            <input
+                type="file"
+                onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)}
+                className="text-sm text-muted-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium"
+            />
+            <Button type="submit" size="sm" disabled={!form.data.file || form.processing}>
+                <Upload className="mr-1.5 h-3.5 w-3.5" /> Upload
+            </Button>
+            {form.errors.file ? <span className="text-xs text-status-critical">{form.errors.file}</span> : null}
+        </form>
+    );
+}
+
+function AttachmentRow({ a, incidentId, canEdit, canPortal }: { a: IncidentDetail['attachments'][number]; incidentId: number; canEdit: boolean; canPortal: boolean }) {
+    const remove = () => router.delete(`/incidents/${incidentId}/attachments/${a.id}`, { preserveScroll: true });
+    const togglePortal = () => router.patch(`/incidents/${incidentId}/attachments/${a.id}`, { portal_visible: !a.portal_visible }, { preserveScroll: true });
+    return (
+        <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{a.name}</p>
+                <p className="text-xs text-muted-foreground">
+                    {fmtSize(a.size)}
+                    {a.uploaded_by ? ` · ${a.uploaded_by}` : ''}
+                    {a.created_at ? ` · ${formatDateTime(a.created_at)}` : ''}
+                    {a.portal_visible ? ' · shared to portal' : ''}
+                </p>
+                {a.notes ? <p className="mt-0.5 text-xs text-muted-foreground">{a.notes}</p> : null}
+            </div>
+            {canPortal ? (
+                <Button variant="ghost" size="sm" onClick={togglePortal} title={a.portal_visible ? 'Stop sharing to the family portal' : 'Share to the family portal'}>
+                    {a.portal_visible ? 'Unshare' : 'Share'}
+                </Button>
+            ) : null}
+            <a href={a.download_url} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted">
+                <Download className="h-3.5 w-3.5" /> Download
+            </a>
+            {canEdit ? (
+                <Button variant="ghost" size="sm" onClick={remove} title="Remove attachment" className="text-status-critical hover:text-status-critical">
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            ) : null}
         </div>
     );
 }
 
 function FollowupsSection({ d, onComplete }: { d: IncidentDetail; onComplete: (id: number) => void }) {
-    if (!d.followups.length) {
+    return (
+        <div className="flex flex-col gap-3">
+            {d.can.followupsManage ? <AddFollowupForm d={d} /> : null}
+
+            {d.followups.length ? (
+                <div className="flex flex-col gap-2">
+                    {d.followups.map((f) => (
+                        <div key={f.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
+                            <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`} />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm text-foreground">{f.notes || 'Follow-up task'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {f.assigned_to ? `${f.assigned_to}` : 'Unassigned'}
+                                    {f.due_at ? ` · due ${formatDateTime(f.due_at)}` : ''}
+                                    {f.completed_at ? ` · completed ${formatDateTime(f.completed_at)}` : f.overdue ? ' · overdue' : ''}
+                                </p>
+                            </div>
+                            {!f.completed_at && d.can.followupsComplete ? (
+                                <Button variant="outline" size="sm" onClick={() => onComplete(f.id)}>
+                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
+                                </Button>
+                            ) : f.completed_at ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                                </span>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="rounded-xl border border-dashed border-border py-10 text-center">
+                    <ListTodo className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">No follow-ups on this incident.</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function AddFollowupForm({ d }: { d: IncidentDetail }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm<{ notes: string; assigned_to_user_id: string; due_at: string }>({ notes: '', assigned_to_user_id: '', due_at: '' });
+
+    if (!open) {
         return (
-            <div className="rounded-xl border border-dashed border-border py-12 text-center">
-                <ListTodo className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No follow-ups on this incident.</p>
-                <p className="mt-1 text-xs text-muted-foreground/70">Add one from the full page.</p>
-            </div>
+            <Button variant="outline" size="sm" className="self-start" onClick={() => setOpen(true)}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add follow-up
+            </Button>
         );
     }
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!form.data.notes.trim()) {
+            form.setError('notes', 'Describe the follow-up task.');
+            return;
+        }
+        form.post(`/incidents/${d.id}/followups`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                setOpen(false);
+            },
+        });
+    };
+
     return (
-        <div className="flex flex-col gap-2">
-            {d.followups.map((f) => (
-                <div key={f.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                    <ListTodo className={`mt-0.5 h-4 w-4 shrink-0 ${f.completed_at ? 'text-status-success' : f.overdue ? 'text-status-critical' : 'text-status-warning'}`} />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm text-foreground">{f.notes || 'Follow-up task'}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {f.assigned_to ? `${f.assigned_to}` : 'Unassigned'}
-                            {f.due_at ? ` · due ${formatDateTime(f.due_at)}` : ''}
-                            {f.completed_at ? ` · completed ${formatDateTime(f.completed_at)}` : f.overdue ? ' · overdue' : ''}
-                        </p>
-                    </div>
-                    {!f.completed_at && d.can.followupsComplete ? (
-                        <Button variant="outline" size="sm" onClick={() => onComplete(f.id)}>
-                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
-                        </Button>
-                    ) : f.completed_at ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Done
-                        </span>
-                    ) : null}
-                </div>
-            ))}
-        </div>
+        <form onSubmit={submit} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3">
+            <Field label="Task" required error={form.errors.notes}>
+                <Textarea rows={2} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="e.g. Update the care plan and notify the GP" />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Assign to">
+                    <SelectInput
+                        value={form.data.assigned_to_user_id}
+                        onChange={(v) => form.setData('assigned_to_user_id', v)}
+                        placeholder="Unassigned"
+                        options={d.assignable_staff.map((s) => ({ value: String(s.id), label: s.name }))}
+                    />
+                </Field>
+                <Field label="Due">
+                    <Input type="date" value={form.data.due_at} onChange={(e) => form.setData('due_at', e.target.value)} />
+                </Field>
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => { form.reset(); form.clearErrors(); setOpen(false); }}>
+                    Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={form.processing}>
+                    Add follow-up
+                </Button>
+            </div>
+        </form>
     );
 }
 

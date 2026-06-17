@@ -62,7 +62,7 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] *Verified:* `tsc` clean + **4 detail feature tests / 60 assertions** (shape, null-when-absent, null-when-unviewable).
 **4b (in progress):** workflow sub-modals into the dialog. *(Until complete, "Open full page" → existing editable show.tsx, so nothing regresses.)*
 - [x] **Lifecycle action panes** (review / close / reopen) — in-body pane pattern (`action` state swaps the dialog body; Options bar shows status-appropriate buttons). Inertia `useForm` → existing endpoints; guardrail `flash.error` keeps the pane open. tsc clean.
-- [ ] Add-follow-up pane (needs `assignable_staff` in detail) + Upload/attachment management (draft-only, multipart).
+- [x] **Add-follow-up** inline form in the Follow-ups section (`assignable_staff` + `can.followupsManage`/`portalManage` added to detail payload) + **attachment management** in Photos: upload (draft-only multipart via `forceFormData`), remove (draft-only), portal share/unshare (portalManage). tsc clean + detail tests still green.
 - [ ] Edit pane (core fields) + Flag/Notify-WorkSafe.
 - [ ] Then slim `incidents/show.tsx` (2196 lines) → thin shell rendering `<IncidentDetailDialog>` (add a `show()`-fed detail); retire old body.
 
@@ -86,4 +86,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 1 migration RUN + verified (migrate/rollback/re-migrate clean, applied mine only via `--path`). **Foundation (Steps 1+2) complete.**
 - 2026-06-17 — Step 3 list page DONE: `IncidentController@index` payload rebuilt + `incidents/index.tsx` rebuilt on hs-hero-kit + TabStrip + EntityFilter + right-click rows + followups worklist + near-miss insights. tsc clean + 18 feature tests (234 assertions).
 - 2026-06-17 — Step 4a DONE: read-only `IncidentDetailDialog` over the list (controller `detail` payload + 6-section WizardShell modal + row-click wiring), non-regressing (show.tsx kept). tsc clean + 4 detail tests (60 assertions).
-- 2026-06-17 — Step 4b-i: lifecycle action panes (review/close/reopen) added to the dialog (in-body pane, existing endpoints). tsc clean. Next 4b: add-followup + upload, then edit + retire show.tsx.
+- 2026-06-17 — Step 4b-i: lifecycle action panes (review/close/reopen) added to the dialog (in-body pane, existing endpoints). tsc clean.
+- 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green. Next 4b: edit pane, then slim show.tsx → thin shell.

@@ -376,8 +376,14 @@ class IncidentController extends Controller
                 'review' => $user->can('review', $incident),
                 'close' => $user->can('close', $incident),
                 'reopen' => $user->can('reopen', $incident),
+                'followupsManage' => $user->canDo('incidents.followups.manage'),
                 'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
+                'portalManage' => $user->canDo('incidents.portal.manage'),
             ],
+            // For the add-follow-up assignee select (managers only).
+            'assignable_staff' => $user->canDo('incidents.followups.manage')
+                ? User::staff()->orderBy('name')->get(['id', 'name'])
+                : [],
         ];
     }
 
