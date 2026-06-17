@@ -343,7 +343,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_safeguarding_show_returns_inertia_page(): void
+    public function test_safeguarding_show_returns_concern_shell(): void
     {
         $concern = SafeguardingConcern::factory()->create();
 
@@ -351,11 +351,24 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get("/safeguarding/{$concern->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/show')
-                ->has('concern')
-                ->has('canUpdate')
-                ->has('canInvestigate')
-                ->has('canReportExternal')
+                ->component('safeguarding/concern')
+                ->where('detail.id', $concern->id)
+                ->where('detail.restricted', false)
+                ->has('detail.can')
+            );
+    }
+
+    public function test_safeguarding_index_serves_detail_over_list(): void
+    {
+        $concern = SafeguardingConcern::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get("/safeguarding?concern={$concern->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('safeguarding/index')
+                ->where('detail.id', $concern->id)
+                ->where('detail.reference_number', $concern->reference_number)
             );
     }
 

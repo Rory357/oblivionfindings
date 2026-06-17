@@ -37,6 +37,17 @@ Intentional safeguarding deltas (per spec, not divergences): `ShieldAlert` medal
 instead of follow-ups; external-referral banner.
 **No inconsistencies found in Incidents.** No shared primitives modified (pure reuse).
 
+### Step 4a (detail modal, read-only) — matched 1:1
+`components/safeguarding/concern-dialog.tsx` authored from `incident-detail-dialog.tsx`, reusing the same
+`WizardShell` + `ReviewCard`/`ReviewRow` (`@/components/wizard/shell`) + `InfoCard` (`@/components/wizard/primitives`)
+chrome: same rail section-switcher, same `footerStart` (severity + status pills) / `footerEnd` ("Open full page"),
+same detail-over-list mechanism (`router.get('/safeguarding', {concern:id}, {only:['detail']})`; close drops the
+param), same derived-Timeline `<ol>` treatment, same `LinkedRow` idiom. Controller `buildConcernDetail()` mirrors
+`IncidentController::buildIncidentDetail()`. Safeguarding deltas (per spec): 7 sections incl. the lifecycle stage
+tracker + Risk/External-reports; **Restricted locked state** + "Viewing is logged" audit cue (need-to-know);
+`show.tsx` retired to a thin `concern.tsx` shell (kept off viewAny for reporter/assignee deep links) vs Incidents
+which deferred its show retirement. **No inconsistencies found; no shared primitives modified.**
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - _(none yet)_
 

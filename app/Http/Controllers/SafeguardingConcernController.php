@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HsEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingInvestigation;
 use App\Models\SafeguardingExternalReport;
@@ -146,7 +147,28 @@ class SafeguardingConcernController extends Controller
                 ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])
                 ->values(),
             'can' => ['create' => $user->can('create', SafeguardingConcern::class)],
+            // Detail-over-list: only fetched (and only authorised) when ?concern={id} is present.
+            'detail' => $this->resolveDetail($request, $user, $canSensitive),
         ]);
+    }
+
+    /**
+     * Serialize a concern for the detail modal when ?concern={id} is present and
+     * the viewer is authorised; otherwise null (the dialog stays closed).
+     */
+    private function resolveDetail(Request $request, User $user, bool $canSensitive): ?array
+    {
+        $concernId = $request->integer('concern');
+        if (! $concernId) {
+            return null;
+        }
+
+        $concern = SafeguardingConcern::query()->find($concernId);
+        if (! $concern || ! $user->can('view', $concern)) {
+            return null;
+        }
+
+        return $this->buildConcernDetail($concern, $user, $canSensitive);
     }
 
     /**
@@ -214,31 +236,19 @@ class SafeguardingConcernController extends Controller
     /**
      * Display the specified concern.
      */
-    public function show(SafeguardingConcern $concern): Response
+    /**
+     * Thin deep-link shell for /safeguarding/{id} — renders the same
+     * SafeguardingConcernDialog content as the list's detail-over-list modal.
+     * Stays accessible to reporters/assignees without global viewAny (policy).
+     */
+    public function show(Request $request, SafeguardingConcern $concern): Response
     {
         $this->authorize('view', $concern);
 
-        $concern->load([
-            'subject',
-            'allegedPerpetrator',
-            'reportedBy',
-            'assignedTo',
-            'closedBy',
-            'site',
-            'relatedIncident',
-            'investigations.leadInvestigator',
-            'externalReports.reportedBy',
-            'riskAssessments.assessor',
-            'actionPlans.assignedTo',
-            'alerts',
-        ]);
+        $canSensitive = $request->user()->can('viewSensitive', SafeguardingConcern::class);
 
-        return Inertia::render('safeguarding/show', [
-            'concern' => $this->serializeConcernForShow($concern),
-            'canUpdate' => auth()->user()->can('update', $concern),
-            'canInvestigate' => auth()->user()->can('investigate', $concern),
-            'canReportExternal' => auth()->user()->can('reportExternal', $concern),
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
+        return Inertia::render('safeguarding/concern', [
+            'detail' => $this->buildConcernDetail($concern, $request->user(), $canSensitive),
         ]);
     }
 
@@ -649,6 +659,184 @@ class SafeguardingConcernController extends Controller
             'links' => [],
             'last_page' => 1,
         ];
+    }
+
+    /** Stage tracker index per status (referred_external parallels investigating; no_action parallels triaged). */
+    private const STAGE_INDEX = [
+        'reported' => 0,
+        'triaged' => 1,
+        'investigating' => 2,
+        'action_plan' => 3,
+        'monitoring' => 4,
+        'closed' => 5,
+        'referred_external' => 2,
+        'no_action_required' => 1,
+    ];
+
+    /**
+     * Serialize a concern for the SafeguardingConcernDialog (read-only sections +
+     * lifecycle tracker). Need-to-know: a restricted concern returns only a
+     * redacted shell. Used by both the list (detail-over-list) and the
+     * /safeguarding/{id} thin deep-link shell.
+     */
+    private function buildConcernDetail(SafeguardingConcern $concern, User $user, bool $canSensitive): array
+    {
+        $lifecycle = app(SafeguardingLifecycle::class);
+        $restricted = $this->isConcernRestricted($concern, $user, $canSensitive);
+
+        $base = [
+            'id' => $concern->id,
+            'reference_number' => $concern->reference_number,
+            'restricted' => $restricted,
+            'severity' => $concern->severity,
+            'status' => $concern->status,
+            'status_label' => $lifecycle->label($concern->status),
+            'stage_index' => self::STAGE_INDEX[$concern->status] ?? 0,
+            'occurred_at' => $concern->occurred_at?->toISOString(),
+            'reported_at' => $concern->reported_at?->toISOString(),
+        ];
+
+        if ($restricted) {
+            return $base; // redacted shell — the dialog renders the locked state
+        }
+
+        $concern->load([
+            'subject', 'allegedPerpetrator', 'reportedBy', 'assignedTo', 'closedBy', 'triagedBy',
+            'site', 'investigations.leadInvestigator', 'externalReports.reportedBy',
+            'riskAssessments.assessor', 'actionPlans.assignedTo', 'alerts',
+        ]);
+
+        // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
+        $hsEvent = null;
+        try {
+            $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
+            $ev = HsEvent::query()->where('idempotency_key', $key)->first();
+            if ($ev) {
+                $hsEvent = ['id' => $ev->id, 'reference_number' => $ev->reference_number, 'status' => $ev->status];
+            }
+        } catch (\Throwable $e) {
+            // H&S link is best-effort; never block the detail on it.
+        }
+
+        return [
+            ...$base,
+            'concern_type' => $concern->concern_type,
+            'abuse_category' => $concern->abuse_category,
+            'location' => $concern->location,
+            'description' => $concern->description,
+            'immediate_actions' => $concern->immediate_actions,
+            'subject_informed' => (bool) $concern->subject_informed,
+            'subject_informed_at' => $concern->subject_informed_at?->toISOString(),
+            'requires_external_referral' => (bool) $concern->requires_external_referral,
+            'current_risk_level' => $concern->current_risk_level,
+            'triage' => $concern->triaged_at ? [
+                'at' => $concern->triaged_at?->toISOString(),
+                'by' => $concern->triagedBy?->name,
+                'substantiation' => $concern->triage_substantiation,
+                'decision' => $concern->triage_decision,
+                'notes' => $concern->triage_notes,
+            ] : null,
+            'closure' => $concern->closed_at ? [
+                'at' => $concern->closed_at?->toISOString(),
+                'by' => $concern->closedBy?->name,
+                'summary' => $concern->closure_summary,
+                'lessons' => $concern->lessons_learned,
+            ] : null,
+            'people' => [
+                'subject' => $this->subjectPerson($concern),
+                'reported_by' => $concern->reportedBy?->name ?? $concern->reported_by_name,
+                'assigned_to' => $concern->assignedTo?->name,
+                'alleged_perpetrator' => $this->perpetratorName($concern),
+            ],
+            'risk_assessments' => $concern->riskAssessments->map(fn ($r) => [
+                'id' => $r->id,
+                'assessed_at' => $r->assessed_at?->toISOString(),
+                'assessor' => $r->assessor?->name,
+                'risk_to_self' => $r->risk_to_self,
+                'risk_to_others' => $r->risk_to_others,
+                'risk_from_others' => $r->risk_from_others,
+                'overall_risk_level' => $r->overall_risk_level,
+                'mental_capacity' => $r->mental_capacity,
+                'protective_measures' => $this->serializeList($r->protective_measures),
+                'next_review_date' => $r->next_review_date?->toISOString(),
+                'notes' => $r->assessment_notes,
+            ])->values()->all(),
+            'investigations' => $concern->investigations->map(fn ($i) => [
+                'id' => $i->id,
+                'type' => $i->investigation_type,
+                'status' => $i->status,
+                'lead' => $i->leadInvestigator?->name,
+                'started_at' => $i->started_at?->toISOString(),
+                'completed_at' => $i->completed_at?->toISOString(),
+                'outcome' => $i->outcome,
+                'findings' => $i->findings,
+                'recommendations' => $i->recommendations,
+            ])->values()->all(),
+            'external_reports' => $concern->externalReports->map(fn ($r) => [
+                'id' => $r->id,
+                'authority_type' => $r->authority_type,
+                'authority_name' => $r->authority_name,
+                'reported_at' => $r->reported_at?->toISOString(),
+                'method' => $r->report_method,
+                'summary' => $r->report_summary,
+                'ack_received' => (bool) $r->acknowledgement_received,
+                'acknowledged_at' => $r->acknowledged_at?->toISOString(),
+                'ack_reference' => $r->acknowledgement_reference,
+                'authority_action' => $r->authority_action,
+            ])->values()->all(),
+            'action_plans' => $concern->actionPlans->map(fn ($a) => [
+                'id' => $a->id,
+                'description' => $a->action_description,
+                'type' => $a->action_type,
+                'assigned_to' => $a->assignedTo?->name,
+                'due_date' => $a->due_date?->toISOString(),
+                'status' => $a->status,
+                'completed_at' => $a->completed_at?->toISOString(),
+                'overdue' => (bool) ($a->due_date && $a->due_date->isPast() && ! in_array($a->status, ['completed', 'cancelled'], true)),
+            ])->values()->all(),
+            'alerts' => $concern->alerts->map(fn ($al) => [
+                'id' => $al->id,
+                'alert_type' => $al->alert_type,
+                'summary' => $al->alert_summary,
+                'severity' => $al->severity,
+                'active' => (bool) $al->active,
+            ])->values()->all(),
+            'related_incident_id' => $concern->related_incident_id,
+            'hs_event' => $hsEvent,
+            'control_room_alert_id' => null, // wired in Step 8
+            'can' => [
+                'update' => $user->can('update', $concern),
+                'investigate' => $user->can('investigate', $concern),
+                'report_external' => $user->can('reportExternal', $concern),
+            ],
+        ];
+    }
+
+    private function subjectPerson(SafeguardingConcern $concern): ?array
+    {
+        $name = $this->subjectDisplayName($concern);
+        if (! $name) {
+            return null;
+        }
+
+        $subject = $concern->subject;
+        $href = $subject instanceof Client ? "/operations/clients/{$subject->id}/care" : null;
+        $type = $subject instanceof Client ? 'client' : ($subject instanceof User ? 'staff' : 'other');
+
+        return ['name' => $name, 'href' => $href, 'type' => $type];
+    }
+
+    private function perpetratorName(SafeguardingConcern $concern): ?string
+    {
+        $p = $concern->allegedPerpetrator;
+        if ($p instanceof Client) {
+            return trim($p->first_name . ' ' . $p->last_name) ?: null;
+        }
+        if ($p instanceof User) {
+            return $p->name;
+        }
+
+        return $concern->alleged_perpetrator_name;
     }
 
     private function normalizeConcernInput(Request $request, array $validated): array

@@ -20,6 +20,7 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
+import { SafeguardingConcernDialog, type ConcernDetail } from '@/components/safeguarding/concern-dialog';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -123,6 +124,7 @@ type Props = {
     sites: Array<{ id: number; name: string }>;
     subjects: Array<{ id: number; name: string }>;
     can: { create: boolean };
+    detail: ConcernDetail | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -205,6 +207,7 @@ export default function SafeguardingIndex({
     sites,
     subjects,
     can,
+    detail,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
@@ -213,8 +216,12 @@ export default function SafeguardingIndex({
 
     const setTab = (id: string) => router.get('/safeguarding', { ...filters, tab: id }, { preserveScroll: true });
 
-    // Step 4 will replace this with a detail-over-list modal; for now open the concern page.
-    const openConcern = (id: number) => router.visit(`/safeguarding/${id}`);
+    // Detail-over-list: fetch only the `detail` prop and open the dialog without
+    // navigating away; closing drops the param so `detail` comes back null.
+    const openConcern = (id: number) =>
+        router.get('/safeguarding', { ...filters, concern: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    const closeDetail = () =>
+        router.get('/safeguarding', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
 
     const clearFilters = () =>
         router.get('/safeguarding', { tab }, { preserveState: true, preserveScroll: true, replace: true });
@@ -422,6 +429,8 @@ export default function SafeguardingIndex({
             </div>
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+
+            {detail ? <SafeguardingConcernDialog detail={detail} open onClose={closeDetail} /> : null}
         </AppLayout>
     );
 }

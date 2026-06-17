@@ -15,7 +15,7 @@
 | 1 | Schema & enum — `store()` sets `status='reported'` (W1); add `no_action_required` to status enum (W2); backfill | ✅ done | `e9fd0862` |
 | 2 | Lifecycle guards + triage action — transition guard + gates on `updateStatus`/`close` (W3/W6/W7); dedicated `triage` (W4) | ✅ done | `a78358cd` |
 | 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | ✅ done | _(this commit)_ |
-| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | in-progress (next) | — |
+| 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | 🔄 4a done (read-only + retire show), 4b next (action panes) | 4a _(this commit)_ |
 | 5 | Triage modal + gated Close modal | todo | — |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | todo | — |
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | todo | — |
@@ -64,6 +64,20 @@ steps 1, 7, (maybe) 8.
   (2m37s), 70 safeguarding tests green. Row click + ctx "View" → `/safeguarding/{id}` (show) for now;
   **Step 4 swaps to the detail-over-list modal** + adds the action ctx items. **Visual parity deferred
   to merge-time Chrome on .com** (established pattern; page mirrors verified-live Incidents components).
+- 2026-06-17 — **Step 4a done.** `SafeguardingConcernDialog` (`components/safeguarding/concern-dialog.tsx`)
+  = read-only detail-over-list modal on `WizardShell` (mirrors `IncidentDetailDialog`): rail sections
+  Overview (w/ **lifecycle stage tracker** + triage-now/active-alert InfoCards) · Timeline (derived audit) ·
+  Risk · Investigation (+ "Open in Health & Safety") · External reports · Action plan · Linked records.
+  **Restricted** concerns render a locked state; footer carries the "Viewing is logged" cue. Controller:
+  `buildConcernDetail()` (redaction-aware, resolves linked HsEvent via idempotency key) feeds both
+  `@index` `detail` (on `?concern={id}`, only-fetched) and the retired `@show`. **show.tsx deleted →
+  `@show` now renders the thin `pages/safeguarding/concern.tsx` shell** mounting the same dialog (kept
+  off `viewAny` so reporters/assignees keep deep-link access). index row click → openDetail (only:['detail']).
+  Tests: rewrote show test → `safeguarding/concern` shell + new detail-over-list test + rewrote the
+  workflow-contract serialization test to the `detail` shape. tsc/eslint/build green; 64 safeguarding
+  tests green. **4b next:** Options bar action panes (assign/investigation/external report/risk/action/
+  mark-informed). **Step 5:** Triage decision screen + gated Close checklist. (Dead `serializeConcernForShow`
+  + `serializeUser` left in controller — cleanup candidate.)
 
 ## Shared-file edits (watch at integration / merge time)
 - _(none yet)_
