@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
 use App\Models\Shift;
@@ -236,7 +237,148 @@ class IncidentController extends Controller
                 'create' => $user->canDo('incidents.create'),
                 'templatesManage' => $user->canDo('incidents.templates.manage'),
             ],
+            // Detail-over-list: when ?incident= is present the dialog opens over
+            // the register (Inertia partial-reloads only this prop). Null otherwise.
+            'detail' => $request->filled('incident')
+                ? $this->buildIncidentDetail($request, (int) $request->get('incident'))
+                : null,
         ]);
+    }
+
+    /**
+     * The full, read-only detail payload behind the IncidentDetailDialog — shared
+     * by the modal-over-list (index `?incident=`) and the `/incidents/{id}`
+     * deep-link. Returns null if the incident is missing or not viewable.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildIncidentDetail(Request $request, int $incidentId): ?array
+    {
+        $user = $request->user();
+
+        $incident = ClientIncident::query()
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name',
+                'reporter:id,name,email',
+                'shift:id,starts_at,ends_at,actual_ends_at',
+                'attachments.uploader:id,name',
+                'followups.assignedTo:id,name',
+                'followups.creator:id,name',
+                'investigator:id,name',
+                'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
+            ])
+            ->find($incidentId);
+
+        if (! $incident || ! $user || $user->cannot('view', $incident)) {
+            return null;
+        }
+
+        // Governance wrapper recorded by ClientIncidentObserver (idempotent).
+        $hsEvent = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->with(['latestInvestigation', 'correctiveActions.assignedTo:id,name'])
+            ->first();
+
+        $inv = $hsEvent?->latestInvestigation;
+
+        return [
+            'id' => $incident->id,
+            'type' => $incident->type,
+            'source' => $incident->source,
+            'interactive' => $incident->interactive,
+            'severity' => $incident->severity,
+            'status' => $incident->status,
+            'occurred_at' => $incident->occurred_at,
+            'description' => $incident->description,
+            'immediate_action_taken' => $incident->immediate_action_taken,
+            'witnesses' => $incident->witnesses,
+            'is_notifiable' => (bool) $incident->is_notifiable,
+            'worksafe_notification_status' => $incident->worksafe_notification_status,
+            'worksafe_notified_at' => $incident->worksafe_notified_at,
+            'worksafe_reference' => $incident->worksafe_reference,
+            'potential_severity' => $incident->potential_severity,
+            'potential_consequence' => $incident->potential_consequence,
+            'investigation_status' => $incident->investigation_status,
+            'submitted_at' => $incident->submitted_at,
+            'reviewed_at' => $incident->reviewed_at,
+            'review_notes' => $incident->review_notes,
+            'closed_at' => $incident->closed_at,
+            'closed_outcome' => $incident->closed_outcome,
+            'closed_notes' => $incident->closed_notes,
+            'reopened_at' => $incident->reopened_at,
+            'reopened_reason' => $incident->reopened_reason,
+            'control_room_alert_id' => $incident->control_room_alert_id,
+            'client' => $incident->client ? [
+                'id' => $incident->client->id,
+                'first_name' => $incident->client->first_name,
+                'last_name' => $incident->client->last_name,
+                'site' => $incident->client->site?->name,
+            ] : null,
+            'reporter' => $incident->reporter ? ['name' => $incident->reporter->name, 'email' => $incident->reporter->email] : null,
+            'investigator' => $incident->investigator?->name,
+            'attachments' => $incident->attachments->map(fn (ClientIncidentAttachment $att) => [
+                'id' => $att->id,
+                'name' => $att->original_name,
+                'mime' => $att->mime ?? $att->mime_type,
+                'size' => $att->size,
+                'portal_visible' => (bool) $att->portal_visible,
+                'notes' => $att->notes,
+                'uploaded_by' => $att->uploader?->name,
+                'created_at' => $att->created_at,
+                'download_url' => "/incidents/{$incident->id}/attachments/{$att->id}/download",
+            ])->values(),
+            'followups' => $incident->followups->map(fn (IncidentFollowup $f) => [
+                'id' => $f->id,
+                'notes' => $f->notes,
+                'assigned_to' => $f->assignedTo?->name,
+                'due_at' => $f->due_at,
+                'completed_at' => $f->completed_at,
+                'created_by' => $f->creator?->name,
+                'overdue' => $f->due_at && ! $f->completed_at ? $f->due_at->isPast() : false,
+            ])->values(),
+            'control_room_alert' => $incident->controlRoomAlert ? [
+                'id' => $incident->controlRoomAlert->id,
+                'status' => $incident->controlRoomAlert->status,
+                'severity' => $incident->controlRoomAlert->severity,
+                'alert_type' => $incident->controlRoomAlert->alert_type,
+                'triggered_at' => $incident->controlRoomAlert->triggered_at,
+                'resolved_at' => $incident->controlRoomAlert->resolved_at,
+            ] : null,
+            'hs_event' => $hsEvent ? [
+                'id' => $hsEvent->id,
+                'reference_number' => $hsEvent->reference_number,
+                'status' => $hsEvent->status,
+                'investigation_required' => (bool) $hsEvent->investigation_required,
+                'investigation' => $inv ? [
+                    'reference_number' => $inv->reference_number,
+                    'status' => $inv->status,
+                    'methodology' => $inv->methodology,
+                    'root_causes' => $inv->root_causes,
+                    'contributing_factors' => $inv->contributing_factors,
+                    'recommendations' => $inv->recommendations,
+                    'lessons_learned' => $inv->lessons_learned,
+                ] : null,
+                'corrective_actions' => $hsEvent->correctiveActions->map(fn ($ca) => [
+                    'id' => $ca->id,
+                    'reference_number' => $ca->reference_number,
+                    'title' => $ca->title,
+                    'status' => $ca->status,
+                    'priority' => $ca->priority,
+                    'assigned_to' => $ca->assignedTo?->name,
+                    'due_date' => $ca->due_date,
+                ])->values(),
+            ] : null,
+            'can' => [
+                'update' => $user->can('update', $incident),
+                'submit' => $user->can('submit', $incident),
+                'review' => $user->can('review', $incident),
+                'close' => $user->can('close', $incident),
+                'reopen' => $user->can('reopen', $incident),
+                'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
+            ],
+        ];
     }
 
     public function create(Request $request)

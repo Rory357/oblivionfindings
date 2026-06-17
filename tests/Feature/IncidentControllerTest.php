@@ -181,6 +181,53 @@ class IncidentControllerTest extends TestCase
             );
     }
 
+    // ── Detail-over-list (IncidentDetailDialog) ──
+
+    public function test_index_without_incident_param_has_null_detail(): void
+    {
+        ClientIncident::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get('/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('detail', null));
+    }
+
+    public function test_index_with_incident_param_returns_detail(): void
+    {
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'type' => 'fall',
+            'description' => 'slipped on a wet floor',
+        ]);
+        IncidentFollowup::factory()->create(['client_incident_id' => $incident->id, 'completed_at' => null]);
+
+        $this->actingAs($this->admin)
+            ->get("/incidents?incident={$incident->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.id', $incident->id)
+                ->where('detail.type', 'fall')
+                ->where('detail.description', 'slipped on a wet floor')
+                ->where('detail.client.id', $this->client->id)
+                ->has('detail.followups', 1)
+                ->has('detail.attachments')
+                ->has('detail.can')
+            );
+    }
+
+    public function test_detail_not_returned_for_unviewable_incident(): void
+    {
+        // staff may only view incidents for their assigned clients
+        $otherClient = Client::factory()->create();
+        $incident = ClientIncident::factory()->create(['client_id' => $otherClient->id]);
+
+        $this->actingAs($this->staff)
+            ->get("/incidents?incident={$incident->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('detail', null));
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  16. All filters
     // ──────────────────────────────────────────────────────────────

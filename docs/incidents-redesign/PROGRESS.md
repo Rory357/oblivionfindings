@@ -54,9 +54,13 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] Extended `IncidentController@index` payload (tabCounts, rows+rowsKind, hero, nearMissInsights, sites, source/site filters, legacy `?type=near_miss`→tab back-compat). `php -l` clean.
 - [x] *Verified:* `tsc` clean (exit 0) + **18 feature tests pass / 234 assertions** (IncidentControllerTest index rewritten to new contract + new tab/source/site/followups/counts coverage; RefreshDatabase exercised the migration in a full migrate:fresh). Browser/live verify deferred to post-merge (.com), per project pattern.
 
-### ☐ Step 4 — Detail modal (`IncidentDetailDialog`, Gap F)
-- [ ] `WizardShell` read-only chrome; rail Overview/Timeline/Photos/Follow-ups/Investigation/Linked; Options bar.
-- [ ] Row-click + "View" open over list. Keep `/incidents/{id}` thin deep-link shell. Retire `show.tsx`.
+### ◑ Step 4 — Detail modal (`IncidentDetailDialog`, Gap F) — 4a DONE, 4b next
+**4a (DONE):** read-only modal over the list, NON-REGRESSING (show.tsx kept for editing).
+- [x] `IncidentController::buildIncidentDetail()` + index `?incident=` → `detail` prop (Inertia partial `only:['detail']`); null when absent/unviewable.
+- [x] `components/incidents/incident-detail-dialog.tsx` on `WizardShell` read-only chrome: rail Overview/Timeline/Photos/Follow-ups/Investigation(H&S)/Linked + Options bar (one-click Submit when draft + Complete-followup + "Open full page" + jumps client `/care` / CR alert / H&S event). Read-only: WorkSafe banner, what-happened, people, classification, timeline (from timestamps), attachments+download, followups+complete, HsEvent/investigation/corrective-actions, linked records.
+- [x] Wired: row-click + ctx "View" → `openDetail` (modal over list, no nav); close drops `?incident=`.
+- [x] *Verified:* `tsc` clean + **4 detail feature tests / 60 assertions** (shape, null-when-absent, null-when-unviewable).
+**4b (NEXT):** workflow sub-modals into the dialog (review / close / reopen / add-followup / upload / edit / flag-WorkSafe / Notify-WorkSafe — endpoints exist), then slim `incidents/show.tsx` (2196 lines) → thin deep-link shell rendering `<IncidentDetailDialog>`; retire the old body. *(Until 4b, "Open full page" → existing editable show.tsx, so nothing regresses.)*
 
 ### ☐ Step 5 — Report wizard (`WizardShell`, §3)
 - [ ] 6 steps + near-miss branch + photo capture + `WizardSuccessPane`; preserve `?incident=` resume + `?shift_id`/`?client_id` prefill. Retire `create.tsx` + `WizardStepper`.
@@ -76,4 +80,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 2 (nav) shipped: "Investigate & Remediate" group (Investigations + Corrective Actions) + near-miss repoint. `tsc` clean.
 - 2026-06-17 — Step 1 CODE written (migration + model, both `php -l` clean). Asked migration-run policy → user: **run autonomously (local)**.
 - 2026-06-17 — Step 1 migration RUN + verified (migrate/rollback/re-migrate clean, applied mine only via `--path`). **Foundation (Steps 1+2) complete.**
-- 2026-06-17 — Step 3 list page DONE: `IncidentController@index` payload rebuilt + `incidents/index.tsx` rebuilt on hs-hero-kit + TabStrip + EntityFilter + right-click rows + followups worklist + near-miss insights. tsc clean + 18 feature tests (234 assertions). Next: Step 4 detail modal.
+- 2026-06-17 — Step 3 list page DONE: `IncidentController@index` payload rebuilt + `incidents/index.tsx` rebuilt on hs-hero-kit + TabStrip + EntityFilter + right-click rows + followups worklist + near-miss insights. tsc clean + 18 feature tests (234 assertions).
+- 2026-06-17 — Step 4a DONE: read-only `IncidentDetailDialog` over the list (controller `detail` payload + 6-section WizardShell modal + row-click wiring), non-regressing (show.tsx kept). tsc clean + 4 detail tests (60 assertions). Next: Step 4b (workflow sub-modals + retire show.tsx).

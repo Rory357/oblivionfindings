@@ -21,6 +21,7 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
+import { IncidentDetailDialog, type IncidentDetail } from '@/components/incidents/incident-detail-dialog';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -128,6 +129,7 @@ type Props = {
     sites?: Array<{ id: number; name: string }> | null;
     clients?: Array<{ id: number; first_name: string; last_name: string }> | null;
     can: { create: boolean; templatesManage: boolean };
+    detail: IncidentDetail | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -212,6 +214,7 @@ export default function IncidentsIndex({
     sites,
     clients,
     can,
+    detail,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
@@ -219,6 +222,13 @@ export default function IncidentsIndex({
         router.get('/incidents', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
 
     const setTab = (id: string) => router.get('/incidents', { ...filters, tab: id }, { preserveScroll: true });
+
+    // Detail-over-list: fetch only the `detail` prop and open the dialog without
+    // navigating away; closing drops the param so `detail` comes back null.
+    const openDetail = (id: number) =>
+        router.get('/incidents', { ...filters, incident: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    const closeDetail = () =>
+        router.get('/incidents', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
 
     const clearFilters = () =>
         router.get('/incidents', { tab }, { preserveState: true, preserveScroll: true, replace: true });
@@ -310,7 +320,7 @@ export default function IncidentsIndex({
         const sev = SEV[i.severity] ?? SEV.low;
         const clientName = i.client ? `${i.client.first_name} ${i.client.last_name}`.trim() : 'No client';
         const items: ShiftCtxItem[] = [
-            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View incident', sub: `${titleCase(i.type)}${i.occurred_at ? ` · ${formatDateTime(i.occurred_at)}` : ''}`, tone: 'primary', onClick: () => router.visit(`/incidents/${i.id}`) },
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View incident', sub: `${titleCase(i.type)}${i.occurred_at ? ` · ${formatDateTime(i.occurred_at)}` : ''}`, tone: 'primary', onClick: () => openDetail(i.id) },
             ...(i.status === 'draft' ? [{ icon: <FileEdit className="h-3.5 w-3.5" />, label: 'Continue draft', onClick: () => router.visit(`/incidents/create?incident=${i.id}`) } satisfies ShiftCtxItem] : []),
             { sep: true },
             ...(i.client ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', sub: clientName, onClick: () => router.visit(`/operations/clients/${i.client!.id}/care`) } satisfies ShiftCtxItem] : []),
@@ -445,9 +455,9 @@ export default function IncidentsIndex({
                 <Card>
                     <CardContent className="p-0">
                         {rowsKind === 'incidents' ? (
-                            <IncidentTable rows={incidentRows} onRowCtx={openRowCtx} />
+                            <IncidentTable rows={incidentRows} onRowCtx={openRowCtx} onOpen={openDetail} />
                         ) : (
-                            <FollowupTable rows={followupRows} />
+                            <FollowupTable rows={followupRows} onOpen={openDetail} />
                         )}
                     </CardContent>
                 </Card>
@@ -456,6 +466,8 @@ export default function IncidentsIndex({
             </div>
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+
+            {detail ? <IncidentDetailDialog detail={detail} open onClose={closeDetail} /> : null}
         </AppLayout>
     );
 }
@@ -514,7 +526,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: To
 /*  Incident table                                                     */
 /* ------------------------------------------------------------------ */
 
-function IncidentTable({ rows, onRowCtx }: { rows: IncidentRow[]; onRowCtx: (e: ReactMouseEvent, i: IncidentRow) => void }) {
+function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowCtx: (e: ReactMouseEvent, i: IncidentRow) => void; onOpen: (id: number) => void }) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -550,7 +562,7 @@ function IncidentTable({ rows, onRowCtx }: { rows: IncidentRow[]; onRowCtx: (e: 
                         return (
                             <tr
                                 key={i.id}
-                                onClick={() => router.visit(`/incidents/${i.id}`)}
+                                onClick={() => onOpen(i.id)}
                                 onContextMenu={(e) => onRowCtx(e, i)}
                                 className="cursor-pointer transition-colors hover:bg-muted/40"
                             >
@@ -632,7 +644,7 @@ function IncidentTable({ rows, onRowCtx }: { rows: IncidentRow[]; onRowCtx: (e: 
 /*  Follow-ups worklist                                                */
 /* ------------------------------------------------------------------ */
 
-function FollowupTable({ rows }: { rows: FollowupRow[] }) {
+function FollowupTable({ rows, onOpen }: { rows: FollowupRow[]; onOpen: (id: number) => void }) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -659,7 +671,7 @@ function FollowupTable({ rows }: { rows: FollowupRow[] }) {
                     {rows.map((f) => (
                         <tr
                             key={f.id}
-                            onClick={() => router.visit(`/incidents/${f.incident_id}`)}
+                            onClick={() => onOpen(f.incident_id)}
                             className="cursor-pointer transition-colors hover:bg-muted/40"
                         >
                             <td className="px-4 py-3 align-top">
