@@ -19,7 +19,7 @@
 | 5 | Triage modal + gated Close modal | ✅ done | _(this commit)_ |
 | 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | ✅ done | _(this commit)_ |
 | 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | ✅ done (7a evidence `de7670f0` + 7b auto-advance/reminders) | 7b _(this commit)_ |
-| 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | in-progress (next — FINAL) | — |
+| 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | ✅ done | _(this commit)_ |
 
 ## Migration policy
 Per established loop policy for this user (Incidents near-twin loop): **run local migrations autonomously**
@@ -134,6 +134,91 @@ steps 1, 7, (maybe) 8.
   non-complete-leaves / reminders-counts). **Full safeguarding suite 77 tests green** (no regression from
   the observer). No frontend touched. **Step 8 (FINAL) next:** X1 reverse incident relation, X2 Control
   Room quick-actions, X3 state-sync, NZ authority currency (MSD-DSS) — then merge + deploy + Chrome-verify.
+- 2026-06-18 — **Step 8 done → ALL 8 STEPS COMPLETE.** X1: `ClientIncident::safeguardingConcerns()`
+  hasMany(related_incident_id) + surfaced on the incident detail (`IncidentController::buildIncidentDetail`
+  + `incident-detail-dialog.tsx` LinkedSection), need-to-know redacted (`can_view` gates the link). X2:
+  concern-side endpoints (assign/triage) + redaction-aware `/safeguarding/{id}` jump already exist — the
+  operator alert-card UI belongs to the Control Room redesign drop, so **no speculative CR UI built**. X3:
+  `SafeguardingConcernController::syncTerminalState` (called from `close()` + `triage()` no-action — the
+  only terminal paths) closes the linked HsEvent + resolves the Control Room alert (kept in the controller,
+  not the after-commit observer, for reliability + testability). NZ authority currency: added `msd_dss` +
+  `coroner` to `SafeguardingExternalReportController` enum + ReportPane AUTHORITIES (Whaikaha relabelled
+  "monitoring"). New `SafeguardingCrossModuleTest` (4). **Verified:** tsc/eslint/build green; safeguarding
+  **81 tests** + incidents **132 tests** green (no incident regression from the cross-module edits).
+  **Cross-module/shared-file edits (Step 8):** `ClientIncident` (+relation), `IncidentController`
+  (+payload), `incident-detail-dialog.tsx` (+LinkedSection rows) — all additive.
+
+---
+
+## FINAL SUMMARY (loop §10) — Safeguarding redesign, branch `feat/safeguarding-redesign`
+
+**Status: all 8 steps built + verified, ready to merge.** 12 commits off `origin/main` @ `e5d65f54`.
+The live `/safeguarding` is standardised to the H&S/Incidents gold standard, feature-complete, modal-first,
+need-to-know throughout, with an enforced + visible lifecycle and cross-module wiring.
+
+### Per step
+1. **Schema & enum** `e9fd0862` — migration `2026_06_17_140000` (status enum +`no_action_required`);
+   `store()` sets `reported`; `TERMINAL_STATUSES`. *5 tests.*
+2. **Lifecycle guards + triage** `a78358cd` — new `app/Services/Safeguarding/SafeguardingLifecycle.php`;
+   guarded `@updateStatus` (W3/W6 + legal transitions); `@triage` (W4) + route; `@close` W7; migration
+   `2026_06_17_150000` (triage fields). *12 tests.*
+3. **List page** `9b3ab672` — `index.tsx` on hs-hero-kit + TabStrip + EntityFilters + right-click rows +
+   Restricted redaction + reviews worklist + referrals banner; `@index` rewrite; migration
+   `2026_06_17_160000` (`is_sensitive`). *4 redaction tests + 7 rewritten.*
+4. **Detail modal** `8a6ed4c7` (4a read-only) + `0adb41af` (4b panes) — new
+   `components/safeguarding/concern-dialog.tsx` (WizardShell, 8 rail sections incl. lifecycle tracker +
+   Evidence, gated Options bar + panes); `buildConcernDetail`; **retired `show.tsx` → thin
+   `pages/safeguarding/concern.tsx` shell**; investigation-start server guard. *detail-over-list + sub-record tests.*
+5. **Triage + gated Close** `8aa43317` — TriagePane (substantiate/risk/lead/path) + ClosePane (4-check
+   checklist, override-on-open-work). *close referral-block test.*
+6. **Raise wizard** `4288994d` — `components/safeguarding/raise-wizard.tsx` (6-step WizardShell +
+   WizardSuccessPane); `@store` back()+flash; **retired `create.tsx`/`edit.tsx` → redirects**.
+   Shared-file: `HandleInertiaRequests` +`created_concern_id`.
+7. **Evidence + auto-advance + reminders** `de7670f0` (7a) + `d22dac72` (7b) — `SafeguardingAttachment`
+   model+migration `2026_06_18_000001`+controller (sensitivity-gated) + Evidence section; W5
+   `SafeguardingInvestigationObserver`; W9 `safeguarding:review-reminders` command + schedule. *evidence + monitoring tests.*
+8. **Cross-module + currency** `(this commit)` — X1 incident reverse-relation surfaced; X3 terminal
+   state-sync (HsEvent close + alert resolve); NZ authority currency (MSD-DSS); X2 concern-side only.
+
+### New backend
+Migrations ×4 (status enum, triage fields, is_sensitive, attachments). Models: `SafeguardingAttachment`
+(+`ClientIncident::safeguardingConcerns`, `SafeguardingConcern` triage/attachments/scopes). Service:
+`SafeguardingLifecycle`. Controllers: `SafeguardingAttachmentController` (new) + `SafeguardingConcernController`
+(triage/guarded updateStatus/W7 close/buildConcernDetail/syncTerminalState). Observer:
+`SafeguardingInvestigationObserver` (W5). Command: `SafeguardingReviewReminders` (W9, scheduled).
+Endpoints: triage, attachments (store/download/destroy).
+
+### Modals (all on WizardShell / Add-Client chrome — zero raw Dialog/Sheet workflows)
+Built: `SafeguardingConcernDialog` (detail + 7 action panes: triage/close/assign/investigation/external-
+report/risk/action + mark-informed) · `SafeguardingRaiseWizard`. Reused: `WizardShell`, wizard primitives,
+`ShiftContextMenu`, `EntityFilter`, hs-hero-kit — all shared with Incidents.
+
+### Pages retired → redirected (no 404)
+`show.tsx` → `@show` thin `concern.tsx` shell (kept off viewAny for reporter/assignee deep links);
+`create.tsx` → `/safeguarding?raise=1`; `edit.tsx` → the concern.
+
+### Incidents-consistency (§7)
+Matched 1:1 throughout (hero/tabs/rows/detail/wizard/attachments) — see `INCIDENTS_CONSISTENCY.md`. One
+inconsistency found + logged (not fixed): Incidents' `IncidentReportDialog` "Open incident" reads an
+unshared `created_incident_id` flash → dead button (Safeguarding shares its own `created_concern_id`).
+Shared/cross-module edits (all additive, flagged): `HandleInertiaRequests` (+flash key), `ClientIncident`
+(+relation), `IncidentController` (+payload), `incident-detail-dialog.tsx` (+LinkedSection rows),
+`AppServiceProvider` (+observer), `routes/console.php` (+schedule).
+
+### Deferred (with reason)
+- **Wizard-inline evidence upload** → use the detail Evidence section (1 click post-raise via the success
+  pane); create-time `forceFormData` breaks `store()`'s boolean validation. Matches the shipped Incidents wizard.
+- **X2 Control Room operator alert-card UI** → belongs to the Control Room redesign drop; Safeguarding
+  provides the concern-side endpoints + redaction-aware jump.
+- **Visual parity** → deferred to merge-time Chrome verification on `.com` (established pattern; every
+  surface reuses verified-live Incidents components).
+- **Dead controller code** (`serializeConcernForShow`/`serializeConcernForForm`/`serializeUser`) → harmless,
+  cleanup candidate.
+
+### To ship
+Merge `feat/safeguarding-redesign` → deploy → Chrome-verify `/safeguarding` on `.com` as Demo Admin (list/
+hero/tabs/detail modal + lifecycle tracker/triage/gated close/raise wizard/evidence; need-to-know redaction;
+incident↔concern links). ⚠️ The 4 migrations run on deploy. No new permissions (reuses `safeguarding.*`).
 
 ## Shared-file edits (watch at integration / merge time)
 - **Step 6** — `app/Http/Middleware/HandleInertiaRequests.php`: added one flash key `created_concern_id`

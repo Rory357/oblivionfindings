@@ -18,7 +18,9 @@ class SafeguardingExternalReportController extends Controller
         $this->authorize('reportExternal', $concern);
 
         $validated = $request->validate([
-            'authority_type' => 'required|in:police,health_nz,whaikaha,worksafe,privacy_commissioner,hdc,oranga_tamariki,other',
+            // NZ authorities (current): DSS moved Whaikaha→MSD Sept 2024, so msd_dss is
+            // the disability-support notification path; Whaikaha is monitoring/advocacy.
+            'authority_type' => 'required|in:police,oranga_tamariki,hdc,health_nz,msd_dss,whaikaha,privacy_commissioner,worksafe,coroner,other',
             'authority_name' => 'required|string',
             'authority_contact' => 'nullable|string',
             'reported_at' => 'required|date',

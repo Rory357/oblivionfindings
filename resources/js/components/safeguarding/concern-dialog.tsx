@@ -374,9 +374,11 @@ const AUTHORITIES = [
     { value: 'oranga_tamariki', label: 'Oranga Tamariki' },
     { value: 'hdc', label: 'Health & Disability Commissioner' },
     { value: 'health_nz', label: 'Te Whatu Ora – Health NZ' },
-    { value: 'whaikaha', label: 'Whaikaha' },
+    { value: 'msd_dss', label: 'MSD – Disability Support Services' },
+    { value: 'whaikaha', label: 'Whaikaha (monitoring)' },
     { value: 'privacy_commissioner', label: 'Privacy Commissioner' },
     { value: 'worksafe', label: 'WorkSafe' },
+    { value: 'coroner', label: 'Coroner' },
     { value: 'other', label: 'Other' },
 ];
 

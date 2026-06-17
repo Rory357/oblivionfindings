@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingInvestigation;
@@ -433,6 +434,10 @@ class SafeguardingConcernController extends Controller
 
         $concern->update($attributes);
 
+        if (in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true)) {
+            $this->syncTerminalState($concern);
+        }
+
         return back()->with('success', $message);
     }
 
@@ -484,6 +489,8 @@ class SafeguardingConcernController extends Controller
             'closed_at' => now(),
             'updated_by' => auth()->id(),
         ]);
+
+        $this->syncTerminalState($concern);
 
         return back()->with('success', 'Concern closed.');
     }
@@ -659,6 +666,41 @@ class SafeguardingConcernController extends Controller
             'links' => [],
             'last_page' => 1,
         ];
+    }
+
+    /**
+     * X3 state-sync: when a concern reaches a terminal state (closed /
+     * no_action_required) keep linked records coherent — close the linked HsEvent
+     * and resolve the Control Room alert. Best-effort; never blocks the action.
+     * (NotifiableIncident has its own regulator lifecycle and is left as-is.)
+     */
+    private function syncTerminalState(SafeguardingConcern $concern): void
+    {
+        try {
+            $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
+            $hsEvent = HsEvent::query()->where('idempotency_key', $key)->first();
+
+            if (! $hsEvent) {
+                return;
+            }
+
+            if ($hsEvent->status !== HsEvent::STATUS_CLOSED) {
+                $hsEvent->update(['status' => HsEvent::STATUS_CLOSED]);
+            }
+
+            $alertId = $hsEvent->control_room_alert_id;
+            if ($alertId) {
+                $alert = ControlRoomAlert::find($alertId);
+                if ($alert && ! in_array($alert->status, [ControlRoomAlert::STATUS_RESOLVED, ControlRoomAlert::STATUS_CLOSED], true)) {
+                    $alert->update(['status' => ControlRoomAlert::STATUS_RESOLVED, 'resolved_at' => now()]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Safeguarding terminal state sync failed', [
+                'concern_id' => $concern->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** Stage tracker index per status (referred_external parallels investigating; no_action parallels triaged). */

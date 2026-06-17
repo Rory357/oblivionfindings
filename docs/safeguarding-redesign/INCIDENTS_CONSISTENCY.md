@@ -89,6 +89,12 @@ beside `SafeguardingConcernObserver`); `safeguarding:review-reminders` mirrors t
 commands in `routes/console.php` (`->timezone('Pacific/Auckland')->dailyAt(...)`). No UI surface; nothing to
 compare. No inconsistencies; no shared primitives modified.
 
+### Step 8 (cross-module) — additive incident-side wiring
+X1 surfaces spawned concerns on the incident detail via the same `LinkedSection`/`LinkedRow` idiom (a new
+relation + a payload key + render rows) — additive, no Incidents behaviour changed; need-to-know via
+`can_view`. X3 (terminal state-sync) + the authority currency are safeguarding-side. X2's operator card is
+left to the Control Room redesign drop. No primitives forked.
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
 - `IncidentReportDialog` "Open incident" reads `flash.created_incident_id`, never shared by
   `HandleInertiaRequests` → button never appears. Not fixed (would touch Incidents); Safeguarding shares
@@ -98,3 +104,9 @@ compare. No inconsistencies; no shared primitives modified.
 ## Shared primitives edited (additive, both modules use)
 - Step 6 — `app/Http/Middleware/HandleInertiaRequests.php`: +1 flash key `created_concern_id` (additive,
   alongside the existing `created_*_id` keys). No existing behaviour changed.
+- Step 8 — `app/Models/ClientIncident.php` (+`safeguardingConcerns()` relation),
+  `app/Http/Controllers/IncidentController.php` (`buildIncidentDetail` +`safeguarding_concerns` payload +
+  eager-load), `resources/js/components/incidents/incident-detail-dialog.tsx` (+LinkedSection rows + type),
+  `app/Providers/AppServiceProvider.php` (+`SafeguardingInvestigation` observer, Step 7b),
+  `routes/console.php` (+`safeguarding:review-reminders` schedule, Step 7b). All additive; no existing
+  behaviour changed. 132 incident tests still green.
