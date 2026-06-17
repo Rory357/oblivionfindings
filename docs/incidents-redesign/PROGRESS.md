@@ -97,7 +97,12 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] First-class link populated on the bridge path: `ClientIncidentObserver` now sets `incident.control_room_alert_id` (updateQuietly) when it bridges a manual high/crit incident — so the FK is direct for ALL paths (flag/sensor/bridge), not only via HsEvent.
 - [x] Incident→alert sync in `IncidentController@close` (`resolveLinkedAlertOnClose`): closing the incident resolves its linked Control Room alert (actionable + transition-guarded; failure never blocks the close; `resolution_code=incident_closed`). Put in the synchronous close() — testable (the observer's afterCommit doesn't fire under RefreshDatabase). Alert→incident coherence is read-live (the detail banner shows the live alert status), deliberately not force-mutating the incident (its own close guardrails).
 - [x] *Verified:* `php -l` + **1 test** (closing an incident resolves the linked open alert).
-**6d (NEXT) — modal components (last Step 6 piece):** build the flag-incident + sensor confirm/dismiss triage **components** (ready-to-mount; do NOT build the CR page) — flag → POST `control-room.incidents.flag`; triage → signal evidence + `control-room.alerts.confirm`/`.dismiss` (dismiss reason chips). tsc-verify.
+**6d (DONE) — modal components:**
+- [x] `components/control-room/flag-incident-dialog.tsx` — client + type + severity (TilePicker incl. critical) + note → POST `/control-room/incidents/flag`; success pane shows CR-{alert} + INC-{incident} (+ optional "Open incident" via `onFlagged`).
+- [x] `components/control-room/sensor-triage-dialog.tsx` — signal evidence panel (device/signal/confidence/location/detected) + **Confirm** (→ `/control-room/alerts/{id}/confirm`) / **Dismiss** with false-positive reason chips (resident sat down / pet / object dropped / staff present / other+free-text) (→ `/control-room/alerts/{id}/dismiss`).
+- [x] Ready-to-mount (props-driven, post to the Gap A/B endpoints). **NOT wired to a page — the CR page is redesigned separately; mount these when it lands.** *Verified:* `tsc` clean.
+
+**Step 6 = cross-module workflows COMPLETE** (Gaps A flag, B sensor bridge, D state-sync — backend tested; + the flag/triage modal components). Builds the workflows, not the CR page, exactly per the spec.
 
 ### ☐ Step 7 — Corrective-actions migration (Option B, §6.6)
 - [ ] Move incident inline remediation → `HsInvestigation` + `HsCorrectiveAction`; wire "+ Raise corrective action"; cross-surface read-only.
@@ -119,4 +124,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 5b: `/incidents/create` → redirect to `/incidents?report=` (auto-opens wizard) + prefill/resume; deleted create.tsx + wizard/* + obsolete e2e spec; Dusk test updated. **Step 5 report wizard COMPLETE.** tsc + 5 create tests.
 - 2026-06-17 — Step 6a (Gap A): `flagAsIncident` (CR operator quick-flag → linked incident+alert) + observer guards (no double-alert for control_room/sensor sources). php -l + 3 tests.
 - 2026-06-17 — Step 6b (Gap B): `SensorIncidentBridgeService` (confirm→sensor incident+evidence; dismiss→false-positive+suppress signals) + ControlRoomAlert confirmed/dismissed states + controller confirm/dismiss endpoints. php -l + 4 tests.
-- 2026-06-17 — Step 6c (Gap D): first-class alert FK on bridge path + close→resolve-linked-alert state-sync. php -l + 1 test. **Step 6 cross-module BACKEND (A+B+D) complete.** Next 6d: flag/triage modal components.
+- 2026-06-17 — Step 6c (Gap D): first-class alert FK on bridge path + close→resolve-linked-alert state-sync. php -l + 1 test.
+- 2026-06-17 — Step 6d: flag-incident + sensor-triage modal components (ready-to-mount, tsc clean). **Step 6 cross-module workflows COMPLETE.** Next: Step 7 (corrective actions Option B + retire show.tsx).
