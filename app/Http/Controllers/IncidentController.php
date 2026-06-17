@@ -615,46 +615,17 @@ class IncidentController extends Controller
         return redirect()->route('incidents.show', $incident)->with('success', 'Incident draft created.');
     }
 
+    /**
+     * Deep-link / shareable view of a single incident. The full editable surface is
+     * the IncidentDetailDialog; this is now a thin shell rendering the same modal
+     * content (no navigate-away page). Reuses the shared detail payload.
+     */
     public function show(Request $request, ClientIncident $incident)
     {
         $this->authorize('view', $incident);
 
-        $incident->load([
-            'client:id,first_name,last_name',
-            'reporter:id,name,email',
-            'shift:id,starts_at,ends_at,actual_ends_at',
-            'attachments',
-            'template',
-            'followups.assignedTo:id,name',
-            'followups.creator:id,name',
-            'investigator:id,name,email',
-        ]);
-
-        $user = $request->user();
-
-        $staff = null;
-        if ($user && ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny'))) {
-            // Assignable staff (exclude portal users)
-            $staff = User::staff()
-                ->orderBy('name')
-                ->get(['id', 'name', 'email', 'role']);
-        }
-
         return inertia('incidents/show', [
-            'incident' => $incident,
-            'can' => [
-                'update' => $user ? $user->can('update', $incident) : false,
-                'submit' => $user ? $user->can('submit', $incident) : false,
-                'review' => $user ? $user->can('review', $incident) : false,
-                'close' => $user ? $user->can('close', $incident) : false,
-                'reopen' => $user ? $user->can('reopen', $incident) : false,
-                'templatesManage' => $user?->canDo('incidents.templates.manage') ?? false,
-                'followupsManage' => $user?->canDo('incidents.followups.manage') ?? false,
-                'followupsComplete' => $user?->canDo('incidents.followups.complete') ?? false,
-                'portalManage' => $user?->canDo('incidents.portal.manage') ?? false,
-            ],
-            'is_editable' => $user ? $incident->isEditableByReporter($user) : false,
-            'staff' => $staff,
+            'detail' => $this->buildIncidentDetail($request, $incident->id),
         ]);
     }
 
@@ -664,10 +635,10 @@ class IncidentController extends Controller
 
         $user = $request->user();
 
-        // The show page mixes full-form saves with smaller partial updates
-        // (for example corrective actions), so preserve the existing core
-        // values when those fields are omitted from non-empty partial requests.
-        // A truly empty update should still surface required-field validation.
+        // The detail dialog mixes full edits with smaller partial updates (review
+        // notes, portal sharing), so preserve the existing core values when those
+        // fields are omitted from non-empty partial requests. A truly empty update
+        // should still surface required-field validation.
         if ($request->except(['_token', '_method']) !== []) {
             $request->merge([
                 'type' => $request->input('type', $incident->type),
@@ -710,19 +681,10 @@ class IncidentController extends Controller
             // WorkSafe
             'is_notifiable' => ['sometimes', 'boolean'],
 
-            // Investigation fields
-            'investigation_status' => ['nullable', 'in:not_required,pending,in_progress,completed'],
-            'investigation_assigned_to' => ['nullable', 'integer', 'exists:users,id'],
-            'root_cause_category' => ['nullable', 'string', 'max:255'],
-            'root_cause_description' => ['nullable', 'string'],
-            'contributing_factors' => ['nullable', 'string'],
-            'corrective_actions' => ['nullable', 'array'],
-            'corrective_actions.*.description' => ['required_with:corrective_actions', 'string'],
-            'corrective_actions.*.assigned_to' => ['nullable', 'string'],
-            'corrective_actions.*.due_date' => ['nullable', 'string'],
-            'corrective_actions.*.status' => ['nullable', 'string'],
-            'corrective_actions.*.completed_at' => ['nullable', 'string'],
-            'lessons_learned' => ['nullable', 'string'],
+            // NOTE (Option B): investigation + corrective-action / root-cause /
+            // lessons-learned editing has moved to the Health & Safety register
+            // (HsInvestigation / HsCorrectiveAction). The incident no longer accepts
+            // those fields — they are surfaced read-only on the detail from H&S.
         ]);
 
         // If reporter is editing, do not allow review fields / portal visibility to be overwritten
@@ -736,8 +698,8 @@ class IncidentController extends Controller
         }
 
         if ($coreLocked) {
-            // Only allow manager/admin-only fields after submission.
-            // Core fields and injury/near-miss details are locked; investigation fields remain editable.
+            // After submission only manager-only fields (review notes / portal) stay
+            // editable; core, injury and near-miss details are locked for audit.
             foreach ([
                 'type', 'severity', 'occurred_at', 'description', 'requires_followup', 'immediate_action_taken', 'witnesses',
                 'potential_severity', 'potential_consequence',

@@ -768,7 +768,7 @@ class IncidentControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('incidents/show')
-                ->where('incident.id', $incident->id)
+                ->where('detail.id', $incident->id)
             );
     }
 
@@ -795,7 +795,7 @@ class IncidentControllerTest extends TestCase
     //  18. Show page returns correct can permissions
     // ──────────────────────────────────────────────────────────────
 
-    public function test_show_returns_can_permissions(): void
+    public function test_show_returns_detail_can_permissions(): void
     {
         $incident = ClientIncident::factory()->create();
 
@@ -803,18 +803,18 @@ class IncidentControllerTest extends TestCase
             ->get("/incidents/{$incident->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('can.update')
-                ->has('can.submit')
-                ->has('can.review')
-                ->has('can.close')
-                ->has('can.templatesManage')
-                ->has('can.followupsManage')
-                ->has('can.followupsComplete')
-                ->has('can.portalManage')
+                ->has('detail.can.update')
+                ->has('detail.can.submit')
+                ->has('detail.can.review')
+                ->has('detail.can.close')
+                ->has('detail.can.followupsManage')
+                ->has('detail.can.followupsComplete')
+                ->has('detail.can.portalManage')
+                ->has('detail.can.raiseCorrectiveAction')
             );
     }
 
-    public function test_show_returns_is_editable_flag(): void
+    public function test_show_detail_carries_records(): void
     {
         $incident = ClientIncident::factory()->create();
 
@@ -822,34 +822,11 @@ class IncidentControllerTest extends TestCase
             ->get("/incidents/{$incident->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('is_editable')
-            );
-    }
-
-    public function test_show_loads_relationships(): void
-    {
-        $incident = ClientIncident::factory()->create();
-
-        $this->actingAs($this->admin)
-            ->get("/incidents/{$incident->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('incident.client')
-                ->has('incident.reporter')
-                ->has('incident.attachments')
-                ->has('incident.followups')
-            );
-    }
-
-    public function test_show_returns_staff_for_managers(): void
-    {
-        $incident = ClientIncident::factory()->create();
-
-        $this->actingAs($this->admin)
-            ->get("/incidents/{$incident->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('staff')
+                ->has('detail.client')
+                ->has('detail.reporter')
+                ->has('detail.attachments')
+                ->has('detail.followups')
+                ->has('detail.assignable_staff')
             );
     }
 

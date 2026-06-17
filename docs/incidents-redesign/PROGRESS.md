@@ -109,7 +109,11 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] `IncidentController@raiseCorrectiveAction` (route `incidents.corrective-actions.store`, perm `incidents.viewAny|compliance.view|hazards.view`) → `HsCorrectiveActionService::createStandalone($hsEvent, …)` linked to the incident's HsEvent; guards: no HsEvent / closed event → back-with-error. `can.raiseCorrectiveAction` + `assignable_staff` in the detail payload.
 - [x] Detail dialog Investigation section: "+ Raise corrective action" inline form (action/detail/priority/owner/due); actions still listed read-only from `hs_event.corrective_actions` (no copy on the incident).
 - [x] *Verified:* `tsc` + **2 tests** (creates an H&S register row linked to the event; permission gate). ⚠️ NOTE: the `ClientIncidentObserver` afterCommit **DOES** fire in this test env (HsEvent auto-created on factory create) — fetch it, don't re-create.
-**7b (NEXT) — retire show.tsx + stop inline remediation:** rewrite `incidents/show.tsx` → thin shell rendering `<IncidentDetailDialog>` (add `show()`-fed detail reusing `buildIncidentDetail`); remove investigation/remediation fields from `update()` validation (H&S is the source of truth going forward). Investigation editing lives at `/health-safety/events/{id}`.
+**7b (DONE) — retire show.tsx + stop inline remediation:**
+- [x] `show()` → thin `detail` payload (reuses `buildIncidentDetail`); `incidents/show.tsx` rewritten 2196→23 lines as a thin shell rendering `<IncidentDetailDialog open onClose=→/incidents>`.
+- [x] Removed investigation/remediation fields (`investigation_status`/`investigation_assigned_to`/`root_cause_*`/`contributing_factors`/`corrective_actions`/`lessons_learned`) from `update()` validation — H&S is the source of truth going forward (investigation editing lives at `/health-safety/events/{id}`). Stale comments fixed.
+- [x] Show tests rewritten to the `detail` payload; obsolete Dusk "manage corrective actions from the show page" test removed (used the soon-dropped column).
+- [x] *Verified:* `tsc` clean + **9 show/update feature tests** (57 assertions).
 **7c (NEXT) — historical data migration + drop columns:** move existing inline `corrective_actions`(JSON)/`root_cause_*`/`contributing_factors`/`lessons_learned` → `HsInvestigation`+`HsCorrectiveAction`, then drop the columns. ⚠️ destructive — write the data-move first; run local (verify migrate/rollback); flag for human review vs prod data before deploy.
 
 ---
@@ -130,4 +134,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 6b (Gap B): `SensorIncidentBridgeService` (confirm→sensor incident+evidence; dismiss→false-positive+suppress signals) + ControlRoomAlert confirmed/dismissed states + controller confirm/dismiss endpoints. php -l + 4 tests.
 - 2026-06-17 — Step 6c (Gap D): first-class alert FK on bridge path + close→resolve-linked-alert state-sync. php -l + 1 test.
 - 2026-06-17 — Step 6d: flag-incident + sensor-triage modal components (ready-to-mount, tsc clean). **Step 6 cross-module workflows COMPLETE.**
-- 2026-06-17 — Step 7a (Option B): `raiseCorrectiveAction` endpoint + dialog "+ Raise corrective action" form → `createStandalone` linked to the incident's HsEvent. tsc + 2 tests. (Observer afterCommit DOES fire in tests.) Next 7b: retire show.tsx; 7c: data migration + drop inline columns.
+- 2026-06-17 — Step 7a (Option B): `raiseCorrectiveAction` endpoint + dialog "+ Raise corrective action" form → `createStandalone` linked to the incident's HsEvent. tsc + 2 tests. (Observer afterCommit DOES fire in tests.)
+- 2026-06-17 — Step 7b: `show()`→detail; `show.tsx` 2196→23-line thin shell over `<IncidentDetailDialog>`; investigation/remediation fields removed from `update()`. tsc + 9 show/update tests. Next 7c: historical data migration + drop inline columns (final piece).
