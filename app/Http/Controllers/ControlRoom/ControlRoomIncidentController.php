@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
@@ -324,5 +325,103 @@ class ControlRoomIncidentController extends Controller
         ]);
 
         return back()->with('success', 'Alert created from incident.');
+    }
+
+    /**
+     * Operator quick-flag (Gap A): create a ClientIncident (source=control_room) and a
+     * ControlRoomAlert together, bidirectionally linked. The alert drives the real-time
+     * operator response; the incident is the system of record that flows on to H&S.
+     *
+     * Wrapped in a transaction so the ClientIncidentObserver (afterCommit) sees the
+     * control_room_alert_id and back-links the HsEvent without raising a duplicate alert.
+     */
+    public function flagAsIncident(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.create'), 403);
+
+        $data = $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'type' => ['required', 'string', 'max:120'],
+            'severity' => ['required', 'string', 'in:low,medium,high,critical'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $client = Client::with('site')->findOrFail($data['client_id']);
+
+        // ClientIncident severity is low|medium|high; an alert may also be critical.
+        $incidentSeverity = $data['severity'] === 'critical' ? 'high' : $data['severity'];
+
+        $result = DB::transaction(function () use ($data, $client, $incidentSeverity, $user) {
+            $incident = ClientIncident::create([
+                'client_id' => $client->id,
+                'reported_by' => $user->id,
+                'type' => $data['type'],
+                'source' => 'control_room',
+                'severity' => $incidentSeverity,
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'occurred_at' => now(),
+                'description' => $data['note'] ?? null,
+                'title' => $data['type'] . ' incident',
+            ]);
+
+            $alertData = [
+                'source' => 'control_room',
+                'alert_type' => 'incident.' . $incident->type,
+                'severity' => $data['severity'],
+                'status' => 'open',
+                'triggered_at' => now(),
+                'created_by_user_id' => $user->id,
+                'site_id' => $client->site_id,
+                'client_id' => $client->id,
+                'context' => [
+                    'incident_id' => $incident->id,
+                    'incident_type' => $incident->type,
+                    'title' => $incident->title,
+                    'description' => $incident->description,
+                    'flagged_by' => $user->name,
+                ],
+                'notes' => $data['note'] ?? null,
+            ];
+
+            $queue = TriageQueue::findForAlert($alertData['severity'], $alertData['source'], $alertData['alert_type']);
+            $alertData['queue_id'] = $queue?->id;
+
+            $alert = ControlRoomAlert::create($alertData);
+
+            if ($queue) {
+                \App\Models\ControlRoom\AlertQueue::create([
+                    'alert_id' => $alert->id,
+                    'queue_id' => $queue->id,
+                    'entered_at' => now(),
+                ]);
+            }
+
+            if (! $alert->sla) {
+                $slaDefinition = SlaDefinition::findForAlert($alert->alert_type, $alert->severity, $alert->source);
+                if ($slaDefinition) {
+                    AlertSla::createFromDefinition($alert, $slaDefinition);
+                }
+            }
+
+            // Bidirectional link (Gap D): incident -> alert (first-class FK).
+            // updateQuietly avoids re-firing the observer; the alert -> incident
+            // direction lives in the alert context above.
+            $incident->updateQuietly(['control_room_alert_id' => $alert->id]);
+
+            return ['incident' => $incident, 'alert' => $alert];
+        });
+
+        AuditLogger::log('controlRoom.alert.flagAsIncident', $result['alert'], [
+            'alert_id' => $result['alert']->id,
+            'incident_id' => $result['incident']->id,
+            'severity' => $data['severity'],
+        ]);
+
+        return back()
+            ->with('success', "Incident INC-{$result['incident']->id} flagged and alert raised.")
+            ->with('flagged_incident_id', $result['incident']->id)
+            ->with('flagged_alert_id', $result['alert']->id);
     }
 }

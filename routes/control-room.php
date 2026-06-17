@@ -224,6 +224,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/control-room/incidents/create-alert', [ControlRoomIncidentController::class, 'createAlertFromIncident'])
         ->middleware('permission:controlRoom.alerts.create')
         ->name('control-room.incidents.create-alert');
+    // Operator quick-flag: raise an alert and create the incident together (Gap A).
+    Route::post('/control-room/incidents/flag', [ControlRoomIncidentController::class, 'flagAsIncident'])
+        ->middleware('permission:controlRoom.alerts.create')
+        ->name('control-room.incidents.flag');
 
     // Live Statistics
     Route::get('/control-room/stats', ControlRoomStatsController::class)

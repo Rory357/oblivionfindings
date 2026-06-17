@@ -128,4 +128,65 @@ class ControlRoomIncidentControllerTest extends TestCase
         $alert = ControlRoomAlert::where('alert_type', 'client_incident')->first();
         $this->assertSame($incident->id, $alert->context['incident_source_id']);
     }
+
+    public function test_flag_as_incident_requires_create_permission(): void
+    {
+        $client = Client::factory()->create();
+
+        $this->actingAs($this->supportWorker)
+            ->post('/control-room/incidents/flag', [
+                'client_id' => $client->id,
+                'type' => 'fall',
+                'severity' => 'high',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_flag_as_incident_creates_linked_incident_and_alert(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/flag', [
+                'client_id' => $client->id,
+                'type' => 'fall',
+                'severity' => 'high',
+                'note' => 'Resident on the floor by the bed',
+            ])
+            ->assertRedirect();
+
+        $incident = ClientIncident::where('source', 'control_room')->latest('id')->first();
+        $this->assertNotNull($incident);
+        $this->assertSame('submitted', $incident->status);
+        $this->assertSame($client->id, $incident->client_id);
+        $this->assertNotNull($incident->control_room_alert_id);
+
+        // Bidirectional link: incident -> alert (FK) and alert -> incident (context).
+        $alert = ControlRoomAlert::find($incident->control_room_alert_id);
+        $this->assertNotNull($alert);
+        $this->assertSame('control_room', $alert->source);
+        $this->assertSame('open', $alert->status);
+        $this->assertSame($incident->id, $alert->context['incident_id']);
+    }
+
+    public function test_flag_as_incident_maps_critical_alert_to_high_incident(): void
+    {
+        $client = Client::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/flag', [
+                'client_id' => $client->id,
+                'type' => 'injury',
+                'severity' => 'critical',
+            ])
+            ->assertRedirect();
+
+        $incident = ClientIncident::where('source', 'control_room')->latest('id')->first();
+        $alert = ControlRoomAlert::find($incident->control_room_alert_id);
+
+        // Incidents top out at 'high'; the alert keeps the operator's 'critical'.
+        $this->assertSame('high', $incident->severity);
+        $this->assertSame('critical', $alert->severity);
+    }
 }

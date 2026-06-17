@@ -82,9 +82,14 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 
 **Step 5 = report wizard COMPLETE** (modal-first, both branches, legacy retired, deep-links preserved). Only deferred bit: in-wizard photo capture (step ②) — attachments are addable from the detail dialog meanwhile.
 
-### ☐ Step 6 — Cross-module workflows (Gaps A, B, D, E)
-- [ ] `flagAsIncident`; `SensorIncidentBridgeService` (confirm→incident/HsEvent; dismiss→false-positive); alert confirm/dismiss states; alert↔incident state-sync observers.
-- [ ] Confirm/dismiss + flag-incident modals (mountable into future Control Room).
+### ◑ Step 6 — Cross-module workflows (Gaps A, B, D, E) — 6a DONE
+> Build the WORKFLOWS, not the CR page (redesigned separately).
+**6a (DONE) — Gap A flag-as-incident:**
+- [x] `ControlRoomIncidentController@flagAsIncident` (+ route `control-room.incidents.flag`, perm `controlRoom.alerts.create`): operator quick-flag → creates `ClientIncident` (source=control_room, status=submitted) **and** `ControlRoomAlert` together, bidirectionally linked (incident.control_room_alert_id FK ↔ alert.context.incident_id). Wrapped in a DB transaction so the observer's afterCommit sees the FK. Critical→high on the incident, critical kept on the alert.
+- [x] `ClientIncidentObserver` guards: for source in {control_room, sensor} → back-link the existing alert to the HsEvent + skip the severity-gated bridge (no duplicate alert); manual unchanged.
+- [x] *Verified:* `php -l` + **3 flagAsIncident tests** (linked incident+alert, critical→high mapping, permission gate).
+**6b (NEXT) — Gap B sensor bridge:** `SensorIncidentBridgeService` — sensor alert CONFIRM → `ClientIncident` (source=sensor, interactive=false) + auto-open HsEvent carrying signal evidence; DISMISS → false-positive reason logged on the alert (sensor-tuning), no incident. Add confirm/dismiss states to `ControlRoomAlert` (model constants/transitions; reuse `resolution_code`/`context` — likely no migration).
+**6c (NEXT) — Gap D state-sync + modals:** alert↔incident state-sync observer (resolve/close one keeps the other coherent); build the confirm/dismiss + flag-incident **modal components** (mountable into the future CR page).
 
 ### ☐ Step 7 — Corrective-actions migration (Option B, §6.6)
 - [ ] Move incident inline remediation → `HsInvestigation` + `HsCorrectiveAction`; wire "+ Raise corrective action"; cross-surface read-only.
@@ -103,4 +108,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green.
 - 2026-06-17 — Step 4b-iii: edit pane (core fields, drafts) added. **Step 4 modal-first detail functionally complete** (view+lifecycle+followups+attachments+edit). show.tsx retirement deferred → Step 7 (investigation migration).
 - 2026-06-17 — Step 5a: report wizard `IncidentReportDialog` (WizardShell, 6 steps + near-miss branch + review + success) over the list, launched from "+ Report"; `store()` extended (source/hazard/followups[]). tsc + 3 store tests.
-- 2026-06-17 — Step 5b: `/incidents/create` → redirect to `/incidents?report=` (auto-opens wizard) + prefill/resume; deleted create.tsx + wizard/* + obsolete e2e spec; Dusk test updated. **Step 5 report wizard COMPLETE.** tsc + 5 create tests. Next: Step 6 cross-module (Control Room).
+- 2026-06-17 — Step 5b: `/incidents/create` → redirect to `/incidents?report=` (auto-opens wizard) + prefill/resume; deleted create.tsx + wizard/* + obsolete e2e spec; Dusk test updated. **Step 5 report wizard COMPLETE.** tsc + 5 create tests.
+- 2026-06-17 — Step 6a (Gap A): `flagAsIncident` (CR operator quick-flag → linked incident+alert) + observer guards (no double-alert for control_room/sensor sources). php -l + 3 tests. Next 6b: SensorIncidentBridgeService + confirm/dismiss states.

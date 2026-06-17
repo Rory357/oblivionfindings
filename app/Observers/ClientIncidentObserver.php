@@ -26,6 +26,18 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
         // Always create the HsEvent record (even for low severity and drafts)
         $this->recordHsEvent($incident);
 
+        // Operator-flag (Gap A) and sensor-bridge (Gap B) paths raise + link their own
+        // ControlRoomAlert inside a transaction, so the FK is already set here. Back-link
+        // it to the HsEvent and skip the severity-gated bridge to avoid a duplicate alert.
+        if (in_array($incident->source, ['control_room', 'sensor'], true)) {
+            if ($incident->control_room_alert_id) {
+                $this->linkAlertToHsEvent($incident, (int) $incident->control_room_alert_id);
+            }
+            $this->maybeEscalateToGovernance($incident);
+
+            return;
+        }
+
         if (! $this->shouldBridge($incident)) {
             return;
         }
@@ -42,6 +54,12 @@ class ClientIncidentObserver implements ShouldHandleEventsAfterCommit
         // Sync severity changes to HsEvent
         if ($incident->wasChanged('severity')) {
             $this->syncHsEventSeverity($incident);
+        }
+
+        // Dedicated CR/sensor incidents own their alert via the bridge service;
+        // alert <-> incident state-sync keeps them coherent, so don't re-bridge here.
+        if (in_array($incident->source, ['control_room', 'sensor'], true)) {
+            return;
         }
 
         if (! $this->shouldBridgeOnUpdate($incident)) {
