@@ -79,7 +79,7 @@ class HsAnalyticsService
             'hero_stats' => $heroStats,
             'scorecard' => $scorecard,
             'period_summary' => $this->periodSummary($siteId, $from, $to),
-            'worksafe_notifiable' => $this->worksafeTotals($from, $to),
+            'worksafe_notifiable' => $this->worksafeTotals($siteId, $from, $to),
             'hours_meta' => [
                 'source' => 'billing_entries',
                 'total_hours' => round($this->kpi->totalHoursWorked(null, null, $siteId), 0),
@@ -106,7 +106,7 @@ class HsAnalyticsService
         $compliance = $this->complianceByMonth($months);
         $engagement = $this->engagementByMonth($from, $to);
         $consultation = $this->consultationByMonth($from, $to);
-        $worksafe = $this->worksafeByMonth($from, $to);
+        $worksafe = $this->worksafeByMonth($siteId, $from, $to);
 
         return collect($months)->map(function (string $m) use (
             $freq, $incidents, $hazOpened, $hazClosed,
@@ -426,11 +426,12 @@ class HsAnalyticsService
     // ── WorkSafe notifiable (HSWA s.56) ─────────────────────────────────
 
     /** @return array<string,array{notified:int,awaiting:int}> */
-    private function worksafeByMonth(CarbonInterface $from, CarbonInterface $to): array
+    private function worksafeByMonth(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
         $rows = NotifiableIncident::query()
             ->where('notification_authority', 'worksafe')
             ->whereBetween('occurred_at', [$from, $to])
+            ->when($siteId, $this->worksafeSiteScope($siteId))
             ->selectRaw("DATE_FORMAT(occurred_at, '%Y-%m') as m, SUM(status = 'pending') as awaiting, SUM(status <> 'pending') as notified")
             ->groupBy('m')
             ->get();
@@ -444,20 +445,36 @@ class HsAnalyticsService
     }
 
     /** @return array{notified:int,awaiting:int} */
-    private function worksafeTotals(CarbonInterface $from, CarbonInterface $to): array
+    private function worksafeTotals(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
+        $scope = $this->worksafeSiteScope($siteId);
+
         return [
             'notified' => (int) NotifiableIncident::query()
                 ->where('notification_authority', 'worksafe')
                 ->where('status', '!=', 'pending')
                 ->whereBetween('occurred_at', [$from, $to])
+                ->when($siteId, $scope)
                 ->count(),
             // Awaiting is a live state — not window-bound.
             'awaiting' => (int) NotifiableIncident::query()
                 ->where('notification_authority', 'worksafe')
                 ->where('status', 'pending')
+                ->when($siteId, $scope)
                 ->count(),
         ];
+    }
+
+    /**
+     * WorkSafe notification is an org-level PCBU obligation. When a site is
+     * selected we attribute an event via its linked incident's client site;
+     * events with no linked incident can't be site-attributed, so they drop
+     * out of the site-scoped view (and only appear org-wide). NotifiableIncident
+     * has no site_id, hence the relatedIncident → client 2-hop.
+     */
+    private function worksafeSiteScope(?int $siteId): \Closure
+    {
+        return fn ($q) => $q->whereHas('relatedIncident', fn ($i) => $i->whereHas('client', fn ($c) => $c->where('site_id', $siteId)));
     }
 
     // ── Site league + heatmap (the site-scoping bug fix) ────────────────
@@ -646,21 +663,28 @@ class HsAnalyticsService
         $openHazards = (int) SiteHazard::query()->whereIn('status', ['open', 'in_progress'])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))->count();
 
-        $caTotal = (int) HsCorrectiveAction::query()->whereNotNull('completed_at')->whereBetween('completed_at', [$from, $to])->count();
-        $caOnTime = (int) HsCorrectiveAction::query()->whereNotNull('completed_at')->whereBetween('completed_at', [$from, $to])
-            ->whereNotNull('due_date')->whereColumn('completed_at', '<=', 'due_date')->count();
+        // Corrective-action on-time % via HsKpiService — matches the scorecard
+        // and is site-scoped (through the parent HsEvent).
+        $actionsOnTime = $this->kpi->actionsClosedOnTimePct($from, $to, $siteId);
 
-        $totalSites = (int) Site::query()->count();
-        $drillsComplete = count(array_filter($this->drillStatusBySite(), fn ($s) => $s === 'compliant'));
+        // Drills are a per-site governance metric — scope to the selected site.
+        $drillStatuses = $this->drillStatusBySite();
+        if ($siteId !== null) {
+            $drillsTotal = 1;
+            $drillsComplete = ($drillStatuses[$siteId] ?? null) === 'compliant' ? 1 : 0;
+        } else {
+            $drillsTotal = (int) Site::query()->count();
+            $drillsComplete = count(array_filter($drillStatuses, fn ($s) => $s === 'compliant'));
+        }
 
         return [
             'incidents' => $incidents,
             'near_misses' => $nearMisses,
-            'worksafe_awaiting' => $this->worksafeTotals($from, $to)['awaiting'],
+            'worksafe_awaiting' => $this->worksafeTotals($siteId, $from, $to)['awaiting'],
             'open_hazards' => $openHazards,
-            'actions_on_time_pct' => $caTotal > 0 ? (int) round($caOnTime / $caTotal * 100) : null,
+            'actions_on_time_pct' => $actionsOnTime === null ? null : (int) round($actionsOnTime),
             'drills_complete' => $drillsComplete,
-            'drills_total' => $totalSites,
+            'drills_total' => $drillsTotal,
         ];
     }
 
