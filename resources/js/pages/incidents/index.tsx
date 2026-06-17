@@ -22,8 +22,9 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { IncidentDetailDialog, type IncidentDetail } from '@/components/incidents/incident-detail-dialog';
+import { IncidentReportDialog } from '@/components/incidents/incident-report-dialog';
 import { formatDateTime } from '@/lib/datetime';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
     Activity,
@@ -128,6 +129,8 @@ type Props = {
     };
     sites?: Array<{ id: number; name: string }> | null;
     clients?: Array<{ id: number; first_name: string; last_name: string }> | null;
+    reportClients?: Array<{ id: number; first_name: string; last_name: string }> | null;
+    reportStaff?: Array<{ id: number; name: string }> | null;
     can: { create: boolean; templatesManage: boolean };
     detail: IncidentDetail | null;
 };
@@ -213,10 +216,18 @@ export default function IncidentsIndex({
     nearMissInsights,
     sites,
     clients,
+    reportClients,
+    reportStaff,
     can,
     detail,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [reportMode, setReportMode] = useState<'incident' | 'near_miss' | null>(null);
+    const [launcherOpen, setLauncherOpen] = useState(false);
+    const openReport = (m: 'incident' | 'near_miss') => {
+        setLauncherOpen(false);
+        setReportMode(m);
+    };
 
     const go = (next: Partial<Filters>) =>
         router.get('/incidents', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -402,27 +413,27 @@ export default function IncidentsIndex({
                         </div>
 
                         {can.create ? (
-                            <Popover>
+                            <Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
                                 <PopoverTrigger asChild>
                                     <Button size="sm" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
                                         <Plus className="mr-1.5 h-4 w-4" /> Report
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent align="end" className="w-64 p-1.5">
-                                    <Link href="/incidents/create" className="flex items-start gap-2.5 rounded-md p-2.5 transition-colors hover:bg-muted">
+                                    <button type="button" onClick={() => openReport('incident')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
                                         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />
                                         <span>
                                             <span className="block text-sm font-medium">An incident</span>
                                             <span className="block text-xs text-muted-foreground">Something happened to a client or worker.</span>
                                         </span>
-                                    </Link>
-                                    <Link href="/incidents/create?type=near_miss" className="flex items-start gap-2.5 rounded-md p-2.5 transition-colors hover:bg-muted">
+                                    </button>
+                                    <button type="button" onClick={() => openReport('near_miss')} className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted">
                                         <Eye className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
                                         <span>
                                             <span className="block text-sm font-medium">A near miss</span>
                                             <span className="block text-xs text-muted-foreground">No harm done — takes under a minute.</span>
                                         </span>
-                                    </Link>
+                                    </button>
                                 </PopoverContent>
                             </Popover>
                         ) : null}
@@ -468,6 +479,20 @@ export default function IncidentsIndex({
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
             {detail ? <IncidentDetailDialog detail={detail} open onClose={closeDetail} /> : null}
+
+            {reportMode && reportClients ? (
+                <IncidentReportDialog
+                    open
+                    mode={reportMode}
+                    clients={reportClients}
+                    staff={reportStaff ?? []}
+                    onClose={() => setReportMode(null)}
+                    onOpenIncident={(id) => {
+                        setReportMode(null);
+                        openDetail(id);
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

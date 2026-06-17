@@ -581,6 +581,55 @@ class IncidentControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_sets_source_manual_and_creates_followups(): void
+    {
+        $this->mockNotificationService();
+
+        $response = $this->actingAs($this->staff)
+            ->post('/incidents', [
+                'client_id' => $this->client->id,
+                'type' => 'fall',
+                'severity' => 'low',
+                'description' => 'Slipped',
+                'followups' => [
+                    ['notes' => 'Update care plan', 'assigned_to_user_id' => $this->coordinator->id, 'due_at' => now()->addDays(3)->format('Y-m-d')],
+                ],
+            ]);
+
+        $response->assertRedirect();
+        $incident = ClientIncident::where('client_id', $this->client->id)->latest('id')->first();
+        $this->assertNotNull($incident);
+        $this->assertSame('manual', $incident->source);
+        $this->assertTrue((bool) $incident->requires_followup);
+        $this->assertDatabaseHas('incident_followups', [
+            'client_incident_id' => $incident->id,
+            'notes' => 'Update care plan',
+            'assigned_to_user_id' => $this->coordinator->id,
+        ]);
+    }
+
+    public function test_store_near_miss_persists_potential_and_hazard(): void
+    {
+        $this->mockNotificationService();
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', [
+                'client_id' => $this->client->id,
+                'type' => 'near_miss',
+                'severity' => 'low',
+                'description' => 'Almost fell',
+                'potential_severity' => 'high',
+                'potential_consequence' => 'Could have broken a hip',
+                'hazard' => 'Wet floor, no sign',
+            ]);
+
+        $incident = ClientIncident::where('type', 'near_miss')->latest('id')->first();
+        $this->assertNotNull($incident);
+        $this->assertSame('high', $incident->potential_severity);
+        $this->assertSame('manual', $incident->source);
+        $this->assertSame('Wet floor, no sign', $incident->metadata['hazard'] ?? null);
+    }
+
     public function test_store_with_template(): void
     {
         $this->mockNotificationService();

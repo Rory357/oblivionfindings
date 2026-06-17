@@ -68,8 +68,13 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 
 **Step 4 = modal-first detail is FUNCTIONALLY COMPLETE** (view + lifecycle + follow-ups + attachments + core edit, all over the list). Remaining is the show.tsx refactor above, sequenced into Step 7.
 
-### ☐ Step 5 — Report wizard (`WizardShell`, §3)
-- [ ] 6 steps + near-miss branch + photo capture + `WizardSuccessPane`; preserve `?incident=` resume + `?shift_id`/`?client_id` prefill. Retire `create.tsx` + `WizardStepper`.
+### ◑ Step 5 — Report wizard (`WizardShell`, §3) — 5a DONE, 5b next
+**5a (DONE):** modal-first report wizard over the list.
+- [x] `components/incidents/incident-report-dialog.tsx` on `WizardShell` (rail + completeness `Ring` + review + `WizardSuccessPane`): 6 steps with a **near-miss branch** (incident: Type&people → What happened → Severity&actions → WorkSafe check → Follow-ups → Review; near-miss: blame-free Who&where → What happened → What-could-have-happened [potential `TilePicker`+hazard+control] → light dangerous-occurrence check → Follow-ups → Review). Dynamic follow-up rows.
+- [x] `store()` extended: `source='manual'`, `hazard`→`metadata.hazard`, `followups[]` created in one submit, `stay`→`back()` + flashes `created_incident_id`. Success pane "Open incident" → `openDetail`.
+- [x] Wired the hero **"+ Report"** launcher (An incident / A near miss) to open the wizard over the list; `reportClients` (scoped) + `reportStaff` added to the index payload.
+- [x] *Verified:* `tsc` clean + **3 store feature tests** (source=manual + followups[] created; near-miss potential+hazard→metadata).
+**5b (NEXT):** retire `incidents/create.tsx` + `wizard/*` + custom `WizardStepper`; make `/incidents/create` render the wizard (or redirect to `/incidents?report=…`); **prefill** (`?shift_id`/`?client_id` from /my-day) + **resume** (`?incident=` draft). Photo capture in step ② (deferred — addable via the detail dialog now).
 
 ### ☐ Step 6 — Cross-module workflows (Gaps A, B, D, E)
 - [ ] `flagAsIncident`; `SensorIncidentBridgeService` (confirm→incident/HsEvent; dismiss→false-positive); alert confirm/dismiss states; alert↔incident state-sync observers.
@@ -90,4 +95,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 4a DONE: read-only `IncidentDetailDialog` over the list (controller `detail` payload + 6-section WizardShell modal + row-click wiring), non-regressing (show.tsx kept). tsc clean + 4 detail tests (60 assertions).
 - 2026-06-17 — Step 4b-i: lifecycle action panes (review/close/reopen) added to the dialog (in-body pane, existing endpoints). tsc clean.
 - 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green.
-- 2026-06-17 — Step 4b-iii: edit pane (core fields, drafts) added. **Step 4 modal-first detail functionally complete** (view+lifecycle+followups+attachments+edit). show.tsx retirement deferred → Step 7 (investigation migration). Next: Step 5 report wizard.
+- 2026-06-17 — Step 4b-iii: edit pane (core fields, drafts) added. **Step 4 modal-first detail functionally complete** (view+lifecycle+followups+attachments+edit). show.tsx retirement deferred → Step 7 (investigation migration).
+- 2026-06-17 — Step 5a: report wizard `IncidentReportDialog` (WizardShell, 6 steps + near-miss branch + review + success) over the list, launched from "+ Report"; `store()` extended (source/hazard/followups[]). tsc + 3 store tests. Next 5b: retire create.tsx/wizard/WizardStepper + prefill/resume.

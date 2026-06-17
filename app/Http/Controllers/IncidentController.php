@@ -214,6 +214,20 @@ class IncidentController extends Controller
             $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
         }
 
+        // Report-wizard data for the modal-first "+ Report": clients the user may
+        // report for (scoped like IncidentController@create) + follow-up owners.
+        $reportClients = null;
+        $reportStaff = null;
+        if ($user->canDo('incidents.create')) {
+            $reportClients = Client::query()
+                ->when(! $user->canDo('clients.viewAny'), fn ($qq) => $qq->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id)))
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name']);
+            $reportStaff = $user->canDo('incidents.followups.manage')
+                ? User::staff()->orderBy('name')->get(['id', 'name'])
+                : [];
+        }
+
         return inertia('incidents/index', [
             'filters' => [
                 'q' => $q,
@@ -233,6 +247,8 @@ class IncidentController extends Controller
             'nearMissInsights' => $nearMissInsights,
             'sites' => $sites,
             'clients' => $clients,
+            'reportClients' => $reportClients,
+            'reportStaff' => $reportStaff,
             'can' => [
                 'create' => $user->canDo('incidents.create'),
                 'templatesManage' => $user->canDo('incidents.templates.manage'),
@@ -486,6 +502,13 @@ class IncidentController extends Controller
             'is_notifiable' => ['sometimes', 'boolean'],
             'site_preserved' => ['sometimes', 'boolean'],
             'worksafe_reference' => ['nullable', 'string', 'max:255'],
+
+            // Report-wizard extras (one-submit report flow)
+            'hazard' => ['nullable', 'string'],
+            'followups' => ['nullable', 'array'],
+            'followups.*.notes' => ['required_with:followups', 'string'],
+            'followups.*.assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'followups.*.due_at' => ['nullable', 'date'],
         ]);
 
         // Server-side notifiable enforcement (NZ HSWA, G2) — escalate-only: a
@@ -521,12 +544,14 @@ class IncidentController extends Controller
             'type' => $data['type'],
             'severity' => $data['severity'],
             'status' => 'draft',
+            'source' => 'manual',
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
-            'requires_followup' => (bool)($data['requires_followup'] ?? false),
+            'requires_followup' => (bool)($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'] . ' incident',
+            'metadata' => $request->filled('hazard') ? ['hazard' => $data['hazard']] : null,
 
             // Near-miss
             'potential_severity' => $data['potential_severity'] ?? null,
@@ -586,10 +611,22 @@ class IncidentController extends Controller
             );
         }
 
-        // In-place wizard (e.g. the H&S command-centre Report flow): stay on the
-        // referring page so its props refresh and the success pane can show.
+        // Report-wizard follow-ups: created alongside the incident in one submit.
+        foreach ($data['followups'] ?? [] as $fu) {
+            $incident->followups()->create([
+                'notes' => $fu['notes'],
+                'assigned_to_user_id' => $fu['assigned_to_user_id'] ?? null,
+                'due_at' => $fu['due_at'] ?? null,
+                'created_by' => $request->user()?->id,
+            ]);
+        }
+
+        // In-place wizard (the modal-first Report flow / H&S command-centre): stay
+        // on the referring page so its props refresh and the success pane can show.
         if ($request->boolean('stay')) {
-            return back()->with('success', 'Incident recorded.');
+            return back()
+                ->with('success', 'Incident recorded.')
+                ->with('created_incident_id', $incident->id);
         }
 
         if ($request->boolean('continue_wizard')) {
