@@ -9,8 +9,10 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Notifications\Safeguarding\SafeguardingReviewDueNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
@@ -178,6 +180,47 @@ class SafeguardingRemediationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('detail.control_room_alert_id', $alert->id)
+            );
+    }
+
+    /** W9 — the daily reminder delivers a digest notification to the assigned lead. */
+    public function test_review_reminder_notifies_the_assigned_lead(): void
+    {
+        Notification::fake();
+
+        $lead = User::factory()->create(['approved_at' => now()]);
+        $concern = SafeguardingConcern::factory()->create([
+            'status' => 'investigating',
+            'assigned_to_user_id' => $lead->id,
+        ]);
+        // An external report awaiting acknowledgement beyond the threshold.
+        $concern->externalReports()->create([
+            'authority_type' => 'police',
+            'authority_name' => 'NZ Police',
+            'report_method' => 'phone',
+            'reported_at' => now()->subDays(10),
+            'report_summary' => 'Notified police.',
+            'reported_by_user_id' => $lead->id,
+            'created_by' => $lead->id,
+            'acknowledgement_received' => false,
+        ]);
+
+        $this->artisan('safeguarding:review-reminders --days=7')->assertExitCode(0);
+
+        Notification::assertSentTo($lead, SafeguardingReviewDueNotification::class);
+    }
+
+    /** The need-to-know access log surfaces who viewed the concern (read-audit). */
+    public function test_detail_exposes_access_log_after_a_view(): void
+    {
+        $user = $this->makeSafeguardingUser(['safeguarding.viewAny']);
+        $concern = SafeguardingConcern::factory()->create();
+
+        $this->actingAs($user)
+            ->get("/safeguarding?concern={$concern->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.access_log.0.by', $user->name)
             );
     }
 }

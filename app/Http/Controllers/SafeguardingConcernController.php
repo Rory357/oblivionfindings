@@ -626,6 +626,34 @@ class SafeguardingConcernController extends Controller
         return $subject instanceof Client ? "/operations/clients/{$subject->id}" : null;
     }
 
+    /**
+     * Recent "accessed by" entries for the need-to-know access log — the read trail
+     * recorded by {@see GovernanceAuditService::log('viewed', …)} above. Only ever
+     * built for a non-restricted detail payload, so it is itself need-to-know aware.
+     *
+     * @return array<int, array{by: string, at: ?string}>
+     */
+    private function recentAccessLog(SafeguardingConcern $concern): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('governance_audit_log')) {
+            return [];
+        }
+
+        return \Illuminate\Support\Facades\DB::table('governance_audit_log as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
+            ->where('a.resource_type', SafeguardingConcern::class)
+            ->where('a.resource_id', $concern->getKey())
+            ->where('a.action', 'viewed')
+            ->orderByDesc('a.created_at')
+            ->limit(8)
+            ->get(['u.name as by', 'a.created_at as at'])
+            ->map(fn ($row) => [
+                'by' => $row->by ?? 'Unknown user',
+                'at' => $row->at ? \Illuminate\Support\Carbon::parse($row->at)->toISOString() : null,
+            ])
+            ->all();
+    }
+
     /** Non-terminal concern ids — the universe for "needs attention" worklists. */
     private function openConcernIds()
     {
@@ -925,6 +953,7 @@ class SafeguardingConcernController extends Controller
             'related_incident_id' => $concern->related_incident_id,
             'hs_event' => $hsEvent,
             'control_room_alert_id' => $controlRoomAlertId,
+            'access_log' => $this->recentAccessLog($concern),
             'can' => [
                 'update' => $user->can('update', $concern),
                 'investigate' => $user->can('investigate', $concern),

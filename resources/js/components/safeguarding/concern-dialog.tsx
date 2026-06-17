@@ -97,6 +97,7 @@ export type ConcernDetail = {
     related_incident_id?: number | null;
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
+    access_log?: { by: string; at: string | null }[];
     can?: { update: boolean; investigate: boolean; report_external: boolean };
     assignable_staff?: Array<{ id: number; name: string }>;
 };
@@ -845,24 +846,48 @@ function TimelineSection({ d }: { d: ConcernDetail }) {
     if (d.closure?.at) events.push({ at: d.closure.at, label: `Closed${d.closure.by ? ` by ${d.closure.by}` : ''}`, tone: 'success', icon: CheckCircle2 });
     events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-    if (!events.length) return <p className="text-sm text-muted-foreground">No timeline events yet.</p>;
+    const accessLog = d.access_log ?? [];
 
     return (
-        <ol className="relative ml-2 border-l border-border">
-            {events.map((e, i) => {
-                const Icon = e.icon;
-                return (
-                    <li key={i} className="mb-5 ml-5">
-                        <span className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full ${DOT[e.tone] ?? DOT.neutral}`} />
-                        <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">{e.label}</span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(e.at)}</p>
-                    </li>
-                );
-            })}
-        </ol>
+        <div className="flex flex-col gap-5">
+            {events.length ? (
+                <ol className="relative ml-2 border-l border-border">
+                    {events.map((e, i) => {
+                        const Icon = e.icon;
+                        return (
+                            <li key={i} className="mb-5 ml-5">
+                                <span className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full ${DOT[e.tone] ?? DOT.neutral}`} />
+                                <div className="flex items-center gap-2">
+                                    <Icon className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm font-medium text-foreground">{e.label}</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(e.at)}</p>
+                            </li>
+                        );
+                    })}
+                </ol>
+            ) : (
+                <p className="text-sm text-muted-foreground">No timeline events yet.</p>
+            )}
+
+            {accessLog.length ? (
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                    <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        <Lock className="h-3 w-3" /> Accessed by · need-to-know
+                    </p>
+                    <ul className="flex flex-col gap-1">
+                        {accessLog.map((a, i) => (
+                            <li key={i} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1.5">
+                                    <UserIcon className="h-3 w-3" /> {a.by}
+                                </span>
+                                {a.at ? <span>{formatDateTime(a.at)}</span> : null}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+        </div>
     );
 }
 
