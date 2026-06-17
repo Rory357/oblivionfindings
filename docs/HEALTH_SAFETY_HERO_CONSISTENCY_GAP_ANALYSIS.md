@@ -50,66 +50,83 @@ strip, medallion, gradient/shadow and role banner must read as identical chrome.
 
 ## B. Rebuild the analytics hero on the kit (P1)
 
-- [ ] **B1** Replace `analytics.tsx` `PageHero` with `HeroShell` composed from the kit.
-- [ ] **B2** Stats → Leading/Lagging `HeroCluster`s below the title (not top-right
+- [x] **B1** Replace `analytics.tsx` `PageHero` with `HeroShell` composed from the kit. _Done._
+- [x] **B2** Stats → Leading/Lagging `HeroCluster`s below the title (not top-right
   `PageHeroStats`); map `hero_stats` (+ `scorecard` split) with period-over-period
-  `delta`/`deltaTone`. Note the 4-vs-8 tile choice here once decided.
-- [ ] **B3** Eyebrow → `HeroStatusPill` (green dot), "Safety analytics · {rangeLabel}".
-- [ ] **B4** Medallion → `HeroMedallion icon={BarChart3}` (kit size, `hidden sm:flex`).
-- [ ] **B5** Description → one terse line; drop the multi-line prose + 3-item `meta[]`
-  (keep at most one compact `meta` line).
+  `delta`/`deltaTone`. _Done — **4+4 tile choice**: mirror the dashboard's exact two
+  clusters (Lagging: Incidents/LTIFR/TRIFR/Days LTI-free · Leading:
+  Near-miss/Actions-on-time/Train-audit/Open-hazards), sourced from `scorecard` by key
+  (it carries the deltas — `hero_stats` overlaps so it's unused now). Delta = `▲/▼ |Δ|`
+  with tone from `dir` (▲ improving=green, ▼ watch=red); null/0 deltas render no line._
+- [x] **B3** Eyebrow → `HeroStatusPill` (green dot), "Safety analytics · {rangeLabel}". _Done._
+- [x] **B4** Medallion → `HeroMedallion icon={BarChart3}` (kit size, `hidden sm:flex`). _Done._
+- [x] **B5** Description → one terse line; drop the multi-line prose + 3-item `meta[]`. _Done
+  — single subtitle line: underlined `{siteScope}` · Ngā Paerewa NZS 8134:2021 · HSWA 2015 ·
+  ACC (exact dates dropped — conveyed by the period control + eyebrow rangeLabel)._
 
 ## C. Canonical compliance-badge labels (P1)
 
-- [ ] **C1** `HeroComplianceBadges` uses the dashboard's verbatim wording, fed by
-  counts/booleans (never strings): `WorkSafe notifiable · {n} awaiting` ·
-  `Ngā Paerewa NZS 8134:2021 · Certified` · `Hazardous substances · SDS current` /
-  `· {n} SDS expiring` · `Fire · {n} drills due` (warning) / `· {n} drills overdue`
-  (critical) / `Drills current` (success) · `First aid · Cover OK`. Tone map +
-  fire-drill threshold defined once in the component.
-- [ ] **C2** Analytics feeds `HeroComplianceBadges` (drops its reworded `PageHeroBadge`
-  list + the `FlaskConical` icon + the bespoke `critical` dot tone).
+- [x] **C1** `HeroComplianceBadges` uses the dashboard's verbatim wording, fed by
+  counts/booleans (never strings). Tone map + one fire-drill threshold in the component.
+  _Done in Pass 1 (A1); locked by `hs-hero-kit.test.tsx`._
+- [x] **C2** Analytics feeds `HeroComplianceBadges` (drops its reworded `PageHeroBadge`
+  list + `FlaskConical` + bespoke `critical` dot tone). _Done — analytics passes
+  `worksafeAwaiting`, `sdsExpiring={0}` (analytics has no SDS-expiry series → "SDS current"),
+  `drillsOverdue` (non-compliant drills → critical, per existing `period_summary` which has
+  no due-soon granularity). Now both pages read the identical chip chrome + wording._
 
 ## D. Action row & gradient (P2)
 
 - [ ] **D1** Analytics folds its two loose outline buttons (Board pack / WorkSafe
   register) into the dashboard's translucent **popover** idiom (or at least its
   translucent-pill style); keep export-led verbs. White primary `Export` stays.
-- [ ] **D2** Analytics drops `brandColour={props.site_brand_colour}` — primary gradient
-  only (grep first; remove now-dead plumbing only if unused elsewhere).
-- [ ] **D3** Custom drop-shadow lives in `HeroShell` so both heroes match (done via A1).
+  _Still open — actions relocated into the eyebrow row (B) but remain 3 flat buttons;
+  popover consolidation deferred to its own pass._
+- [x] **D2** Analytics drops `brandColour={props.site_brand_colour}` — primary gradient
+  only. _Done — `HeroShell` takes no `brandColour`, so the prop read is gone; both heroes
+  render the primary gradient. The `site_brand_colour` payload field is now vestigial for
+  analytics (left in `AnalyticsProps`/controller as a harmless extra prop)._
+- [x] **D3** Custom drop-shadow lives in `HeroShell` so both heroes match. _Done — analytics
+  now uses `HeroShell` (shadow from A1)._
 
 ## E. Footer control band (P2)
 
-- [ ] **E1** Rebuild analytics `heroFooter` from kit parts: `HeroSegmented` (period,
-  pill variant) + `EntityFilter` (onDark) + `HeroSegmented` (lens) + `HeroSummaryStrip`.
-  **Keep analytics' own presets** (Last 30d / Quarter / 6 months / YTD / Custom).
-- [ ] **E2** Summary strip → `HeroSummaryStrip` + `HeroSummaryMetric` (dot-led), with
-  the "Hide summary" toggle as the kit `onToggle`/`collapsed` prop.
-- [ ] **E3** Add uppercase `Period` / `Lens` labels to the analytics footer.
-- [ ] **E4** Preserve analytics' Custom-range popover (via `HeroSegmented` pill
-  `popover` slot or beside it).
+- [x] **E1** Rebuild analytics `heroFooter` from kit parts. _Done — `HeroSegmented` (period,
+  pill variant) + `EntityFilter` (onDark) + `HeroSegmented` (lens) + `HeroSummaryStrip`;
+  analytics' presets (Last 30d / Quarter / 6 months / YTD / Custom) preserved._
+- [x] **E2** Summary strip → `HeroSummaryStrip` + `HeroSummaryMetric` (dot-led), toggle as
+  the kit `onToggle`/`collapsed` prop. _Done — toggle moved out of the controls row into the
+  strip; dot-led metrics._
+- [x] **E3** Add uppercase `Period` / `Lens` labels to the analytics footer. _Done (via
+  `HeroSegmented label=`)._
+- [x] **E4** Preserve analytics' Custom-range popover (via `HeroSegmented` pill `popover`
+  slot). _Done — `CustomRangeFields` embedded in the Custom pill's popover._
 - [ ] **E5** Swap the dashboard's hand-rolled period/lens pills to `HeroSegmented` too
   (so the kit is the only implementation) — verify dashboard still pixel-identical.
+  _Still open — final consolidation pass (with D1)._
 
 ## F. Title polish (P3)
 
-- [ ] **F1** Medallion size/visibility aligned (done in A1/B4).
-- [ ] **F2** One title casing convention — sentence case both ("Health & Safety
-  analytics" to match "command centre").
+- [x] **F1** Medallion size/visibility aligned (`HeroMedallion`, done in A1/B4).
+- [x] **F2** One title casing convention — sentence case both. _Done — "Health & Safety
+  analytics" (was "Analytics" title case), h1 scale matched to the dashboard
+  (`text-2xl … md:text-[28px]`)._
 
 ## G. Page shell (P2/P3)
 
-- [ ] **G1** Analytics replaces its inline role-note div with the shared `RoleLensBanner`
-  (dashed/muted/`Search`-icon look).
-- [ ] **G2** Analytics page wrapper `gap-4` → `gap-6` (`analytics.tsx`).
+- [x] **G1** Analytics replaces its inline role-note div with the shared `RoleLensBanner`.
+  _Done — `<RoleLensBanner lens={filters.lens} />` (uses the shared `LENS_TEXT` map; the
+  backend `role_note` is now vestigial for analytics)._
+- [x] **G2** Analytics page wrapper `gap-4` → `gap-6`. _Done._
 
 ## Backend (minimal — NO speculative migrations)
 
-- [ ] **BK1** Confirm no new controller params/migrations needed; if a cluster tile needs
-  a value analytics doesn't send, stub `// TODO(Gx):` rendering `—` via `fmt()`. Data on
-  hand: dashboard `leading_lagging` + `kpis`; analytics `hero_stats` (deltas),
-  `period_summary`, `worksafe_notifiable`, `scorecard`.
+- [x] **BK1** Confirm no new controller params/migrations needed. _Confirmed — the analytics
+  hero is built entirely from existing payload (`scorecard` for cluster tiles+deltas,
+  `period_summary` + `worksafe_notifiable` for badges + summary strip). No controller/migration
+  changes. Two values analytics simply doesn't track: **SDS expiry** (→ `sdsExpiring={0}`,
+  "SDS current") and **due-soon vs overdue drills** (→ all non-compliant treated as overdue).
+  Both reflect existing analytics behaviour, not stubs needing new schema._
 
 ---
 
@@ -123,3 +140,15 @@ strip, medallion, gradient/shadow and role banner must read as identical chrome.
   `npm run build` ✓. Files: `resources/js/pages/health-safety/components/hs-hero-kit.tsx`,
   `…/command-centre-hero.tsx`, `…/hs-hero-kit.test.tsx`, this tracker. Next: **B** (rebuild
   the analytics hero on the kit).
+- **Pass 2** — B1–B5, C1–C2, D2–D3, E1–E4, F1–F2, G1–G2, BK1 ✅. Rebuilt the analytics
+  hero on the kit: `PageHero` → `HeroShell`; top-right `PageHeroStats` → Leading/Lagging
+  `HeroCluster`s (4+4, mirroring the dashboard, with period-over-period deltas from
+  `scorecard`); eyebrow → `HeroStatusPill`; medallion → `HeroMedallion(BarChart3)`;
+  badges → `HeroComplianceBadges` (canonical NZ labels now identical on both pages);
+  footer → `HeroSegmented`×2 + `EntityFilter` + `HeroSummaryStrip` (Hide-summary as a kit
+  prop; Custom-range popover in the pill); dropped `brandColour`; sentence-case title;
+  inline role-note → shared `RoleLensBanner`; `gap-4`→`gap-6`. Removed the page's local
+  `Segmented`/`SummaryStat`/`CustomRange`. Verified: `types` clean · `lint` (analytics)
+  clean · `test` 5/5 · `build` ✓. File: `resources/js/pages/health-safety/analytics.tsx`
+  (+ tracker). **Remaining: D1** (fold analytics' 2 outline buttons into a popover) **+
+  E5** (swap the dashboard's period/lens pills onto `HeroSegmented`) — final pass.
