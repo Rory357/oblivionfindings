@@ -89,6 +89,15 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.acknowledge');
 
+        // Sensor triage (Gap B): confirm a detection into an incident, or dismiss it.
+        Route::post('/control-room/alerts/{alert}/confirm', [ControlRoomAlertController::class, 'confirm'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.confirm');
+
+        Route::post('/control-room/alerts/{alert}/dismiss', [ControlRoomAlertController::class, 'dismiss'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.dismiss');
+
         Route::post('/control-room/alerts/{alert}/triage', [ControlRoomAlertController::class, 'triage'])
             ->whereNumber('alert')
             ->name('control-room.alerts.triage');

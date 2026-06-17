@@ -10,6 +10,7 @@ use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\SensorIncidentBridgeService;
 use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -691,6 +692,54 @@ class ControlRoomAlertController extends Controller
         ]);
 
         return back()->with('success', 'Alert acknowledged.');
+    }
+
+    /**
+     * Confirm a sensor detection into a ClientIncident (Gap B).
+     */
+    public function confirm(Request $request, ControlRoomAlert $alert, SensorIncidentBridgeService $bridge)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
+
+        $data = $request->validate([
+            'type' => ['nullable', 'string', 'max:120'],
+            'severity' => ['nullable', 'string', 'in:low,medium,high'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $incident = $bridge->confirm($alert, $user, array_filter($data, fn ($v) => $v !== null && $v !== ''));
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
+        }
+
+        return back()
+            ->with('success', "Confirmed — incident INC-{$incident->id} created.")
+            ->with('confirmed_incident_id', $incident->id);
+    }
+
+    /**
+     * Dismiss a sensor detection as a false positive (Gap B). No incident is created.
+     */
+    public function dismiss(Request $request, ControlRoomAlert $alert, SensorIncidentBridgeService $bridge)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $bridge->dismiss($alert, $data['reason'], $user);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['alert' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Alert dismissed as a false positive.');
     }
 
     /**

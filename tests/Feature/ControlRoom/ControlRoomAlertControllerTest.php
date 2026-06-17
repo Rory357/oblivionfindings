@@ -3,7 +3,10 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\PlaybookStep;
@@ -837,6 +840,99 @@ class ControlRoomAlertControllerTest extends TestCase
         }
 
         return $user;
+    }
+
+    // ──────────────────────────────────────
+    // Sensor triage: confirm / dismiss (Gap B)
+    // ──────────────────────────────────────
+
+    public function test_confirm_creates_linked_sensor_incident_with_evidence(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'sensor',
+            'alert_type' => 'sensor.fall_detected',
+            'severity' => 'high',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        Signal::create([
+            'alert_id' => $alert->id,
+            'client_id' => $client->id,
+            'signal_type_code' => 'fall_detected',
+            'occurred_at' => now(),
+            'payload' => ['confidence' => 0.95, 'location' => 'Bedroom'],
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->assertRedirect();
+
+        $incident = ClientIncident::where('source', 'sensor')->latest('id')->first();
+        $this->assertNotNull($incident);
+        $this->assertSame('fall', $incident->type);
+        $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertFalse($incident->interactive);
+        $this->assertSame('fall_detected', $incident->metadata['sensor_evidence']['signal_type'] ?? null);
+
+        $alert->refresh();
+        $this->assertSame('confirmed', $alert->status);
+        $this->assertSame($incident->id, $alert->context['incident_id']);
+    }
+
+    public function test_dismiss_logs_false_positive_without_incident(): void
+    {
+        $client = Client::factory()->create();
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'sensor',
+            'alert_type' => 'sensor.fall_detected',
+            'client_id' => $client->id,
+        ]);
+        $signal = Signal::create([
+            'alert_id' => $alert->id,
+            'client_id' => $client->id,
+            'signal_type_code' => 'fall_detected',
+            'occurred_at' => now(),
+            'payload' => ['confidence' => 0.4],
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/dismiss", ['reason' => 'Resident sat down'])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertSame('dismissed', $alert->status);
+        $this->assertSame('false_positive', $alert->resolution_code);
+        $this->assertSame('Resident sat down', $alert->context['dismissed_reason']);
+
+        $this->assertSame(0, ClientIncident::where('source', 'sensor')->count());
+
+        $signal->refresh();
+        $this->assertSame('suppressed', $signal->status);
+    }
+
+    public function test_confirm_requires_manage_permission(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['source' => 'sensor']);
+
+        $this->actingAs($this->supportWorker)
+            ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->assertForbidden();
+    }
+
+    public function test_cannot_confirm_a_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create(['source' => 'sensor']);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->assertSessionHasErrors('alert');
+
+        $this->assertSame(0, ClientIncident::where('source', 'sensor')->count());
     }
 
     protected function scopeUserToSite(User $user, Site $site): void

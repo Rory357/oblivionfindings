@@ -17,6 +17,10 @@ class ControlRoomAlert extends Model
     public const STATUS_TRIAGING = 'triaging';
     public const STATUS_RESOLVED = 'resolved';
     public const STATUS_CLOSED = 'closed';
+    // Sensor triage outcomes (Gap B): an operator confirms a detection into an
+    // incident, or dismisses it as a false positive (sensor-tuning signal).
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_DISMISSED = 'dismissed';
 
     public const VALID_STATUSES = [
         self::STATUS_OPEN,
@@ -24,15 +28,19 @@ class ControlRoomAlert extends Model
         self::STATUS_TRIAGING,
         self::STATUS_RESOLVED,
         self::STATUS_CLOSED,
+        self::STATUS_CONFIRMED,
+        self::STATUS_DISMISSED,
     ];
 
     /**
      * Valid state transitions. Each key lists the statuses it may transition TO.
      */
     public const ALLOWED_TRANSITIONS = [
-        self::STATUS_OPEN => [self::STATUS_ACK, self::STATUS_TRIAGING, self::STATUS_RESOLVED],
-        self::STATUS_ACK => [self::STATUS_TRIAGING, self::STATUS_RESOLVED],
-        self::STATUS_TRIAGING => [self::STATUS_RESOLVED, self::STATUS_CLOSED],
+        self::STATUS_OPEN => [self::STATUS_ACK, self::STATUS_TRIAGING, self::STATUS_RESOLVED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_ACK => [self::STATUS_TRIAGING, self::STATUS_RESOLVED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_TRIAGING => [self::STATUS_RESOLVED, self::STATUS_CLOSED, self::STATUS_CONFIRMED, self::STATUS_DISMISSED],
+        self::STATUS_CONFIRMED => [self::STATUS_RESOLVED, self::STATUS_CLOSED],
+        self::STATUS_DISMISSED => [self::STATUS_CLOSED],
         self::STATUS_RESOLVED => [self::STATUS_CLOSED],
         self::STATUS_CLOSED => [],
     ];
@@ -293,7 +301,8 @@ class ControlRoomAlert extends Model
      */
     public function isTerminal(): bool
     {
-        return in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_CLOSED], true);
+        // Dismissed (false positive) is terminal too — no further triage.
+        return in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_CLOSED, self::STATUS_DISMISSED], true);
     }
 
     /**
