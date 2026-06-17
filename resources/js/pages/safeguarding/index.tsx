@@ -20,13 +20,14 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { SafeguardingConcernDialog, type ConcernDetail } from '@/components/safeguarding/concern-dialog';
+import { SafeguardingConcernDialog, type ConcernDetail, type ActionKey, type SectionKey } from '@/components/safeguarding/concern-dialog';
 import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
     Activity,
+    BadgeCheck,
     Bell,
     Calendar,
     CheckCircle2,
@@ -39,6 +40,7 @@ import {
     LayoutList,
     ListTodo,
     Lock,
+    Paperclip,
     Plus,
     RadioTower,
     Search,
@@ -46,6 +48,7 @@ import {
     ShieldAlert,
     User as UserIcon,
     UserCheck,
+    UserCog,
     X,
 } from 'lucide-react';
 
@@ -60,11 +63,14 @@ type ConcernRow = {
     reported_at: string | null;
     concern_type: string;
     abuse_category: string | null;
+    description: string | null;
     severity: string;
     status: string;
     current_risk_level: string | null;
     restricted: boolean;
-    subject: { name: string | null; site: string | null } | null;
+    attachments_count: number;
+    subject: { name: string | null; site: string | null; href: string | null } | null;
+    subject_informed: boolean;
     assigned_to: { name: string } | null;
     flags: {
         has_alert: boolean;
@@ -75,6 +81,7 @@ type ConcernRow = {
     };
     related_incident_id: number | null;
     control_room_alert_id: number | null;
+    can: { update: boolean; investigate: boolean; report_external: boolean };
 };
 
 type ReviewRow = {
@@ -82,8 +89,10 @@ type ReviewRow = {
     reference_number: string;
     restricted: boolean;
     subject: string | null;
+    owner: string | null;
     kind: 'risk' | 'ack';
     detail: string;
+    open_section?: SectionKey;
     due_at: string | null;
     overdue: boolean;
 };
@@ -216,6 +225,8 @@ export default function SafeguardingIndex({
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [raiseOpen, setRaiseOpen] = useState(raise);
+    // Which pane the detail dialog should open on (set by the row right-click menu).
+    const [pendingOpen, setPendingOpen] = useState<{ action?: ActionKey; section?: SectionKey } | null>(null);
 
     const go = (next: Partial<Filters>) =>
         router.get('/safeguarding', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -224,10 +235,14 @@ export default function SafeguardingIndex({
 
     // Detail-over-list: fetch only the `detail` prop and open the dialog without
     // navigating away; closing drops the param so `detail` comes back null.
-    const openConcern = (id: number) =>
+    const openConcern = (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => {
+        setPendingOpen(opts ?? null);
         router.get('/safeguarding', { ...filters, concern: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
-    const closeDetail = () =>
+    };
+    const closeDetail = () => {
+        setPendingOpen(null);
         router.get('/safeguarding', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
 
     const clearFilters = () =>
         router.get('/safeguarding', { tab }, { preserveState: true, preserveScroll: true, replace: true });
@@ -259,7 +274,7 @@ export default function SafeguardingIndex({
 
     /* ---- date range (footer pills) ---- */
     const activeRange = !filters.from
-        ? ''
+        ? 'all'
         : filters.from === daysAgoStr(7)
           ? 'week'
           : filters.from === daysAgoStr(30)
@@ -268,11 +283,16 @@ export default function SafeguardingIndex({
               ? 'quarter'
               : 'custom';
     const RANGE_ITEMS = [
+        { key: 'all', label: 'All' },
         { key: 'week', label: 'This week' },
         { key: '30d', label: '30 days' },
         { key: 'quarter', label: 'Quarter' },
     ];
     const onRange = (key: string) => {
+        if (key === 'all') {
+            go({ from: null, to: null });
+            return;
+        }
         const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
         go({ from: daysAgoStr(map[key]), to: todayStr() });
     };
@@ -286,18 +306,45 @@ export default function SafeguardingIndex({
     ];
 
     /* ---- right-click context menu (concern rows) ---- */
+    // The menu mirrors the detail dialog's Options bar 1:1 — same permission + lifecycle
+    // gates — so every item shown maps to a real backend action. Workflow items open the
+    // dialog on the matching pane; "Mark informed" posts directly (no pane needed).
     const openRowCtx = (e: ReactMouseEvent, c: ConcernRow) => {
         e.preventDefault();
         if (c.restricted) return; // need-to-know: no actions exposed on a restricted row
         const sev = SEV[c.severity] ?? SEV.low;
         const subjectName = c.subject?.name ?? 'Subject withheld';
+        const can = c.can;
+        const terminal = c.status === 'closed' || c.status === 'no_action_required';
+        const reported = c.status === 'reported';
+        const markInformed = () => router.post(`/safeguarding/${c.id}/subject-informed`, {}, { preserveScroll: true });
+
+        // Navigation (always-available views).
         const items: ShiftCtxItem[] = [
             { icon: <Eye className="h-3.5 w-3.5" />, label: 'View concern', sub: c.reference_number, tone: 'primary', onClick: () => openConcern(c.id) },
-            { sep: true },
-            ...(c.subject ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => openConcern(c.id) } satisfies ShiftCtxItem] : []),
-            ...(c.related_incident_id ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents/${c.related_incident_id}`) } satisfies ShiftCtxItem] : []),
-            ...(c.control_room_alert_id ? [{ icon: <RadioTower className="h-3.5 w-3.5" />, label: 'View Control Room alert', onClick: () => router.visit(`/control-room/alerts/${c.control_room_alert_id}`) } satisfies ShiftCtxItem] : []),
+            ...(c.subject?.href
+                ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => router.visit(c.subject!.href!) } satisfies ShiftCtxItem]
+                : []),
+            ...(c.related_incident_id
+                ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents?incident=${c.related_incident_id}`) } satisfies ShiftCtxItem]
+                : []),
         ];
+
+        // Workflow actions — gated identically to the dialog Options bar.
+        const workflow: ShiftCtxItem[] = [];
+        if (can.update && reported) workflow.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Triage', onClick: () => openConcern(c.id, { action: 'triage' }) });
+        if (can.update && !terminal) workflow.push({ icon: <UserCog className="h-3.5 w-3.5" />, label: 'Assign lead', onClick: () => openConcern(c.id, { action: 'assign' }) });
+        if (can.update && !terminal) workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Add risk assessment', onClick: () => openConcern(c.id, { action: 'risk' }) });
+        if (can.investigate && !terminal && !reported) workflow.push({ icon: <Search className="h-3.5 w-3.5" />, label: 'Start investigation', onClick: () => openConcern(c.id, { action: 'investigation' }) });
+        if (can.report_external && !terminal && !reported) workflow.push({ icon: <Landmark className="h-3.5 w-3.5" />, label: 'Log external referral', onClick: () => openConcern(c.id, { action: 'report' }) });
+        if (can.update && !terminal && !reported) workflow.push({ icon: <ListTodo className="h-3.5 w-3.5" />, label: 'Add action', onClick: () => openConcern(c.id, { action: 'action' }) });
+        if (can.update && !terminal) workflow.push({ icon: <Paperclip className="h-3.5 w-3.5" />, label: 'Add evidence', onClick: () => openConcern(c.id, { section: 'evidence' }) });
+        if (can.update && !terminal && !c.subject_informed) workflow.push({ icon: <BadgeCheck className="h-3.5 w-3.5" />, label: 'Mark subject informed', onClick: markInformed });
+        if (can.update && c.status === 'action_plan') workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Move to monitoring', onClick: () => router.patch(`/safeguarding/${c.id}/status`, { status: 'monitoring' }, { preserveScroll: true }) });
+        if (can.update && !terminal && !reported) workflow.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close concern', tone: 'critical', onClick: () => openConcern(c.id, { action: 'close' }) });
+
+        if (workflow.length) items.push({ sep: true }, ...workflow);
+
         setCtx({ x: e.clientX, y: e.clientY, tag: sev.label.toUpperCase(), meta: `${c.reference_number} · ${titleCase(c.concern_type)}`, items });
     };
 
@@ -436,7 +483,16 @@ export default function SafeguardingIndex({
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
-            {detail ? <SafeguardingConcernDialog detail={detail} open onClose={closeDetail} /> : null}
+            {detail ? (
+                <SafeguardingConcernDialog
+                    key={detail.id}
+                    detail={detail}
+                    open
+                    onClose={closeDetail}
+                    initialAction={pendingOpen?.action ?? null}
+                    initialSection={pendingOpen?.section ?? 'overview'}
+                />
+            ) : null}
 
             {raiseOpen && can.create ? (
                 <SafeguardingRaiseWizard
@@ -501,10 +557,18 @@ function ConcernTable({
                                 key={c.id}
                                 onClick={() => (c.restricted ? undefined : onOpen(c.id))}
                                 onContextMenu={(e) => onRowCtx(e, c)}
+                                tabIndex={c.restricted ? -1 : 0}
+                                aria-label={c.restricted ? undefined : `Open concern ${c.reference_number}`}
+                                onKeyDown={(e) => {
+                                    if (!c.restricted && (e.key === 'Enter' || e.key === ' ')) {
+                                        e.preventDefault();
+                                        onOpen(c.id);
+                                    }
+                                }}
                                 className={
                                     c.restricted
                                         ? 'bg-[repeating-linear-gradient(45deg,transparent,transparent_9px,var(--muted)_9px,var(--muted)_10px)]'
-                                        : 'cursor-pointer transition-colors hover:bg-muted/40'
+                                        : 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
                                 }
                             >
                                 <td className="px-4 py-3 align-top whitespace-nowrap">
@@ -528,8 +592,9 @@ function ConcernTable({
                                             <div className="flex items-center gap-2">
                                                 <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`} />
                                                 <span className="font-medium">{titleCase(c.concern_type)}</span>
+                                                {c.abuse_category ? <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{titleCase(c.abuse_category)}</span> : null}
                                             </div>
-                                            {c.abuse_category ? <p className="mt-0.5 text-xs text-muted-foreground">{titleCase(c.abuse_category)}</p> : null}
+                                            {c.description ? <p className="mt-0.5 line-clamp-1 max-w-[28rem] text-xs text-muted-foreground/80">{c.description}</p> : null}
                                         </td>
                                         <td className="px-4 py-3 align-top">
                                             {c.subject?.name ? (
@@ -580,6 +645,12 @@ function ConcernTable({
                                         ) : null}
                                         {c.flags.review_due ? <Clock className="h-3.5 w-3.5 text-status-warning" aria-label="Risk review due" /> : null}
                                         {c.flags.action_overdue ? <ListTodo className="h-3.5 w-3.5 text-status-critical" aria-label="Overdue action" /> : null}
+                                        {c.attachments_count > 0 ? (
+                                            <span className="inline-flex items-center gap-0.5" aria-label={`${c.attachments_count} evidence file${c.attachments_count === 1 ? '' : 's'}`}>
+                                                <Paperclip className="h-3.5 w-3.5" />
+                                                <span className="text-[10px] font-medium">{c.attachments_count}</span>
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </td>
                             </tr>
@@ -595,7 +666,7 @@ function ConcernTable({
 /*  Reviews / monitoring worklist                                      */
 /* ------------------------------------------------------------------ */
 
-function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number) => void }) {
+function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => void }) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -613,51 +684,69 @@ function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number)
                         <th className="px-4 py-2.5">Reference</th>
                         <th className="px-4 py-2.5">What's due</th>
                         <th className="px-4 py-2.5">Subject</th>
+                        <th className="px-4 py-2.5">Owner</th>
                         <th className="px-4 py-2.5">Due</th>
                         <th className="px-4 py-2.5"></th>
                     </tr>
                 </thead>
                 <tbody className="divide-y">
-                    {rows.map((r, i) => (
-                        <tr key={`${r.id}-${r.kind}-${i}`} onClick={() => onOpen(r.id)} className="cursor-pointer transition-colors hover:bg-muted/40">
-                            <td className="px-4 py-3 align-top font-medium whitespace-nowrap">{r.reference_number}</td>
-                            <td className="px-4 py-3 align-top">
-                                <div className="flex items-start gap-2">
-                                    {r.kind === 'risk' ? (
-                                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                    {rows.map((r, i) => {
+                        const open = () => onOpen(r.id, r.open_section ? { section: r.open_section } : undefined);
+                        const actionLabel = r.kind === 'risk' ? 'Review' : 'Record ack';
+                        return (
+                            <tr
+                                key={`${r.id}-${r.kind}-${i}`}
+                                onClick={open}
+                                tabIndex={0}
+                                aria-label={`${actionLabel} for ${r.reference_number}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        open();
+                                    }
+                                }}
+                                className="cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                            >
+                                <td className="px-4 py-3 align-top font-medium whitespace-nowrap">{r.reference_number}</td>
+                                <td className="px-4 py-3 align-top">
+                                    <div className="flex items-start gap-2">
+                                        {r.kind === 'risk' ? (
+                                            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                                        ) : (
+                                            <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
+                                        )}
+                                        <span>{r.detail}</span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 align-top">
+                                    {r.restricted ? (
+                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Lock className="h-3 w-3" /> Restricted
+                                        </span>
                                     ) : (
-                                        <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
+                                        r.subject ?? '—'
                                     )}
-                                    <span>{r.detail}</span>
-                                </div>
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                                {r.restricted ? (
-                                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Lock className="h-3 w-3" /> Restricted
+                                </td>
+                                <td className="px-4 py-3 align-top text-xs text-muted-foreground">{r.owner ?? 'Unassigned'}</td>
+                                <td className="px-4 py-3 align-top whitespace-nowrap">
+                                    {r.due_at ? (
+                                        <span className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
+                                            <Clock className="h-3.5 w-3.5" />
+                                            {formatDateTime(r.due_at)}
+                                            {r.overdue ? ' · overdue' : ''}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 align-top text-right">
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                                        <Eye className="h-3.5 w-3.5" /> {actionLabel}
                                     </span>
-                                ) : (
-                                    r.subject ?? '—'
-                                )}
-                            </td>
-                            <td className="px-4 py-3 align-top whitespace-nowrap">
-                                {r.due_at ? (
-                                    <span className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatDateTime(r.due_at)}
-                                        {r.overdue ? ' · overdue' : ''}
-                                    </span>
-                                ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                )}
-                            </td>
-                            <td className="px-4 py-3 align-top text-right">
-                                <span className="inline-flex items-center gap-1 text-xs text-primary">
-                                    <Eye className="h-3.5 w-3.5" /> Open
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

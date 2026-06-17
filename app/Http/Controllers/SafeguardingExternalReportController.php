@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingExternalReport;
 use App\Models\User;
+use App\Services\Safeguarding\SafeguardingLifecycle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -34,6 +35,17 @@ class SafeguardingExternalReportController extends Controller
         $validated['acknowledgement_received'] = false;
 
         SafeguardingExternalReport::create($validated);
+
+        // W6: a concern parked at triage for referral advances to "Referred external"
+        // once the authority report is logged — the promised flow surfaced by both the
+        // triage panel and the raise wizard. Guarded so a concern already past triage
+        // (mid-investigation, on an action plan, etc.) is never regressed.
+        if ($concern->status === 'triaged' && $concern->requires_external_referral) {
+            $guard = app(SafeguardingLifecycle::class)->guardTransition($concern->fresh(), 'referred_external');
+            if ($guard['allowed']) {
+                $concern->update(['status' => 'referred_external']);
+            }
+        }
 
         return back()->with('success', 'External report created successfully.');
     }

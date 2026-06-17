@@ -105,6 +105,7 @@ class SafeguardingConcernController extends Controller
                 ->with(['subject', 'assignedTo', 'site', 'latestRiskAssessment'])
                 ->withCount([
                     'externalReports',
+                    'attachments',
                     'alerts as active_alerts_count' => fn ($q) => $q->where('active', true),
                     'actionPlans as overdue_actions_count' => fn ($q) => $q->where('due_date', '<', now())->whereNotIn('status', ['completed', 'cancelled']),
                 ]);
@@ -214,11 +215,15 @@ class SafeguardingConcernController extends Controller
             'witnesses' => 'nullable',
             'immediate_actions' => 'nullable|string',
             'requires_external_referral' => 'boolean',
+            // Need-to-know: a raiser can mark an allegation sensitive so it is redacted
+            // to everyone but the lead, the reporter and viewSensitive-cleared staff.
+            'is_sensitive' => 'boolean',
             'site_id' => 'nullable|exists:sites,id',
             'related_incident_id' => 'nullable|exists:client_incidents,id',
         ]);
 
         $validated = $this->normalizeConcernInput($request, $validated);
+        $validated['is_sensitive'] = $request->boolean('is_sensitive');
 
         $validated['reported_by_user_id'] = auth()->id();
         $validated['reported_at'] = now();
@@ -511,6 +516,27 @@ class SafeguardingConcernController extends Controller
         return back()->with('success', 'Subject marked as informed.');
     }
 
+    /**
+     * Toggle need-to-know restriction on a concern. Marking it sensitive redacts
+     * the subject/category/evidence to everyone but the lead, the reporter and
+     * viewSensitive-cleared staff; lifting it restores normal visibility.
+     */
+    public function setSensitivity(Request $request, SafeguardingConcern $concern): RedirectResponse
+    {
+        $this->authorize('update', $concern);
+
+        $validated = $request->validate(['is_sensitive' => 'required|boolean']);
+
+        $concern->update([
+            'is_sensitive' => $validated['is_sensitive'],
+            'updated_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', $validated['is_sensitive']
+            ? 'Concern restricted to need-to-know.'
+            : 'Need-to-know restriction removed.');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Index helpers (rows, redaction, worklist, counts)                  */
     /* ------------------------------------------------------------------ */
@@ -556,14 +582,18 @@ class SafeguardingConcernController extends Controller
             'reported_at' => $concern->reported_at?->toISOString(),
             'concern_type' => $concern->concern_type,
             'abuse_category' => $restricted ? null : $concern->abuse_category,
+            'description' => $restricted ? null : \Illuminate\Support\Str::limit((string) $concern->description, 120),
             'severity' => $concern->severity,
             'status' => $concern->status,
             'current_risk_level' => $concern->current_risk_level,
             'restricted' => $restricted,
+            'attachments_count' => (int) ($concern->attachments_count ?? 0),
             'subject' => $restricted ? null : [
                 'name' => $this->subjectDisplayName($concern),
                 'site' => $concern->site?->name,
+                'href' => $this->subjectHref($concern),
             ],
+            'subject_informed' => (bool) $concern->subject_informed,
             'assigned_to' => $concern->assignedTo ? ['name' => $concern->assignedTo->name] : null,
             'flags' => [
                 'has_alert' => ($concern->active_alerts_count ?? 0) > 0,
@@ -575,8 +605,25 @@ class SafeguardingConcernController extends Controller
                 'action_overdue' => ($concern->overdue_actions_count ?? 0) > 0,
             ],
             'related_incident_id' => $concern->related_incident_id,
-            'control_room_alert_id' => null, // wired in Step 8 (Control Room cross-module)
+            // The active Control Room alert id is resolved (via the linked HsEvent) on the
+            // detail payload only — see buildConcernDetail — to keep the list free of a
+            // per-row HsEvent lookup. The row context menu jumps to it via the detail.
+            'control_room_alert_id' => null,
+            // Lifecycle gates for the row's right-click menu, mirroring the detail Options bar.
+            'can' => [
+                'update' => $user->can('update', $concern),
+                'investigate' => $user->can('investigate', $concern),
+                'report_external' => $user->can('reportExternal', $concern),
+            ],
         ];
+    }
+
+    /** Deep-link to a Client subject's profile (no `/care` — that route 302-redirects). */
+    private function subjectHref(SafeguardingConcern $concern): ?string
+    {
+        $subject = $concern->subject;
+
+        return $subject instanceof Client ? "/operations/clients/{$subject->id}" : null;
     }
 
     /** Non-terminal concern ids — the universe for "needs attention" worklists. */
@@ -619,7 +666,7 @@ class SafeguardingConcernController extends Controller
     private function reviewWorklist($concernIds, User $user, bool $canSensitive): array
     {
         $riskItems = $this->riskReviewQuery($concernIds)
-            ->with(['subject', 'riskAssessments' => fn ($q) => $q->whereNotNull('next_review_date')->orderBy('next_review_date')])
+            ->with(['subject', 'assignedTo', 'riskAssessments' => fn ($q) => $q->whereNotNull('next_review_date')->orderBy('next_review_date')])
             ->get()
             ->map(function (SafeguardingConcern $c) use ($user, $canSensitive) {
                 $review = $c->riskAssessments->first();
@@ -630,15 +677,17 @@ class SafeguardingConcernController extends Controller
                     'reference_number' => $c->reference_number,
                     'restricted' => $restricted,
                     'subject' => $restricted ? null : $this->subjectDisplayName($c),
+                    'owner' => $c->assignedTo?->name,
                     'kind' => 'risk',
                     'detail' => 'Risk review',
+                    'open_section' => 'risk',
                     'due_at' => $review?->next_review_date?->toISOString(),
                     'overdue' => (bool) ($review && $review->next_review_date && $review->next_review_date->isPast()),
                 ];
             });
 
         $ackItems = $this->acksAwaitedQuery($concernIds)
-            ->with(['concern.subject'])
+            ->with(['concern.subject', 'concern.assignedTo'])
             ->get()
             ->map(function (SafeguardingExternalReport $r) use ($user, $canSensitive) {
                 $c = $r->concern;
@@ -652,8 +701,10 @@ class SafeguardingConcernController extends Controller
                     'reference_number' => $c->reference_number,
                     'restricted' => $restricted,
                     'subject' => $restricted ? null : $this->subjectDisplayName($c),
+                    'owner' => $c->assignedTo?->name,
                     'kind' => 'ack',
                     'detail' => 'Acknowledgement awaited · ' . $r->authority_name,
+                    'open_section' => 'reports',
                     'due_at' => $r->reported_at?->toISOString(),
                     'overdue' => (bool) ($r->reported_at && $r->reported_at->lt(now()->subDays(7))),
                 ];
@@ -726,6 +777,10 @@ class SafeguardingConcernController extends Controller
         $lifecycle = app(SafeguardingLifecycle::class);
         $restricted = $this->isConcernRestricted($concern, $user, $canSensitive);
 
+        // Need-to-know: every access to a concern detail is recorded — this is what the
+        // dialog's "Viewing is logged" cue refers to. No-ops if the audit table is absent.
+        \App\Domain\Governance\Services\GovernanceAuditService::log('viewed', SafeguardingConcern::class, $concern->getKey(), ['restricted' => $restricted]);
+
         $base = [
             'id' => $concern->id,
             'reference_number' => $concern->reference_number,
@@ -749,12 +804,15 @@ class SafeguardingConcernController extends Controller
         ]);
 
         // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
+        // The same event carries the Control Room alert id, so we surface both from one lookup.
         $hsEvent = null;
+        $controlRoomAlertId = null;
         try {
             $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
             $ev = HsEvent::query()->where('idempotency_key', $key)->first();
             if ($ev) {
                 $hsEvent = ['id' => $ev->id, 'reference_number' => $ev->reference_number, 'status' => $ev->status];
+                $controlRoomAlertId = $ev->control_room_alert_id;
             }
         } catch (\Throwable $e) {
             // H&S link is best-effort; never block the detail on it.
@@ -769,6 +827,7 @@ class SafeguardingConcernController extends Controller
             'immediate_actions' => $concern->immediate_actions,
             'subject_informed' => (bool) $concern->subject_informed,
             'subject_informed_at' => $concern->subject_informed_at?->toISOString(),
+            'is_sensitive' => (bool) $concern->is_sensitive,
             'requires_external_referral' => (bool) $concern->requires_external_referral,
             'current_risk_level' => $concern->current_risk_level,
             'triage' => $concern->triaged_at ? [
@@ -865,7 +924,7 @@ class SafeguardingConcernController extends Controller
             })->values()->all(),
             'related_incident_id' => $concern->related_incident_id,
             'hs_event' => $hsEvent,
-            'control_room_alert_id' => null, // wired in Step 8
+            'control_room_alert_id' => $controlRoomAlertId,
             'can' => [
                 'update' => $user->can('update', $concern),
                 'investigate' => $user->can('investigate', $concern),
@@ -884,10 +943,9 @@ class SafeguardingConcernController extends Controller
         }
 
         $subject = $concern->subject;
-        $href = $subject instanceof Client ? "/operations/clients/{$subject->id}/care" : null;
         $type = $subject instanceof Client ? 'client' : ($subject instanceof User ? 'staff' : 'other');
 
-        return ['name' => $name, 'href' => $href, 'type' => $type];
+        return ['name' => $name, 'href' => $this->subjectHref($concern), 'type' => $type];
     }
 
     private function perpetratorName(SafeguardingConcern $concern): ?string
@@ -943,72 +1001,6 @@ class SafeguardingConcernController extends Controller
         return $validated;
     }
 
-    private function serializeConcernForForm(SafeguardingConcern $concern): array
-    {
-        return [
-            ...$concern->toArray(),
-            'subject_type' => match ($concern->subject_type) {
-                Client::class, 'client' => 'client',
-                User::class, 'staff' => 'staff',
-                default => $concern->subject_name ? 'other' : '',
-            },
-            'other_subject_name' => $concern->subject_name,
-            'alleged_perpetrator_type' => match ($concern->alleged_perpetrator_type) {
-                Client::class, 'client' => 'client',
-                User::class, 'staff' => 'staff',
-                default => $concern->alleged_perpetrator_name ? 'other' : '',
-            },
-            'other_perpetrator_name' => $concern->alleged_perpetrator_name,
-            'perpetrator_relationship' => $concern->alleged_perpetrator_details,
-            'immediate_action_taken' => filled($concern->immediate_actions),
-            'immediate_action_description' => $concern->immediate_actions,
-        ];
-    }
-
-    private function serializeConcernForShow(SafeguardingConcern $concern): array
-    {
-        return [
-            ...$concern->toArray(),
-            'reportedBy' => $this->serializeUser($concern->reportedBy),
-            'assignedTo' => $this->serializeUser($concern->assignedTo),
-            'closedBy' => $this->serializeUser($concern->closedBy),
-            'allegedPerpetrator' => $concern->allegedPerpetrator?->toArray(),
-            'investigations' => $concern->investigations
-                ->map(fn ($investigation) => [
-                    ...$investigation->toArray(),
-                    'evidence_summary' => $this->serializeList($investigation->evidence_collected),
-                ])
-                ->values()
-                ->all(),
-            'externalReports' => $concern->externalReports
-                ->map(fn ($report) => [
-                    ...$report->toArray(),
-                    'reported_by' => $this->serializeUser($report->reportedBy),
-                    'acknowledgment_received' => (bool) $report->acknowledgement_received,
-                    'acknowledgment_date' => $report->acknowledged_at?->toISOString(),
-                    'acknowledgment_reference' => $report->acknowledgement_reference,
-                ])
-                ->values()
-                ->all(),
-            'riskAssessments' => $concern->riskAssessments
-                ->map(fn ($assessment) => [
-                    ...$assessment->toArray(),
-                    'risk_factors' => $this->serializeList($assessment->risk_factors),
-                    'protective_factors' => $this->serializeList($assessment->protective_factors),
-                    'protective_measures' => $this->serializeList($assessment->protective_measures),
-                ])
-                ->values()
-                ->all(),
-            'actionPlans' => $concern->actionPlans
-                ->map(fn ($plan) => [
-                    ...$plan->toArray(),
-                    'assigned_to' => $this->serializeUser($plan->assignedTo),
-                ])
-                ->values()
-                ->all(),
-        ];
-    }
-
     private function normalizeWitnesses(mixed $witnesses): ?array
     {
         if (is_array($witnesses)) {
@@ -1044,18 +1036,6 @@ class SafeguardingConcernController extends Controller
         }
 
         return $this->nullableString($value);
-    }
-
-    private function serializeUser(?User $user): ?array
-    {
-        if (! $user) {
-            return null;
-        }
-
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-        ];
     }
 
     private function nullableString(mixed $value): ?string

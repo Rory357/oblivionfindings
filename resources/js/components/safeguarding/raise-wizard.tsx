@@ -4,7 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell, WizardStepPane, WizardSuccessPane } from '@/components/wizard/shell';
 import { Field, InfoCard, Ring, Segmented, SelectInput, StepHead, TilePicker } from '@/components/wizard/primitives';
 import { useForm, usePage } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, FileText, Landmark, Search, ShieldAlert, Users } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, ClipboardList, FileText, Landmark, Lock, Search, ShieldAlert, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Opt = { id: number; name: string };
@@ -28,6 +28,7 @@ type RaiseForm = {
     immediate_action_description: string;
     subject_informed: string;
     requires_external_referral: string;
+    is_sensitive: boolean;
     site_id: string;
 };
 
@@ -111,6 +112,7 @@ export function SafeguardingRaiseWizard({
         immediate_action_description: '',
         subject_informed: '',
         requires_external_referral: '',
+        is_sensitive: false,
         site_id: '',
     });
     const d = form.data;
@@ -166,6 +168,7 @@ export function SafeguardingRaiseWizard({
             immediate_action_description: data.immediate_action_description || null,
             subject_informed: data.subject_informed === 'yes',
             requires_external_referral: data.requires_external_referral === 'yes',
+            is_sensitive: data.is_sensitive,
             site_id: data.site_id ? Number(data.site_id) : null,
         }));
         form.post('/safeguarding', {
@@ -381,6 +384,17 @@ export function SafeguardingRaiseWizard({
                                 <ReviewRow label="Referral" value={d.requires_external_referral === 'yes' ? 'Indicated — log the report after raising' : d.requires_external_referral === 'no' ? 'Not indicated' : undefined} />
                             </ReviewCard>
                         </div>
+                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${d.is_sensitive ? 'border-status-critical/40 bg-status-critical-bg/30' : 'border-border hover:bg-muted/40'}`}>
+                            <input type="checkbox" checked={d.is_sensitive} onChange={(e) => form.setData('is_sensitive', e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-border" />
+                            <span className="min-w-0">
+                                <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                                    <Lock className="h-3.5 w-3.5" /> Mark as sensitive — need-to-know
+                                </span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                    Restricts the subject, category and evidence to the assigned lead, the reporter and staff cleared to view sensitive concerns. Everyone else sees only a redacted row.
+                                </span>
+                            </span>
+                        </label>
                         <InfoCard icon={ShieldAlert} tone="info">Raising creates the concern as <b>Awaiting triage</b> and auto-generates a Health &amp; Safety event and Control Room alert.</InfoCard>
                     </div>
                 ) : null}
