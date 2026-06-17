@@ -5,9 +5,6 @@
  * the dashboard). Shares the dashboard's hero/tab/filter idiom. NZ-only:
  * LTIFR / TRIFR, WorkSafe notifiable events, Nga Paerewa NZS 8134:2021, ACC.
  */
-import { PageHero } from '@/components/page';
-import type { PageHeroBadge } from '@/components/page/page-hero-badges';
-import type { PageHeroStat } from '@/components/page/page-hero-stats';
 import { EntityFilter, ShiftContextMenu, TabStrip } from '@/components/rostering';
 import type { RosterTabItem, ShiftCtxItem, ShiftCtxState } from '@/components/rostering';
 import { Badge } from '@/components/ui/badge';
@@ -27,18 +24,16 @@ import {
     BarChart3,
     Building2,
     Calendar,
+    ChevronDown,
     ClipboardList,
+    Clock,
     Download,
     ExternalLink,
     Eye,
     FileText,
-    FlaskConical,
-    Flame,
-    HeartPulse,
     LayoutDashboard,
-    MapPin,
     Shield,
-    Sparkles,
+    TrendingDown,
     TrendingUp,
     User,
     Users,
@@ -63,20 +58,29 @@ import {
     type DonutDatum,
 } from './analytics-charts';
 import type { AnalyticsProps, DrillTarget, ScorecardItem, SiteRow } from './analytics-types';
+import { RoleLensBanner } from './components/dashboard-tabs';
+import {
+    HeroCluster,
+    HeroClusterTile,
+    HeroComplianceBadges,
+    HeroMedallion,
+    type HeroSegItem,
+    HeroSegmented,
+    HeroShell,
+    HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
+    type Tone,
+} from './components/hs-hero-kit';
 
 const PALETTE = [TOKEN.c1, TOKEN.c2, TOKEN.c3, TOKEN.c4, TOKEN.c5, 'var(--status-info)'];
 
-const RANGE_OPTIONS: [string, string][] = [
-    ['30d', 'Last 30d'],
-    ['q', 'Quarter'],
-    ['6m', '6 months'],
-    ['ytd', 'YTD'],
-    ['custom', 'Custom'],
-];
-const LENS_OPTIONS: [string, string][] = [
-    ['governance', 'Governance'],
-    ['manager', 'Manager'],
-    ['frontline', 'Frontline'],
+// Lens segmented items (shared kit shape). Period presets are built inline in the
+// component because the Custom item embeds a range-picker popover with live closures.
+const LENS_SEG_ITEMS: HeroSegItem[] = [
+    { key: 'governance', label: 'Governance' },
+    { key: 'manager', label: 'Manager' },
+    { key: 'frontline', label: 'Frontline' },
 ];
 
 const TABS: RosterTabItem[] = [
@@ -95,6 +99,16 @@ const REGISTER: Record<string, string> = {
     root_cause: '/health-safety/events',
 };
 
+// Governance report set — same list as the dashboard's export popover; analytics opens each
+// dated report in a new tab (export-led), the dashboard navigates (report-led).
+const GOV_REPORTS: { name: string; label: string }[] = [
+    { name: 'board-summary', label: 'Board summary' },
+    { name: 'worksafe-register', label: 'WorkSafe register' },
+    { name: 'investigation-outcomes', label: 'Investigation outcomes' },
+    { name: 'corrective-action-traceability', label: 'Corrective-action traceability' },
+    { name: 'risk-assessment-register', label: 'Risk-assessment register' },
+];
+
 function rangeLabel(period: string): string {
     return { '30d': 'Last 30 days', q: 'This quarter', '6m': 'Last 6 months', ytd: 'Year to date', custom: 'Custom range' }[period] ?? 'Year to date';
 }
@@ -103,7 +117,7 @@ function fmt(v: number | null | undefined, suffix = ''): string {
     return v === null || v === undefined ? '—' : `${v}${suffix}`;
 }
 
-function toneFromDir(dir: string): PageHeroStat['tone'] {
+function toneFromDir(dir: string): Tone {
     return dir === 'improving' ? 'success' : dir === 'watch' ? 'critical' : 'neutral';
 }
 
@@ -112,28 +126,6 @@ function deltaArrow(dir: string): string {
 }
 
 // ── small UI helpers ────────────────────────────────────────────────────
-
-function Segmented({ options, value, onChange, ariaLabel }: { options: [string, string][]; value: string; onChange: (v: string) => void; ariaLabel: string }) {
-    return (
-        <div role="group" aria-label={ariaLabel} className="inline-flex items-center gap-0.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
-            {options.map(([v, label]) => (
-                // eslint-disable-next-line no-restricted-syntax -- onDark segmented control pill, not a standard Button
-                <button
-                    key={v}
-                    type="button"
-                    onClick={() => onChange(v)}
-                    aria-pressed={value === v}
-                    className={cn(
-                        'rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40',
-                        value === v ? 'bg-primary-foreground text-primary shadow-sm' : 'text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground',
-                    )}
-                >
-                    {label}
-                </button>
-            ))}
-        </div>
-    );
-}
 
 function ScorecardCell({ item }: { item: ScorecardItem }) {
     const tone = item.dir === 'improving' ? 'text-status-success' : item.dir === 'watch' ? 'text-status-critical' : 'text-muted-foreground';
@@ -531,7 +523,7 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
-    const { trends, hero_stats, scorecard, period_summary, worksafe_notifiable, hours_meta, role_note, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+    const { trends, scorecard, period_summary, worksafe_notifiable, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
 
     const [tab, setTab] = useState('overview');
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -600,120 +592,138 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const siteTarget = (s: SiteRow): DrillTarget => ({ view: 'incidents', label: `Site · ${s.name}`, filters: { site_id: s.id }, register: REGISTER.incidents });
 
     // ── hero pieces ──
-    const heroStats: PageHeroStat[] = [
-        { label: 'LTIFR', value: fmt(hero_stats.ltifr.value), sub: hero_stats.ltifr.delta !== null ? `${deltaArrow(hero_stats.ltifr.dir)} ${hero_stats.ltifr.delta}` : 'no prior data', tone: toneFromDir(hero_stats.ltifr.dir) },
-        { label: 'TRIFR', value: fmt(hero_stats.trifr.value), sub: hero_stats.trifr.delta !== null ? `${deltaArrow(hero_stats.trifr.dir)} ${hero_stats.trifr.delta}` : 'no prior data', tone: toneFromDir(hero_stats.trifr.dir) },
-        { label: 'Near-miss ratio', value: `${fmt(hero_stats.near_miss_ratio.value)}:1`, sub: hero_stats.near_miss_ratio.delta !== null ? `${deltaArrow(hero_stats.near_miss_ratio.dir)} ${hero_stats.near_miss_ratio.delta}` : 'reporting culture', tone: toneFromDir(hero_stats.near_miss_ratio.dir) },
-        { label: 'Compliance', value: fmt(hero_stats.compliance_pct.value, '%'), sub: hero_stats.compliance_pct.delta !== null ? `${deltaArrow(hero_stats.compliance_pct.dir)} ${hero_stats.compliance_pct.delta}` : 'training & audit', tone: toneFromDir(hero_stats.compliance_pct.dir) },
-    ];
+    // Cluster tiles read from the scorecard split (it carries the period-over-period
+    // deltas); the dashboard's hero_stats overlap so we don't read hero_stats here.
+    const scoreByKey = useMemo(() => {
+        const m: Record<string, ScorecardItem> = {};
+        for (const it of [...scorecard.leading, ...scorecard.lagging]) m[it.key] = it;
+        return m;
+    }, [scorecard]);
+    const heroVal = (key: string): number | null => scoreByKey[key]?.value ?? null;
+    const heroDelta = (key: string): { delta?: string; deltaTone?: Tone } => {
+        const it = scoreByKey[key];
+        if (!it || it.delta === null || it.delta === 0) return {};
+        // ▲ = improving (good), ▼ = worsening — sentiment, not numeric sign (matches the body scorecard).
+        return { delta: `${deltaArrow(it.dir)} ${Math.abs(it.delta)}`, deltaTone: toneFromDir(it.dir) };
+    };
 
     const siteScope = filters.site_id ? sites.find((s) => s.id === filters.site_id)?.name ?? 'Selected site' : `${sites.length} supported-living sites`;
-    const drillsOverdue = period_summary.drills_total - period_summary.drills_complete;
+    // analytics tracks completed-vs-total drills (no due-soon granularity) → non-compliant = overdue.
+    const drillsOverdue = Math.max(0, period_summary.drills_total - period_summary.drills_complete);
 
-    const badges: PageHeroBadge[] = [
+    // Period presets — analytics keeps its longer-horizon set; Custom embeds the range popover.
+    const periodItems: HeroSegItem[] = [
+        { key: '30d', label: 'Last 30d' },
+        { key: 'q', label: 'Quarter' },
+        { key: '6m', label: '6 months' },
+        { key: 'ytd', label: 'YTD' },
         {
-            dot: true,
-            tone: worksafe_notifiable.awaiting > 0 ? 'warning' : 'success',
-            label: `WorkSafe notifiable · ${worksafe_notifiable.awaiting} awaiting`,
-            icon: AlertTriangle,
+            key: 'custom',
+            label: 'Custom',
+            popover: <CustomRangeFields from={filters.from} to={filters.to} onApply={(f, t) => reload({ period: 'custom', from: f, to: t })} />,
         },
-        { dot: true, tone: 'success', label: 'Ngā Paerewa NZS 8134 · Certified', icon: Shield },
-        { dot: true, tone: 'success', label: 'Hazardous Substances · SDS current', icon: FlaskConical },
-        { dot: true, tone: drillsOverdue > 0 ? 'critical' : 'success', label: `Fire & evacuation · ${drillsOverdue > 0 ? `${drillsOverdue} drill overdue` : 'on schedule'}`, icon: Flame },
-        { dot: true, tone: 'success', label: 'First aid cover · OK', icon: HeartPulse },
     ];
 
     const heroFooter = (
-        <div className="flex flex-col gap-3 py-3">
-            <div className="flex flex-wrap items-center gap-3">
-                <Segmented options={RANGE_OPTIONS} value={filters.period} onChange={setPeriod} ariaLabel="Date range" />
-                {filters.period === 'custom' ? <CustomRange from={filters.from} to={filters.to} onApply={(f, t) => reload({ period: 'custom', from: f, to: t })} /> : null}
-                <div className="hidden h-5 w-px bg-primary-foreground/20 sm:block" />
-                <EntityFilter label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => reload({ site_id: id })} onDark />
-                <div className="hidden h-5 w-px bg-primary-foreground/20 sm:block" />
-                <Segmented options={LENS_OPTIONS} value={filters.lens} onChange={(l) => reload({ lens: l })} ariaLabel="Role lens" />
-                {/* eslint-disable-next-line no-restricted-syntax -- onDark summary toggle, custom hero-footer affordance */}
-                <button
-                    type="button"
-                    onClick={() => setShowSummary((v) => !v)}
-                    className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 hover:text-primary-foreground"
-                    aria-pressed={showSummary}
-                >
-                    <Sparkles className="h-3 w-3" /> {showSummary ? 'Hide' : 'Show'} summary
-                </button>
-            </div>
-            {showSummary ? (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-primary-foreground/15 pt-2 text-[11.5px] text-primary-foreground/80">
-                    <SummaryStat value={period_summary.incidents} label="incidents" />
-                    <SummaryStat value={period_summary.near_misses} label="near misses" />
-                    <SummaryStat value={worksafe_notifiable.awaiting} label="WorkSafe-notifiable awaiting" tone={worksafe_notifiable.awaiting > 0 ? 'warning' : undefined} />
-                    <SummaryStat value={period_summary.open_hazards} label="open hazards" />
-                    <SummaryStat value={period_summary.actions_on_time_pct} label="% actions on time" suffix="%" />
-                    <SummaryStat value={`${period_summary.drills_complete}/${period_summary.drills_total}`} label="drills complete" />
+        <>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <HeroSegmented variant="pill" label="Period" ariaLabel="Date range" items={periodItems} value={filters.period} onChange={setPeriod} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <EntityFilter onDark label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => reload({ site_id: id })} />
+                    <HeroSegmented variant="segmented" label="Lens" ariaLabel="Role lens" items={LENS_SEG_ITEMS} value={filters.lens} onChange={(l) => reload({ lens: l })} />
                 </div>
-            ) : null}
-        </div>
+            </div>
+            <HeroSummaryStrip label={rangeLabel(filters.period)} collapsed={!showSummary} onToggle={() => setShowSummary((v) => !v)}>
+                <HeroSummaryMetric tone={period_summary.incidents > 0 ? 'warning' : 'success'}>{period_summary.incidents} incidents</HeroSummaryMetric>
+                <HeroSummaryMetric tone="neutral">{period_summary.near_misses} near misses</HeroSummaryMetric>
+                <HeroSummaryMetric tone={worksafe_notifiable.awaiting > 0 ? 'critical' : 'success'}>{worksafe_notifiable.awaiting} WorkSafe-notifiable</HeroSummaryMetric>
+                <HeroSummaryMetric tone={period_summary.open_hazards > 0 ? 'warning' : 'success'}>{period_summary.open_hazards} open hazards</HeroSummaryMetric>
+                <HeroSummaryMetric tone={(period_summary.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'}>{fmt(period_summary.actions_on_time_pct, '%')} actions on time</HeroSummaryMetric>
+                <HeroSummaryMetric tone={period_summary.drills_complete === period_summary.drills_total ? 'success' : 'warning'}>
+                    {period_summary.drills_complete}/{period_summary.drills_total} drills complete
+                </HeroSummaryMetric>
+            </HeroSummaryStrip>
+        </>
     );
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Analytics', href: '/health-safety/analytics' }]}>
             <Head title="H&S Analytics" />
 
-            <div className="flex flex-col gap-4 p-6">
-                <PageHero
-                    variant="hero"
-                    brandColour={props.site_brand_colour}
-                    icon={BarChart3}
-                    title={
-                        <span className="flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-primary-foreground/85">
-                                <span className="relative flex h-1.5 w-1.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground/70" />
-                                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                                </span>
-                                Safety analytics · {rangeLabel(filters.period)}
-                            </span>
-                            <span className="text-[30px] font-bold leading-none tracking-tight">Health &amp; Safety Analytics</span>
-                        </span>
-                    }
-                    description={
-                        <span>
-                            Trend, root-cause and governance insight across <span className="font-semibold text-primary-foreground">{siteScope}</span>, framed to{' '}
-                            <span className="font-semibold text-primary-foreground">Ngā Paerewa (NZS 8134:2021)</span> and the <span className="font-semibold text-primary-foreground">HSWA 2015</span>.
-                        </span>
-                    }
-                    meta={[
-                        { icon: Calendar, label: `${filters.from} → ${filters.to}` },
-                        { icon: MapPin, label: siteScope },
-                        { icon: Shield, label: 'HSWA 2015 · WorkSafe NZ · ACC' },
-                    ]}
-                    badges={badges}
-                    stats={heroStats}
-                    actions={
-                        <div className="flex flex-wrap gap-2">
-                            <a href={queryFor(tab === 'sites' ? 'sites' : tab === 'breakdowns' ? 'incidents' : 'incidents')} className="inline-flex">
-                                <Button size="sm" className="gap-1.5 bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+            <div className="flex flex-col gap-6 p-6">
+                <HeroShell footer={heroFooter}>
+                    {/* Eyebrow + export actions */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <HeroStatusPill>Safety analytics · {rangeLabel(filters.period)}</HeroStatusPill>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <a href={queryFor(tab === 'sites' ? 'sites' : 'incidents')} className="inline-flex">
+                                <Button className="gap-1.5 bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90">
                                     <Download className="h-4 w-4" /> Export
                                 </Button>
                             </a>
-                            <Button size="sm" variant="outline" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => window.open(reportUrl('board-summary'), '_blank')}>
-                                <FileText className="h-4 w-4" /> Board pack
-                            </Button>
-                            <Button size="sm" variant="outline" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => window.open(reportUrl('worksafe-register'), '_blank')}>
-                                <Shield className="h-4 w-4" /> WorkSafe register
-                            </Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Board reports
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-60 p-1">
+                                    {GOV_REPORTS.map((r) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                                        <button
+                                            key={r.name}
+                                            type="button"
+                                            onClick={() => window.open(reportUrl(r.name), '_blank')}
+                                            className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                        >
+                                            {r.label}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
                         </div>
-                    }
-                    footer={heroFooter}
-                />
+                    </div>
+
+                    {/* Title block */}
+                    <div className="flex items-start gap-4 md:gap-5">
+                        <HeroMedallion icon={BarChart3} />
+                        <div className="min-w-0 flex-1">
+                            <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">Health &amp; Safety analytics</h1>
+                            <p className="mt-1 text-sm text-primary-foreground/75">
+                                <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteScope}</span>
+                                {' · Ngā Paerewa NZS 8134:2021 · HSWA 2015 · ACC'}
+                            </p>
+                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={0} drillsOverdue={drillsOverdue} />
+                        </div>
+                    </div>
+
+                    {/* Stat clusters — Leading / Lagging with period-over-period deltas */}
+                    <div className="grid gap-3 lg:grid-cols-2">
+                        <HeroCluster title="Lagging · outcomes" icon={TrendingDown}>
+                            <HeroClusterTile href="/incidents" label="Incidents" value={fmt(heroVal('incidents'))} caption="this period" tone={(heroVal('incidents') ?? 0) > 0 ? 'warning' : 'success'} {...heroDelta('incidents')} />
+                            <HeroClusterTile href="/health-safety/injuries" label="LTIFR" value={fmt(heroVal('ltifr'))} caption="per M hrs" tone="neutral" {...heroDelta('ltifr')} />
+                            <HeroClusterTile href="/health-safety/injuries" label="TRIFR" value={fmt(heroVal('trifr'))} caption="per M hrs" tone="neutral" {...heroDelta('trifr')} />
+                            <HeroClusterTile href="/health-safety/injuries" label="Days LTI-free" value={fmt(heroVal('days_since_lti'))} caption="since last LTI" tone={(heroVal('days_since_lti') ?? 0) >= 30 ? 'success' : 'warning'} {...heroDelta('days_since_lti')} />
+                        </HeroCluster>
+
+                        <HeroCluster title="Leading · proactive" icon={Clock}>
+                            <HeroClusterTile href="/incidents?type=near_miss" label="Near-miss" value={fmt(heroVal('near_miss_ratio'), '×')} caption=": incident" tone={(heroVal('near_miss_ratio') ?? 0) >= 3 ? 'success' : 'warning'} {...heroDelta('near_miss_ratio')} />
+                            <HeroClusterTile href="/health-safety/corrective-actions" label="Actions on time" value={fmt(heroVal('actions_on_time_pct'), '%')} caption="30-day" tone={(heroVal('actions_on_time_pct') ?? 0) >= 90 ? 'success' : 'warning'} {...heroDelta('actions_on_time_pct')} />
+                            <HeroClusterTile href="/health-safety/worker-participation" label="Train / audit" value={fmt(heroVal('training_pct'), '%')} caption="compliance" tone={(heroVal('training_pct') ?? 0) >= 90 ? 'success' : 'warning'} {...heroDelta('training_pct')} />
+                            <HeroClusterTile href="/compliance/hazards" label="Open hazards" value={fmt(heroVal('open_hazards'))} caption="open now" tone={(heroVal('open_hazards') ?? 0) > 0 ? 'warning' : 'success'} {...heroDelta('open_hazards')} />
+                        </HeroCluster>
+                    </div>
+                </HeroShell>
 
                 <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Analytics views" />
 
-                {/* role note */}
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-accent/50 px-3 py-2 text-xs text-muted-foreground">
-                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>{role_note}</span>
-                </div>
+                <RoleLensBanner lens={filters.lens} />
 
                 {tab === 'overview' ? (
                     <OverviewTab
@@ -807,53 +817,26 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
 
 // ── sub-components ──────────────────────────────────────────────────────
 
-function SummaryStat({ value, label, suffix = '', tone }: { value: number | string | null; label: string; suffix?: string; tone?: 'warning' }) {
-    return (
-        <span className="inline-flex items-center gap-1">
-            <span className={cn('font-bold tabular-nums', tone === 'warning' ? 'text-status-warning' : 'text-primary-foreground')}>
-                {value === null ? '—' : value}
-                {value !== null ? suffix : ''}
-            </span>
-            <span>{label}</span>
-        </span>
-    );
-}
-
-function CustomRange({ from, to, onApply }: { from: string; to: string; onApply: (from: string, to: string) => void }) {
+/** Range-picker fields rendered inside the period segmented control's Custom popover. */
+function CustomRangeFields({ from, to, onApply }: { from: string; to: string; onApply: (from: string, to: string) => void }) {
     const [f, setF] = useState(from);
     const [t, setT] = useState(to);
-    const [open, setOpen] = useState(false);
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                {/* eslint-disable-next-line no-restricted-syntax -- onDark range-picker trigger pill, not a standard Button */}
-                <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-foreground/20">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {from} → {to}
-                </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-3">
-                <div className="flex flex-col gap-2">
-                    <label className="text-xs font-medium text-muted-foreground">
-                        From
-                        <Input type="date" value={f} max={t || undefined} onChange={(e) => setF(e.target.value)} className="mt-1" />
-                    </label>
-                    <label className="text-xs font-medium text-muted-foreground">
-                        To
-                        <Input type="date" value={t} min={f || undefined} onChange={(e) => setT(e.target.value)} className="mt-1" />
-                    </label>
-                    <Button
-                        size="sm"
-                        onClick={() => {
-                            setOpen(false);
-                            onApply(f, t);
-                        }}
-                    >
-                        Apply range
-                    </Button>
-                </div>
-            </PopoverContent>
-        </Popover>
+        <>
+            <div className="flex items-end gap-2">
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    From
+                    <Input type="date" value={f} max={t || undefined} onChange={(e) => setF(e.target.value)} className="mt-1" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    To
+                    <Input type="date" value={t} min={f || undefined} onChange={(e) => setT(e.target.value)} className="mt-1" />
+                </label>
+            </div>
+            <Button size="sm" className="w-full" onClick={() => onApply(f, t)}>
+                Apply range
+            </Button>
+        </>
     );
 }
 
