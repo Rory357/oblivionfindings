@@ -45,14 +45,14 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - [x] Repoint Near Misses `:1170` `/incidents?type=near_miss` → `/incidents?tab=near_misses`; drop the title-flip (handled by new index).
 - [x] *Verify:* `tsc --noEmit` clean (exit 0). Browser check (both registers reachable; near-miss lands on tab) deferred to Step 3 when the tab target exists.
 
-### ☐ Step 3 — List page (`incidents/index.tsx`, Gap G)
-- [ ] hs-hero-kit hero (incident clusters "This period" + "Needs attention", NOT compliance badges) + footer filter band.
-- [ ] `TabStrip` 8 tabs: All · Open · Under investigation · Follow-ups due · WorkSafe-notifiable · Near misses · Awaiting review · Closed.
-- [ ] `EntityFilter`s (Site, Client) + Sources lens + search pill.
-- [ ] Right-click `ShiftContextMenu` rows (copy PRN `openRowCtx`); row badges; row-click → detail modal.
-- [ ] Follow-ups-due worklist tab; near-miss insights strip.
-- [ ] Extend `IncidentController@index` payload (per-tab aggregates, follow-ups roll-up, near-miss insights, source).
-- [ ] *Verify:* tabs filter; right-click opens; counts match.
+### ☑ Step 3 — List page (`incidents/index.tsx`, Gap G) ✅
+- [x] hs-hero-kit hero: "This period · last 30 days" (Reported Δ / Open / Investigating / Closed Δ) + "Needs attention" (Follow-ups due+overdue / Awaiting review / WorkSafe / Active CR alerts) clusters, tiles href→tabs. NOT compliance badges.
+- [x] `TabStrip` 8 tabs with counts (tones per spec). Tab nav preserves filters.
+- [x] Footer filter band (onDark): date-range `HeroSegmented` (week/30d/quarter/custom popover) + Site + Client `EntityFilter`s + Source segmented + search pill + Clear.
+- [x] Right-click `ShiftContextMenu` rows (PRN `openRowCtx` idiom); row badges (alert-linked / investigation / WorkSafe / follow-up-due+count / attachments+count); source column. **Row-click → `/incidents/{id}` (interim — Step 4 swaps to detail modal).** Ctx items limited to working actions (View / Continue draft / View client `/care` / View CR alert / Submit) — Add-followup/Upload/Flag deferred to Step 4 modals (no stubs).
+- [x] Follow-ups-due worklist tab (open only, owner/due/overdue/parent); near-miss insights strip (trend / ratio / by-potential bars — "what could have happened" proxy for hazards until Step 5 adds a hazard field).
+- [x] Extended `IncidentController@index` payload (tabCounts, rows+rowsKind, hero, nearMissInsights, sites, source/site filters, legacy `?type=near_miss`→tab back-compat). `php -l` clean.
+- [x] *Verified:* `tsc` clean (exit 0) + **18 feature tests pass / 234 assertions** (IncidentControllerTest index rewritten to new contract + new tab/source/site/followups/counts coverage; RefreshDatabase exercised the migration in a full migrate:fresh). Browser/live verify deferred to post-merge (.com), per project pattern.
 
 ### ☐ Step 4 — Detail modal (`IncidentDetailDialog`, Gap F)
 - [ ] `WizardShell` read-only chrome; rail Overview/Timeline/Photos/Follow-ups/Investigation/Linked; Options bar.
@@ -75,4 +75,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Mapped spec + codebase (component kit + cross-module backend). Branch + tracker created.
 - 2026-06-17 — Step 2 (nav) shipped: "Investigate & Remediate" group (Investigations + Corrective Actions) + near-miss repoint. `tsc` clean.
 - 2026-06-17 — Step 1 CODE written (migration + model, both `php -l` clean). Asked migration-run policy → user: **run autonomously (local)**.
-- 2026-06-17 — Step 1 migration RUN + verified (migrate/rollback/re-migrate clean, applied mine only via `--path`). **Foundation (Steps 1+2) complete.** Next tick: Step 3 list page (controller payload + index.tsx rebuild).
+- 2026-06-17 — Step 1 migration RUN + verified (migrate/rollback/re-migrate clean, applied mine only via `--path`). **Foundation (Steps 1+2) complete.**
+- 2026-06-17 — Step 3 list page DONE: `IncidentController@index` payload rebuilt + `incidents/index.tsx` rebuilt on hs-hero-kit + TabStrip + EntityFilter + right-click rows + followups worklist + near-miss insights. tsc clean + 18 feature tests (234 assertions). Next: Step 4 detail modal.

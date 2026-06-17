@@ -119,7 +119,7 @@ class IncidentControllerTest extends TestCase
     //  3. INDEX - Inertia response
     // ──────────────────────────────────────────────────────────────
 
-    public function test_index_returns_inertia_page_with_incidents(): void
+    public function test_index_returns_inertia_page_with_rows(): void
     {
         ClientIncident::factory()->count(3)->create();
 
@@ -128,19 +128,23 @@ class IncidentControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('incidents/index')
-                ->has('incidents')
+                ->has('rows')
                 ->has('filters')
                 ->has('clients')
+                ->has('tabCounts')
+                ->has('hero')
+                ->where('rowsKind', 'incidents')
             );
     }
 
-    public function test_index_admin_receives_clients_list(): void
+    public function test_index_admin_receives_clients_and_sites_list(): void
     {
         $this->actingAs($this->admin)
             ->get('/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('clients')
+                ->has('sites')
             );
     }
 
@@ -160,8 +164,8 @@ class IncidentControllerTest extends TestCase
         $response = $this->actingAs($this->staff)->get('/incidents');
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('incidents.data', 1)
-            ->where('incidents.data.0.id', $assignedIncident->id)
+            ->has('rows.data', 1)
+            ->where('rows.data.0.id', $assignedIncident->id)
         );
     }
 
@@ -173,7 +177,7 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 3)
+                ->has('rows.data', 3)
             );
     }
 
@@ -181,18 +185,97 @@ class IncidentControllerTest extends TestCase
     //  16. All filters
     // ──────────────────────────────────────────────────────────────
 
-    public function test_filter_by_status(): void
+    public function test_tab_review_shows_only_submitted(): void
     {
         ClientIncident::factory()->submitted()->create();
         ClientIncident::factory()->reviewed()->create();
         ClientIncident::factory()->create(['status' => 'draft']);
 
         $this->actingAs($this->admin)
-            ->get('/incidents?status=submitted')
+            ->get('/incidents?tab=review')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
-                ->where('incidents.data.0.status', 'submitted')
+                ->where('tab', 'review')
+                ->has('rows.data', 1)
+                ->where('rows.data.0.status', 'submitted')
+            );
+    }
+
+    public function test_tab_closed_shows_only_closed(): void
+    {
+        ClientIncident::factory()->create(['status' => 'closed']);
+        ClientIncident::factory()->submitted()->create();
+
+        $this->actingAs($this->admin)
+            ->get('/incidents?tab=closed')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('rows.data', 1)
+                ->where('rows.data.0.status', 'closed')
+            );
+    }
+
+    public function test_tab_near_misses_filters_type(): void
+    {
+        ClientIncident::factory()->create(['type' => 'near_miss']);
+        ClientIncident::factory()->create(['type' => 'fall']);
+
+        $this->actingAs($this->admin)
+            ->get('/incidents?tab=near_misses')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('rows.data', 1)
+                ->where('rows.data.0.type', 'near_miss')
+            );
+    }
+
+    public function test_legacy_near_miss_query_lands_on_tab(): void
+    {
+        ClientIncident::factory()->create(['type' => 'near_miss']);
+        ClientIncident::factory()->create(['type' => 'fall']);
+
+        $this->actingAs($this->admin)
+            ->get('/incidents?type=near_miss')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tab', 'near_misses')
+                ->has('rows.data', 1)
+            );
+    }
+
+    public function test_followups_tab_returns_open_followup_worklist(): void
+    {
+        $incident = ClientIncident::factory()->create(['client_id' => $this->client->id]);
+        IncidentFollowup::factory()->create(['client_incident_id' => $incident->id, 'completed_at' => null]);
+
+        // a completed follow-up must be excluded from the worklist
+        $other = ClientIncident::factory()->create(['client_id' => $this->client->id]);
+        IncidentFollowup::factory()->completed()->create(['client_incident_id' => $other->id]);
+
+        $this->actingAs($this->admin)
+            ->get('/incidents?tab=followups')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('rowsKind', 'followups')
+                ->has('rows.data', 1)
+                ->where('rows.data.0.incident_id', $incident->id)
+            );
+    }
+
+    public function test_tab_counts_reflect_data(): void
+    {
+        ClientIncident::factory()->create(['type' => 'near_miss', 'status' => 'draft']);
+        ClientIncident::factory()->submitted()->create();
+        ClientIncident::factory()->create(['status' => 'closed']);
+
+        $this->actingAs($this->admin)
+            ->get('/incidents')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tabCounts.all', 3)
+                ->where('tabCounts.near_misses', 1)
+                ->where('tabCounts.review', 1)
+                ->where('tabCounts.closed', 1)
             );
     }
 
@@ -206,8 +289,8 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents?severity=high')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
-                ->where('incidents.data.0.severity', 'high')
+                ->has('rows.data', 1)
+                ->where('rows.data.0.severity', 'high')
             );
     }
 
@@ -222,8 +305,8 @@ class IncidentControllerTest extends TestCase
             ->get("/incidents?client_id={$clientA->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
-                ->where('incidents.data.0.client_id', $clientA->id)
+                ->has('rows.data', 1)
+                ->where('rows.data.0.client.id', $clientA->id)
             );
     }
 
@@ -239,34 +322,39 @@ class IncidentControllerTest extends TestCase
             ->get("/incidents?from={$from}&to={$to}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
+                ->has('rows.data', 1)
             );
     }
 
-    public function test_filter_by_reviewed_yes(): void
+    public function test_filter_by_source(): void
     {
-        ClientIncident::factory()->reviewed()->create();
-        ClientIncident::factory()->submitted()->create();
+        ClientIncident::factory()->create(['source' => 'sensor']);
+        ClientIncident::factory()->create(['source' => 'manual']);
 
         $this->actingAs($this->admin)
-            ->get('/incidents?reviewed=yes')
+            ->get('/incidents?source=sensor')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
-                ->where('incidents.data.0.status', 'reviewed')
+                ->has('rows.data', 1)
+                ->where('rows.data.0.source', 'sensor')
             );
     }
 
-    public function test_filter_by_reviewed_no(): void
+    public function test_filter_by_site_id(): void
     {
-        ClientIncident::factory()->reviewed()->create();
-        ClientIncident::factory()->create(['status' => 'draft', 'reviewed_at' => null]);
+        $siteA = \App\Models\Site::factory()->create();
+        $siteB = \App\Models\Site::factory()->create();
+        $clientA = Client::factory()->create(['site_id' => $siteA->id]);
+        $clientB = Client::factory()->create(['site_id' => $siteB->id]);
+        ClientIncident::factory()->create(['client_id' => $clientA->id]);
+        ClientIncident::factory()->create(['client_id' => $clientB->id]);
 
         $this->actingAs($this->admin)
-            ->get('/incidents?reviewed=no')
+            ->get("/incidents?site_id={$siteA->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
+                ->has('rows.data', 1)
+                ->where('rows.data.0.client.id', $clientA->id)
             );
     }
 
@@ -287,7 +375,7 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents?q=xylophone')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
+                ->has('rows.data', 1)
             );
     }
 
@@ -306,7 +394,7 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents?q=fall')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
+                ->has('rows.data', 1)
             );
     }
 
@@ -327,7 +415,7 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents?q=UniqueSearchableTitle')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('incidents.data', 1)
+                ->has('rows.data', 1)
             );
     }
 

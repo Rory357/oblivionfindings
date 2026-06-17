@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\NotificationService;
@@ -15,64 +17,225 @@ use Illuminate\Support\Facades\Storage;
 
 class IncidentController extends Controller
 {
+    /**
+     * Unified Incidents register (redesign): hs-hero-kit hero with incident stat
+     * clusters, an 8-tab TabStrip, Site/Client/Source filters, and right-click
+     * rows. Near misses and the follow-ups worklist are first-class tabs.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned')), 403);
 
         $q = trim((string) $request->get('q', ''));
-        $type = $request->get('type');
-        $status = $request->get('status');
+        $tab = $request->get('tab', 'all'); // all|open|investigation|followups|worksafe|near_misses|review|closed
+        // Back-compat: the legacy ?type=near_miss lens now lands on the tab.
+        if ($request->get('type') === 'near_miss' && ! $request->filled('tab')) {
+            $tab = 'near_misses';
+        }
         $severity = $request->get('severity');
         $clientId = $request->get('client_id');
-        $reviewed = $request->get('reviewed'); // yes|no|null
+        $siteId = $request->get('site_id');
+        $source = $request->get('source');
         $from = $request->get('from');
         $to = $request->get('to');
 
-        $incidents = ClientIncident::query()
-            ->with(['client:id,first_name,last_name', 'reporter:id,name', 'shift:id,starts_at,ends_at,actual_ends_at'])
-            ->when($user->canDo('incidents.viewAssigned') && !$user->canDo('incidents.viewAny'), function ($query) use ($user) {
-                $query->whereHas('client.supportWorkers', fn ($q) => $q->whereKey($user->id));
-            })
-            ->when($q, function ($query) use ($q) {
-                $searchTerm = '%' . $q . '%';
-                $query->where(function ($sub) use ($searchTerm) {
-                    $sub->where('description', 'like', $searchTerm)
-                        ->orWhere('type', 'like', $searchTerm)
-                        ->orWhere('title', 'like', $searchTerm);
-                });
-            })
-            ->when($type, fn($query) => $query->where('type', $type))
-            ->when($status, fn($query) => $query->where('status', $status))
-            ->when($severity, fn($query) => $query->where('severity', $severity))
-            ->when($clientId, fn($query) => $query->where('client_id', $clientId))
-            ->when($from, fn($query) => $query->whereDate('occurred_at', '>=', $from))
-            ->when($to, fn($query) => $query->whereDate('occurred_at', '<=', $to))
-            ->when($reviewed === 'yes', fn($query) => $query->whereNotNull('reviewed_at'))
-            ->when($reviewed === 'no', fn($query) => $query->whereNull('reviewed_at'))
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->paginate(50)
-            ->withQueryString();
+        // Shared filters (everything EXCEPT the tab), reusable on both the
+        // ClientIncident query and the follow-ups whereHas('incident') subquery,
+        // so the tab counts stay mutually consistent.
+        $applyFilters = function ($query) use ($user, $q, $severity, $clientId, $siteId, $source, $from, $to) {
+            return $query
+                ->when($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny'), function ($query) use ($user) {
+                    $query->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id));
+                })
+                ->when($q !== '', function ($query) use ($q) {
+                    $term = '%' . $q . '%';
+                    $query->where(fn ($sub) => $sub->where('description', 'like', $term)
+                        ->orWhere('type', 'like', $term)
+                        ->orWhere('title', 'like', $term));
+                })
+                ->when($severity, fn ($query) => $query->where('severity', $severity))
+                ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
+                ->when($siteId, fn ($query) => $query->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
+                ->when($source, fn ($query) => $query->where('source', $source))
+                ->when($from, fn ($query) => $query->whereDate('occurred_at', '>=', $from))
+                ->when($to, fn ($query) => $query->whereDate('occurred_at', '<=', $to));
+        };
 
+        $applyTab = fn ($query, string $t) => match ($t) {
+            'open' => $query->where('status', '!=', 'closed'),
+            'investigation' => $query->whereIn('investigation_status', ['pending', 'in_progress']),
+            'worksafe' => $query->where('is_notifiable', true),
+            'near_misses' => $query->where('type', 'near_miss'),
+            'review' => $query->where('status', 'submitted'),
+            'closed' => $query->where('status', 'closed'),
+            default => $query,
+        };
+
+        // Per-tab counts.
+        $countFor = fn (string $t) => $applyTab($applyFilters(ClientIncident::query()), $t)->count();
+        $openFollowupsQuery = fn () => IncidentFollowup::query()
+            ->whereNull('completed_at')
+            ->whereHas('incident', fn ($i) => $applyFilters($i));
+
+        $tabCounts = [
+            'all' => $countFor('all'),
+            'open' => $countFor('open'),
+            'investigation' => $countFor('investigation'),
+            'followups' => $openFollowupsQuery()->count(),
+            'worksafe' => $countFor('worksafe'),
+            'near_misses' => $countFor('near_misses'),
+            'review' => $countFor('review'),
+            'closed' => $countFor('closed'),
+        ];
+
+        // Rows for the active tab. Follow-ups due is a worklist of follow-up rows;
+        // every other tab is a list of incident rows.
+        if ($tab === 'followups') {
+            $rows = $openFollowupsQuery()
+                ->with(['incident:id,type,client_id', 'incident.client:id,first_name,last_name', 'assignedTo:id,name'])
+                ->orderByRaw('due_at is null')
+                ->orderBy('due_at')
+                ->paginate(50)
+                ->withQueryString()
+                ->through(fn (IncidentFollowup $f) => [
+                    'id' => $f->id,
+                    'incident_id' => $f->client_incident_id,
+                    'incident_type' => $f->incident?->type,
+                    'client_name' => $f->incident?->client
+                        ? trim(($f->incident->client->first_name ?? '') . ' ' . ($f->incident->client->last_name ?? ''))
+                        : null,
+                    'assigned_to' => $f->assignedTo?->name,
+                    'due_at' => $f->due_at,
+                    'overdue' => $f->due_at ? $f->due_at->isPast() : false,
+                    'notes' => $f->notes,
+                ]);
+            $rowsKind = 'followups';
+        } else {
+            $rows = $applyTab($applyFilters(ClientIncident::query()), $tab)
+                ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'reporter:id,name'])
+                ->withCount([
+                    'attachments',
+                    'followups as open_followups_count' => fn ($qq) => $qq->whereNull('completed_at'),
+                ])
+                ->orderByDesc('occurred_at')
+                ->orderByDesc('id')
+                ->paginate(50)
+                ->withQueryString()
+                ->through(fn (ClientIncident $i) => [
+                    'id' => $i->id,
+                    'occurred_at' => $i->occurred_at,
+                    'type' => $i->type,
+                    'description' => $i->description,
+                    'severity' => $i->severity,
+                    'status' => $i->status,
+                    'source' => $i->source,
+                    'interactive' => $i->interactive,
+                    'is_notifiable' => (bool) $i->is_notifiable,
+                    'worksafe_notification_status' => $i->worksafe_notification_status,
+                    'potential_severity' => $i->potential_severity,
+                    'investigation_status' => $i->investigation_status,
+                    'control_room_alert_id' => $i->control_room_alert_id,
+                    'requires_followup' => (bool) $i->requires_followup,
+                    'attachments_count' => $i->attachments_count,
+                    'open_followups_count' => $i->open_followups_count,
+                    'client' => $i->client ? [
+                        'id' => $i->client->id,
+                        'first_name' => $i->client->first_name,
+                        'last_name' => $i->client->last_name,
+                        'site' => $i->client->site?->name,
+                    ] : null,
+                    'reporter' => $i->reporter ? ['name' => $i->reporter->name] : null,
+                ]);
+            $rowsKind = 'incidents';
+        }
+
+        // Hero clusters. "This period" = 30-day flow (Reported/Closed carry a
+        // delta vs the prior 30 days); Open / Under investigation are current
+        // state. "Needs attention" = current worklists.
+        $p30 = now()->subDays(30);
+        $p60 = now()->subDays(60);
+        $p90 = now()->subDays(90);
+
+        $reported30 = $applyFilters(ClientIncident::query())->where('occurred_at', '>=', $p30)->count();
+        $reportedPrev = $applyFilters(ClientIncident::query())->whereBetween('occurred_at', [$p60, $p30])->count();
+        $closed30 = $applyFilters(ClientIncident::query())->where('status', 'closed')->where('closed_at', '>=', $p30)->count();
+        $closedPrev = $applyFilters(ClientIncident::query())->where('status', 'closed')->whereBetween('closed_at', [$p60, $p30])->count();
+
+        $overdueFollowups = $openFollowupsQuery()->where('due_at', '<', now())->count();
+        $worksafeAwaiting = $applyFilters(ClientIncident::query())
+            ->where('is_notifiable', true)
+            ->where(fn ($w) => $w->whereNull('worksafe_notification_status')->orWhere('worksafe_notification_status', 'pending'))
+            ->count();
+        $activeAlerts = $applyFilters(ClientIncident::query())
+            ->whereNotNull('control_room_alert_id')
+            ->whereHas('controlRoomAlert', fn ($a) => $a->whereNotIn('status', ['resolved', 'closed']))
+            ->count();
+
+        $hero = [
+            'period' => [
+                'reported' => ['value' => $reported30, 'delta' => $reported30 - $reportedPrev],
+                'open' => ['value' => $tabCounts['open']],
+                'investigation' => ['value' => $tabCounts['investigation']],
+                'closed' => ['value' => $closed30, 'delta' => $closed30 - $closedPrev],
+            ],
+            'attention' => [
+                'followups' => ['value' => $tabCounts['followups'], 'overdue' => $overdueFollowups],
+                'review' => ['value' => $tabCounts['review']],
+                'worksafe' => ['value' => $worksafeAwaiting],
+                'alerts' => ['value' => $activeAlerts],
+            ],
+        ];
+
+        // Near-miss insights strip (leading indicator).
+        $nm30 = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->where('occurred_at', '>=', $p30)->count();
+        $nmPrev = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->whereBetween('occurred_at', [$p60, $p30])->count();
+        $nm90 = $applyFilters(ClientIncident::query())->where('type', 'near_miss')->where('occurred_at', '>=', $p90)->count();
+        $inc90 = $applyFilters(ClientIncident::query())->where('type', '!=', 'near_miss')->where('occurred_at', '>=', $p90)->count();
+        $nmByPotential = $applyFilters(ClientIncident::query())
+            ->where('type', 'near_miss')
+            ->whereNotNull('potential_severity')
+            ->selectRaw('potential_severity, count(*) as c')
+            ->groupBy('potential_severity')
+            ->orderByDesc('c')
+            ->pluck('c', 'potential_severity');
+
+        $nearMissInsights = [
+            'trend_pct' => $nmPrev > 0 ? (int) round((($nm30 - $nmPrev) / $nmPrev) * 100) : null,
+            'ratio' => $inc90 > 0 ? round($nm90 / $inc90, 1) : null,
+            'by_potential' => $nmByPotential, // {low: n, medium: n, ...} — "what could have happened"
+        ];
+
+        $sites = null;
         $clients = null;
         if ($user->canDo('incidents.viewAny')) {
+            $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
             $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
         }
 
         return inertia('incidents/index', [
             'filters' => [
                 'q' => $q,
-                'type' => $type,
-                'status' => $status,
+                'tab' => $tab,
                 'severity' => $severity,
-                'client_id' => $clientId,
-                'reviewed' => $reviewed,
+                'client_id' => $clientId ? (int) $clientId : null,
+                'site_id' => $siteId ? (int) $siteId : null,
+                'source' => $source,
                 'from' => $from,
                 'to' => $to,
             ],
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'rows' => $rows,
+            'rowsKind' => $rowsKind,
+            'hero' => $hero,
+            'nearMissInsights' => $nearMissInsights,
+            'sites' => $sites,
             'clients' => $clients,
-            'incidents' => $incidents,
+            'can' => [
+                'create' => $user->canDo('incidents.create'),
+                'templatesManage' => $user->canDo('incidents.templates.manage'),
+            ],
         ]);
     }
 
