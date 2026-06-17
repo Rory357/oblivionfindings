@@ -199,24 +199,19 @@ class SafeguardingConcernControllerTest extends TestCase
         $this->get('/safeguarding/create')->assertRedirect('/login');
     }
 
-    public function test_safeguarding_create_accessible_by_admin(): void
+    public function test_safeguarding_create_redirects_to_raise_wizard(): void
     {
+        // The full-page create form is retired — raising is a modal wizard on the list.
         $this->actingAs($this->admin)
             ->get('/safeguarding/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/create')
-                ->has('clients')
-                ->has('staff')
-                ->has('sites')
-            );
+            ->assertRedirect('/safeguarding?raise=1');
     }
 
     public function test_safeguarding_create_accessible_by_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/safeguarding/create')
-            ->assertOk();
+            ->assertRedirect();
     }
 
     // ──────────────────────────────────────
@@ -232,7 +227,8 @@ class SafeguardingConcernControllerTest extends TestCase
                 'description' => 'Test safeguarding concern description.',
                 'requires_external_referral' => false,
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHas('created_concern_id');
 
         $this->assertDatabaseHas('safeguarding_concerns', [
             'concern_type' => 'abuse',
@@ -398,20 +394,14 @@ class SafeguardingConcernControllerTest extends TestCase
     // Edit & Update
     // ──────────────────────────────────────
 
-    public function test_safeguarding_edit_accessible_by_admin(): void
+    public function test_safeguarding_edit_redirects_to_concern(): void
     {
+        // The full-page edit form is retired — fields are maintained via the detail modal.
         $concern = SafeguardingConcern::factory()->create();
 
         $this->actingAs($this->admin)
             ->get("/safeguarding/{$concern->id}/edit")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/edit')
-                ->has('concern')
-                ->has('clients')
-                ->has('staff')
-                ->has('sites')
-            );
+            ->assertRedirect("/safeguarding/{$concern->id}");
     }
 
     public function test_safeguarding_update_successful(): void

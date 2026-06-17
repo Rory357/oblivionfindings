@@ -17,8 +17,8 @@
 | 3 | List page — hs-hero-kit hero, TabStrip (8 + Assigned to me), EntityFilters, reviews worklist, referrals banner, right-click rows, Restricted treatment | ✅ done | _(this commit)_ |
 | 4 | Detail modal `SafeguardingConcernDialog` — WizardShell read-only chrome, rail sections + lifecycle tracker, gated Options bar; retire `show.tsx`→thin shell | ✅ done (4a `8a6ed4c7` + 4b action panes) | 4b _(this commit)_ |
 | 5 | Triage modal + gated Close modal | ✅ done | _(this commit)_ |
-| 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | in-progress (next) | — |
-| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | todo | — |
+| 6 | Raise wizard — WizardShell 6 steps + WizardSuccessPane; retire `create.tsx`/`edit.tsx` | ✅ done | _(this commit)_ |
+| 7 | Evidence (`SafeguardingAttachment`) + auto-advance (W5) + review/ack reminders (W9) + subject-informed close check (W10) | in-progress (next) | — |
 | 8 | Cross-module — `ClientIncident::safeguardingConcerns()` (X1), Control Room quick-actions (X2), state-sync (X3), NZ authority currency | todo | — |
 
 ## Migration policy
@@ -100,9 +100,24 @@ steps 1, 7, (maybe) 8.
   also fires on an unlogged-but-indicated referral (matches the prototype's `closeChecks` gating) +
   lifecycle test. tsc/eslint/build green; 13 lifecycle tests green. **The lifecycle is now fully drivable
   from the modal.** Step 6 = raise wizard (retire create/edit.tsx).
+- 2026-06-18 — **Step 6 done.** `components/safeguarding/raise-wizard.tsx` = `WizardShell` 6-step modal
+  (Add-Client contract, modelled on `IncidentReportDialog`): ① subject & concern type ② what happened
+  (+optional witnesses + expandable alleged person; evidence-upload InfoCard deferred to Step 7, no
+  dropzone) ③ severity & abuse category ④ immediate response & subject-informed ⑤ NZ external-referral
+  check (auto-suggest criminal→Police) ⑥ review → `WizardSuccessPane` (Open concern / Raise another /
+  Done). Completeness `Ring`, per-step gating, `form.transform` → store contract. `@store` now `back()` +
+  flashes `created_concern_id` (shared-file: `HandleInertiaRequests` +1 flash key); `@create` →
+  `/safeguarding?raise=1`, `@edit` → concern (both retired forms redirect, no 404); index "Raise concern"
+  opens the wizard, `?raise=1` auto-opens. **Deleted create.tsx + edit.tsx** (only index.tsx + concern.tsx
+  remain). Updated create/edit tests → redirect; store test asserts the flash. tsc/eslint/build green; 69
+  safeguarding tests green. (Dead `serializeConcernForShow`/`serializeConcernForForm`/`serializeUser` in
+  controller — cleanup candidate.) Step 7 = evidence (`SafeguardingAttachment`) + auto-advance (W5) +
+  reminders (W9).
 
 ## Shared-file edits (watch at integration / merge time)
-- _(none yet)_
+- **Step 6** — `app/Http/Middleware/HandleInertiaRequests.php`: added one flash key `created_concern_id`
+  (additive, alongside `created_client_id`/`created_site_id`) so the raise wizard's success pane can open
+  the new concern. Pure addition; no existing keys touched.
 
 ## Deferred / backlog
 - _(none yet)_

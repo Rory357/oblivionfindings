@@ -146,6 +146,9 @@ class SafeguardingConcernController extends Controller
             'subjects' => Client::query()->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
                 ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])
                 ->values(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
+                ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
+            'raise' => $request->boolean('raise'),
             'can' => ['create' => $user->can('create', SafeguardingConcern::class)],
             // Detail-over-list: only fetched (and only authorised) when ?concern={id} is present.
             'detail' => $this->resolveDetail($request, $user, $canSensitive),
@@ -174,18 +177,15 @@ class SafeguardingConcernController extends Controller
     /**
      * Show the form for creating a new concern.
      */
-    public function create(): Response
+    /**
+     * The full-page create form is retired — raising is a modal wizard on the
+     * list. Redirect deep links to the list with the wizard open.
+     */
+    public function create(): RedirectResponse
     {
         $this->authorize('create', SafeguardingConcern::class);
 
-        return Inertia::render('safeguarding/create', [
-            'clients' => Client::select('id', 'first_name', 'last_name')
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get(),
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
-        ]);
+        return redirect()->route('safeguarding.index', ['raise' => 1]);
     }
 
     /**
@@ -228,9 +228,11 @@ class SafeguardingConcernController extends Controller
 
         $concern = SafeguardingConcern::create($validated);
 
-        return redirect()
-            ->route('safeguarding.show', $concern)
-            ->with('success', 'Safeguarding concern created successfully with reference: ' . $concern->reference_number);
+        // back() so the raise wizard can show its success pane (preserveState) and
+        // the list refreshes in place; created_concern_id powers "Open concern".
+        return back()
+            ->with('success', 'Safeguarding concern raised — reference ' . $concern->reference_number . '.')
+            ->with('created_concern_id', $concern->id);
     }
 
     /**
@@ -255,21 +257,15 @@ class SafeguardingConcernController extends Controller
     /**
      * Show the form for editing the concern.
      */
-    public function edit(SafeguardingConcern $concern): Response
+    /**
+     * The full-page edit form is retired — concern fields are maintained through
+     * the detail modal's action panes. Redirect deep links to the concern.
+     */
+    public function edit(SafeguardingConcern $concern): RedirectResponse
     {
         $this->authorize('update', $concern);
 
-        $concern->load(['subject', 'allegedPerpetrator', 'site']);
-
-        return Inertia::render('safeguarding/edit', [
-            'concern' => $this->serializeConcernForForm($concern),
-            'clients' => Client::select('id', 'first_name', 'last_name')
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get(),
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
-        ]);
+        return redirect()->route('safeguarding.show', $concern);
     }
 
     /**

@@ -230,6 +230,9 @@ class HandleInertiaRequests extends Middleware
                 // The Add Site modal reads this after a successful create so its
                 // success pane can link straight to the new site profile.
                 'created_site_id' => session('created_site_id'),
+                // The Safeguarding raise wizard reads this so its success pane can
+                // open the newly-raised concern.
+                'created_concern_id' => session('created_concern_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

@@ -64,8 +64,23 @@ Close uses a computed checklist + `InfoCard` warnings + `Field`/`Textarea`/`Inpu
 Safeguarding-specific (Incidents has review/close/reopen instead) but built entirely on the same wizard
 primitives, so they read as one product. **No inconsistencies found; no shared primitives modified.**
 
+### Step 6 (raise wizard) — matched 1:1
+`raise-wizard.tsx` authored from `incident-report-dialog.tsx`: same `WizardShell` + `WizardStepPane` +
+`WizardSuccessPane`, completeness `Ring` in `footerStart`, Back/Next/Submit `footerEnd`, per-step gating,
+`useForm`+`transform`+`preserveState`+`flash`-id success, shared primitives (TilePicker/Segmented/
+SelectInput/Field/StepHead/InfoCard). Same retire-to-redirect pattern as Incidents (create→list with the
+wizard open). Safeguarding deltas: 6 safeguarding steps, blame-free protective copy, NZ referral step.
+**Note (not an inconsistency to fix):** Incidents' `IncidentReportDialog` reads `flash.created_incident_id`
+but that key isn't shared in `HandleInertiaRequests`, so its "Open incident" button is effectively dead.
+Safeguarding adds `created_concern_id` to the shared flash so "Open concern" works (logged below). Left
+Incidents as-is per §7.
+
 ## Inconsistencies found in Incidents (do NOT refactor — log only)
+- `IncidentReportDialog` "Open incident" reads `flash.created_incident_id`, never shared by
+  `HandleInertiaRequests` → button never appears. Not fixed (would touch Incidents); Safeguarding shares
+  its own `created_concern_id` instead.
 - _(none yet)_
 
 ## Shared primitives edited (additive, both modules use)
-- _(none yet)_
+- Step 6 — `app/Http/Middleware/HandleInertiaRequests.php`: +1 flash key `created_concern_id` (additive,
+  alongside the existing `created_*_id` keys). No existing behaviour changed.

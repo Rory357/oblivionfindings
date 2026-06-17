@@ -21,6 +21,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { SafeguardingConcernDialog, type ConcernDetail } from '@/components/safeguarding/concern-dialog';
+import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -123,6 +124,8 @@ type Props = {
     referralOverdueCount: number;
     sites: Array<{ id: number; name: string }>;
     subjects: Array<{ id: number; name: string }>;
+    staff: Array<{ id: number; name: string }>;
+    raise: boolean;
     can: { create: boolean };
     detail: ConcernDetail | null;
 };
@@ -206,10 +209,13 @@ export default function SafeguardingIndex({
     referralOverdueCount,
     sites,
     subjects,
+    staff,
+    raise,
     can,
     detail,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [raiseOpen, setRaiseOpen] = useState(raise);
 
     const go = (next: Partial<Filters>) =>
         router.get('/safeguarding', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -375,7 +381,7 @@ export default function SafeguardingIndex({
                         </div>
 
                         {can.create ? (
-                            <Button size="sm" onClick={() => router.visit('/safeguarding/create')} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                            <Button size="sm" onClick={() => setRaiseOpen(true)} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
                                 <Plus className="mr-1.5 h-4 w-4" /> Raise concern
                             </Button>
                         ) : null}
@@ -431,6 +437,20 @@ export default function SafeguardingIndex({
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
             {detail ? <SafeguardingConcernDialog detail={detail} open onClose={closeDetail} /> : null}
+
+            {raiseOpen && can.create ? (
+                <SafeguardingRaiseWizard
+                    open
+                    clients={subjects}
+                    staff={staff}
+                    sites={sites}
+                    onClose={() => setRaiseOpen(false)}
+                    onOpenConcern={(id) => {
+                        setRaiseOpen(false);
+                        openConcern(id);
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }
