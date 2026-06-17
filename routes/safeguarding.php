@@ -6,6 +6,7 @@ use App\Http\Controllers\SafeguardingInvestigationController;
 use App\Http\Controllers\SafeguardingExternalReportController;
 use App\Http\Controllers\SafeguardingRiskAssessmentController;
 use App\Http\Controllers\SafeguardingActionPlanController;
+use App\Http\Controllers\SafeguardingAttachmentController;
 
 /**
  * Safeguarding & Allegations Management Routes
@@ -44,6 +45,8 @@ Route::middleware(['auth'])->group(function () {
     // Workflow actions
     Route::post('/safeguarding/{concern}/assign', [SafeguardingConcernController::class, 'assign'])
         ->name('safeguarding.assign');
+    Route::post('/safeguarding/{concern}/triage', [SafeguardingConcernController::class, 'triage'])
+        ->name('safeguarding.triage');
     Route::patch('/safeguarding/{concern}/status', [SafeguardingConcernController::class, 'updateStatus'])
         ->name('safeguarding.updateStatus');
     Route::post('/safeguarding/{concern}/close', [SafeguardingConcernController::class, 'close'])
@@ -70,6 +73,14 @@ Route::middleware(['auth'])->group(function () {
     // Risk assessments
     Route::post('/safeguarding/{concern}/risk-assessments', [SafeguardingRiskAssessmentController::class, 'store'])
         ->name('safeguarding.riskAssessments.store');
+
+    // Evidence attachments (policy-protected in the controller; sensitive downloads gated by viewSensitive)
+    Route::post('/safeguarding/{concern}/attachments', [SafeguardingAttachmentController::class, 'store'])
+        ->name('safeguarding.attachments.store');
+    Route::get('/safeguarding/{concern}/attachments/{attachment}/download', [SafeguardingAttachmentController::class, 'download'])
+        ->name('safeguarding.attachments.download');
+    Route::delete('/safeguarding/{concern}/attachments/{attachment}', [SafeguardingAttachmentController::class, 'destroy'])
+        ->name('safeguarding.attachments.destroy');
 
     // Action plans
     Route::post('/safeguarding/{concern}/action-plans', [SafeguardingActionPlanController::class, 'store'])

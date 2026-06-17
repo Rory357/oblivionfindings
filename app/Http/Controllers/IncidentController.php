@@ -291,6 +291,7 @@ class IncidentController extends Controller
                 'followups.creator:id,name',
                 'investigator:id,name',
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
+                'safeguardingConcerns',
             ])
             ->find($incidentId);
 
@@ -394,6 +395,19 @@ class IncidentController extends Controller
                     'due_date' => $ca->due_date,
                 ])->values(),
             ] : null,
+            // X1: safeguarding concern(s) spawned from this incident (e.g. abuse/neglect
+            // auto-escalation). Need-to-know — redacted unless the viewer can view the concern.
+            'safeguarding_concerns' => $incident->safeguardingConcerns->map(function ($concern) use ($user) {
+                $canView = $user->can('view', $concern);
+
+                return [
+                    'id' => $concern->id,
+                    'reference_number' => $canView ? $concern->reference_number : null,
+                    'status' => $canView ? $concern->status : null,
+                    'severity' => $canView ? $concern->severity : null,
+                    'can_view' => $canView,
+                ];
+            })->values()->all(),
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),

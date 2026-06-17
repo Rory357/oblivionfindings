@@ -165,6 +165,15 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->hasMany(ClientIncidentAttachment::class, 'incident_id');
     }
 
+    /**
+     * Safeguarding concern(s) spawned from this incident (reverse of
+     * SafeguardingConcern.related_incident_id) — e.g. abuse/neglect auto-escalation.
+     */
+    public function safeguardingConcerns(): HasMany
+    {
+        return $this->hasMany(SafeguardingConcern::class, 'related_incident_id');
+    }
+
     public function followups(): HasMany
     {
         return $this->hasMany(IncidentFollowup::class, 'client_incident_id');

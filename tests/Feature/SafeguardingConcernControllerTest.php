@@ -87,39 +87,44 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('safeguarding/index')
-                ->has('concerns')
+                ->has('rows')
                 ->has('filters')
-                ->has('stats')
+                ->has('tab')
+                ->has('tabCounts')
+                ->has('hero')
             );
     }
 
-    public function test_safeguarding_index_shows_stats(): void
+    public function test_safeguarding_index_shows_hero_counts(): void
     {
-        SafeguardingConcern::factory()->count(3)->create(['status' => 'reported']);
+        // Pin severities — the factory randomises severity, which would otherwise
+        // make the criticalOpen count non-deterministic.
+        SafeguardingConcern::factory()->count(3)->create(['status' => 'reported', 'severity' => 'medium']);
         SafeguardingConcern::factory()->critical()->count(2)->create(['status' => 'investigating']);
-        SafeguardingConcern::factory()->closed()->count(1)->create();
+        SafeguardingConcern::factory()->closed()->count(1)->create(['severity' => 'low']);
 
         $this->actingAs($this->admin)
             ->get('/safeguarding')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('stats.open')
-                ->has('stats.critical')
-                ->has('stats.requiring_referral')
-                ->has('stats.assigned_to_me')
+                ->where('hero.openWork.awaitingTriage.value', 3)
+                ->where('hero.openWork.investigating.value', 2)
+                ->where('hero.attention.criticalOpen.value', 2)
+                ->has('hero.attention.reviewsDue.value')
             );
     }
 
-    public function test_safeguarding_index_filter_by_status(): void
+    public function test_safeguarding_index_filter_by_tab(): void
     {
         SafeguardingConcern::factory()->count(3)->create(['status' => 'reported']);
         SafeguardingConcern::factory()->count(2)->create(['status' => 'investigating']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?status=reported')
+            ->get('/safeguarding?tab=triage')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 3)
+                ->where('rowsKind', 'concerns')
+                ->has('rows.data', 3)
             );
     }
 
@@ -132,7 +137,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get('/safeguarding?severity=critical')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 2)
+                ->has('rows.data', 2)
             );
     }
 
@@ -142,23 +147,34 @@ class SafeguardingConcernControllerTest extends TestCase
         SafeguardingConcern::factory()->create(['description' => 'Another concern']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?search=Unique')
+            ->get('/safeguarding?q=Unique')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 1)
+                ->has('rows.data', 1)
             );
     }
 
-    public function test_safeguarding_index_filter_by_concern_type(): void
+    public function test_safeguarding_index_filter_by_category(): void
     {
-        SafeguardingConcern::factory()->count(2)->create(['concern_type' => 'abuse']);
-        SafeguardingConcern::factory()->count(3)->create(['concern_type' => 'neglect']);
+        SafeguardingConcern::factory()->count(2)->create(['abuse_category' => 'financial']);
+        SafeguardingConcern::factory()->count(3)->create(['abuse_category' => 'physical']);
 
         $this->actingAs($this->admin)
-            ->get('/safeguarding?concern_type=abuse')
+            ->get('/safeguarding?category=financial')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 2)
+                ->has('rows.data', 2)
+            );
+    }
+
+    public function test_safeguarding_index_reviews_tab_returns_worklist(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/safeguarding?tab=reviews')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('rowsKind', 'reviews')
+                ->has('rows.data')
             );
     }
 
@@ -170,7 +186,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get('/safeguarding')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('concerns.data', 20)
+                ->has('rows.data', 20)
             );
     }
 
@@ -183,24 +199,19 @@ class SafeguardingConcernControllerTest extends TestCase
         $this->get('/safeguarding/create')->assertRedirect('/login');
     }
 
-    public function test_safeguarding_create_accessible_by_admin(): void
+    public function test_safeguarding_create_redirects_to_raise_wizard(): void
     {
+        // The full-page create form is retired — raising is a modal wizard on the list.
         $this->actingAs($this->admin)
             ->get('/safeguarding/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/create')
-                ->has('clients')
-                ->has('staff')
-                ->has('sites')
-            );
+            ->assertRedirect('/safeguarding?raise=1');
     }
 
     public function test_safeguarding_create_accessible_by_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/safeguarding/create')
-            ->assertOk();
+            ->assertRedirect();
     }
 
     // ──────────────────────────────────────
@@ -216,7 +227,8 @@ class SafeguardingConcernControllerTest extends TestCase
                 'description' => 'Test safeguarding concern description.',
                 'requires_external_referral' => false,
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHas('created_concern_id');
 
         $this->assertDatabaseHas('safeguarding_concerns', [
             'concern_type' => 'abuse',
@@ -327,7 +339,7 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertOk();
     }
 
-    public function test_safeguarding_show_returns_inertia_page(): void
+    public function test_safeguarding_show_returns_concern_shell(): void
     {
         $concern = SafeguardingConcern::factory()->create();
 
@@ -335,11 +347,24 @@ class SafeguardingConcernControllerTest extends TestCase
             ->get("/safeguarding/{$concern->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/show')
-                ->has('concern')
-                ->has('canUpdate')
-                ->has('canInvestigate')
-                ->has('canReportExternal')
+                ->component('safeguarding/concern')
+                ->where('detail.id', $concern->id)
+                ->where('detail.restricted', false)
+                ->has('detail.can')
+            );
+    }
+
+    public function test_safeguarding_index_serves_detail_over_list(): void
+    {
+        $concern = SafeguardingConcern::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get("/safeguarding?concern={$concern->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('safeguarding/index')
+                ->where('detail.id', $concern->id)
+                ->where('detail.reference_number', $concern->reference_number)
             );
     }
 
@@ -369,20 +394,14 @@ class SafeguardingConcernControllerTest extends TestCase
     // Edit & Update
     // ──────────────────────────────────────
 
-    public function test_safeguarding_edit_accessible_by_admin(): void
+    public function test_safeguarding_edit_redirects_to_concern(): void
     {
+        // The full-page edit form is retired — fields are maintained via the detail modal.
         $concern = SafeguardingConcern::factory()->create();
 
         $this->actingAs($this->admin)
             ->get("/safeguarding/{$concern->id}/edit")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('safeguarding/edit')
-                ->has('concern')
-                ->has('clients')
-                ->has('staff')
-                ->has('sites')
-            );
+            ->assertRedirect("/safeguarding/{$concern->id}");
     }
 
     public function test_safeguarding_update_successful(): void
@@ -454,16 +473,17 @@ class SafeguardingConcernControllerTest extends TestCase
 
     public function test_safeguarding_update_status(): void
     {
-        $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
+        // action_plan -> monitoring is a legal, ungated forward transition.
+        $concern = SafeguardingConcern::factory()->create(['status' => 'action_plan']);
 
         $this->actingAs($this->admin)
             ->patch("/safeguarding/{$concern->id}/status", [
-                'status' => 'investigating',
+                'status' => 'monitoring',
             ])
             ->assertRedirect();
 
         $concern->refresh();
-        $this->assertEquals('investigating', $concern->status);
+        $this->assertEquals('monitoring', $concern->status);
     }
 
     public function test_safeguarding_update_status_validates(): void
@@ -477,19 +497,31 @@ class SafeguardingConcernControllerTest extends TestCase
             ->assertSessionHasErrors(['status']);
     }
 
-    public function test_safeguarding_valid_status_transitions(): void
+    public function test_safeguarding_legal_transitions_are_enforced(): void
     {
-        $validStatuses = ['reported', 'triaged', 'investigating', 'action_plan', 'monitoring', 'closed', 'referred_external'];
-
-        foreach ($validStatuses as $status) {
-            $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
+        // Legal forward transitions succeed.
+        foreach ([
+            ['action_plan', 'monitoring'],
+            ['monitoring', 'action_plan'],
+            ['investigating', 'action_plan'],
+        ] as [$from, $to]) {
+            $concern = SafeguardingConcern::factory()->create(['status' => $from]);
 
             $this->actingAs($this->admin)
-                ->patch("/safeguarding/{$concern->id}/status", [
-                    'status' => $status,
-                ])
+                ->patch("/safeguarding/{$concern->id}/status", ['status' => $to])
                 ->assertRedirect();
+
+            $this->assertEquals($to, $concern->fresh()->status);
         }
+
+        // Illegal: a reported concern can't be advanced by updateStatus (triage first).
+        $reported = SafeguardingConcern::factory()->create(['status' => 'reported']);
+
+        $this->actingAs($this->admin)
+            ->patch("/safeguarding/{$reported->id}/status", ['status' => 'monitoring'])
+            ->assertSessionHasErrors('status');
+
+        $this->assertEquals('reported', $reported->fresh()->status);
     }
 
     // ──────────────────────────────────────

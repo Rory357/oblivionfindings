@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\SafeguardingAttachment;
+use App\Models\SafeguardingConcern;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * Safeguarding redesign — Step 7a (W8). Evidence upload/download/delete.
+ * Sensitive evidence is need-to-know — download is gated by viewSensitive.
+ */
+class SafeguardingAttachmentController extends Controller
+{
+    public function store(Request $request, SafeguardingConcern $concern): RedirectResponse
+    {
+        $this->authorize('update', $concern);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+            'notes' => ['nullable', 'string'],
+            // Read via $request->boolean() below — no strict `boolean` rule so a
+            // multipart "true"/"1"/"on" value isn't rejected.
+            'is_sensitive' => ['nullable'],
+        ]);
+
+        $file = $request->file('file');
+        $disk = 'public';
+        $path = $file->store('safeguarding_attachments', $disk);
+
+        $concern->attachments()->create([
+            'uploaded_by' => $request->user()?->id,
+            'disk' => $disk,
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+            'notes' => $validated['notes'] ?? null,
+            'is_sensitive' => $request->boolean('is_sensitive'),
+        ]);
+
+        return back()->with('success', 'Evidence uploaded.');
+    }
+
+    public function download(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment)
+    {
+        $this->authorize('view', $concern);
+        abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
+
+        // Sensitive evidence is need-to-know.
+        if ($attachment->is_sensitive) {
+            abort_unless((bool) $request->user()?->can('viewSensitive', SafeguardingConcern::class), 403);
+        }
+
+        $disk = $attachment->disk ?: 'public';
+
+        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+    }
+
+    public function destroy(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment): RedirectResponse
+    {
+        $this->authorize('update', $concern);
+        abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
+
+        $disk = $attachment->disk ?: 'public';
+        if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
+            Storage::disk($disk)->delete($attachment->path);
+        }
+        $attachment->delete();
+
+        return back()->with('success', 'Evidence removed.');
+    }
+}

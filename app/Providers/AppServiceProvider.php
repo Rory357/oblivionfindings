@@ -196,6 +196,7 @@ class AppServiceProvider extends ServiceProvider
         ClientIncident::observe(ClientIncidentObserver::class);
         ClientIncident::observe(ProjectsToTimelineObserver::class);
         SafeguardingConcern::observe(SafeguardingConcernObserver::class);
+        \App\Models\SafeguardingInvestigation::observe(\App\Observers\SafeguardingInvestigationObserver::class);
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
         RestraintEvent::observe(RestraintEventObserver::class);

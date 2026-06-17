@@ -105,6 +105,7 @@ export type IncidentDetail = {
     } | null;
     can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean; raiseCorrectiveAction: boolean };
     assignable_staff: Array<{ id: number; name: string }>;
+    safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -826,8 +827,18 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
             {d.hs_event ? (
                 <LinkedRow icon={ShieldAlert} title="Health & Safety event" sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`} href={`/health-safety/events/${d.hs_event.id}`} />
             ) : null}
+            {(d.safeguarding_concerns ?? []).map((c) =>
+                c.can_view ? (
+                    <LinkedRow key={c.id} icon={ShieldAlert} title="Safeguarding concern" sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`} href={`/safeguarding/${c.id}`} />
+                ) : (
+                    <div key={c.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground">
+                        <ShieldAlert className="h-4 w-4 shrink-0" />
+                        <span className="text-sm">Safeguarding concern raised · restricted (need-to-know)</span>
+                    </div>
+                ),
+            )}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
+            {!d.control_room_alert && !d.hs_event && !d.client && !(d.safeguarding_concerns ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
         </div>
     );
 }

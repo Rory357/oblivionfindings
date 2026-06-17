@@ -22,6 +22,7 @@ class SafeguardingConcern extends Model
         'concern_type',
         'abuse_category',
         'severity',
+        'is_sensitive',
         'description',
         'occurred_at',
         'location',
@@ -36,6 +37,11 @@ class SafeguardingConcern extends Model
         'reporter_notes',
         'witnesses',
         'status',
+        'triaged_at',
+        'triaged_by_user_id',
+        'triage_substantiation',
+        'triage_decision',
+        'triage_notes',
         'immediate_actions',
         'subject_informed',
         'subject_informed_at',
@@ -59,11 +65,13 @@ class SafeguardingConcern extends Model
         'witnesses' => 'array',
         'reported_at' => 'datetime',
         'occurred_at' => 'datetime',
+        'triaged_at' => 'datetime',
         'subject_informed_at' => 'datetime',
         'assigned_at' => 'datetime',
         'closed_at' => 'datetime',
         'subject_informed' => 'boolean',
         'requires_external_referral' => 'boolean',
+        'is_sensitive' => 'boolean',
     ];
 
     /**
@@ -143,6 +151,14 @@ class SafeguardingConcern extends Model
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
+
+    /**
+     * User who triaged the concern.
+     */
+    public function triagedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'triaged_by_user_id');
     }
 
     /**
@@ -226,6 +242,14 @@ class SafeguardingConcern extends Model
     }
 
     /**
+     * Evidence attachments (photos/documents).
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SafeguardingAttachment::class);
+    }
+
+    /**
      * Get the latest investigation.
      */
     public function latestInvestigation()
@@ -242,19 +266,26 @@ class SafeguardingConcern extends Model
     }
 
     /**
+     * Terminal statuses — a concern in one of these is no longer "open work".
+     * `no_action_required` is the "No further action" triage outcome (folds in
+     * with closed for list/hero purposes).
+     */
+    public const TERMINAL_STATUSES = ['closed', 'no_action_required'];
+
+    /**
      * Scope: Open concerns.
      */
     public function scopeOpen($query)
     {
-        return $query->whereNotIn('status', ['closed']);
+        return $query->whereNotIn('status', self::TERMINAL_STATUSES);
     }
 
     /**
-     * Scope: Closed concerns.
+     * Scope: Closed concerns (incl. no-further-action).
      */
     public function scopeClosed($query)
     {
-        return $query->where('status', 'closed');
+        return $query->whereIn('status', self::TERMINAL_STATUSES);
     }
 
     /**
@@ -279,7 +310,7 @@ class SafeguardingConcern extends Model
      */
     public function isOpen(): bool
     {
-        return $this->status !== 'closed';
+        return ! in_array($this->status, self::TERMINAL_STATUSES, true);
     }
 
     /**
