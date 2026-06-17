@@ -15,6 +15,7 @@ import {
     LinkIcon,
     ListTodo,
     Paperclip,
+    Pencil,
     Plus,
     RadioTower,
     RotateCcw,
@@ -144,6 +145,7 @@ type LifecycleAction = 'review' | 'close' | 'reopen';
 export function IncidentDetailDialog({ detail, open, onClose }: { detail: IncidentDetail; open: boolean; onClose: () => void }) {
     const [section, setSection] = useState<SectionKey>('overview');
     const [action, setAction] = useState<LifecycleAction | null>(null);
+    const [editing, setEditing] = useState(false);
 
     const d = detail;
     const clientName = d.client ? `${d.client.first_name} ${d.client.last_name}`.trim() : 'No client linked';
@@ -165,13 +167,18 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
     const submit = () => router.post(`/incidents/${d.id}/submit`, {}, { preserveScroll: true });
     const completeFollowup = (fid: number) => router.post(`/incidents/${d.id}/followups/${fid}/complete`, {}, { preserveScroll: true });
 
-    // While a lifecycle action pane is open it owns the body + its own buttons,
+    // While an action / edit pane is open it owns the body + its own buttons,
     // so the Options bar is suppressed.
-    const footerEnd = action ? null : (
+    const footerEnd = action || editing ? null : (
         <div className="flex flex-wrap items-center gap-2">
             <Link href={`/incidents/${d.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
                 <ExternalLink className="h-4 w-4" /> Open full page
             </Link>
+            {d.can.update && d.status === 'draft' ? (
+                <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                    <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                </Button>
+            ) : null}
             {d.can.submit && d.status === 'draft' ? (
                 <Button size="sm" onClick={submit}>
                     <Send className="mr-1.5 h-4 w-4" /> Submit for review
@@ -220,7 +227,9 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {action ? (
+            {editing ? (
+                <EditPane d={d} onDone={() => setEditing(false)} />
+            ) : action ? (
                 <ActionPane incidentId={d.id} action={action} onDone={() => setAction(null)} />
             ) : (
                 <>
@@ -301,6 +310,108 @@ function ActionPane({ incidentId, action, onDone }: { incidentId: number; action
                 </Button>
                 <Button type="submit" disabled={form.processing}>
                     {meta.cta}
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Edit pane (core fields — drafts only)                              */
+/* ------------------------------------------------------------------ */
+
+const INCIDENT_TYPES = [
+    { value: 'injury', label: 'Injury' },
+    { value: 'fall', label: 'Fall' },
+    { value: 'behaviour', label: 'Behaviour' },
+    { value: 'medication', label: 'Medication' },
+    { value: 'safeguarding', label: 'Safeguarding' },
+    { value: 'near_miss', label: 'Near miss' },
+    { value: 'property_damage', label: 'Property damage' },
+    { value: 'missing_person', label: 'Missing person' },
+    { value: 'complaint', label: 'Complaint' },
+    { value: 'other', label: 'Other' },
+];
+const SEVERITY_OPTIONS = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+];
+const POTENTIAL_OPTIONS = [...SEVERITY_OPTIONS, { value: 'critical', label: 'Critical' }];
+
+function toLocalInput(iso: string): string {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return '';
+    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
+    const form = useForm({
+        type: d.type,
+        severity: d.severity,
+        occurred_at: d.occurred_at ? toLocalInput(d.occurred_at) : '',
+        description: d.description ?? '',
+        immediate_action_taken: d.immediate_action_taken ?? '',
+        witnesses: d.witnesses ?? '',
+        potential_severity: d.potential_severity ?? '',
+        potential_consequence: d.potential_consequence ?? '',
+        is_notifiable: d.is_notifiable,
+    });
+    const isNearMiss = form.data.type === 'near_miss';
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.put(`/incidents/${d.id}`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={Pencil} title="Edit incident" blurb="Update the incident details. Drafts only — once submitted, the record is locked for audit." />
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Type" required error={form.errors.type}>
+                    <SelectInput value={form.data.type} onChange={(v) => form.setData('type', v)} placeholder="Select type" options={INCIDENT_TYPES} />
+                </Field>
+                <Field label="Severity" required error={form.errors.severity}>
+                    <SelectInput value={form.data.severity} onChange={(v) => form.setData('severity', v)} placeholder="Select severity" options={SEVERITY_OPTIONS} />
+                </Field>
+            </div>
+            <Field label="When it occurred" error={form.errors.occurred_at}>
+                <Input type="datetime-local" value={form.data.occurred_at} onChange={(e) => form.setData('occurred_at', e.target.value)} />
+            </Field>
+            <Field label="What happened" error={form.errors.description}>
+                <Textarea rows={4} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+            </Field>
+            <Field label="Immediate action taken" error={form.errors.immediate_action_taken}>
+                <Textarea rows={3} value={form.data.immediate_action_taken} onChange={(e) => form.setData('immediate_action_taken', e.target.value)} />
+            </Field>
+            <Field label="Witnesses" error={form.errors.witnesses}>
+                <Input value={form.data.witnesses} onChange={(e) => form.setData('witnesses', e.target.value)} placeholder="Names of any witnesses" />
+            </Field>
+            {isNearMiss ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Potential severity" error={form.errors.potential_severity}>
+                        <SelectInput value={form.data.potential_severity} onChange={(v) => form.setData('potential_severity', v)} placeholder="What could have happened" options={POTENTIAL_OPTIONS} />
+                    </Field>
+                    <Field label="Could have caused" error={form.errors.potential_consequence}>
+                        <Input value={form.data.potential_consequence} onChange={(e) => form.setData('potential_consequence', e.target.value)} />
+                    </Field>
+                </div>
+            ) : null}
+            <label className="flex items-center gap-2 text-sm text-foreground">
+                <input type="checkbox" checked={form.data.is_notifiable} onChange={(e) => form.setData('is_notifiable', e.target.checked)} className="h-4 w-4 rounded border-border" />
+                WorkSafe NZ notifiable event
+            </label>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Save changes
                 </Button>
             </div>
         </form>

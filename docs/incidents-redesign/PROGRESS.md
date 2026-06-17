@@ -63,8 +63,10 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 **4b (in progress):** workflow sub-modals into the dialog. *(Until complete, "Open full page" → existing editable show.tsx, so nothing regresses.)*
 - [x] **Lifecycle action panes** (review / close / reopen) — in-body pane pattern (`action` state swaps the dialog body; Options bar shows status-appropriate buttons). Inertia `useForm` → existing endpoints; guardrail `flash.error` keeps the pane open. tsc clean.
 - [x] **Add-follow-up** inline form in the Follow-ups section (`assignable_staff` + `can.followupsManage`/`portalManage` added to detail payload) + **attachment management** in Photos: upload (draft-only multipart via `forceFormData`), remove (draft-only), portal share/unshare (portalManage). tsc clean + detail tests still green.
-- [ ] Edit pane (core fields) + Flag/Notify-WorkSafe.
-- [ ] Then slim `incidents/show.tsx` (2196 lines) → thin shell rendering `<IncidentDetailDialog>` (add a `show()`-fed detail); retire old body.
+- [x] **Edit pane** (core fields: type / severity / occurred_at / description / immediate-action / witnesses + near-miss potential + WorkSafe-notifiable flag) for **drafts**, via PUT `/incidents/{id}`; `flash.error` keeps the pane open. tsc clean.
+- [ ] **(deferred → Step 7)** slim `incidents/show.tsx` (2196 lines) → thin shell rendering `<IncidentDetailDialog>` + retire old body. **Why deferred:** the only show.tsx capabilities not in the dialog are injury-detail + **investigation/corrective-action editing**, which Step 7 (Option B) migrates to the H&S register — retiring show.tsx is cleanest once that lands. Until then, "Open full page" bridges (no regression).
+
+**Step 4 = modal-first detail is FUNCTIONALLY COMPLETE** (view + lifecycle + follow-ups + attachments + core edit, all over the list). Remaining is the show.tsx refactor above, sequenced into Step 7.
 
 ### ☐ Step 5 — Report wizard (`WizardShell`, §3)
 - [ ] 6 steps + near-miss branch + photo capture + `WizardSuccessPane`; preserve `?incident=` resume + `?shift_id`/`?client_id` prefill. Retire `create.tsx` + `WizardStepper`.
@@ -87,4 +89,5 @@ Branch: `incidents-control-room-redesign`. Started 2026-06-17 via `/loop`.
 - 2026-06-17 — Step 3 list page DONE: `IncidentController@index` payload rebuilt + `incidents/index.tsx` rebuilt on hs-hero-kit + TabStrip + EntityFilter + right-click rows + followups worklist + near-miss insights. tsc clean + 18 feature tests (234 assertions).
 - 2026-06-17 — Step 4a DONE: read-only `IncidentDetailDialog` over the list (controller `detail` payload + 6-section WizardShell modal + row-click wiring), non-regressing (show.tsx kept). tsc clean + 4 detail tests (60 assertions).
 - 2026-06-17 — Step 4b-i: lifecycle action panes (review/close/reopen) added to the dialog (in-body pane, existing endpoints). tsc clean.
-- 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green. Next 4b: edit pane, then slim show.tsx → thin shell.
+- 2026-06-17 — Step 4b-ii: add-follow-up inline form (+ `assignable_staff`/`can` in detail payload) + attachment upload/remove/portal-toggle in the dialog. tsc clean + detail tests green.
+- 2026-06-17 — Step 4b-iii: edit pane (core fields, drafts) added. **Step 4 modal-first detail functionally complete** (view+lifecycle+followups+attachments+edit). show.tsx retirement deferred → Step 7 (investigation migration). Next: Step 5 report wizard.
