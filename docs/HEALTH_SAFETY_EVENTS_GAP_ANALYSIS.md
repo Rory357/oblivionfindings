@@ -19,7 +19,7 @@
 ## B. Backend governance (expose + gate the existing engine — NO new schema)
 - [x] B1 — **`HsEventService::closeEvent()`** + closure gate (E-Gap 1): block unless required investigation completed + no open/unverified corrective actions + `closure_summary`; override w/ logged reason + permission. `HsEventController@close` + route + `hazards.manage`.
 - [x] B2 — **WorkSafe notification** (E-Gap 2): service methods to record notification (→ `notified`: date/method/reference) + acknowledgement (→ `acknowledged`); reuse `NotifiableEventClassifier`; make the `worksafe-register` report actionable.
-- [ ] B3 — **`HsInvestigationController` + routes** (E-Gap 3) exposing `HsInvestigationService` (create/start/recordFindings/submitForReview/returnForRework/complete). Gate `hazards.manage`.
+- [x] B3 — **`HsInvestigationController` + routes** (E-Gap 3) exposing `HsInvestigationService` (create/start/recordFindings/submitForReview/returnForRework/complete). Gate `hazards.manage`.
 - [ ] B4 — **`HsCorrectiveActionController` + routes** (E-Gap 3) exposing `HsCorrectiveActionService` (createFromRecommendation/createStandalone/start/complete/returnForRework/verify/close). Gate `hazards.manage`.
 - [ ] B5 — **Auto-advance on investigation complete** (E-Gap 6): event → `corrective_action` + offer `createFromRecommendation()` for each recommendation.
 
