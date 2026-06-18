@@ -40,17 +40,19 @@ class IncidentController extends Controller
 
     public function index(Request $request)
     {
-        $formOptions = $this->formOptions();
+        $filterKeys = ['vehicle_id', 'driver_id', 'site_id', 'severity', 'incident_type', 'status', 'search', 'date_from', 'date_to', 'tab'];
 
         if (! Schema::hasTable('fleet_incidents')) {
             return Inertia::render('fleet-assets/incidents/index', [
                 'incidents' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
-                'filters' => $request->only(['vehicle_id', 'driver_id', 'site_id', 'severity', 'incident_type', 'status', 'search', 'date_from', 'date_to', 'tab']),
-                'tab' => 'all',
+                'filters' => $request->only($filterKeys),
+                'tab' => $request->input('tab', 'all'),
                 'tabCounts' => [],
                 'stats' => $this->emptyStats(),
-                'formOptions' => $formOptions,
+                'formOptions' => $this->formOptions(),
                 'can' => ['manage' => $this->userCanManage()],
+                'detail' => null,
+                'report' => $request->input('report'),
             ]);
         }
 
@@ -63,8 +65,34 @@ class IncidentController extends Controller
         }
 
         $tab = $request->input('tab', 'all');
+        $incidentParam = $request->filled('incident') ? (int) $request->input('incident') : null;
 
-        $listQuery = (clone $base)
+        // Expensive props are closures so a `detail`-only partial reload (opening the
+        // modal over the list) doesn't recompute the list / stats / counts.
+        return Inertia::render('fleet-assets/incidents/index', [
+            'incidents' => fn () => $this->buildListPayload((clone $base), $tab),
+            'tab' => $tab,
+            'tabCounts' => fn () => $this->tabCounts((clone $base)),
+            'stats' => fn () => $this->stats((clone $base)),
+            'filters' => $request->only($filterKeys),
+            'formOptions' => fn () => $this->formOptions(),
+            'can' => ['manage' => $this->userCanManage()],
+            'detail' => function () use ($incidentParam) {
+                if (! $incidentParam) {
+                    return null;
+                }
+                $found = FleetIncident::find($incidentParam);
+
+                return $found ? $this->buildDetailPayload($found) : null;
+            },
+            'report' => $request->input('report'),
+        ]);
+    }
+
+    /** @return array{data: mixed, links: array, meta: array} */
+    private function buildListPayload($base, string $tab): array
+    {
+        $listQuery = $base
             ->with([
                 'asset:id,name,registration_number,category',
                 'reportedBy:id,name',
@@ -73,13 +101,12 @@ class IncidentController extends Controller
             ->withCount(['attachments', 'followups']);
 
         if (isset(self::TAB_SCOPES[$tab])) {
-            $scope = self::TAB_SCOPES[$tab];
-            $listQuery->{$scope}();
+            $listQuery->{self::TAB_SCOPES[$tab]}();
         }
 
         $paginator = $listQuery->latest('occurred_at')->paginate(25)->withQueryString();
 
-        $incidents = [
+        return [
             'data' => $paginator->getCollection()->map(fn (FleetIncident $i) => $this->rowPayload($i))->values(),
             'links' => $paginator->linkCollection()->toArray(),
             'meta' => [
@@ -88,16 +115,6 @@ class IncidentController extends Controller
                 'total' => $paginator->total(),
             ],
         ];
-
-        return Inertia::render('fleet-assets/incidents/index', [
-            'incidents' => $incidents,
-            'filters' => $request->only(['vehicle_id', 'driver_id', 'site_id', 'severity', 'incident_type', 'status', 'search', 'date_from', 'date_to', 'tab']),
-            'tab' => $tab,
-            'tabCounts' => $this->tabCounts($base),
-            'stats' => $this->stats($base),
-            'formOptions' => $formOptions,
-            'can' => ['manage' => $this->userCanManage()],
-        ]);
     }
 
     public function create(Request $request)
