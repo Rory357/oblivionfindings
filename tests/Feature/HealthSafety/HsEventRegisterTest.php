@@ -79,6 +79,25 @@ class HsEventRegisterTest extends TestCase
             );
     }
 
+    public function test_register_can_filter_by_originating_source(): void
+    {
+        HsEvent::factory()->create(); // default source is a ClientIncident
+        $workOrder = FleetWorkOrder::factory()->create(['priority' => 'high']);
+        $equipmentEvent = HsEvent::query()
+            ->where('source_type', FleetWorkOrder::class)
+            ->where('source_id', $workOrder->id)
+            ->firstOrFail();
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?source=equipment')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('events.data', 1)
+                ->where('events.data.0.id', $equipmentEvent->id)
+                ->where('filters.source', 'equipment')
+            );
+    }
+
     public function test_event_query_param_returns_detail_over_list(): void
     {
         $event = HsEvent::factory()->high()->create();

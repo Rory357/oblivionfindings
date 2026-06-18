@@ -8,6 +8,7 @@ use App\Models\EmergencyDrill;
 use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
+use App\Models\HsInvestigation;
 use App\Models\SiteHazard;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
@@ -224,29 +225,117 @@ class HsAnalyticsService
     /** Ordered desc with running cumulative % for the Pareto line. @return array<int,array<string,mixed>> */
     private function rootCausePareto(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
     {
-        $rows = ClientIncident::query()
-            ->whereBetween('occurred_at', [$from, $to])
-            ->whereNotNull('root_cause_category')
-            ->where('root_cause_category', '!=', '')
-            ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
-            ->selectRaw('root_cause_category as cause, COUNT(*) as count')
-            ->groupBy('root_cause_category')
-            ->orderByDesc('count')
-            ->get();
+        $counts = [];
+        $this->rootCauseInvestigations($siteId, $from, $to)->each(function (HsInvestigation $investigation) use (&$counts) {
+            foreach ($this->investigationRootCauseLabels($investigation) as $cause) {
+                $counts[$cause] = ($counts[$cause] ?? 0) + 1;
+            }
+        });
+        arsort($counts);
 
-        $total = (int) $rows->sum('count') ?: 1;
+        $total = array_sum($counts) ?: 1;
         $running = 0;
 
-        return $rows->map(function ($r) use ($total, &$running) {
-            $running += (int) $r->count;
+        return collect($counts)->map(function (int $count, string $cause) use ($total, &$running) {
+            $running += $count;
 
             return [
-                'cause' => (string) $r->cause,
-                'count' => (int) $r->count,
-                'pct' => round((int) $r->count / $total * 100, 1),
+                'cause' => $cause,
+                'count' => $count,
+                'pct' => round($count / $total * 100, 1),
                 'cumulative_pct' => round($running / $total * 100, 1),
             ];
-        })->all();
+        })->values()->all();
+    }
+
+    private function rootCauseInvestigations(?int $siteId, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return HsInvestigation::query()
+            ->with('hsEvent:id,site_id,occurred_at')
+            ->whereNotNull('root_causes')
+            ->whereHas('hsEvent', fn ($q) => $q
+                ->whereBetween('occurred_at', [$from, $to])
+                ->when($siteId, fn ($eventQuery) => $eventQuery->where('site_id', $siteId)))
+            ->get(['id', 'hs_event_id', 'root_causes']);
+    }
+
+    /** @return array<int,string> */
+    private function investigationRootCauseLabels(HsInvestigation $investigation): array
+    {
+        $labels = [];
+        foreach ($investigation->root_causes ?? [] as $rootCause) {
+            if (! is_array($rootCause)) {
+                continue;
+            }
+
+            $label = trim((string) ($rootCause['category'] ?? ''));
+            if ($label === '') {
+                $label = trim((string) ($rootCause['description'] ?? ''));
+            }
+            if ($label !== '') {
+                $labels[] = $label;
+            }
+        }
+
+        return array_values(array_unique($labels));
+    }
+
+    /** @return array<int,int> */
+    private function incidentIdsForRootCause(?int $siteId, CarbonInterface $from, CarbonInterface $to, string $cause): array
+    {
+        $cause = trim($cause);
+        if ($cause === '') {
+            return [];
+        }
+
+        return HsInvestigation::query()
+            ->with('hsEvent:id,source_type,source_id,site_id,occurred_at')
+            ->whereNotNull('root_causes')
+            ->whereHas('hsEvent', fn ($q) => $q
+                ->where('source_type', ClientIncident::class)
+                ->whereBetween('occurred_at', [$from, $to])
+                ->when($siteId, fn ($eventQuery) => $eventQuery->where('site_id', $siteId)))
+            ->get(['id', 'hs_event_id', 'root_causes'])
+            ->filter(fn (HsInvestigation $investigation) => in_array($cause, $this->investigationRootCauseLabels($investigation), true))
+            ->map(fn (HsInvestigation $investigation) => (int) $investigation->hsEvent?->source_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int,int>  $incidentIds
+     * @return array<int,array<int,string>>
+     */
+    private function rootCauseLabelsByIncidentId(array $incidentIds): array
+    {
+        $incidentIds = array_values(array_unique(array_filter($incidentIds)));
+        if ($incidentIds === []) {
+            return [];
+        }
+
+        $labelsByIncident = [];
+        HsInvestigation::query()
+            ->with('hsEvent:id,source_type,source_id')
+            ->whereNotNull('root_causes')
+            ->whereHas('hsEvent', fn ($q) => $q
+                ->where('source_type', ClientIncident::class)
+                ->whereIn('source_id', $incidentIds))
+            ->get(['id', 'hs_event_id', 'root_causes'])
+            ->each(function (HsInvestigation $investigation) use (&$labelsByIncident) {
+                $incidentId = (int) $investigation->hsEvent?->source_id;
+                if (! $incidentId) {
+                    return;
+                }
+
+                foreach ($this->investigationRootCauseLabels($investigation) as $label) {
+                    $labelsByIncident[$incidentId][] = $label;
+                }
+                $labelsByIncident[$incidentId] = array_values(array_unique($labelsByIncident[$incidentId] ?? []));
+            });
+
+        return $labelsByIncident;
     }
 
     // ── Hazards ─────────────────────────────────────────────────────────
@@ -735,15 +824,20 @@ class HsAnalyticsService
      */
     private function exportIncidents(?int $siteId, CarbonInterface $from, CarbonInterface $to, Collection $siteNames, array $filters = []): array
     {
+        $incidentIdsForCause = ! empty($filters['cause'])
+            ? $this->incidentIdsForRootCause($siteId, $from, $to, (string) $filters['cause'])
+            : null;
+
         $rows = ClientIncident::query()
             ->with('client:id,first_name,last_name,site_id')
             ->whereBetween('occurred_at', [$from, $to])
             ->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)))
             ->when(! empty($filters['type']), fn ($q) => $q->where('type', $filters['type']))
             ->when(! empty($filters['severity']), fn ($q) => $q->where('severity', $filters['severity']))
-            ->when(! empty($filters['cause']), fn ($q) => $q->where('root_cause_category', $filters['cause']))
+            ->when($incidentIdsForCause !== null, fn ($q) => $q->whereIn('id', $incidentIdsForCause ?: [0]))
             ->orderByDesc('occurred_at')
             ->get();
+        $rootCausesByIncident = $this->rootCauseLabelsByIncidentId($rows->pluck('id')->map(fn ($id) => (int) $id)->all());
 
         return [
             'name' => 'incidents',
@@ -756,7 +850,7 @@ class HsAnalyticsService
                 $i->status,
                 $siteNames[$i->client?->site_id] ?? '—',
                 trim(($i->client?->first_name ?? '').' '.($i->client?->last_name ?? '')) ?: '—',
-                $i->root_cause_category ?? '—',
+                implode(', ', $rootCausesByIncident[(int) $i->id] ?? []) ?: '—',
             ])->all(),
         ];
     }

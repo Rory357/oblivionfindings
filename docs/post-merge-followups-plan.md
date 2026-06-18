@@ -38,7 +38,7 @@ were merged to `main` and pushed (auto-deploying to `oblivionfindings.com`).
 
 ## 1. DO FIRST — post-deploy server actions (SSH)
 
-The deploy webhook auto-pulls + builds `main` but **skips seeders**. Two seeders must be run on the server (the agent must NOT enter the SSH password itself — ask Stephan to run these, or run via a non-interactive deploy mechanism):
+The deploy webhook auto-pulls + builds `main` but **skips seeders**. Two seeders must be run on the server (the agent must not enter SSH/server passwords unless Stephan explicitly authorises that exact server action; prefer a non-interactive deploy mechanism when available):
 
 ```bash
 # (1) REQUIRED — grant Coordinators the new rostering.viewAny (else they 403 on /operations/rostering).
@@ -58,7 +58,7 @@ Both demo seeders are idempotent. Base data is already seeded (39 clients, 46 me
 
 ## 2. Verify the deploy (live checklist — `oblivionfindings.com`)
 
-Browser verification on this project is via **Chrome MCP** against an **already-logged-in** session (the agent must NOT type the login password — ask Stephan to log in first). Log in as `admin@demo.test`; for the frontline view use `sw1@demo.test`.
+Browser verification on this project is via **Chrome MCP** against `oblivionfindings.com`. The agent is allowed to type the demo application login password when Stephan provides or confirms it for the live dev app. Use `admin@demo.test` for admin verification; for the frontline view use `sw1@demo.test`.
 
 1. **Rostering Calendar tab:** open `/operations/rostering` → click the **Calendar** tab (or go to `/operations/rostering?tab=calendar`). Confirm the FullCalendar renders, shows shifts, and drag-to-create works. Confirm `/scheduling` redirects here. Confirm the sidebar shows Workforce **"Calendar"** and no System **"Scheduling"**.
 2. **Coordinator access** (after seeder #1): a Coordinator-role user can reach `/operations/rostering` (no 403).
@@ -153,7 +153,7 @@ is committed in the same change.
 - **Routes changed?** run `php artisan wayfinder:generate` (or it runs in `npm run build`). `resources/js/routes/**` + `resources/js/actions/**` are generated (gitignored) — don't hand-edit.
 - **Permissions are seeded, not migrated**, deploys skip seeders → new permission-gated features 403 until the seeder is run `--force`. No super-admin bypass in `canDo()`.
 - **Timezone:** store UTC, convert at `app.worker_timezone` (Pacific/Auckland); `getRawOriginal(col)`→UTC when reading datetimes back for slot matching.
-- **Browser verify:** Herd local (`oblivionfindings.test`, needs Herd Desktop on PHP 8.4; delete `public/hot` if blank) OR Playwright e2e (`$env:PLAYWRIGHT_PORT=NNNN; npx playwright test -c playwright.config.ts <spec> --project=chromium-desktop`) OR Chrome MCP against the deployed site (already-logged-in session only — never enter passwords). `php artisan serve` can't bind a port in the sandbox.
+- **Browser verify:** Herd local (`oblivionfindings.test`, needs Herd Desktop on PHP 8.4; delete `public/hot` if blank) OR Playwright e2e (`$env:PLAYWRIGHT_PORT=NNNN; npx playwright test -c playwright.config.ts <spec> --project=chromium-desktop`) OR Chrome MCP against the deployed site. Demo application login password entry is allowed when Stephan provides or confirms the credential for this live dev app. `php artisan serve` can't bind a port in the sandbox.
 - **Don't** add `catch (\Throwable)` that returns empty without `report($e)`. Hide unbuilt actions rather than shipping stubs. Fix incidental errors found while verifying.
 
 ---
@@ -191,5 +191,5 @@ frontline break-cap tests 44/44 green (51 total); `npm run build` green.
 
 **§1 seeders turned out unnecessary** — `rostering.viewAny` for Coordinators and sw1's demo shift data were
 already present on the server, so the Coordinator-403 and My-Day-rail checks passed without running them. (The
-agent cannot run seeders anyway: no SSH key on the box → password auth, which the agent is barred from entering.)
+agent could not run seeders in that session: no SSH key on the box and no explicit authorisation for SSH password entry.)
 **Net: every item in §2 is green; nothing outstanding.**

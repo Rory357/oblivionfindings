@@ -3,14 +3,22 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientIncident;
+use App\Models\EmergencyDrill;
+use App\Models\FleetIncident;
+use App\Models\FleetWorkOrder;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
+use App\Models\RestraintEvent;
+use App\Models\SafeguardingConcern;
 use App\Models\Site;
+use App\Models\SiteHazard;
 use App\Models\SiteInspectionRecord;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
+use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -54,6 +62,9 @@ class HsEventController extends Controller
         }
         if ($request->filled('category')) {
             $query->where('event_category', $request->input('category'));
+        }
+        if ($sourceType = $this->sourceTypeForFilter($request->input('source'))) {
+            $query->where('source_type', $sourceType);
         }
         if ($request->boolean('worksafe')) {
             $query->where('worksafe_notifiable', true);
@@ -149,6 +160,7 @@ class HsEventController extends Controller
                 'tab' => $tab,
                 'severity' => $request->input('severity'),
                 'category' => $request->input('category'),
+                'source' => $request->input('source'),
                 'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
                 'worksafe' => $request->boolean('worksafe') ?: null,
                 'from' => $request->input('from'),
@@ -194,6 +206,23 @@ class HsEventController extends Controller
             'closed' => $query->where('status', HsEvent::STATUS_CLOSED),
             'worksafe' => $query->where('worksafe_notifiable', true),
             default => $query, // 'all'
+        };
+    }
+
+    private function sourceTypeForFilter(mixed $source): ?string
+    {
+        return match ((string) $source) {
+            'incidents' => ClientIncident::class,
+            'safeguarding' => SafeguardingConcern::class,
+            'fleet' => FleetIncident::class,
+            'injuries' => WorkplaceInjury::class,
+            'exposure' => SubstanceExposureRecord::class,
+            'site_hazards' => SiteHazard::class,
+            'inspection' => SiteInspectionRecord::class,
+            'equipment' => FleetWorkOrder::class,
+            'restraints' => RestraintEvent::class,
+            'drills' => EmergencyDrill::class,
+            default => null,
         };
     }
 

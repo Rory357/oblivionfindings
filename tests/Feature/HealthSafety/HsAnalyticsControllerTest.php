@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -61,6 +63,34 @@ class HsAnalyticsControllerTest extends TestCase
                 ->where('filters.lens', 'manager')
                 ->where('filters.period', 'ytd')
             );
+    }
+
+    public function test_root_cause_analytics_uses_investigation_root_causes(): void
+    {
+        $event = HsEvent::factory()->create([
+            'occurred_at' => now()->subDay(),
+            'reported_at' => now()->subDay(),
+        ]);
+        HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $event->id,
+            'root_causes' => [
+                ['category' => 'Procedural gap', 'description' => 'Handover checklist not followed'],
+            ],
+        ]);
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/analytics')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('root_cause_data.0.cause', 'Procedural gap')
+                ->where('root_cause_data.0.count', 1)
+            );
+
+        $this->actingAs($this->hsOfficer())
+            ->getJson('/health-safety/analytics/records?view=incidents&cause=Procedural%20gap')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('rows.0.7', 'Procedural gap');
     }
 
     public function test_analytics_echoes_period_site_lens_and_scopes_drills(): void
