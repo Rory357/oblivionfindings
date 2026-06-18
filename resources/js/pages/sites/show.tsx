@@ -32,6 +32,7 @@ import { Switch } from '@/components/ui/switch';
 import { TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/fleet-utils';
 import type { ChecklistsData } from '@/components/checklists/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -46,6 +47,7 @@ import {
     Calendar,
     Car,
     ClipboardCheck,
+    ClipboardList,
     Clock,
     Cpu,
     DollarSign,
@@ -559,6 +561,31 @@ type SiteFleetData = {
     }>;
 };
 
+type InspectionsSummary = {
+    active_schedules: number;
+    overdue_schedules: number;
+    due_soon_schedules: number;
+    failed_records: number;
+    schedules: Array<{
+        id: number;
+        inspection_type: string;
+        title: string;
+        frequency: string;
+        next_due_date: string | null;
+        assigned_to_name: string | null;
+        is_overdue: boolean;
+    }>;
+    records: Array<{
+        id: number;
+        schedule_title: string | null;
+        due_date: string | null;
+        completed_at: string | null;
+        completed_by_name: string | null;
+        result: 'pass' | 'fail' | 'partial' | 'na' | null;
+        findings: string | null;
+    }>;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -603,6 +630,7 @@ type Props = {
     can?: { createAsset?: boolean };
     fleet?: SiteFleetData;
     checklistsData?: ChecklistsData;
+    inspectionsSummary?: InspectionsSummary;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -626,6 +654,33 @@ const typeColors = {
     facility:
         'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
+
+const emptyInspectionsSummary: InspectionsSummary = {
+    active_schedules: 0,
+    overdue_schedules: 0,
+    due_soon_schedules: 0,
+    failed_records: 0,
+    schedules: [],
+    records: [],
+};
+
+const inspectionResultStyles: Record<
+    NonNullable<InspectionsSummary['records'][number]['result']>,
+    string
+> = {
+    pass: 'border-status-success/30 bg-status-success-bg text-status-success',
+    fail: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    partial: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    na: 'border-border bg-muted text-muted-foreground',
+};
+
+function inspectionTypeLabel(value: string): string {
+    return value
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
 
 function fallbackTypePlan(site: Site): SiteTypePlanSummary {
     const tabLabel =
@@ -859,6 +914,7 @@ export default function SiteShow({
     can: assetCan,
     fleet,
     checklistsData,
+    inspectionsSummary = emptyInspectionsSummary,
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -1076,6 +1132,17 @@ export default function SiteShow({
             icon: FileText,
         },
         { value: 'calendar', label: 'Calendar', icon: Calendar },
+        {
+            value: 'inspections',
+            label: 'Inspections',
+            icon: ClipboardList,
+            badge:
+                inspectionsSummary.overdue_schedules > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {inspectionsSummary.overdue_schedules}
+                    </Badge>
+                ) : undefined,
+        },
         { value: 'checklists', label: 'Checklists', icon: ClipboardCheck },
         { value: 'hazards', label: 'Hazards', icon: ShieldAlert },
         {
@@ -1871,6 +1938,173 @@ export default function SiteShow({
                                 canApprove={!!canGlobal?.calendar?.approve}
                             />
                         </Suspense>
+                    </TabsContent>
+
+                    {/* Inspections Tab */}
+                    <TabsContent value="inspections" className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Active
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold">
+                                        {inspectionsSummary.active_schedules}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Overdue
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold text-status-critical">
+                                        {inspectionsSummary.overdue_schedules}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Due soon
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold text-status-warning">
+                                        {inspectionsSummary.due_soon_schedules}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Failed results
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold">
+                                        {inspectionsSummary.failed_records}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="grid gap-4 xl:grid-cols-2">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                                    <CardTitle>Inspection Schedules</CardTitle>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link href={`/sites/${site.id}/inspections`}>
+                                                Open
+                                            </Link>
+                                        </Button>
+                                        {can_edit && (
+                                            <Button asChild size="sm">
+                                                <Link href={`/sites/${site.id}/inspections`}>
+                                                    Schedule
+                                                </Link>
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {inspectionsSummary.schedules.length === 0 ? (
+                                        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                            No active inspection schedules.
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y rounded-md border">
+                                            {inspectionsSummary.schedules.map((schedule) => (
+                                                <div
+                                                    key={schedule.id}
+                                                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-medium">
+                                                                {schedule.title}
+                                                            </p>
+                                                            {schedule.is_overdue && (
+                                                                <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                                    Overdue
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            {inspectionTypeLabel(schedule.inspection_type)}
+                                                            {' · '}
+                                                            {schedule.frequency}
+                                                        </p>
+                                                        {schedule.assigned_to_name && (
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {schedule.assigned_to_name}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm font-medium">
+                                                        {formatDate(schedule.next_due_date)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                                    <CardTitle>Recent Results</CardTitle>
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={`/sites/${site.id}/inspections`}>
+                                            Record
+                                        </Link>
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    {inspectionsSummary.records.length === 0 ? (
+                                        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                            No inspection records yet.
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y rounded-md border">
+                                            {inspectionsSummary.records.map((record) => (
+                                                <div
+                                                    key={record.id}
+                                                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-medium">
+                                                                {record.schedule_title ?? 'Inspection'}
+                                                            </p>
+                                                            {record.result && (
+                                                                <Badge
+                                                                    className={
+                                                                        inspectionResultStyles[record.result]
+                                                                    }
+                                                                >
+                                                                    {record.result.toUpperCase()}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        {record.findings && (
+                                                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                                {record.findings}
+                                                            </p>
+                                                        )}
+                                                        {record.completed_by_name && (
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {record.completed_by_name}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm font-medium">
+                                                        {formatDate(record.completed_at ?? record.due_date)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
                     </TabsContent>
 
                     {/* Checklists Tab */}

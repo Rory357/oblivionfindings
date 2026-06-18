@@ -51,7 +51,10 @@ test('global inspections page loads for users with checklists.view', function ()
 });
 
 test('global inspections page is forbidden without checklists.view', function () {
-    $user = siteNavUser('support_worker');
+    $user = User::factory()->create([
+        'role' => 'viewer',
+        'approved_at' => now(),
+    ]);
 
     $this->actingAs($user)
         ->get('/sites/inspections')

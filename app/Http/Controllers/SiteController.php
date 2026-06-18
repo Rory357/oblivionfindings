@@ -27,6 +27,8 @@ use App\Models\SiteDocumentFolder;
 use App\Models\SiteFacilityZone;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
+use App\Models\SiteInspectionRecord;
+use App\Models\SiteInspectionSchedule;
 use App\Models\SiteStaffRequirement;
 use App\Models\SiteVendor;
 use App\Models\User;
@@ -403,6 +405,7 @@ class SiteController extends Controller
         // Eager because checklist run actions redirect back() to this page, and
         // the embedded workspace must refresh without optional-prop gaps.
         $checklistsData = (new ChecklistsDashboardData($request))->forSite($site);
+        $inspectionsSummary = $this->buildInspectionsSummary($site);
 
         return inertia('sites/show', [
             'site' => [
@@ -694,6 +697,7 @@ class SiteController extends Controller
             'checklistsData' => $checklistsData,
             'runDetail' => $checklistsData['runDetail'],
             'templateDetail' => $checklistsData['templateDetail'],
+            'inspectionsSummary' => $inspectionsSummary,
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
@@ -716,6 +720,68 @@ class SiteController extends Controller
                 'assigned_asset_ids' => $g->assignedAssets->pluck('id')->values(),
             ])->values(),
         ]);
+    }
+
+    private function buildInspectionsSummary(Site $site): array
+    {
+        $today = now()->toDateString();
+        $nextWeek = now()->addDays(7)->toDateString();
+
+        $activeSchedules = SiteInspectionSchedule::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true);
+
+        $schedules = (clone $activeSchedules)
+            ->with('assignedTo:id,name')
+            ->orderBy('next_due_date')
+            ->limit(5)
+            ->get()
+            ->map(fn (SiteInspectionSchedule $schedule) => [
+                'id' => $schedule->id,
+                'inspection_type' => $schedule->inspection_type,
+                'title' => $schedule->title,
+                'frequency' => $schedule->frequency,
+                'next_due_date' => $schedule->next_due_date?->toDateString(),
+                'assigned_to_name' => $schedule->assignedTo?->name,
+                'is_overdue' => $schedule->next_due_date
+                    ? $schedule->next_due_date->toDateString() < $today
+                    : false,
+            ])
+            ->values();
+
+        $records = SiteInspectionRecord::query()
+            ->where('site_id', $site->id)
+            ->with(['schedule:id,title', 'completedBy:id,name'])
+            ->orderByDesc('completed_at')
+            ->orderByDesc('due_date')
+            ->limit(5)
+            ->get()
+            ->map(fn (SiteInspectionRecord $record) => [
+                'id' => $record->id,
+                'schedule_title' => $record->schedule?->title,
+                'due_date' => $record->due_date?->toDateString(),
+                'completed_at' => $record->completed_at?->toDateTimeString(),
+                'completed_by_name' => $record->completedBy?->name,
+                'result' => $record->result,
+                'findings' => $record->findings,
+            ])
+            ->values();
+
+        return [
+            'active_schedules' => (int) (clone $activeSchedules)->count(),
+            'overdue_schedules' => (int) (clone $activeSchedules)
+                ->whereDate('next_due_date', '<', $today)
+                ->count(),
+            'due_soon_schedules' => (int) (clone $activeSchedules)
+                ->whereBetween('next_due_date', [$today, $nextWeek])
+                ->count(),
+            'failed_records' => (int) SiteInspectionRecord::query()
+                ->where('site_id', $site->id)
+                ->where('result', 'fail')
+                ->count(),
+            'schedules' => $schedules,
+            'records' => $records,
+        ];
     }
 
     public function updateContactInfo(Request $request, Site $site)

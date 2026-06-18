@@ -11,6 +11,8 @@ use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
+use App\Models\SiteInspectionRecord;
+use App\Models\SiteInspectionSchedule;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -391,6 +393,65 @@ class SiteControllerTest extends TestCase
                 ->has('runDetail')
                 ->has('templateDetail')
                 ->missing('checklistsSummary')
+            );
+    }
+
+    public function test_site_show_exposes_inspections_summary_for_profile_tab(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $overdueSchedule = SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'inspection_type' => 'house_safety',
+            'title' => 'House safety inspection',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->subMonth()->toDateString(),
+            'next_due_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+        $dueSoonSchedule = SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'inspection_type' => 'fire_safety',
+            'title' => 'Fire safety inspection',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->toDateString(),
+            'next_due_date' => now()->addDays(3)->toDateString(),
+            'is_active' => true,
+        ]);
+
+        SiteInspectionRecord::create([
+            'schedule_id' => $overdueSchedule->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'due_date' => now()->subDay()->toDateString(),
+            'completed_at' => now(),
+            'completed_by_user_id' => $this->admin->id,
+            'result' => 'fail',
+            'findings' => 'Exit lighting failed.',
+        ]);
+        SiteInspectionRecord::create([
+            'schedule_id' => $dueSoonSchedule->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'due_date' => now()->toDateString(),
+            'completed_at' => now()->subHour(),
+            'completed_by_user_id' => $this->admin->id,
+            'result' => 'pass',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('inspectionsSummary.active_schedules', 2)
+                ->where('inspectionsSummary.overdue_schedules', 1)
+                ->where('inspectionsSummary.due_soon_schedules', 1)
+                ->where('inspectionsSummary.failed_records', 1)
+                ->has('inspectionsSummary.schedules', 2)
+                ->has('inspectionsSummary.records', 2)
+                ->where('inspectionsSummary.records.0.result', 'fail')
+                ->where('inspectionsSummary.records.0.findings', 'Exit lighting failed.')
             );
     }
 
