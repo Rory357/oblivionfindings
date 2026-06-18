@@ -169,9 +169,9 @@ class IncidentController extends Controller
             ]);
         }
 
-        return redirect()
-            ->route('fleet-assets.incidents.index')
-            ->with('success', 'Incident '.$incident->reference().' reported.');
+        return back()
+            ->with('success', 'Incident '.$incident->reference().' reported.')
+            ->with('created_fleet_incident_id', $incident->id);
     }
 
     public function show(Request $request, FleetIncident $incident)

@@ -233,6 +233,9 @@ class HandleInertiaRequests extends Middleware
                 // The Safeguarding raise wizard reads this so its success pane can
                 // open the newly-raised concern.
                 'created_concern_id' => session('created_concern_id'),
+                // The Fleet incident report wizard reads this so its success pane
+                // can open the newly-reported incident.
+                'created_fleet_incident_id' => session('created_fleet_incident_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
