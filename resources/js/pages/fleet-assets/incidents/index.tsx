@@ -481,7 +481,7 @@ export default function FleetIncidentsIndex({
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
-            {detail ? <FleetIncidentDialog detail={detail} open onClose={closeDetail} canManage={can.manage} onChanged={() => openDetail(detail.id)} /> : null}
+            {detail ? <FleetIncidentDialog detail={detail} open onClose={closeDetail} users={formOptions.users} /> : null}
 
             {reportMode ? (
                 <FleetIncidentReportDialog
