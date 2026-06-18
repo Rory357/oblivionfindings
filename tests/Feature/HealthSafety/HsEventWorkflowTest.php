@@ -142,6 +142,40 @@ class HsEventWorkflowTest extends TestCase
         $this->assertEquals(HsEvent::STATUS_MONITORING, $event->fresh()->status);
     }
 
+    public function test_seed_corrective_action_from_recommendation(): void
+    {
+        $officer = $this->hsOfficer();
+        $lead = User::factory()->create();
+        $event = HsEvent::factory()->high()->create();
+
+        // Build a completed investigation with one recommendation.
+        $this->actingAs($officer)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/investigations", ['methodology' => '5_whys', 'lead_investigator_id' => $lead->id]);
+        $inv = HsInvestigation::where('hs_event_id', $event->id)->firstOrFail();
+        $this->actingAs($officer)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/findings", [
+                'root_causes' => [['description' => 'Missing rail']],
+                'recommendations' => [['description' => 'Install a grab rail', 'priority' => 'high']],
+            ]);
+        $this->actingAs($officer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/submit");
+        $this->actingAs($officer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete");
+
+        // Seed an action from recommendation 0.
+        $this->actingAs($officer)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", ['recommendation_index' => 0])
+            ->assertSessionHas('success');
+
+        $action = HsCorrectiveAction::where('hs_investigation_id', $inv->id)->where('recommendation_index', 0)->first();
+        $this->assertNotNull($action);
+        $this->assertEquals('Install a grab rail', $action->title);
+
+        // Re-seeding the same recommendation is blocked.
+        $this->actingAs($officer)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", ['recommendation_index' => 0])
+            ->assertSessionHas('error');
+        $this->assertEquals(1, HsCorrectiveAction::where('hs_investigation_id', $inv->id)->count());
+    }
+
     public function test_workflow_routes_require_hazards_manage(): void
     {
         $event = HsEvent::factory()->create();

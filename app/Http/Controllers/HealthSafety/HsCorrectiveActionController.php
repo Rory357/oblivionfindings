@@ -5,6 +5,7 @@ namespace App\Http\Controllers\HealthSafety;
 use App\Http\Controllers\Controller;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -48,6 +49,22 @@ class HsCorrectiveActionController extends Controller
         }
 
         return back()->with('success', 'Corrective action added.');
+    }
+
+    /** Seed a corrective action from an investigation recommendation (E-Gap 6). */
+    public function seedFromRecommendation(Request $request, HsEvent $event, HsInvestigation $investigation)
+    {
+        abort_unless($investigation->hs_event_id === $event->id, 404);
+
+        $data = $request->validate(['recommendation_index' => ['required', 'integer', 'min:0']]);
+
+        try {
+            $this->service->createFromRecommendation($investigation, $data['recommendation_index']);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Corrective action created from recommendation.');
     }
 
     /** Start (open → in_progress), optionally (re)assigning the owner. */

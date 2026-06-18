@@ -377,6 +377,8 @@ class HsEventController extends Controller
                 'verified_at' => $a->verified_at?->toIso8601String(),
                 'verified_by_name' => $a->verifiedBy?->name,
                 'effectiveness_confirmed' => $a->effectiveness_confirmed,
+                'hs_investigation_id' => $a->hs_investigation_id,
+                'recommendation_index' => $a->recommendation_index,
             ]);
 
         $riskAssessments = $hsEvent->riskAssessments()

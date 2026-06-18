@@ -21,7 +21,7 @@
 - [x] B2 — **WorkSafe notification** (E-Gap 2): service methods to record notification (→ `notified`: date/method/reference) + acknowledgement (→ `acknowledged`); reuse `NotifiableEventClassifier`; make the `worksafe-register` report actionable.
 - [x] B3 — **`HsInvestigationController` + routes** (E-Gap 3) exposing `HsInvestigationService` (create/start/recordFindings/submitForReview/returnForRework/complete). Gate `hazards.manage`.
 - [x] B4 — **`HsCorrectiveActionController` + routes** (E-Gap 3) exposing `HsCorrectiveActionService` (createFromRecommendation/createStandalone/start/complete/returnForRework/verify/close). Gate `hazards.manage`.
-- [ ] B5 — **Auto-advance on investigation complete** (E-Gap 6): event → `corrective_action` + offer `createFromRecommendation()` for each recommendation.
+- [x] B5 — **Auto-advance on investigation complete** (E-Gap 6): event → `corrective_action` + offer `createFromRecommendation()` for each recommendation.
 
 ## C. List (`/health-safety/events`) — hero, tabs, rows
 - [x] C1 — Replace `PageHero` with **`hs-hero-kit`** treatment; governance clusters (Live / Needs attention incl. **Investigation overdue**, **Actions awaiting verification**, **WorkSafe notify due**); no compliance badges.

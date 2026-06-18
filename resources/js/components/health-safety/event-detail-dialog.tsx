@@ -96,6 +96,8 @@ export type EventCorrectiveAction = {
     verified_at: string | null;
     verified_by_name?: string | null;
     effectiveness_confirmed: boolean | null;
+    hs_investigation_id: number | null;
+    recommendation_index: number | null;
 };
 
 export type EventRiskAssessment = {
@@ -1406,12 +1408,32 @@ function InvestigationSection({ d, canAct, onPane }: { d: EventDetail; canAct: b
                                         Recommendations ({inv.recommendation_count})
                                     </p>
                                     <ul className="mt-1 space-y-1">
-                                        {inv.recommendations.map((r, i) => (
-                                            <li key={i} className="flex items-start gap-2 text-sm">
-                                                {r.priority ? <span className={`mt-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY[r.priority] ?? PRIORITY.medium}`}>{titleCase(r.priority)}</span> : null}
-                                                <span className="text-foreground">{r.description}</span>
-                                            </li>
-                                        ))}
+                                        {inv.recommendations.map((r, i) => {
+                                            const seeded = d.corrective_actions.some((a) => a.hs_investigation_id === inv.id && a.recommendation_index === i);
+                                            return (
+                                                <li key={i} className="flex items-start gap-2 text-sm">
+                                                    {r.priority ? <span className={`mt-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY[r.priority] ?? PRIORITY.medium}`}>{titleCase(r.priority)}</span> : null}
+                                                    <span className="flex-1 text-foreground">{r.description}</span>
+                                                    {canAct && inv.status === 'completed' ? (
+                                                        seeded ? (
+                                                            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-status-success" title="A corrective action has been raised from this recommendation">
+                                                                <CheckCircle2 className="h-3 w-3" /> Action raised
+                                                            </span>
+                                                        ) : (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="shrink-0"
+                                                                onClick={() => router.post(`/health-safety/events/${d.id}/investigations/${inv.id}/seed-action`, { recommendation_index: i }, { preserveScroll: true })}
+                                                            >
+                                                                <Plus className="mr-1 h-3 w-3" /> Seed action
+                                                            </Button>
+                                                        )
+                                                    ) : null}
+                                                </li>
+                                            );
+                                        })}
                                     </ul>
                                 </div>
                             ) : null}
