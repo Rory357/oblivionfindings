@@ -8,12 +8,15 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\Site;
+use App\Services\HealthSafety\HsEventService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class HsEventController extends Controller
 {
+    public function __construct(private readonly HsEventService $events) {}
+
     /**
      * H&S Events register — the governance convergence view.
      *
@@ -209,6 +212,32 @@ class HsEventController extends Controller
     }
 
     /**
+     * Close an event through the governance gate (E-Gap 1). A blocked closure
+     * (incomplete required investigation / unverified actions) requires a logged
+     * override reason; a closure summary is always required.
+     */
+    public function close(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'closure_summary' => ['required', 'string', 'max:2000'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->events->closeEvent(
+                $hsEvent,
+                $data['closure_summary'],
+                $request->user(),
+                $data['override_reason'] ?? null,
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Event closed.');
+    }
+
+    /**
      * The full governance detail payload — the contract behind the HsEventDialog
      * (mirrored by `EventDetail` in event-detail-dialog.tsx). Shared by index()
      * (over-the-list modal on ?event=) and show() (deep-link shell).
@@ -339,6 +368,11 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions,
             'risk_assessments' => $riskAssessments,
             'attachments' => [],   // evidence gallery wired in a later step
+            'close_gate' => [
+                'investigation_ok' => ! $hsEvent->investigation_required || $hsEvent->hasCompletedInvestigation(),
+                'actions_ok' => ! $hsEvent->hasOpenCorrectiveActions(),
+                'blockers' => $this->events->closeBlockers($hsEvent),
+            ],
             'can' => ['manage' => (bool) (auth()->user()?->can('hazards.manage') ?? false)],
         ];
     }

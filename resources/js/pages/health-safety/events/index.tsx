@@ -27,6 +27,7 @@ import {
 import {
     EventDetailDialog,
     EVENT_CATEGORY_LABELS,
+    type EventActionKey,
     type EventDetail,
     type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
@@ -184,9 +185,10 @@ const daysAgoStr = (n: number) => {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, sites, detail }: Props) {
+export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, sites, detail, can }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [pendingSection, setPendingSection] = useState<EventSectionKey>('overview');
+    const [pendingAction, setPendingAction] = useState<EventActionKey | null>(null);
 
     const go = (next: Partial<Filters>) =>
         router.get('/health-safety/events', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -195,8 +197,9 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
 
     // Detail-over-list: fetch only the `detail` prop and open the dialog without
     // navigating away; closing drops the param so `detail` comes back null.
-    const openEvent = (id: number, opts?: { section?: EventSectionKey }) => {
+    const openEvent = (id: number, opts?: { section?: EventSectionKey; action?: EventActionKey }) => {
         setPendingSection(opts?.section ?? 'overview');
+        setPendingAction(opts?.action ?? null);
         router.get('/health-safety/events', { ...filters, event: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
     };
     const closeDetail = () =>
@@ -261,6 +264,9 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
         ];
         if (ev.worksafe_notifiable) {
             items.push({ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'WorkSafe', sub: titleCase(ev.worksafe_status ?? 'pending'), onClick: () => openEvent(ev.id, { section: 'overview' }) });
+        }
+        if (can.manage && ev.status !== 'closed') {
+            items.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close event', tone: 'critical', onClick: () => openEvent(ev.id, { action: 'close' }) });
         }
         items.push({ sep: true }, { icon: <Link2 className="h-3.5 w-3.5" />, label: 'Open full page', onClick: () => router.visit(`/health-safety/events/${ev.id}`) });
 
@@ -389,7 +395,7 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
             {detail ? (
-                <EventDetailDialog key={detail.id} detail={detail} open onClose={closeDetail} initialSection={pendingSection} />
+                <EventDetailDialog key={detail.id} detail={detail} open onClose={closeDetail} initialSection={pendingSection} initialAction={pendingAction} />
             ) : null}
         </AppLayout>
     );

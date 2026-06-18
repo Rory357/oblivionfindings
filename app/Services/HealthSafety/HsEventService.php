@@ -3,6 +3,7 @@
 namespace App\Services\HealthSafety;
 
 use App\Models\HsEvent;
+use App\Models\User;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -160,6 +161,80 @@ class HsEventService
         }
 
         $hsEvent->updateQuietly(['control_room_alert_id' => $alertId]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Governance — gated closure (E-Gap 1)                                */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The unmet closure gates for an event (empty array = clean to close).
+     *
+     * An event cannot be closed while a required investigation is incomplete or
+     * any corrective action is still open/unverified — unless overridden with a
+     * logged reason.
+     *
+     * @return list<string>
+     */
+    public function closeBlockers(HsEvent $event): array
+    {
+        $blockers = [];
+
+        if ($event->investigation_required && ! $event->hasCompletedInvestigation()) {
+            $blockers[] = 'A completed investigation is required before this event can be closed.';
+        }
+
+        if ($event->hasOpenCorrectiveActions()) {
+            $blockers[] = 'All corrective actions must be verified or closed before this event can be closed.';
+        }
+
+        return $blockers;
+    }
+
+    /**
+     * Close an event through the governance gate.
+     *
+     * Blocks unless every gate in {@see closeBlockers()} is met, except when an
+     * `$overrideReason` is supplied (logged for the audit trail). A closure
+     * summary is always required.
+     *
+     * @throws \DomainException when the gate blocks and no override reason is given
+     */
+    public function closeEvent(HsEvent $event, string $summary, User $actor, ?string $overrideReason = null): HsEvent
+    {
+        if ($event->status === HsEvent::STATUS_CLOSED) {
+            throw new \DomainException('This event is already closed.');
+        }
+
+        $summary = trim($summary);
+        if ($summary === '') {
+            throw new \DomainException('A closure summary is required.');
+        }
+
+        $blockers = $this->closeBlockers($event);
+        $override = $overrideReason !== null && trim($overrideReason) !== '';
+
+        if ($blockers !== [] && ! $override) {
+            throw new \DomainException(implode(' ', $blockers));
+        }
+
+        $event->update([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $actor->id,
+            'closure_summary' => $summary,
+        ]);
+
+        Log::info('HsEventService: event closed', [
+            'hs_event_id' => $event->id,
+            'reference' => $event->reference_number,
+            'actor' => $actor->id,
+            'overridden' => $override,
+            'override_reason' => $override ? trim((string) $overrideReason) : null,
+            'blockers_at_close' => $blockers,
+        ]);
+
+        return $event;
     }
 
     /* ------------------------------------------------------------------ */

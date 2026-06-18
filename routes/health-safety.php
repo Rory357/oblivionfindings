@@ -41,6 +41,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/risk-assessments', [HsEventController::class, 'riskAssessments'])->name('risk-assessments.index');
     });
 
+    // ── Events governance write actions (gated) ──
+    Route::middleware('permission:hazards.manage')->group(function () {
+        Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
+    });
+
     // ── PR6: Governance & Compliance Reports ──
     Route::middleware('permission:governance.view')->prefix('reports')->name('reports.')->group(function () {
         Route::get('/board-summary', [HsGovernanceReportController::class, 'boardSummary'])->name('board-summary');

@@ -15,12 +15,14 @@
  * Write actions (close / WorkSafe / investigation / corrective actions) are added
  * to the Options bar as their backend lands — an action appears only when it can
  * actually run (no stubs). */
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
-import { InfoCard } from '@/components/wizard/primitives';
+import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { formatDateTime } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -40,7 +42,7 @@ import {
     User as UserIcon,
     type LucideIcon,
 } from 'lucide-react';
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Contract — mirrors HsEventController::buildEventDetail()            */
@@ -159,10 +161,13 @@ export type EventDetail = {
     corrective_actions: EventCorrectiveAction[];
     risk_assessments: EventRiskAssessment[];
     attachments: EventAttachment[];
+    close_gate: { investigation_ok: boolean; actions_ok: boolean; blockers: string[] };
     can: { manage: boolean };
 };
 
 export type EventSectionKey = 'overview' | 'investigation' | 'actions' | 'risk' | 'timeline' | 'evidence';
+/** Workflow action panes that replace the body + own their buttons. Grows as backend lands. */
+export type EventActionKey = 'close';
 
 /* ------------------------------------------------------------------ */
 /*  Token maps (semantic only)                                         */
@@ -244,16 +249,19 @@ export function EventDetailDialog({
     open,
     onClose,
     initialSection = 'overview',
+    initialAction = null,
     openedFrom = null,
 }: {
     detail: EventDetail;
     open: boolean;
     onClose: () => void;
     initialSection?: EventSectionKey;
+    initialAction?: EventActionKey | null;
     /** Set when arrived via a source module's "Open in Health & Safety" jump. */
     openedFrom?: string | null;
 }) {
     const [section, setSection] = useState<EventSectionKey>(initialSection);
+    const [action, setAction] = useState<EventActionKey | null>(initialAction);
     const d = detail;
 
     const cat = EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
@@ -289,16 +297,31 @@ export function EventDetailDialog({
         </div>
     );
 
-    // Options bar — read-only for now: deep-link to the full page. Write actions
-    // (close / WorkSafe / investigation / corrective actions) are added here as
-    // their backend lands so an action only ever shows when it can run.
-    const footerEnd = (
-        <Link
-            href={`/health-safety/events/${d.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
-        >
-            <ExternalLink className="h-4 w-4" /> Open full page
-        </Link>
+    const canClose = d.can.manage && d.status !== 'closed';
+    const blockers = d.close_gate?.blockers ?? [];
+
+    // Options bar — suppressed while an action pane owns the body + its own buttons.
+    // Write actions appear only when they can run (no stubs); more land per backend step.
+    const footerEnd = action ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+            <Link
+                href={`/health-safety/events/${d.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+                <ExternalLink className="h-4 w-4" /> Open full page
+            </Link>
+            {canClose ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAction('close')}
+                    title={blockers.length ? `Closure blocked: ${blockers.join(' ')}` : undefined}
+                    className={blockers.length ? 'border-status-critical/40 text-status-critical hover:text-status-critical' : ''}
+                >
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close event
+                </Button>
+            ) : null}
+        </div>
     );
 
     return (
@@ -317,21 +340,113 @@ export function EventDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {openedFrom ? (
-                <div className="mb-4">
-                    <InfoCard icon={LinkIcon} tone="info">
-                        Opened from {openedFrom}. This is the Health &amp; Safety governance record — investigation, corrective actions and closure are managed here.
-                    </InfoCard>
-                </div>
+            {action === 'close' ? (
+                <CloseEventPane d={d} onDone={() => setAction(null)} />
+            ) : (
+                <>
+                    {openedFrom ? (
+                        <div className="mb-4">
+                            <InfoCard icon={LinkIcon} tone="info">
+                                Opened from {openedFrom}. This is the Health &amp; Safety governance record — investigation, corrective actions and closure are managed here.
+                            </InfoCard>
+                        </div>
+                    ) : null}
+
+                    {section === 'overview' ? <OverviewSection d={d} cat={cat} stage={stage} /> : null}
+                    {section === 'investigation' ? <InvestigationSection d={d} /> : null}
+                    {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} /> : null}
+                    {section === 'risk' ? <RiskSection d={d} /> : null}
+                    {section === 'timeline' ? <TimelineSection d={d} /> : null}
+                    {section === 'evidence' ? <EvidenceSection d={d} /> : null}
+                </>
+            )}
+        </WizardShell>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Workflow action panes                                              */
+/* ------------------------------------------------------------------ */
+
+function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+    const gate = d.close_gate;
+    const blocked = (gate?.blockers.length ?? 0) > 0;
+    const form = useForm<{ closure_summary: string; override_reason: string }>({ closure_summary: '', override_reason: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        // A blocked closure comes back on a 302 as flash.error (not 422) — keep the
+        // pane open so the user can record an override reason.
+        form.post(`/health-safety/events/${d.id}/close`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={CheckCircle2}
+                title="Close event"
+                blurb="A required investigation must be complete and every corrective action verified — or close with a logged override. A closure summary is always required."
+            />
+
+            {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">
+                <GateRow ok={gate?.investigation_ok ?? true} label="Required investigation complete" />
+                <GateRow ok={gate?.actions_ok ?? true} label="All corrective actions verified or closed" />
+            </div>
+
+            {blocked ? (
+                <InfoCard icon={AlertTriangle} tone="crit">
+                    This event does not meet the closure gate yet. You can still close it by recording an override reason — the override is logged for the audit trail.
+                </InfoCard>
             ) : null}
 
-            {section === 'overview' ? <OverviewSection d={d} cat={cat} stage={stage} /> : null}
-            {section === 'investigation' ? <InvestigationSection d={d} /> : null}
-            {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} /> : null}
-            {section === 'risk' ? <RiskSection d={d} /> : null}
-            {section === 'timeline' ? <TimelineSection d={d} /> : null}
-            {section === 'evidence' ? <EvidenceSection d={d} /> : null}
-        </WizardShell>
+            <Field label="Closure summary" required error={form.errors.closure_summary}>
+                <Textarea
+                    rows={4}
+                    value={form.data.closure_summary}
+                    onChange={(e) => form.setData('closure_summary', e.target.value)}
+                    placeholder="How was this event resolved? What did the investigation and corrective actions conclude?"
+                />
+            </Field>
+
+            {blocked ? (
+                <Field label="Override reason" required hint="Logged" error={form.errors.override_reason}>
+                    <Textarea
+                        rows={3}
+                        value={form.data.override_reason}
+                        onChange={(e) => form.setData('override_reason', e.target.value)}
+                        placeholder="Why is this event being closed despite the open gate?"
+                    />
+                </Field>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Close event
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function GateRow({ ok, label }: { ok: boolean; label: string }) {
+    return (
+        <div className="flex items-center gap-2 text-sm">
+            {ok ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
+            ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
+            )}
+            <span className={ok ? 'text-foreground' : 'text-status-critical'}>{label}</span>
+        </div>
     );
 }
 
