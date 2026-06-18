@@ -75,12 +75,7 @@ class HsEventController extends Controller
             'worksafe_notifiable' => (bool) $e->worksafe_notifiable,
             'worksafe_status' => $e->worksafe_status,
             'investigation_required' => (bool) $e->investigation_required,
-            'source' => $e->source_id ? [
-                'type' => class_basename($e->source_type),
-                'id' => $e->source_id,
-                'label' => class_basename($e->source_type) . ' #' . $e->source_id,
-                'unwired' => false,
-            ] : null,
+            'source' => $this->resolveSource($e->source_type, $e->source_id),
             'flags' => [
                 'investigation_overdue' => $e->overdue_investigations_count > 0,
                 'awaiting_verification' => (int) $e->awaiting_verification_count,
@@ -285,6 +280,40 @@ class HsEventController extends Controller
     }
 
     /**
+     * Two-way convergence (E-Gap 4): resolve a polymorphic source to a label + a
+     * jump back to the originating record. Categories with no source (the orphan
+     * categories) return null. Modules without a per-record route resolve to a
+     * label only (no jump) rather than a broken link.
+     */
+    private function resolveSource(?string $sourceType, ?int $sourceId): ?array
+    {
+        if (! $sourceType || ! $sourceId) {
+            return null;
+        }
+
+        $basename = class_basename($sourceType);
+
+        [$label, $url] = match ($basename) {
+            'ClientIncident' => ['Incident', "/incidents/{$sourceId}"],
+            'SafeguardingConcern' => ['Safeguarding concern', "/safeguarding/{$sourceId}"],
+            'FleetIncident' => ['Fleet incident', "/fleet-assets/incidents?incident={$sourceId}"],
+            'WorkplaceInjury' => ['Workplace injury', "/health-safety/injuries/{$sourceId}"],
+            'EmergencyDrill' => ['Emergency drill', "/health-safety/drills/{$sourceId}"],
+            'SiteHazard' => ['Hazard', null],
+            'RestraintEvent' => ['Restraint event', null],
+            default => [$basename, null],
+        };
+
+        return [
+            'type' => $basename,
+            'id' => $sourceId,
+            'label' => "{$label} #{$sourceId}",
+            'url' => $url,
+            'unwired' => false,
+        ];
+    }
+
+    /**
      * The full governance detail payload — the contract behind the HsEventDialog
      * (mirrored by `EventDetail` in event-detail-dialog.tsx). Shared by index()
      * (over-the-list modal on ?event=) and show() (deep-link shell).
@@ -373,13 +402,7 @@ class HsEventController extends Controller
                 'is_due_for_review' => $ra->isDueForReview(),
             ]);
 
-        $source = $hsEvent->source_id ? [
-            'type' => class_basename($hsEvent->source_type),
-            'id' => $hsEvent->source_id,
-            'label' => class_basename($hsEvent->source_type) . ' #' . $hsEvent->source_id,
-            'url' => null,      // resolved to a working jump in Step 5 (E-Gap 4)
-            'unwired' => false,
-        ] : null;
+        $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id);
 
         $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
 

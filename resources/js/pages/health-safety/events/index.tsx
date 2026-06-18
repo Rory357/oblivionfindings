@@ -73,7 +73,7 @@ type EventRow = {
     worksafe_notifiable: boolean;
     worksafe_status: string | null;
     investigation_required: boolean;
-    source: { type: string; id: number; label: string; unwired: boolean } | null;
+    source: { type: string; id: number; label: string; url: string | null; unwired: boolean } | null;
     flags: {
         investigation_overdue: boolean;
         awaiting_verification: number;
@@ -262,6 +262,9 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             { icon: <Search className="h-3.5 w-3.5" />, label: 'Investigation', onClick: () => openEvent(ev.id, { section: 'investigation' }) },
             { icon: <ListChecks className="h-3.5 w-3.5" />, label: 'Corrective actions', onClick: () => openEvent(ev.id, { section: 'actions' }) },
         ];
+        if (ev.source?.url) {
+            items.push({ icon: <Link2 className="h-3.5 w-3.5" />, label: 'View originating record', sub: ev.source.label, onClick: () => router.visit(ev.source!.url!) });
+        }
         if (ev.worksafe_notifiable && can.manage && ev.worksafe_status !== 'acknowledged') {
             if (ev.worksafe_status === 'notified') {
                 items.push({ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Record WorkSafe acknowledgement', onClick: () => openEvent(ev.id, { action: 'worksafe_acknowledge' }) });

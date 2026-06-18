@@ -105,6 +105,20 @@ class HsEventRegisterTest extends TestCase
             );
     }
 
+    public function test_detail_resolves_the_originating_source_link(): void
+    {
+        $event = HsEvent::factory()->create(); // the factory's source is a ClientIncident
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source.type', 'ClientIncident')
+                ->where('detail.source.url', "/incidents/{$event->source_id}")
+                ->where('detail.source.unwired', false)
+            );
+    }
+
     public function test_register_requires_hazards_view(): void
     {
         $user = User::factory()->create(['approved_at' => now()]);

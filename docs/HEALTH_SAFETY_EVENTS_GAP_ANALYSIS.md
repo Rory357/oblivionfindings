@@ -13,7 +13,7 @@
 
 ## A. Convergence completeness
 - [x] A1 — Every wired category (8) has a row treatment + a visible **source/category badge**; the register is the unified convergence view (category = filter, not hidden).
-- [ ] A2 — **Two-way source back-link** (E-Gap 4): resolve `HsEvent.source()` to label + URL; "View originating record" on the detail Overview + row menu (incident/safeguarding/fleet/injury/hazard/restraint/drill).
+- [x] A2 — **Two-way source back-link** (E-Gap 4): resolve `HsEvent.source()` to label + URL; "View originating record" on the detail Overview + row menu (incident/safeguarding/fleet/injury/hazard/restraint/drill).
 - [ ] A3 — **Orphan categories** (E-Gap 5): decide wire-or-remove `exposure` / `inspection_failure` / `equipment_fault`. **Decision required (flag to user).**
 
 ## B. Backend governance (expose + gate the existing engine — NO new schema)
@@ -26,7 +26,7 @@
 ## C. List (`/health-safety/events`) — hero, tabs, rows
 - [x] C1 — Replace `PageHero` with **`hs-hero-kit`** treatment; governance clusters (Live / Needs attention incl. **Investigation overdue**, **Actions awaiting verification**, **WorkSafe notify due**); no compliance badges.
 - [x] C2 — `TabStrip`: All · Open · Investigating · Corrective actions · WorkSafe-notifiable · Monitoring · Closed (category = filter).
-- [ ] C3 — Footer band: date-range `HeroSegmented`, Site + Category + Source `EntityFilter` (`onDark`), severity + worksafe filter, search.
+- [x] C3 — Footer band: date-range `HeroSegmented`, Site + Category + Source `EntityFilter` (`onDark`), severity + worksafe filter, search.
 - [x] C4 — Replace plain row-nav with **`ShiftContextMenu`** right-click (copy PRN `openRowCtx`) + row click → event detail modal. Item set per design §2c.
 - [x] C5 — Row badges: category + source module, severity, status, investigation-required/overdue, actions-awaiting-verification, WorkSafe-notifiable/status.
 
@@ -62,4 +62,5 @@
 - **18 Jun 2026** — Events = the governance hub; convergence already works (8 categories). Adopt the H&S gold standard: `hs-hero-kit` hero, `TabStrip`, `ShiftContextMenu`, **detail-as-modal** (`HsEventDialog`); `/health-safety/events/{id}` kept as deep-link fallback.
 - **18 Jun 2026** — The investigation + corrective-action **engine is strong and stays**; the work is **exposing it (controllers/routes/modals), gating closure + WorkSafe notification, surfacing the two-way source link**, and resolving 3 orphan categories. **No new schema expected** (models already hold the fields).
 - **18 Jun 2026** — Decision required: wire-or-remove `exposure` / `inspection_failure` / `equipment_fault`.
+- **18 Jun 2026 (Step 5)** — C3 footer "Source EntityFilter" intentionally folded into the existing **Category** filter: every `event_category` maps 1:1 to a source module, so a separate Source-by-module filter is redundant. Category + Site + severity + WorkSafe + date-range + search compose the footer band. Source resolution (A2) is delivered as the per-event "View originating record" jump, not a filter.
 - **18 Jun 2026 (loop pass 1 — AUDIT)** — Re-verified every A–H item against live code. Confirmed: the investigation + corrective-action engine is strong and fully gated (`complete()` already auto-advances the event to `corrective_action`; CA `verify()` enforces verifier ≠ completer; closing the last CA auto-advances to `monitoring`) → **B5 backend mostly exists**, remaining E-Gap 6 work is the per-recommendation "Seed action" affordance. `HsEvent` already holds `closed_at`/`closed_by`/`closure_summary` (**B1 needs no schema**) but **lacks** `worksafe_notified_at`/`worksafe_method`/`worksafe_acknowledged_at` (**B2 needs a small additive migration** — only deviation from "no new schema"; flagged). Absent as expected: `closeEvent`/`recordWorksafeNotification`/`acknowledgeWorksafe`, both governance controllers + all write routes, the `source()` `{label,url}` resolver. UI off-standard + read-only as described (E-Gap 7). Branch `feat/health-safety-events-redesign`; step plan in `docs/health-safety-events-redesign/PROGRESS.md`. Nothing yet satisfied → no items ticked.
