@@ -3,9 +3,15 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Models\Client;
+use App\Models\Asset;
+use App\Models\FleetWorkOrder;
+use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteInspectionRecord;
+use App\Models\SiteInspectionSchedule;
+use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,6 +121,95 @@ class HsEventRegisterTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.source.type', 'ClientIncident')
                 ->where('detail.source.url', "/incidents/{$event->source_id}")
+                ->where('detail.source.unwired', false)
+            );
+    }
+
+    public function test_detail_resolves_substance_exposure_originating_source_link(): void
+    {
+        $substance = HazardousSubstance::factory()->create();
+        $record = SubstanceExposureRecord::create([
+            'hazardous_substance_id' => $substance->id,
+            'user_id' => User::factory()->create()->id,
+            'exposed_at' => now(),
+            'exposure_type' => 'skin_contact',
+        ]);
+        $event = HsEvent::factory()->create([
+            'source_type' => SubstanceExposureRecord::class,
+            'source_id' => $record->id,
+            'event_category' => HsEvent::CATEGORY_EXPOSURE,
+        ]);
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source.type', 'SubstanceExposureRecord')
+                ->where('detail.source.url', "/health-safety/substances/{$substance->id}")
+                ->where('detail.source.unwired', false)
+            );
+    }
+
+    public function test_detail_resolves_site_inspection_failure_originating_source_link(): void
+    {
+        $site = Site::factory()->create();
+        $schedule = SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'inspection_type' => 'house_safety',
+            'title' => 'House safety inspection',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->subDay()->toDateString(),
+            'next_due_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+        $record = SiteInspectionRecord::create([
+            'schedule_id' => $schedule->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'due_date' => now()->subDay()->toDateString(),
+            'completed_at' => now(),
+            'result' => 'fail',
+        ]);
+        $event = HsEvent::factory()->create([
+            'source_type' => SiteInspectionRecord::class,
+            'source_id' => $record->id,
+            'event_category' => HsEvent::CATEGORY_INSPECTION_FAILURE,
+            'site_id' => $site->id,
+        ]);
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source.type', 'SiteInspectionRecord')
+                ->where('detail.source.url', "/sites/{$site->id}/inspections")
+                ->where('detail.source.unwired', false)
+            );
+    }
+
+    public function test_detail_resolves_fleet_work_order_originating_source_link(): void
+    {
+        $asset = Asset::factory()->vehicle()->create();
+        $workOrder = FleetWorkOrder::factory()->create([
+            'asset_id' => $asset->id,
+            'priority' => 'critical',
+            'status' => 'open',
+        ]);
+        $event = HsEvent::factory()->create([
+            'source_type' => FleetWorkOrder::class,
+            'source_id' => $workOrder->id,
+            'event_category' => HsEvent::CATEGORY_EQUIPMENT_FAULT,
+            'site_id' => $asset->site_id,
+            'asset_id' => $asset->id,
+        ]);
+
+        $this->actingAs($this->hsOfficer())
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source.type', 'FleetWorkOrder')
+                ->where('detail.source.url', "/fleet-assets/maintenance/work-orders/{$workOrder->id}")
                 ->where('detail.source.unwired', false)
             );
     }

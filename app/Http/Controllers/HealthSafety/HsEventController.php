@@ -8,6 +8,8 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\Site;
+use App\Models\SiteInspectionRecord;
+use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
 use Illuminate\Database\Eloquent\Builder;
@@ -298,6 +300,9 @@ class HsEventController extends Controller
             'SafeguardingConcern' => ['Safeguarding concern', "/safeguarding/{$sourceId}"],
             'FleetIncident' => ['Fleet incident', "/fleet-assets/incidents?incident={$sourceId}"],
             'WorkplaceInjury' => ['Workplace injury', "/health-safety/injuries/{$sourceId}"],
+            'SubstanceExposureRecord' => $this->resolveSubstanceExposureSource($sourceId),
+            'SiteInspectionRecord' => $this->resolveSiteInspectionSource($sourceId),
+            'FleetWorkOrder' => ['Fleet work order', "/fleet-assets/maintenance/work-orders/{$sourceId}"],
             'EmergencyDrill' => ['Emergency drill', "/health-safety/drills/{$sourceId}"],
             'SiteHazard' => ['Hazard', null],
             'RestraintEvent' => ['Restraint event', null],
@@ -310,6 +315,32 @@ class HsEventController extends Controller
             'label' => "{$label} #{$sourceId}",
             'url' => $url,
             'unwired' => false,
+        ];
+    }
+
+    private function resolveSubstanceExposureSource(int $sourceId): array
+    {
+        $record = SubstanceExposureRecord::query()
+            ->select(['id', 'hazardous_substance_id'])
+            ->find($sourceId);
+
+        return [
+            'Substance exposure',
+            $record?->hazardous_substance_id
+                ? "/health-safety/substances/{$record->hazardous_substance_id}"
+                : null,
+        ];
+    }
+
+    private function resolveSiteInspectionSource(int $sourceId): array
+    {
+        $record = SiteInspectionRecord::query()
+            ->select(['id', 'site_id'])
+            ->find($sourceId);
+
+        return [
+            'Site inspection',
+            $record?->site_id ? "/sites/{$record->site_id}/inspections" : null,
         ];
     }
 

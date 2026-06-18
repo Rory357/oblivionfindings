@@ -40,7 +40,9 @@ import {
     Bell,
     Calendar,
     CheckCircle2,
+    ClipboardCheck,
     Flame,
+    FlaskConical,
     Hand,
     HeartPulse,
     LayoutList,
@@ -51,6 +53,7 @@ import {
     ShieldAlert,
     ShieldCheck,
     Truck,
+    Wrench,
     X,
     type LucideIcon,
 } from 'lucide-react';
@@ -150,7 +153,10 @@ const SOURCE_MODULE: Record<string, { label: string; icon: LucideIcon }> = {
     SafeguardingConcern: { label: 'Safeguarding', icon: ShieldCheck },
     FleetIncident: { label: 'Fleet', icon: Truck },
     WorkplaceInjury: { label: 'Injury', icon: HeartPulse },
+    SubstanceExposureRecord: { label: 'Exposure', icon: FlaskConical },
     SiteHazard: { label: 'Hazard', icon: AlertTriangle },
+    SiteInspectionRecord: { label: 'Inspection', icon: ClipboardCheck },
+    FleetWorkOrder: { label: 'Equipment', icon: Wrench },
     RestraintEvent: { label: 'Restraint', icon: Hand },
     EmergencyDrill: { label: 'Drill', icon: Flame },
 };
@@ -160,10 +166,13 @@ const CATEGORY_OPTIONS = [
     'near_miss',
     'hazard',
     'injury',
+    'exposure',
     'restraint',
     'safeguarding',
     'vehicle_incident',
     'drill_failure',
+    'inspection_failure',
+    'equipment_fault',
 ];
 
 function titleCase(s: string): string {
