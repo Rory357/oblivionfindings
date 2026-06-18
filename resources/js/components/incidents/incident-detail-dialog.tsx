@@ -19,6 +19,7 @@ import {
     Pencil,
     Plus,
     RadioTower,
+    Truck,
     RotateCcw,
     Search,
     Send,
@@ -106,6 +107,7 @@ export type IncidentDetail = {
     can: { update: boolean; submit: boolean; review: boolean; close: boolean; reopen: boolean; followupsManage: boolean; followupsComplete: boolean; portalManage: boolean; raiseCorrectiveAction: boolean };
     assignable_staff: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
+    fleet_incident?: { id: number; reference: string; type: string } | null;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -815,8 +817,11 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
                     </div>
                 ),
             )}
+            {d.fleet_incident ? (
+                <LinkedRow icon={Truck} title="Fleet incident" sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`} href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`} />
+            ) : null}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !(d.safeguarding_concerns ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
+            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
         </div>
     );
 }

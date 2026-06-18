@@ -256,17 +256,30 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         ->whereNumber('handover')
         ->name('fleet-assets.handovers.dispute');
 
-    // Incidents (view, create, report)
+    // Incidents (view, report) — read
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/incidents', [IncidentController::class, 'index'])->name('fleet-assets.incidents.index');
         Route::get('/incidents/create', [IncidentController::class, 'create'])->name('fleet-assets.incidents.create');
         Route::post('/incidents', [IncidentController::class, 'store'])->name('fleet-assets.incidents.store');
         Route::get('/incidents/{incident}', [IncidentController::class, 'show'])->whereNumber('incident')->name('fleet-assets.incidents.show');
+        Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
+            ->whereNumber('incident')->whereNumber('attachment')->name('fleet-assets.incidents.attachments.download');
     });
 
-    // Incident management (update/resolve requires elevated permission)
+    // Incident management — write (modal-first workflows)
     Route::middleware('permission:fleet.incidents.manage|fleet.manage')->group(function () {
         Route::put('/incidents/{incident}', [IncidentController::class, 'update'])->whereNumber('incident')->name('fleet-assets.incidents.update');
+        Route::post('/incidents/{incident}/status', [IncidentController::class, 'updateStatus'])->whereNumber('incident')->name('fleet-assets.incidents.status');
+        Route::post('/incidents/{incident}/followups', [IncidentController::class, 'addFollowup'])->whereNumber('incident')->name('fleet-assets.incidents.followups.add');
+        Route::post('/incidents/{incident}/followups/{followup}/complete', [IncidentController::class, 'completeFollowup'])
+            ->whereNumber('incident')->whereNumber('followup')->name('fleet-assets.incidents.followups.complete');
+        Route::post('/incidents/{incident}/attachments', [IncidentController::class, 'uploadAttachment'])->whereNumber('incident')->name('fleet-assets.incidents.attachments.store');
+        Route::delete('/incidents/{incident}/attachments/{attachment}', [IncidentController::class, 'destroyAttachment'])
+            ->whereNumber('incident')->whereNumber('attachment')->name('fleet-assets.incidents.attachments.destroy');
+        Route::post('/incidents/{incident}/police-report', [IncidentController::class, 'logPoliceReport'])->whereNumber('incident')->name('fleet-assets.incidents.police-report');
+        Route::post('/incidents/{incident}/claim', [IncidentController::class, 'logClaim'])->whereNumber('incident')->name('fleet-assets.incidents.claim');
+        Route::post('/incidents/{incident}/off-road', [IncidentController::class, 'markOffRoad'])->whereNumber('incident')->name('fleet-assets.incidents.off-road');
+        Route::post('/incidents/{incident}/back-in-service', [IncidentController::class, 'backInService'])->whereNumber('incident')->name('fleet-assets.incidents.back-in-service');
     });
 
     // Outings / Community Access — read

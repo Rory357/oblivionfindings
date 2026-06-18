@@ -22,6 +22,7 @@ class ClientIncident extends Model implements EmitsToTimeline
         'reported_by',
         'shift_id',
         'control_room_alert_id',
+        'fleet_incident_id', // originating fleet/asset incident (transport cascade — Gap F1)
         'respite_stay_id',
         'service_context_id',
         'template_id',
@@ -153,6 +154,16 @@ class ClientIncident extends Model implements EmitsToTimeline
     public function template(): BelongsTo
     {
         return $this->belongsTo(IncidentTemplate::class, 'template_id');
+    }
+
+    /**
+     * The originating fleet/asset incident, when this client incident was created
+     * by the transport-incident cascade (residents aboard). Reverse of
+     * FleetIncident::clientIncidents() — Gap F1.
+     */
+    public function fleetIncident(): BelongsTo
+    {
+        return $this->belongsTo(FleetIncident::class, 'fleet_incident_id');
     }
 
     public function investigator(): BelongsTo

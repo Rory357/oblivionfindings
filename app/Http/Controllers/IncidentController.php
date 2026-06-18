@@ -292,6 +292,7 @@ class IncidentController extends Controller
                 'investigator:id,name',
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
                 'safeguardingConcerns',
+                'fleetIncident:id,incident_type',
             ])
             ->find($incidentId);
 
@@ -408,6 +409,14 @@ class IncidentController extends Controller
                     'can_view' => $canView,
                 ];
             })->values()->all(),
+            // F1: the originating fleet/asset incident, when this client incident came
+            // from a transport-incident cascade (residents aboard). Reciprocal of the
+            // fleet detail's "Linked records".
+            'fleet_incident' => $incident->fleetIncident ? [
+                'id' => $incident->fleetIncident->id,
+                'reference' => $incident->fleetIncident->reference(),
+                'type' => $incident->fleetIncident->incident_type,
+            ] : null,
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
