@@ -25,14 +25,14 @@ Design the full capture set (plan §3). Each group: design now unless marked **`
 - [ ] A10 — Investigation: assigned owner, root-cause, **corrective actions**, investigation-completed-at.
 - [ ] A11 — Non-vehicle asset specifics: serial snapshot, condition before/after, warranty, replacement cost (form branch when `category != vehicle`).
 
-## B. Backend foundation
-- [ ] B1 — Expand `fleet_incidents` schema for A (grouped migrations); snapshot register-sourced fields. **Confirm before building.**
-- [ ] B2 — **`FleetIncidentAttachment`** (or polymorphic) + upload/download routes (evidence — biggest UX gap).
-- [ ] B3 — **Fleet incident follow-ups** (reuse `IncidentFollowup` pattern or polymorphic).
-- [ ] B4 — **Direct FK `FleetIncident ↔ ClientIncident`** + reverse relations (replace the implicit cascade link) (Gap F1).
-- [ ] B5 — **s22 24-hour Police-report** logic + **WorkSafe-notifiable** classifier (reuse client-incident `NotifiableEventClassifier`) + ACC fields (A8).
-- [ ] B6 — **Severity vocab alignment** with client incidents/HsEvent (map in UI or migrate) (Gap F4).
-- [ ] B7 — `PREP-LATER`: register snapshots (A1) + driver licence (A2); telematics crash-detection bridge (Gap F2).
+## B. Backend foundation (Step 1 — DONE on `feat/fleet-incidents-redesign`)
+- [x] B1 — Expanded `fleet_incidents` schema for A (one grouped migration `expand_fleet_incidents_capture`, 70 cols §3.1–3.12, all nullable/defaulted); register/licence snapshot columns added (populated `PREP-LATER`).
+- [x] B2 — **`FleetIncidentAttachment`** table + model (mirrors `SafeguardingAttachment`; `kind`/`notes`/`alt_text`). Upload/download routes = Step 2.
+- [x] B3 — **`FleetIncidentFollowup`** table + model (mirrors `IncidentFollowup`, FK to `fleet_incidents`). Endpoints = Step 2.
+- [x] B4 — **Direct FK `client_incidents.fleet_incident_id`** + `ClientIncident::fleetIncident()` / `FleetIncident::clientIncidents()` reverse relations (Gap F1).
+- [x] B5 — **s22 24-hour Police-report** model logic (`requiresPoliceReport`/`isPoliceReportDue`/`policeReportDueAt`/`policeReportHoursRemaining` + `police_report_due_at`/`_logged_at`/TCR cols) + WorkSafe cols mirroring `ClientIncident` (`is_notifiable`/`worksafe_*`, classified via reused `NotifiableEventClassifier`) + ACC cols (A8). Wizard/controller wiring = Steps 2/5.
+- [x] B6 — **Severity vocab** decided (Gap F4): keep minor/moderate/major/critical, map at boundaries via `FleetIncident::mapSeverityToHs()`; **fixed the observer bug** (major never alerted / HsEvent recorded as low).
+- [ ] B7 — `PREP-LATER`: register snapshots (A1) + driver licence (A2) columns exist but unpopulated; telematics crash-detection bridge (Gap F2) = storyboard only (Step 6).
 
 ## C. List (`/fleet-assets/incidents`) — hero, tabs, rows
 - [ ] C1 — Replace `PageHero` with **`hs-hero-kit`** treatment; fleet clusters (This period / Needs attention incl. **Police report due**, **Off-road**, Injury/ACC, Open claims); **no** H&S compliance badges.

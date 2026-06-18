@@ -27,14 +27,17 @@ class FleetIncidentObserver implements ShouldHandleEventsAfterCommit
 
     public function updated(FleetIncident $incident): void
     {
-        if ($incident->wasChanged('severity')) {
-            $this->syncHsEventSeverity($incident);
+        if (! $incident->wasChanged('severity')) {
+            return;
         }
 
-        if ($incident->wasChanged('severity')
-            && in_array($incident->severity, ['high', 'critical'], true)
-            && ! in_array($incident->getOriginal('severity'), ['high', 'critical'], true)
-        ) {
+        $this->syncHsEventSeverity($incident);
+
+        // Re-bridge when severity escalates INTO the major/critical band (Gap F4 —
+        // fleet vocab is minor/moderate/major/critical, not high/critical).
+        $wasHigh = in_array($incident->getOriginal('severity'), ['major', 'critical'], true);
+
+        if ($incident->isHighSeverity() && ! $wasHigh) {
             $this->dispatchBridge($incident, escalation: true);
         }
     }
@@ -49,7 +52,7 @@ class FleetIncidentObserver implements ShouldHandleEventsAfterCommit
             $this->hsEventService->recordEvent([
                 'source' => $incident,
                 'event_category' => HsEvent::CATEGORY_VEHICLE_INCIDENT,
-                'severity' => $incident->severity ?? 'medium',
+                'severity' => $incident->hsSeverity(), // map minor/moderate/major/critical → low/medium/high/critical
                 'occurred_at' => $incident->occurred_at,
                 'reported_at' => $incident->created_at,
                 'site_id' => $incident->asset?->site_id,
@@ -72,7 +75,7 @@ class FleetIncidentObserver implements ShouldHandleEventsAfterCommit
             $hsEvent = HsEvent::where('idempotency_key', $key)->first();
 
             if ($hsEvent) {
-                $this->hsEventService->syncSeverity($hsEvent, $incident->severity);
+                $this->hsEventService->syncSeverity($hsEvent, $incident->hsSeverity());
             }
         } catch (\Throwable $e) {
             Log::error('FleetIncidentObserver: HsEvent severity sync failed', [
@@ -88,7 +91,7 @@ class FleetIncidentObserver implements ShouldHandleEventsAfterCommit
 
     private function qualifiesForBridge(FleetIncident $incident): bool
     {
-        return in_array($incident->severity, ['high', 'critical'], true);
+        return $incident->isHighSeverity(); // major | critical
     }
 
     private function dispatchBridge(FleetIncident $incident, bool $escalation = false): void
