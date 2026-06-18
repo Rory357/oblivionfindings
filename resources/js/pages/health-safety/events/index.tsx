@@ -275,6 +275,9 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             items.push({ icon: <Search className="h-3.5 w-3.5" />, label: 'Start investigation', onClick: () => openEvent(ev.id, { action: 'investigation' }) });
         }
         if (can.manage && ev.status !== 'closed') {
+            items.push({ icon: <ListChecks className="h-3.5 w-3.5" />, label: 'Add corrective action', onClick: () => openEvent(ev.id, { action: 'add_action' }) });
+        }
+        if (can.manage && ev.status !== 'closed') {
             items.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close event', tone: 'critical', onClick: () => openEvent(ev.id, { action: 'close' }) });
         }
         items.push({ sep: true }, { icon: <Link2 className="h-3.5 w-3.5" />, label: 'Open full page', onClick: () => router.visit(`/health-safety/events/${ev.id}`) });

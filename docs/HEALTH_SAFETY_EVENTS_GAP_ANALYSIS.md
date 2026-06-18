@@ -20,7 +20,7 @@
 - [x] B1 — **`HsEventService::closeEvent()`** + closure gate (E-Gap 1): block unless required investigation completed + no open/unverified corrective actions + `closure_summary`; override w/ logged reason + permission. `HsEventController@close` + route + `hazards.manage`.
 - [x] B2 — **WorkSafe notification** (E-Gap 2): service methods to record notification (→ `notified`: date/method/reference) + acknowledgement (→ `acknowledged`); reuse `NotifiableEventClassifier`; make the `worksafe-register` report actionable.
 - [x] B3 — **`HsInvestigationController` + routes** (E-Gap 3) exposing `HsInvestigationService` (create/start/recordFindings/submitForReview/returnForRework/complete). Gate `hazards.manage`.
-- [ ] B4 — **`HsCorrectiveActionController` + routes** (E-Gap 3) exposing `HsCorrectiveActionService` (createFromRecommendation/createStandalone/start/complete/returnForRework/verify/close). Gate `hazards.manage`.
+- [x] B4 — **`HsCorrectiveActionController` + routes** (E-Gap 3) exposing `HsCorrectiveActionService` (createFromRecommendation/createStandalone/start/complete/returnForRework/verify/close). Gate `hazards.manage`.
 - [ ] B5 — **Auto-advance on investigation complete** (E-Gap 6): event → `corrective_action` + offer `createFromRecommendation()` for each recommendation.
 
 ## C. List (`/health-safety/events`) — hero, tabs, rows
@@ -32,18 +32,18 @@
 
 ## D. Event detail = modal governance workspace (retire navigate-away)
 - [x] D1 — Build **`HsEventDialog`** on `WizardShell` read-only chrome (rail = sections, footer = Options bar); opens **over** the register + from source modules' "Open in Health & Safety". Keep `/health-safety/events/{id}` as deep-link fallback.
-- [ ] D2 — Rail sections: **Overview** (governance stage tracker + source back-link + WorkSafe banner w/ site-preservation) · **Investigation** (actionable) · **Corrective actions** (actionable) · **Risk** (RiskMatrix) · **Timeline** (EventTimeline) · **Evidence** (HsAttachment).
-- [ ] D3 — Options bar actions open modals in place; **disable + explain** gated actions.
+- [x] D2 — Rail sections: **Overview** (governance stage tracker + source back-link + WorkSafe banner w/ site-preservation) · **Investigation** (actionable) · **Corrective actions** (actionable) · **Risk** (RiskMatrix) · **Timeline** (EventTimeline) · **Evidence** (HsAttachment).
+- [x] D3 — Options bar actions open modals in place; **disable + explain** gated actions.
 - [x] D4 — **Modal-first sweep:** all governance actions are dialogs — no navigate-away in the normal path.
 
 ## E. Investigation workflow (actionable, gated)
-- [ ] E1 — **Start investigation** modal: methodology picker (5-whys/fishbone/bow-tie/ICAM/TapRooT), lead + team (guard: event open, no active investigation).
-- [ ] E2 — **Record findings** modal: immediate/root causes, contributing factors, recommendations (guard: ≥1 cause).
-- [ ] E3 — **Submit for review → Review → Complete** gated steps (reviewer/approver); show gate states.
+- [x] E1 — **Start investigation** modal: methodology picker (5-whys/fishbone/bow-tie/ICAM/TapRooT), lead + team (guard: event open, no active investigation).
+- [x] E2 — **Record findings** modal: immediate/root causes, contributing factors, recommendations (guard: ≥1 cause).
+- [x] E3 — **Submit for review → Review → Complete** gated steps (reviewer/approver); show gate states.
 
 ## F. Corrective actions (actionable, verified)
-- [ ] F1 — **Create** action (standalone or **from a recommendation**), assign + due + priority.
-- [ ] F2 — **Complete** (notes/evidence) → **Verify** (enforce **verifier ≠ completer** + effectiveness) → **Close**.
+- [x] F1 — **Create** action (standalone or **from a recommendation**), assign + due + priority.
+- [x] F2 — **Complete** (notes/evidence) → **Verify** (enforce **verifier ≠ completer** + effectiveness) → **Close**.
 - [ ] F3 — Surface the **Corrective-actions register** (sibling view) cross-linked; reflect auto-advance of the event to monitoring when all resolved.
 
 ## G. WorkSafe + closure gates (the governance "make it make sense")

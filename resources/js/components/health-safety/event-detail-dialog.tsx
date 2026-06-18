@@ -36,6 +36,7 @@ import {
     LinkIcon,
     ListChecks,
     Paperclip,
+    Play,
     Plus,
     RadioTower,
     RotateCcw,
@@ -412,7 +413,7 @@ export function EventDetailDialog({
 
                     {section === 'overview' ? <OverviewSection d={d} cat={cat} stage={stage} /> : null}
                     {section === 'investigation' ? <InvestigationSection d={d} canAct={canAct} onPane={setPane} /> : null}
-                    {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} /> : null}
+                    {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} canAct={canAct} onPane={setPane} /> : null}
                     {section === 'risk' ? <RiskSection d={d} /> : null}
                     {section === 'timeline' ? <TimelineSection d={d} /> : null}
                     {section === 'evidence' ? <EvidenceSection d={d} /> : null}
@@ -618,6 +619,7 @@ function WorksafeAcknowledgePane({ d, onDone }: { d: EventDetail; onDone: () => 
 /** Routes an ActivePane to its form. Corrective-action panes land in Step 4b-ii. */
 function PaneRenderer({ pane, d, onDone }: { pane: ActivePane; d: EventDetail; onDone: () => void }) {
     const inv = 'investigationId' in pane ? (d.investigations.find((i) => i.id === pane.investigationId) ?? null) : null;
+    const ca = 'actionId' in pane ? (d.corrective_actions.find((a) => a.id === pane.actionId) ?? null) : null;
 
     switch (pane.kind) {
         case 'close':
@@ -635,10 +637,13 @@ function PaneRenderer({ pane, d, onDone }: { pane: ActivePane; d: EventDetail; o
         case 'inv_return':
             return inv ? <ReturnInvestigationPane d={d} inv={inv} onDone={onDone} /> : null;
         case 'ca_add':
+            return <AddCorrectiveActionPane d={d} onDone={onDone} />;
         case 'ca_complete':
+            return ca ? <CompleteActionPane d={d} ca={ca} onDone={onDone} /> : null;
         case 'ca_verify':
+            return ca ? <VerifyActionPane d={d} ca={ca} onDone={onDone} /> : null;
         case 'ca_return':
-            return null; // corrective-action panes land in Step 4b-ii
+            return ca ? <ReturnActionPane d={d} ca={ca} onDone={onDone} /> : null;
     }
 }
 
@@ -929,6 +934,213 @@ function InvestigationControls({ d, inv, onPane }: { d: EventDetail; inv: EventI
                         <RotateCcw className="mr-1.5 h-4 w-4" /> Return for rework
                     </Button>
                 </>
+            ) : null}
+        </div>
+    );
+}
+
+/* ---- corrective-action panes ---- */
+
+const ACTION_TYPES = [
+    { value: 'corrective', label: 'Corrective' },
+    { value: 'preventive', label: 'Preventive' },
+    { value: 'improvement', label: 'Improvement' },
+];
+
+function AddCorrectiveActionPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+    const form = useForm<{ title: string; description: string; priority: string; action_type: string; assigned_to_user_id: string; due_date: string }>({
+        title: '',
+        description: '',
+        priority: 'medium',
+        action_type: 'corrective',
+        assigned_to_user_id: '',
+        due_date: '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/corrective-actions`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={ListChecks} title="Add corrective action" blurb="Raise a remediation action and drive it to verified. The event moves to Corrective action." />
+            <Field label="Action" required error={form.errors.title}>
+                <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="e.g. Install a grab rail in the bathroom" />
+            </Field>
+            <Field label="Detail" hint="Optional" error={form.errors.description}>
+                <Textarea rows={2} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Priority" required error={form.errors.priority}>
+                    <SelectInput value={form.data.priority} onChange={(v) => form.setData('priority', v)} placeholder="Priority" options={PRIORITY_OPTS.map((p) => ({ value: p, label: titleCase(p) }))} />
+                </Field>
+                <Field label="Type" error={form.errors.action_type}>
+                    <SelectInput value={form.data.action_type} onChange={(v) => form.setData('action_type', v)} placeholder="Type" options={ACTION_TYPES} />
+                </Field>
+                <Field label="Due" error={form.errors.due_date}>
+                    <Input type="date" value={form.data.due_date} onChange={(e) => form.setData('due_date', e.target.value)} />
+                </Field>
+            </div>
+            <Field label="Owner" hint="Optional" error={form.errors.assigned_to_user_id}>
+                <StaffSelect value={form.data.assigned_to_user_id} onChange={(v) => form.setData('assigned_to_user_id', v)} staff={d.assignable_staff} placeholder="Unassigned" />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Add action
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function CompleteActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrectiveAction; onDone: () => void }) {
+    const form = useForm<{ completion_notes: string }>({ completion_notes: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/complete`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={CheckCircle2} title="Complete action" blurb={`${ca.reference_number} · ${ca.title}`} />
+            <Field label="What was done" required error={form.errors.completion_notes}>
+                <Textarea rows={4} value={form.data.completion_notes} onChange={(e) => form.setData('completion_notes', e.target.value)} placeholder="Describe the evidence that this action is complete." />
+            </Field>
+            <InfoCard icon={ShieldCheck} tone="info">
+                A different person must verify this action — separation of duties.
+            </InfoCard>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Mark complete
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function VerifyActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrectiveAction; onDone: () => void }) {
+    const form = useForm<{ effectiveness_confirmed: boolean; verification_notes: string }>({ effectiveness_confirmed: true, verification_notes: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/verify`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={ShieldCheck} title="Verify action" blurb={`${ca.reference_number} · ${ca.title}`} />
+            <InfoCard icon={ShieldCheck} tone="warn">
+                Separation of duties — the verifier must be a different person than whoever completed this action{ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
+            </InfoCard>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                    type="checkbox"
+                    checked={form.data.effectiveness_confirmed}
+                    onChange={(e) => form.setData('effectiveness_confirmed', e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                />
+                The action is effective
+            </label>
+            <Field label="Verification notes" hint="Optional" error={form.errors.verification_notes}>
+                <Textarea rows={3} value={form.data.verification_notes} onChange={(e) => form.setData('verification_notes', e.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Verify
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function ReturnActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrectiveAction; onDone: () => void }) {
+    const form = useForm<{ reason: string }>({ reason: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/return`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={RotateCcw} title="Return for rework" blurb={`${ca.reference_number} · ${ca.title}`} />
+            <Field label="Reason" required error={form.errors.reason}>
+                <Textarea rows={4} value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} placeholder="Why is this action being returned?" />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Return for rework
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+/** Per-action workflow buttons, driven by status. */
+function CorrectiveActionControls({ d, ca, onPane }: { d: EventDetail; ca: EventCorrectiveAction; onPane: (p: ActivePane) => void }) {
+    const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}`;
+    if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status)) return null;
+
+    return (
+        <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-2">
+            {ca.status === 'open' ? (
+                <Button size="sm" variant="outline" onClick={() => router.post(`${base}/start`, {}, { preserveScroll: true })}>
+                    <Play className="mr-1.5 h-3.5 w-3.5" /> Start
+                </Button>
+            ) : null}
+            {ca.status === 'in_progress' ? (
+                <Button size="sm" onClick={() => onPane({ kind: 'ca_complete', actionId: ca.id })}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
+                </Button>
+            ) : null}
+            {ca.status === 'completed' ? (
+                <>
+                    <Button size="sm" onClick={() => onPane({ kind: 'ca_verify', actionId: ca.id })}>
+                        <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Verify
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onPane({ kind: 'ca_return', actionId: ca.id })}>
+                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Return
+                    </Button>
+                </>
+            ) : null}
+            {ca.status === 'verified' ? (
+                <Button size="sm" variant="outline" onClick={() => router.post(`${base}/close`, {}, { preserveScroll: true })}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Close
+                </Button>
             ) : null}
         </div>
     );
@@ -1237,18 +1449,42 @@ function CauseList({ label, causes }: { label: string; causes: JsonCause[] | nul
     );
 }
 
-function ActionsSection({ d, openActions, awaitingVerification }: { d: EventDetail; openActions: number; awaitingVerification: number }) {
+function ActionsSection({
+    d,
+    openActions,
+    awaitingVerification,
+    canAct,
+    onPane,
+}: {
+    d: EventDetail;
+    openActions: number;
+    awaitingVerification: number;
+    canAct: boolean;
+    onPane: (p: ActivePane) => void;
+}) {
     if (!d.corrective_actions.length) {
         return (
-            <EmptyState
-                icon={ListChecks}
-                title="No corrective actions"
-                blurb="Corrective actions are raised from investigation recommendations or added directly, then driven to verified."
-            />
+            <div className="flex flex-col gap-4">
+                <EmptyState
+                    icon={ListChecks}
+                    title="No corrective actions"
+                    blurb="Corrective actions are raised from investigation recommendations or added directly, then driven to verified."
+                />
+                {canAct ? (
+                    <Button className="self-start" size="sm" onClick={() => onPane({ kind: 'ca_add' })}>
+                        <Plus className="mr-1.5 h-4 w-4" /> Add corrective action
+                    </Button>
+                ) : null}
+            </div>
         );
     }
     return (
         <div className="flex flex-col gap-3">
+            {canAct ? (
+                <Button className="self-start" size="sm" variant="outline" onClick={() => onPane({ kind: 'ca_add' })}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Add corrective action
+                </Button>
+            ) : null}
             <div className="flex flex-wrap gap-2 text-xs">
                 {openActions > 0 ? <span className="rounded-full bg-status-warning-bg px-2 py-0.5 font-medium text-status-warning">{openActions} open</span> : null}
                 {awaitingVerification > 0 ? <span className="rounded-full bg-status-info-bg px-2 py-0.5 font-medium text-status-info">{awaitingVerification} awaiting verification</span> : null}
@@ -1279,6 +1515,8 @@ function ActionsSection({ d, openActions, awaitingVerification }: { d: EventDeta
                                     Verified{a.verified_by_name ? ` by ${a.verified_by_name}` : ''} · {a.effectiveness_confirmed ? 'effective' : 'not yet effective'}
                                 </p>
                             ) : null}
+
+                            {canAct ? <CorrectiveActionControls d={d} ca={a} onPane={onPane} /> : null}
                         </div>
                     );
                 })}
