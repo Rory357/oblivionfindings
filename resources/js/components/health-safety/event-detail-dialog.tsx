@@ -23,7 +23,7 @@ import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/prim
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { formatDateTime } from '@/lib/datetime';
-import { Link, useForm } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -36,10 +36,14 @@ import {
     LinkIcon,
     ListChecks,
     Paperclip,
+    Plus,
     RadioTower,
+    RotateCcw,
     Search,
+    Send,
     ShieldAlert,
     ShieldCheck,
+    Trash2,
     User as UserIcon,
     type LucideIcon,
 } from 'lucide-react';
@@ -164,12 +168,14 @@ export type EventDetail = {
     risk_assessments: EventRiskAssessment[];
     attachments: EventAttachment[];
     close_gate: { investigation_ok: boolean; actions_ok: boolean; blockers: string[] };
+    assignable_staff: Array<{ id: number; name: string }>;
     can: { manage: boolean };
 };
 
 export type EventSectionKey = 'overview' | 'investigation' | 'actions' | 'risk' | 'timeline' | 'evidence';
-/** Workflow action panes that replace the body + own their buttons. Grows as backend lands. */
-export type EventActionKey = 'close' | 'worksafe_notify' | 'worksafe_acknowledge';
+/** Event-level launchers (Options bar / row menu). Per-item workflow panes are
+ *  opened from inside the Investigation / Corrective-actions sections. */
+export type EventActionKey = 'close' | 'worksafe_notify' | 'worksafe_acknowledge' | 'investigation' | 'add_action';
 
 /* ------------------------------------------------------------------ */
 /*  Token maps (semantic only)                                         */
@@ -246,6 +252,39 @@ function fmtSize(bytes: number | null): string {
 /*  Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
+/** A workflow form that replaces the body + owns its buttons. Event-level panes
+ *  are launched from the Options bar / row menu; per-item ones from inside the
+ *  Investigation / Corrective-actions sections. */
+type ActivePane =
+    | { kind: 'close' }
+    | { kind: 'worksafe_notify' }
+    | { kind: 'worksafe_acknowledge' }
+    | { kind: 'inv_start' }
+    | { kind: 'inv_findings'; investigationId: number }
+    | { kind: 'inv_complete'; investigationId: number }
+    | { kind: 'inv_return'; investigationId: number }
+    | { kind: 'ca_add' }
+    | { kind: 'ca_complete'; actionId: number }
+    | { kind: 'ca_verify'; actionId: number }
+    | { kind: 'ca_return'; actionId: number };
+
+function paneFromAction(action: EventActionKey | null): ActivePane | null {
+    switch (action) {
+        case 'close':
+            return { kind: 'close' };
+        case 'worksafe_notify':
+            return { kind: 'worksafe_notify' };
+        case 'worksafe_acknowledge':
+            return { kind: 'worksafe_acknowledge' };
+        case 'investigation':
+            return { kind: 'inv_start' };
+        case 'add_action':
+            return { kind: 'ca_add' };
+        default:
+            return null;
+    }
+}
+
 export function EventDetailDialog({
     detail,
     open,
@@ -263,7 +302,7 @@ export function EventDetailDialog({
     openedFrom?: string | null;
 }) {
     const [section, setSection] = useState<EventSectionKey>(initialSection);
-    const [action, setAction] = useState<EventActionKey | null>(initialAction);
+    const [pane, setPane] = useState<ActivePane | null>(() => paneFromAction(initialAction));
     const d = detail;
 
     const cat = EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
@@ -299,12 +338,13 @@ export function EventDetailDialog({
         </div>
     );
 
-    const canClose = d.can.manage && d.status !== 'closed';
+    const canAct = d.can.manage && d.status !== 'closed';
     const blockers = d.close_gate?.blockers ?? [];
 
-    // Options bar — suppressed while an action pane owns the body + its own buttons.
-    // Write actions appear only when they can run (no stubs); more land per backend step.
-    const footerEnd = action ? null : (
+    // Options bar — suppressed while a pane owns the body + its own buttons. Write
+    // actions appear only when they can run (no stubs). Investigation / corrective-
+    // action workflows live inline in their sections (and the row menu).
+    const footerEnd = pane ? null : (
         <div className="flex flex-wrap items-center gap-2">
             <Link
                 href={`/health-safety/events/${d.id}`}
@@ -314,25 +354,25 @@ export function EventDetailDialog({
             </Link>
             {d.can.manage && d.worksafe_notifiable && d.worksafe_status !== 'acknowledged' ? (
                 d.worksafe_status === 'notified' ? (
-                    <Button size="sm" variant="outline" onClick={() => setAction('worksafe_acknowledge')}>
+                    <Button size="sm" variant="outline" onClick={() => setPane({ kind: 'worksafe_acknowledge' })}>
                         <ShieldCheck className="mr-1.5 h-4 w-4" /> Record acknowledgement
                     </Button>
                 ) : (
                     <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setAction('worksafe_notify')}
+                        onClick={() => setPane({ kind: 'worksafe_notify' })}
                         className="border-status-critical/40 text-status-critical hover:text-status-critical"
                     >
                         <ShieldAlert className="mr-1.5 h-4 w-4" /> Record WorkSafe notification
                     </Button>
                 )
             ) : null}
-            {canClose ? (
+            {canAct ? (
                 <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setAction('close')}
+                    onClick={() => setPane({ kind: 'close' })}
                     title={blockers.length ? `Closure blocked: ${blockers.join(' ')}` : undefined}
                     className={blockers.length ? 'border-status-critical/40 text-status-critical hover:text-status-critical' : ''}
                 >
@@ -358,12 +398,8 @@ export function EventDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
-            {action === 'close' ? (
-                <CloseEventPane d={d} onDone={() => setAction(null)} />
-            ) : action === 'worksafe_notify' ? (
-                <WorksafeNotifyPane d={d} onDone={() => setAction(null)} />
-            ) : action === 'worksafe_acknowledge' ? (
-                <WorksafeAcknowledgePane d={d} onDone={() => setAction(null)} />
+            {pane ? (
+                <PaneRenderer pane={pane} d={d} onDone={() => setPane(null)} />
             ) : (
                 <>
                     {openedFrom ? (
@@ -375,7 +411,7 @@ export function EventDetailDialog({
                     ) : null}
 
                     {section === 'overview' ? <OverviewSection d={d} cat={cat} stage={stage} /> : null}
-                    {section === 'investigation' ? <InvestigationSection d={d} /> : null}
+                    {section === 'investigation' ? <InvestigationSection d={d} canAct={canAct} onPane={setPane} /> : null}
                     {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} /> : null}
                     {section === 'risk' ? <RiskSection d={d} /> : null}
                     {section === 'timeline' ? <TimelineSection d={d} /> : null}
@@ -576,6 +612,325 @@ function WorksafeAcknowledgePane({ d, onDone }: { d: EventDetail; onDone: () => 
                 </Button>
             </div>
         </form>
+    );
+}
+
+/** Routes an ActivePane to its form. Corrective-action panes land in Step 4b-ii. */
+function PaneRenderer({ pane, d, onDone }: { pane: ActivePane; d: EventDetail; onDone: () => void }) {
+    const inv = 'investigationId' in pane ? (d.investigations.find((i) => i.id === pane.investigationId) ?? null) : null;
+
+    switch (pane.kind) {
+        case 'close':
+            return <CloseEventPane d={d} onDone={onDone} />;
+        case 'worksafe_notify':
+            return <WorksafeNotifyPane d={d} onDone={onDone} />;
+        case 'worksafe_acknowledge':
+            return <WorksafeAcknowledgePane d={d} onDone={onDone} />;
+        case 'inv_start':
+            return <StartInvestigationPane d={d} onDone={onDone} />;
+        case 'inv_findings':
+            return inv ? <RecordFindingsPane d={d} inv={inv} onDone={onDone} /> : null;
+        case 'inv_complete':
+            return inv ? <CompleteInvestigationPane d={d} inv={inv} onDone={onDone} /> : null;
+        case 'inv_return':
+            return inv ? <ReturnInvestigationPane d={d} inv={inv} onDone={onDone} /> : null;
+        case 'ca_add':
+        case 'ca_complete':
+        case 'ca_verify':
+        case 'ca_return':
+            return null; // corrective-action panes land in Step 4b-ii
+    }
+}
+
+/* ---- shared form bits ---- */
+
+const METHODOLOGIES = [
+    { value: '5_whys', label: '5 Whys' },
+    { value: 'fishbone', label: 'Fishbone (Ishikawa)' },
+    { value: 'bow_tie', label: 'Bow-tie' },
+    { value: 'icam', label: 'ICAM' },
+    { value: 'taproot', label: 'TapRooT' },
+    { value: 'other', label: 'Other' },
+];
+const PRIORITY_OPTS = ['low', 'medium', 'high', 'critical'];
+
+function StaffSelect({
+    value,
+    onChange,
+    staff,
+    placeholder = 'Select…',
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    staff: EventDetail['assignable_staff'];
+    placeholder?: string;
+}) {
+    return <SelectInput value={value} onChange={onChange} placeholder={placeholder} options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />;
+}
+
+function CauseListEditor({
+    label,
+    items,
+    onChange,
+    placeholder,
+}: {
+    label: string;
+    items: { description: string }[];
+    onChange: (v: { description: string }[]) => void;
+    placeholder: string;
+}) {
+    return (
+        <Field label={label}>
+            <div className="flex flex-col gap-1.5">
+                {items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                        <Input value={it.description} onChange={(e) => onChange(items.map((x, idx) => (idx === i ? { description: e.target.value } : x)))} placeholder={placeholder} />
+                        <Button type="button" variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => onChange(items.filter((_, idx) => idx !== i))} aria-label="Remove">
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => onChange([...items, { description: '' }])}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                </Button>
+            </div>
+        </Field>
+    );
+}
+
+function RecommendationEditor({
+    items,
+    onChange,
+}: {
+    items: { description: string; priority: string }[];
+    onChange: (v: { description: string; priority: string }[]) => void;
+}) {
+    return (
+        <Field label="Recommendations" hint="Required to complete">
+            <div className="flex flex-col gap-1.5">
+                {items.map((it, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                        <Input value={it.description} onChange={(e) => onChange(items.map((x, idx) => (idx === i ? { ...x, description: e.target.value } : x)))} placeholder="Recommended action" />
+                        <select
+                            value={it.priority}
+                            onChange={(e) => onChange(items.map((x, idx) => (idx === i ? { ...x, priority: e.target.value } : x)))}
+                            className="shrink-0 rounded-md border border-border bg-background px-2 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&>option]:text-foreground"
+                            aria-label="Priority"
+                        >
+                            {PRIORITY_OPTS.map((p) => (
+                                <option key={p} value={p}>
+                                    {titleCase(p)}
+                                </option>
+                            ))}
+                        </select>
+                        <Button type="button" variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => onChange(items.filter((_, idx) => idx !== i))} aria-label="Remove">
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => onChange([...items, { description: '', priority: 'medium' }])}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add recommendation
+                </Button>
+            </div>
+        </Field>
+    );
+}
+
+/* ---- investigation panes ---- */
+
+function StartInvestigationPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+    const form = useForm<{ methodology: string; lead_investigator_id: string; target_completion_date: string }>({
+        methodology: '',
+        lead_investigator_id: '',
+        target_completion_date: '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/investigations`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={Search} title="Start investigation" blurb="Pick a root-cause methodology and assign a lead. The event moves to Investigating." />
+            <Field label="Methodology" required error={form.errors.methodology}>
+                <SelectInput value={form.data.methodology} onChange={(v) => form.setData('methodology', v)} placeholder="Choose a method" options={METHODOLOGIES} />
+            </Field>
+            <Field label="Lead investigator" required error={form.errors.lead_investigator_id}>
+                <StaffSelect value={form.data.lead_investigator_id} onChange={(v) => form.setData('lead_investigator_id', v)} staff={d.assignable_staff} placeholder="Assign a lead" />
+            </Field>
+            <Field label="Target completion" hint="Optional" error={form.errors.target_completion_date}>
+                <Input type="date" value={form.data.target_completion_date} onChange={(e) => form.setData('target_completion_date', e.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Start investigation
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function RecordFindingsPane({ d, inv, onDone }: { d: EventDetail; inv: EventInvestigation; onDone: () => void }) {
+    const form = useForm<{
+        findings_summary: string;
+        immediate_causes: { description: string }[];
+        root_causes: { description: string }[];
+        contributing_factors: { description: string }[];
+        recommendations: { description: string; priority: string }[];
+        lessons_learned: string;
+    }>({
+        findings_summary: inv.findings_summary ?? '',
+        immediate_causes: inv.immediate_causes?.map((c) => ({ description: c.description ?? '' })) ?? [],
+        root_causes: inv.root_causes?.map((c) => ({ description: c.description ?? '' })) ?? [],
+        contributing_factors: inv.contributing_factors?.map((c) => ({ description: c.description ?? '' })) ?? [],
+        recommendations: inv.recommendations?.map((r) => ({ description: r.description ?? '', priority: r.priority ?? 'medium' })) ?? [],
+        lessons_learned: inv.lessons_learned ?? '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            immediate_causes: data.immediate_causes.filter((c) => c.description.trim()),
+            root_causes: data.root_causes.filter((c) => c.description.trim()),
+            contributing_factors: data.contributing_factors.filter((c) => c.description.trim()),
+            recommendations: data.recommendations.filter((r) => r.description.trim()),
+        }));
+        form.post(`/health-safety/events/${d.id}/investigations/${inv.id}/findings`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={FileText} title="Record findings" blurb="Capture causes and recommendations. At least one cause or a summary is required; recommendations are needed before you can complete." />
+            <Field label="Findings summary" error={form.errors.findings_summary}>
+                <Textarea rows={3} value={form.data.findings_summary} onChange={(e) => form.setData('findings_summary', e.target.value)} placeholder="What did the investigation establish?" />
+            </Field>
+            <CauseListEditor label="Immediate causes" items={form.data.immediate_causes} onChange={(v) => form.setData('immediate_causes', v)} placeholder="Immediate cause" />
+            <CauseListEditor label="Root causes" items={form.data.root_causes} onChange={(v) => form.setData('root_causes', v)} placeholder="Root cause" />
+            <CauseListEditor label="Contributing factors" items={form.data.contributing_factors} onChange={(v) => form.setData('contributing_factors', v)} placeholder="Contributing factor" />
+            <RecommendationEditor items={form.data.recommendations} onChange={(v) => form.setData('recommendations', v)} />
+            <Field label="Lessons learned" hint="Optional" error={form.errors.lessons_learned}>
+                <Textarea rows={2} value={form.data.lessons_learned} onChange={(e) => form.setData('lessons_learned', e.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Save findings
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function CompleteInvestigationPane({ d, inv, onDone }: { d: EventDetail; inv: EventInvestigation; onDone: () => void }) {
+    const form = useForm<{ approved_by_id: string }>({ approved_by_id: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/investigations/${inv.id}/complete`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={CheckCircle2} title="Complete investigation" blurb="Approve and close the investigation. The event advances to Corrective action, where the recommendations become corrective actions." />
+            <InfoCard icon={CheckCircle2} tone="info">
+                Completing requires recorded recommendations. You sign off as the approver unless you nominate someone else.
+            </InfoCard>
+            <Field label="Approver" hint="Defaults to you" error={form.errors.approved_by_id}>
+                <StaffSelect value={form.data.approved_by_id} onChange={(v) => form.setData('approved_by_id', v)} staff={d.assignable_staff} placeholder="You" />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Complete investigation
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function ReturnInvestigationPane({ d, inv, onDone }: { d: EventDetail; inv: EventInvestigation; onDone: () => void }) {
+    const form = useForm<{ review_notes: string }>({ review_notes: '' });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/investigations/${inv.id}/return`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={RotateCcw} title="Return for rework" blurb="Send the investigation back to in-progress with reviewer notes." />
+            <Field label="Review notes" required error={form.errors.review_notes}>
+                <Textarea rows={4} value={form.data.review_notes} onChange={(e) => form.setData('review_notes', e.target.value)} placeholder="What needs more work?" />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Return for rework
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+/** Per-investigation workflow buttons, driven by status. */
+function InvestigationControls({ d, inv, onPane }: { d: EventDetail; inv: EventInvestigation; onPane: (p: ActivePane) => void }) {
+    const base = `/health-safety/events/${d.id}/investigations/${inv.id}`;
+    if (!['in_progress', 'findings_recorded', 'under_review'].includes(inv.status)) return null;
+
+    return (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+            {inv.status === 'in_progress' ? (
+                <Button size="sm" onClick={() => onPane({ kind: 'inv_findings', investigationId: inv.id })}>
+                    <FileText className="mr-1.5 h-4 w-4" /> Record findings
+                </Button>
+            ) : null}
+            {inv.status === 'findings_recorded' ? (
+                <Button size="sm" onClick={() => router.post(`${base}/submit`, {}, { preserveScroll: true })}>
+                    <Send className="mr-1.5 h-4 w-4" /> Submit for review
+                </Button>
+            ) : null}
+            {inv.status === 'under_review' ? (
+                <>
+                    <Button size="sm" onClick={() => onPane({ kind: 'inv_complete', investigationId: inv.id })}>
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" /> Complete
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onPane({ kind: 'inv_return', investigationId: inv.id })}>
+                        <RotateCcw className="mr-1.5 h-4 w-4" /> Return for rework
+                    </Button>
+                </>
+            ) : null}
+        </div>
     );
 }
 
@@ -784,14 +1139,21 @@ function InvestigationGate({ status }: { status: string }) {
     );
 }
 
-function InvestigationSection({ d }: { d: EventDetail }) {
+function InvestigationSection({ d, canAct, onPane }: { d: EventDetail; canAct: boolean; onPane: (p: ActivePane) => void }) {
     if (!d.investigations.length) {
         return (
-            <EmptyState
-                icon={Search}
-                title="No investigation yet"
-                blurb={d.investigation_required ? 'An investigation is required for this event.' : 'No investigation has been opened.'}
-            />
+            <div className="flex flex-col gap-4">
+                <EmptyState
+                    icon={Search}
+                    title="No investigation yet"
+                    blurb={d.investigation_required ? 'An investigation is required for this event.' : 'No investigation has been opened.'}
+                />
+                {canAct ? (
+                    <Button className="self-start" size="sm" onClick={() => onPane({ kind: 'inv_start' })}>
+                        <Plus className="mr-1.5 h-4 w-4" /> Start investigation
+                    </Button>
+                ) : null}
+            </div>
         );
     }
     return (
@@ -844,6 +1206,8 @@ function InvestigationSection({ d }: { d: EventDetail }) {
                             {inv.lessons_learned ? <Finding label="Lessons learned" text={inv.lessons_learned} /> : null}
                         </div>
                     ) : null}
+
+                    {canAct ? <InvestigationControls d={d} inv={inv} onPane={onPane} /> : null}
                 </div>
             ))}
         </div>

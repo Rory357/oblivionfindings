@@ -271,6 +271,9 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
         } else if (ev.worksafe_notifiable) {
             items.push({ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'WorkSafe', sub: titleCase(ev.worksafe_status ?? 'pending'), onClick: () => openEvent(ev.id, { section: 'overview' }) });
         }
+        if (can.manage && ev.status !== 'closed' && !ev.has_investigation) {
+            items.push({ icon: <Search className="h-3.5 w-3.5" />, label: 'Start investigation', onClick: () => openEvent(ev.id, { action: 'investigation' }) });
+        }
         if (can.manage && ev.status !== 'closed') {
             items.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close event', tone: 'critical', onClick: () => openEvent(ev.id, { action: 'close' }) });
         }

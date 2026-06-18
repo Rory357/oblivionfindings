@@ -8,6 +8,7 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -380,6 +381,8 @@ class HsEventController extends Controller
             'unwired' => false,
         ] : null;
 
+        $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
+
         return [
             'id' => $hsEvent->id,
             'reference_number' => $hsEvent->reference_number,
@@ -420,7 +423,11 @@ class HsEventController extends Controller
                 'actions_ok' => ! $hsEvent->hasOpenCorrectiveActions(),
                 'blockers' => $this->events->closeBlockers($hsEvent),
             ],
-            'can' => ['manage' => (bool) (auth()->user()?->can('hazards.manage') ?? false)],
+            'assignable_staff' => $canManage
+                ? User::query()->whereNotNull('approved_at')->orderBy('name')->limit(200)->get(['id', 'name'])
+                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->all()
+                : [],
+            'can' => ['manage' => $canManage],
         ];
     }
 
