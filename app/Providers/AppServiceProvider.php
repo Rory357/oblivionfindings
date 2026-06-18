@@ -44,6 +44,8 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteHazard;
+use App\Models\SiteInspectionRecord;
+use App\Models\SubstanceExposureRecord;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
@@ -68,7 +70,9 @@ use App\Observers\SafeguardingConcernObserver;
 use App\Observers\ShiftObserver;
 use App\Observers\SiteChecklistRunObserver;
 use App\Observers\SiteHazardObserver;
+use App\Observers\SiteInspectionRecordObserver;
 use App\Observers\SiteObserver;
+use App\Observers\SubstanceExposureRecordObserver;
 use App\Observers\TimesheetMileageObserver;
 use App\Observers\WorkplaceInjuryObserver;
 use App\Services\AuditLogger;
@@ -199,6 +203,8 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\SafeguardingInvestigation::observe(\App\Observers\SafeguardingInvestigationObserver::class);
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
+        SubstanceExposureRecord::observe(SubstanceExposureRecordObserver::class);
+        SiteInspectionRecord::observe(SiteInspectionRecordObserver::class);
         RestraintEvent::observe(RestraintEventObserver::class);
         EmergencyDrill::observe(EmergencyDrillObserver::class);
 

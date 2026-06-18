@@ -5,12 +5,18 @@ namespace Tests\Feature\HealthSafety;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
+use App\Models\Asset;
 use App\Models\FleetIncident;
+use App\Models\FleetWorkOrder;
+use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\SiteHazard;
+use App\Models\SiteInspectionRecord;
+use App\Models\SiteInspectionSchedule;
+use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
@@ -280,6 +286,135 @@ class HsEventBackboneTest extends TestCase
             'source_type' => RestraintEvent::class,
             'source_id' => $event->id,
             'severity' => 'medium',
+        ]);
+    }
+
+    // ──────────────────────────────────────────────────────
+    // Step 7 orphan-category wiring
+    // ──────────────────────────────────────────────────────
+
+    public function test_substance_exposure_record_creates_exposure_hs_event(): void
+    {
+        $site = Site::factory()->create();
+        $worker = User::factory()->create();
+        $creator = User::factory()->create();
+        $substance = HazardousSubstance::factory()->create(['created_by' => $creator->id]);
+
+        $record = SubstanceExposureRecord::create([
+            'hazardous_substance_id' => $substance->id,
+            'user_id' => $worker->id,
+            'site_id' => $site->id,
+            'exposed_at' => now()->subHour(),
+            'exposure_type' => 'inhalation',
+            'circumstances' => 'Cleaner vapour exposure during storage-room spill response.',
+            'medical_attention_sought' => true,
+            'incident_reported' => false,
+            'created_by' => $creator->id,
+        ]);
+
+        $this->assertDatabaseHas('hs_events', [
+            'source_type' => SubstanceExposureRecord::class,
+            'source_id' => $record->id,
+            'event_category' => HsEvent::CATEGORY_EXPOSURE,
+            'severity' => HsEvent::SEVERITY_HIGH,
+            'site_id' => $site->id,
+            'staff_id' => $worker->id,
+            'created_by' => $creator->id,
+            'investigation_required' => true,
+        ]);
+    }
+
+    public function test_failed_site_inspection_record_creates_inspection_failure_hs_event(): void
+    {
+        $site = Site::factory()->create();
+        $inspector = User::factory()->create();
+        $schedule = SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'inspection_type' => 'house_safety',
+            'title' => 'House safety inspection',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->subDay()->toDateString(),
+            'next_due_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $record = SiteInspectionRecord::create([
+            'schedule_id' => $schedule->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'due_date' => now()->subDay()->toDateString(),
+            'completed_at' => now(),
+            'completed_by_user_id' => $inspector->id,
+            'result' => 'fail',
+            'findings' => 'Exit lighting failed and trip hazard found.',
+            'corrective_actions' => 'Replace lighting and remove trip hazard.',
+        ]);
+
+        $this->assertDatabaseHas('hs_events', [
+            'source_type' => SiteInspectionRecord::class,
+            'source_id' => $record->id,
+            'event_category' => HsEvent::CATEGORY_INSPECTION_FAILURE,
+            'severity' => HsEvent::SEVERITY_HIGH,
+            'site_id' => $site->id,
+            'staff_id' => $inspector->id,
+            'created_by' => $inspector->id,
+            'investigation_required' => true,
+        ]);
+    }
+
+    public function test_passing_site_inspection_record_does_not_create_inspection_failure_hs_event(): void
+    {
+        $site = Site::factory()->create();
+        $schedule = SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'inspection_type' => 'house_safety',
+            'title' => 'House safety inspection',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->subDay()->toDateString(),
+            'next_due_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        SiteInspectionRecord::create([
+            'schedule_id' => $schedule->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'due_date' => now()->subDay()->toDateString(),
+            'completed_at' => now(),
+            'result' => 'pass',
+        ]);
+
+        $this->assertDatabaseMissing('hs_events', [
+            'event_category' => HsEvent::CATEGORY_INSPECTION_FAILURE,
+        ]);
+    }
+
+    public function test_high_priority_fleet_work_order_creates_equipment_fault_hs_event(): void
+    {
+        $site = Site::factory()->create();
+        $reporter = User::factory()->create();
+        $asset = Asset::factory()->forSite($site)->vehicle()->create();
+
+        $workOrder = FleetWorkOrder::factory()->create([
+            'asset_id' => $asset->id,
+            'reported_by_user_id' => $reporter->id,
+            'tenant_id' => $site->tenant_id,
+            'title' => 'Wheelchair ramp hydraulic fault',
+            'priority' => 'high',
+            'status' => 'open',
+        ]);
+
+        $this->assertDatabaseHas('hs_events', [
+            'source_type' => FleetWorkOrder::class,
+            'source_id' => $workOrder->id,
+            'event_category' => HsEvent::CATEGORY_EQUIPMENT_FAULT,
+            'severity' => HsEvent::SEVERITY_HIGH,
+            'site_id' => $site->id,
+            'asset_id' => $asset->id,
+            'created_by' => $reporter->id,
+            'investigation_required' => true,
         ]);
     }
 

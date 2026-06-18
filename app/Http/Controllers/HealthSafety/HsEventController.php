@@ -7,37 +7,63 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
+use App\Models\Site;
+use App\Models\SiteInspectionRecord;
+use App\Models\SubstanceExposureRecord;
+use App\Models\User;
+use App\Services\HealthSafety\HsEventService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class HsEventController extends Controller
 {
+    public function __construct(private readonly HsEventService $events) {}
+
     /**
-     * H&S Events listing with filters.
+     * H&S Events register — the governance convergence view.
+     *
+     * Hero counts, tab counts, standardised rows (source + governance flags) and,
+     * on ?event=, the detail payload for the over-the-list modal.
      */
     public function index(Request $request): \Inertia\Response
     {
+        $tab = (string) $request->input('tab', 'all');
+
+        // ── List query: scope (site + period) + tab + refinements ──
         $query = HsEvent::query()
             ->with(['site:id,name', 'client:id,first_name,last_name', 'staff:id,name'])
+            ->withCount([
+                'investigations',
+                'investigations as overdue_investigations_count' => fn (Builder $q) => $q
+                    ->whereNotNull('target_completion_date')
+                    ->where('target_completion_date', '<', now())
+                    ->where('status', '!=', HsInvestigation::STATUS_COMPLETED),
+                'correctiveActions as open_actions_count' => fn (Builder $q) => $q
+                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]),
+                'correctiveActions as awaiting_verification_count' => fn (Builder $q) => $q
+                    ->where('status', HsCorrectiveAction::STATUS_COMPLETED),
+            ])
             ->orderByDesc('reported_at');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        $this->applyScope($query, $request);
+        $this->applyTab($query, $tab);
 
         if ($request->filled('severity')) {
             $query->where('severity', $request->input('severity'));
         }
-
         if ($request->filled('category')) {
             $query->where('event_category', $request->input('category'));
         }
-
-        if ($request->filled('site_id')) {
-            $query->where('site_id', $request->input('site_id'));
+        if ($request->boolean('worksafe')) {
+            $query->where('worksafe_notifiable', true);
+        }
+        if ($request->filled('q')) {
+            $term = trim((string) $request->input('q'));
+            $query->where('reference_number', 'like', "%{$term}%");
         }
 
-        $events = $query->paginate(25)->through(fn (HsEvent $e) => [
+        $events = $query->paginate(25)->withQueryString()->through(fn (HsEvent $e) => [
             'id' => $e->id,
             'reference_number' => $e->reference_number,
             'event_category' => $e->event_category,
@@ -48,34 +74,293 @@ class HsEventController extends Controller
             'site_name' => $e->site?->name,
             'client_name' => $e->client ? trim($e->client->first_name . ' ' . $e->client->last_name) : null,
             'staff_name' => $e->staff?->name,
-            'worksafe_notifiable' => $e->worksafe_notifiable,
-            'investigation_required' => $e->investigation_required,
-            'has_investigation' => $e->latestInvestigation()->exists(),
-            'has_open_actions' => $e->openCorrectiveActions()->exists(),
+            'worksafe_notifiable' => (bool) $e->worksafe_notifiable,
+            'worksafe_status' => $e->worksafe_status,
+            'investigation_required' => (bool) $e->investigation_required,
+            'source' => $this->resolveSource($e->source_type, $e->source_id),
+            'flags' => [
+                'investigation_overdue' => $e->overdue_investigations_count > 0,
+                'awaiting_verification' => (int) $e->awaiting_verification_count,
+                'worksafe_pending' => $e->worksafe_notifiable && $e->worksafe_status === HsEvent::WORKSAFE_PENDING,
+                'unwired' => $e->source_id === null,
+            ],
+            'has_investigation' => $e->investigations_count > 0,
+            'has_open_actions' => $e->open_actions_count > 0,
         ]);
+
+        // ── Hero + tab counts (respect scope only — not tab/refinements) ──
+        $statusCounts = $this->scopedBase($request)
+            ->selectRaw('status, count(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+
+        $count = fn (string $s): int => (int) ($statusCounts[$s] ?? 0);
+
+        $tabCounts = [
+            'all' => (int) $statusCounts->sum(),
+            'open' => $count(HsEvent::STATUS_OPEN),
+            'investigating' => $count(HsEvent::STATUS_INVESTIGATING),
+            'corrective_actions' => $count(HsEvent::STATUS_CORRECTIVE_ACTION),
+            'monitoring' => $count(HsEvent::STATUS_MONITORING),
+            'closed' => $count(HsEvent::STATUS_CLOSED),
+            'worksafe' => (int) $this->scopedBase($request)->where('worksafe_notifiable', true)->count(),
+        ];
+
+        $hero = [
+            'live' => [
+                'open' => $count(HsEvent::STATUS_OPEN),
+                'investigating' => $count(HsEvent::STATUS_INVESTIGATING),
+                'corrective_action' => $count(HsEvent::STATUS_CORRECTIVE_ACTION),
+                'monitoring' => $count(HsEvent::STATUS_MONITORING),
+            ],
+            'attention' => [
+                'investigation_due' => (int) $this->scopedBase($request)
+                    ->where('investigation_required', true)
+                    ->where('status', '!=', HsEvent::STATUS_CLOSED)
+                    ->whereDoesntHave('investigations', fn (Builder $q) => $q->where('status', HsInvestigation::STATUS_COMPLETED))
+                    ->count(),
+                'awaiting_verification' => (int) $this->scopedBase($request)
+                    ->whereHas('correctiveActions', fn (Builder $q) => $q->where('status', HsCorrectiveAction::STATUS_COMPLETED))
+                    ->count(),
+                'worksafe_due' => (int) $this->scopedBase($request)
+                    ->where('worksafe_notifiable', true)
+                    ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
+                    ->count(),
+                'closed_period' => $count(HsEvent::STATUS_CLOSED),
+            ],
+        ];
+
+        // ── Detail-over-list (?event=) ──
+        $detail = null;
+        if ($request->filled('event')) {
+            $target = HsEvent::find($request->integer('event'));
+            $detail = $target ? $this->buildEventDetail($target) : null;
+        }
+
+        $siteIds = $this->scopedBase($request)->whereNotNull('site_id')->distinct()->pluck('site_id');
 
         return Inertia::render('health-safety/events/index', [
             'events' => $events,
-            'filters' => $request->only(['status', 'severity', 'category', 'site_id']),
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'hero' => $hero,
+            'filters' => [
+                'q' => $request->input('q'),
+                'tab' => $tab,
+                'severity' => $request->input('severity'),
+                'category' => $request->input('category'),
+                'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
+                'worksafe' => $request->boolean('worksafe') ?: null,
+                'from' => $request->input('from'),
+                'to' => $request->input('to'),
+            ],
+            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
+            'detail' => $detail,
+            'can' => ['manage' => (bool) ($request->user()?->can('hazards.manage') ?? false)],
+        ]);
+    }
+
+    /** Scope = the hero/tab "period + site" lens (never the tab or list refinements). */
+    private function applyScope(Builder $query, Request $request): void
+    {
+        if ($request->filled('site_id')) {
+            $query->where('site_id', (int) $request->input('site_id'));
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('occurred_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('occurred_at', '<=', $request->input('to'));
+        }
+    }
+
+    /** A fresh, scope-applied base query for the hero/tab aggregates. */
+    private function scopedBase(Request $request): Builder
+    {
+        $query = HsEvent::query();
+        $this->applyScope($query, $request);
+
+        return $query;
+    }
+
+    /** Tab → governance-status filter (category stays a filter, never a tab). */
+    private function applyTab(Builder $query, string $tab): void
+    {
+        match ($tab) {
+            'open' => $query->where('status', HsEvent::STATUS_OPEN),
+            'investigating' => $query->where('status', HsEvent::STATUS_INVESTIGATING),
+            'corrective_actions' => $query->where('status', HsEvent::STATUS_CORRECTIVE_ACTION),
+            'monitoring' => $query->where('status', HsEvent::STATUS_MONITORING),
+            'closed' => $query->where('status', HsEvent::STATUS_CLOSED),
+            'worksafe' => $query->where('worksafe_notifiable', true),
+            default => $query, // 'all'
+        };
+    }
+
+    /**
+     * H&S Event detail — thin deep-link / share fallback. Renders the same
+     * governance modal (HsEventDialog) on a thin shell as the over-the-list
+     * modal opened from the register.
+     */
+    public function show(HsEvent $hsEvent): \Inertia\Response
+    {
+        return Inertia::render('health-safety/events/show', [
+            'detail' => $this->buildEventDetail($hsEvent),
         ]);
     }
 
     /**
-     * H&S Event detail with investigation, corrective actions, and risk assessments.
+     * Close an event through the governance gate (E-Gap 1). A blocked closure
+     * (incomplete required investigation / unverified actions) requires a logged
+     * override reason; a closure summary is always required.
      */
-    public function show(HsEvent $hsEvent): \Inertia\Response
+    public function close(Request $request, HsEvent $hsEvent)
     {
-        $hsEvent->load([
+        $data = $request->validate([
+            'closure_summary' => ['required', 'string', 'max:2000'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->events->closeEvent(
+                $hsEvent,
+                $data['closure_summary'],
+                $request->user(),
+                $data['override_reason'] ?? null,
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Event closed.');
+    }
+
+    /**
+     * Record the WorkSafe NZ notification for a notifiable event (E-Gap 2):
+     * pending → notified, persisting date/method/reference + site preservation.
+     */
+    public function worksafeNotify(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'notified_at' => ['required', 'date'],
+            'method' => ['required', 'string', 'max:50'],
+            'reference' => ['nullable', 'string', 'max:50'],
+            'site_preserved' => ['boolean'],
+        ]);
+
+        try {
+            $this->events->recordWorksafeNotification(
+                $hsEvent,
+                $data['notified_at'],
+                $data['method'],
+                $data['reference'] ?? null,
+                $request->boolean('site_preserved'),
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'WorkSafe notification recorded.');
+    }
+
+    /**
+     * Record WorkSafe's acknowledgement of the notification (notified → acknowledged).
+     */
+    public function worksafeAcknowledge(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'acknowledged_at' => ['required', 'date'],
+        ]);
+
+        try {
+            $this->events->acknowledgeWorksafe($hsEvent, $data['acknowledged_at']);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'WorkSafe acknowledgement recorded.');
+    }
+
+    /**
+     * Two-way convergence (E-Gap 4): resolve a polymorphic source to a label + a
+     * jump back to the originating record. Categories with no source (the orphan
+     * categories) return null. Modules without a per-record route resolve to a
+     * label only (no jump) rather than a broken link.
+     */
+    private function resolveSource(?string $sourceType, ?int $sourceId): ?array
+    {
+        if (! $sourceType || ! $sourceId) {
+            return null;
+        }
+
+        $basename = class_basename($sourceType);
+
+        [$label, $url] = match ($basename) {
+            'ClientIncident' => ['Incident', "/incidents/{$sourceId}"],
+            'SafeguardingConcern' => ['Safeguarding concern', "/safeguarding/{$sourceId}"],
+            'FleetIncident' => ['Fleet incident', "/fleet-assets/incidents?incident={$sourceId}"],
+            'WorkplaceInjury' => ['Workplace injury', "/health-safety/injuries/{$sourceId}"],
+            'SubstanceExposureRecord' => $this->resolveSubstanceExposureSource($sourceId),
+            'SiteInspectionRecord' => $this->resolveSiteInspectionSource($sourceId),
+            'FleetWorkOrder' => ['Fleet work order', "/fleet-assets/maintenance/work-orders/{$sourceId}"],
+            'EmergencyDrill' => ['Emergency drill', "/health-safety/drills/{$sourceId}"],
+            'SiteHazard' => ['Hazard', null],
+            'RestraintEvent' => ['Restraint event', null],
+            default => [$basename, null],
+        };
+
+        return [
+            'type' => $basename,
+            'id' => $sourceId,
+            'label' => "{$label} #{$sourceId}",
+            'url' => $url,
+            'unwired' => false,
+        ];
+    }
+
+    private function resolveSubstanceExposureSource(int $sourceId): array
+    {
+        $record = SubstanceExposureRecord::query()
+            ->select(['id', 'hazardous_substance_id'])
+            ->find($sourceId);
+
+        return [
+            'Substance exposure',
+            $record?->hazardous_substance_id
+                ? "/health-safety/substances/{$record->hazardous_substance_id}"
+                : null,
+        ];
+    }
+
+    private function resolveSiteInspectionSource(int $sourceId): array
+    {
+        $record = SiteInspectionRecord::query()
+            ->select(['id', 'site_id'])
+            ->find($sourceId);
+
+        return [
+            'Site inspection',
+            $record?->site_id ? "/sites/{$record->site_id}/inspections" : null,
+        ];
+    }
+
+    /**
+     * The full governance detail payload — the contract behind the HsEventDialog
+     * (mirrored by `EventDetail` in event-detail-dialog.tsx). Shared by index()
+     * (over-the-list modal on ?event=) and show() (deep-link shell).
+     */
+    private function buildEventDetail(HsEvent $hsEvent): array
+    {
+        $hsEvent->loadMissing([
             'site:id,name',
             'client:id,first_name,last_name',
-            'staff:id,name,email',
-            'asset:id,name,asset_tag',
-            'shift:id,starts_at,ends_at',
-            'controlRoomAlert:id,severity,status,triggered_at',
+            'staff:id,name',
+            'asset:id,name',
+            'controlRoomAlert:id,severity,status',
             'creator:id,name',
         ]);
 
-        $investigations = HsInvestigation::where('hs_event_id', $hsEvent->id)
+        $investigations = $hsEvent->investigations()
             ->with(['leadInvestigator:id,name', 'reviewedBy:id,name', 'approvedBy:id,name'])
             ->orderByDesc('created_at')
             ->get()
@@ -99,11 +384,13 @@ class HsEventController extends Controller
                 'findings_summary' => $inv->findings_summary,
                 'recommendations' => $inv->recommendations,
                 'lessons_learned' => $inv->lessons_learned,
+                'reviewed_by_name' => $inv->reviewedBy?->name,
+                'approved_by_name' => $inv->approvedBy?->name,
             ]);
 
-        $correctiveActions = HsCorrectiveAction::where('hs_event_id', $hsEvent->id)
+        $correctiveActions = $hsEvent->correctiveActions()
             ->with(['assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name'])
-            ->orderBy('priority')
+            ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date')
             ->get()
             ->map(fn (HsCorrectiveAction $a) => [
@@ -117,11 +404,15 @@ class HsEventController extends Controller
                 'due_date' => $a->due_date?->toDateString(),
                 'is_overdue' => $a->isOverdue(),
                 'completed_at' => $a->completed_at?->toIso8601String(),
+                'completed_by_name' => $a->completedBy?->name,
                 'verified_at' => $a->verified_at?->toIso8601String(),
+                'verified_by_name' => $a->verifiedBy?->name,
                 'effectiveness_confirmed' => $a->effectiveness_confirmed,
+                'hs_investigation_id' => $a->hs_investigation_id,
+                'recommendation_index' => $a->recommendation_index,
             ]);
 
-        $riskAssessments = HsRiskAssessment::where('hs_event_id', $hsEvent->id)
+        $riskAssessments = $hsEvent->riskAssessments()
             ->with(['assessedBy:id,name'])
             ->orderByDesc('created_at')
             ->get()
@@ -130,8 +421,12 @@ class HsEventController extends Controller
                 'reference_number' => $ra->reference_number,
                 'title' => $ra->title,
                 'status' => $ra->status,
+                'likelihood' => $ra->likelihood,
+                'consequence' => $ra->consequence,
                 'risk_score' => $ra->risk_score,
                 'risk_level' => $ra->risk_level,
+                'residual_likelihood' => $ra->residual_likelihood,
+                'residual_consequence' => $ra->residual_consequence,
                 'residual_risk_score' => $ra->residual_risk_score,
                 'residual_risk_level' => $ra->residual_risk_level,
                 'risk_acceptable' => $ra->risk_acceptable,
@@ -140,46 +435,56 @@ class HsEventController extends Controller
                 'is_due_for_review' => $ra->isDueForReview(),
             ]);
 
-        return Inertia::render('health-safety/events/show', [
-            'event' => [
-                'id' => $hsEvent->id,
-                'reference_number' => $hsEvent->reference_number,
-                'event_category' => $hsEvent->event_category,
-                'severity' => $hsEvent->severity,
-                'status' => $hsEvent->status,
-                'occurred_at' => $hsEvent->occurred_at?->toIso8601String(),
-                'reported_at' => $hsEvent->reported_at?->toIso8601String(),
-                'site_name' => $hsEvent->site?->name,
-                'site_id' => $hsEvent->site_id,
-                'client_name' => $hsEvent->client ? trim($hsEvent->client->first_name . ' ' . $hsEvent->client->last_name) : null,
-                'client_id' => $hsEvent->client_id,
-                'staff_name' => $hsEvent->staff?->name,
-                'staff_id' => $hsEvent->staff_id,
-                'asset_name' => $hsEvent->asset?->name,
-                'asset_id' => $hsEvent->asset_id,
-                'shift_id' => $hsEvent->shift_id,
-                'worksafe_notifiable' => $hsEvent->worksafe_notifiable,
-                'worksafe_status' => $hsEvent->worksafe_status,
-                'worksafe_reference' => $hsEvent->worksafe_reference,
-                'investigation_required' => $hsEvent->investigation_required,
-                'control_room_alert' => $hsEvent->controlRoomAlert ? [
-                    'id' => $hsEvent->controlRoomAlert->id,
-                    'severity' => $hsEvent->controlRoomAlert->severity,
-                    'status' => $hsEvent->controlRoomAlert->status,
-                ] : null,
-                'closed_at' => $hsEvent->closed_at?->toIso8601String(),
-                'closure_summary' => $hsEvent->closure_summary,
-                'created_by_name' => $hsEvent->creator?->name,
-                'source_type' => class_basename($hsEvent->source_type),
-                'source_id' => $hsEvent->source_id,
-                'can_create_investigation' => $hsEvent->canCreateInvestigation(),
-                'has_open_corrective_actions' => $hsEvent->hasOpenCorrectiveActions(),
-                'all_corrective_actions_resolved' => $hsEvent->allCorrectiveActionsResolved(),
-            ],
+        $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id);
+
+        $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
+
+        return [
+            'id' => $hsEvent->id,
+            'reference_number' => $hsEvent->reference_number,
+            'event_category' => $hsEvent->event_category,
+            'severity' => $hsEvent->severity,
+            'status' => $hsEvent->status,
+            'occurred_at' => $hsEvent->occurred_at?->toIso8601String(),
+            'reported_at' => $hsEvent->reported_at?->toIso8601String(),
+            'description' => null,
+            'site' => $hsEvent->site ? ['id' => $hsEvent->site->id, 'name' => $hsEvent->site->name] : null,
+            'client' => $hsEvent->client ? ['id' => $hsEvent->client->id, 'name' => trim($hsEvent->client->first_name . ' ' . $hsEvent->client->last_name)] : null,
+            'staff' => $hsEvent->staff ? ['id' => $hsEvent->staff->id, 'name' => $hsEvent->staff->name] : null,
+            'asset' => $hsEvent->asset ? ['id' => $hsEvent->asset->id, 'name' => $hsEvent->asset->name] : null,
+            'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
+            'worksafe_status' => $hsEvent->worksafe_status,
+            'worksafe_reference' => $hsEvent->worksafe_reference,
+            'worksafe_notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
+            'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
+            'worksafe_method' => $hsEvent->worksafe_method,
+            'worksafe_site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
+            'worksafe_reason' => null,
+            'investigation_required' => (bool) $hsEvent->investigation_required,
+            'control_room_alert' => $hsEvent->controlRoomAlert ? [
+                'id' => $hsEvent->controlRoomAlert->id,
+                'severity' => $hsEvent->controlRoomAlert->severity,
+                'status' => $hsEvent->controlRoomAlert->status,
+            ] : null,
+            'closed_at' => $hsEvent->closed_at?->toIso8601String(),
+            'closure_summary' => $hsEvent->closure_summary,
+            'created_by_name' => $hsEvent->creator?->name,
+            'source' => $source,
             'investigations' => $investigations,
             'corrective_actions' => $correctiveActions,
             'risk_assessments' => $riskAssessments,
-        ]);
+            'attachments' => [],   // evidence gallery wired in a later step
+            'close_gate' => [
+                'investigation_ok' => ! $hsEvent->investigation_required || $hsEvent->hasCompletedInvestigation(),
+                'actions_ok' => ! $hsEvent->hasOpenCorrectiveActions(),
+                'blockers' => $this->events->closeBlockers($hsEvent),
+            ],
+            'assignable_staff' => $canManage
+                ? User::query()->whereNotNull('approved_at')->orderBy('name')->limit(200)->get(['id', 'name'])
+                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->all()
+                : [],
+            'can' => ['manage' => $canManage],
+        ];
     }
 
     /**
@@ -187,32 +492,34 @@ class HsEventController extends Controller
      */
     public function correctiveActions(Request $request): \Inertia\Response
     {
+        $tab = (string) $request->input('tab', $this->legacyActionTab($request));
+
         $query = HsCorrectiveAction::query()
             ->with([
-                'hsEvent:id,reference_number,event_category,severity,site_id',
+                'hsEvent:id,reference_number,event_category,severity,status,site_id',
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
             ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        $this->applyActionScope($query, $request);
+        $this->applyActionTab($query, $tab);
 
         if ($request->filled('priority')) {
             $query->where('priority', $request->input('priority'));
         }
 
-        if ($request->input('overdue') === 'true') {
-            $query->overdue();
+        if ($request->filled('q')) {
+            $term = trim((string) $request->input('q'));
+            $query->where(function (Builder $q) use ($term) {
+                $q->where('reference_number', 'like', "%{$term}%")
+                    ->orWhere('title', 'like', "%{$term}%")
+                    ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', "%{$term}%"));
+            });
         }
 
-        if ($request->input('awaiting_verification') === 'true') {
-            $query->awaitingVerification();
-        }
-
-        $actions = $query->paginate(25)->through(fn (HsCorrectiveAction $a) => [
+        $actions = $query->paginate(25)->withQueryString()->through(fn (HsCorrectiveAction $a) => [
             'id' => $a->id,
             'reference_number' => $a->reference_number,
             'title' => $a->title,
@@ -222,15 +529,148 @@ class HsEventController extends Controller
             'assigned_to_name' => $a->assignedTo?->name,
             'due_date' => $a->due_date?->toDateString(),
             'is_overdue' => $a->isOverdue(),
-            'event_reference' => $a->hsEvent?->reference_number,
-            'event_category' => $a->hsEvent?->event_category,
-            'site_name' => $a->hsEvent?->site?->name,
+            'completed_at' => $a->completed_at?->toIso8601String(),
+            'verified_at' => $a->verified_at?->toIso8601String(),
+            'event' => $a->hsEvent ? [
+                'id' => $a->hsEvent->id,
+                'reference_number' => $a->hsEvent->reference_number,
+                'event_category' => $a->hsEvent->event_category,
+                'severity' => $a->hsEvent->severity,
+                'status' => $a->hsEvent->status,
+                'site_name' => $a->hsEvent->site?->name,
+                'url' => "/health-safety/events?event={$a->hsEvent->id}",
+                'monitoring' => $a->hsEvent->status === HsEvent::STATUS_MONITORING,
+            ] : null,
         ]);
+
+        $base = $this->actionScopedBase($request);
+        $countStatus = fn (string $status): int => (int) (clone $base)->where('status', $status)->count();
+        $openCount = $countStatus(HsCorrectiveAction::STATUS_OPEN);
+        $inProgressCount = $countStatus(HsCorrectiveAction::STATUS_IN_PROGRESS);
+        $awaitingCount = $countStatus(HsCorrectiveAction::STATUS_COMPLETED);
+        $verifiedCount = $countStatus(HsCorrectiveAction::STATUS_VERIFIED);
+        $closedCount = $countStatus(HsCorrectiveAction::STATUS_CLOSED);
+
+        $tabCounts = [
+            'all' => (int) (clone $base)->count(),
+            'open' => $openCount,
+            'in_progress' => $inProgressCount,
+            'awaiting_verification' => $awaitingCount,
+            'overdue' => (int) (clone $base)->overdue()->count(),
+            'verified' => $verifiedCount,
+            'closed' => $closedCount,
+        ];
+
+        $hero = [
+            'live' => [
+                'open' => $openCount,
+                'in_progress' => $inProgressCount,
+                'awaiting_verification' => $awaitingCount,
+                'verified' => $verifiedCount,
+            ],
+            'attention' => [
+                'overdue' => $tabCounts['overdue'],
+                'critical_open' => (int) (clone $base)
+                    ->whereIn('priority', [HsCorrectiveAction::PRIORITY_HIGH, HsCorrectiveAction::PRIORITY_CRITICAL])
+                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->count(),
+                'unassigned' => (int) (clone $base)
+                    ->whereNull('assigned_to_user_id')
+                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->count(),
+                'monitoring_events' => (int) (clone $base)
+                    ->whereHas('hsEvent', fn (Builder $q) => $q->where('status', HsEvent::STATUS_MONITORING))
+                    ->distinct('hs_event_id')
+                    ->count('hs_event_id'),
+            ],
+        ];
+
+        $detail = null;
+        if ($request->filled('event')) {
+            $target = HsEvent::find($request->integer('event'));
+            $detail = $target ? $this->buildEventDetail($target) : null;
+        }
+
+        $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
+            ->with('hsEvent:id,site_id')
+            ->get()
+            ->pluck('hsEvent.site_id')
+            ->filter()
+            ->unique()
+            ->values();
 
         return Inertia::render('health-safety/corrective-actions/index', [
             'actions' => $actions,
-            'filters' => $request->only(['status', 'priority', 'overdue', 'awaiting_verification']),
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'hero' => $hero,
+            'filters' => [
+                'q' => $request->input('q'),
+                'tab' => $tab,
+                'priority' => $request->input('priority'),
+                'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
+                'from' => $request->input('from'),
+                'to' => $request->input('to'),
+            ],
+            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
+            'detail' => $detail,
+            'can' => ['manage' => (bool) ($request->user()?->can('hazards.manage') ?? false)],
         ]);
+    }
+
+    private function legacyActionTab(Request $request): string
+    {
+        if ($request->input('overdue') === 'true') {
+            return 'overdue';
+        }
+
+        if ($request->input('awaiting_verification') === 'true') {
+            return 'awaiting_verification';
+        }
+
+        return match ((string) $request->input('status', 'all')) {
+            HsCorrectiveAction::STATUS_IN_PROGRESS => 'in_progress',
+            HsCorrectiveAction::STATUS_COMPLETED => 'awaiting_verification',
+            HsCorrectiveAction::STATUS_VERIFIED => 'verified',
+            HsCorrectiveAction::STATUS_CLOSED => 'closed',
+            HsCorrectiveAction::STATUS_OPEN => 'open',
+            default => 'all',
+        };
+    }
+
+    private function applyActionScope(Builder $query, Request $request): void
+    {
+        if ($request->filled('site_id')) {
+            $siteId = (int) $request->input('site_id');
+            $query->whereHas('hsEvent', fn (Builder $q) => $q->where('site_id', $siteId));
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('due_date', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('due_date', '<=', $request->input('to'));
+        }
+    }
+
+    private function actionScopedBase(Request $request): Builder
+    {
+        $query = HsCorrectiveAction::query();
+        $this->applyActionScope($query, $request);
+
+        return $query;
+    }
+
+    private function applyActionTab(Builder $query, string $tab): void
+    {
+        match ($tab) {
+            'open' => $query->where('status', HsCorrectiveAction::STATUS_OPEN),
+            'in_progress' => $query->where('status', HsCorrectiveAction::STATUS_IN_PROGRESS),
+            'awaiting_verification' => $query->where('status', HsCorrectiveAction::STATUS_COMPLETED),
+            'verified' => $query->where('status', HsCorrectiveAction::STATUS_VERIFIED),
+            'closed' => $query->where('status', HsCorrectiveAction::STATUS_CLOSED),
+            'overdue' => $query->overdue(),
+            default => $query,
+        };
     }
 
     /**

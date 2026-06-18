@@ -4,8 +4,10 @@ use App\Http\Controllers\HealthSafety\EmergencyDrillController;
 use App\Http\Controllers\HealthSafety\FirstAidController;
 use App\Http\Controllers\HealthSafety\HazardousSubstanceController;
 use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
+use App\Http\Controllers\HealthSafety\HsCorrectiveActionController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
+use App\Http\Controllers\HealthSafety\HsInvestigationController;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\RestraintController;
@@ -39,6 +41,29 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
         Route::get('/risk-assessments', [HsEventController::class, 'riskAssessments'])->name('risk-assessments.index');
+    });
+
+    // ── Events governance write actions (gated) ──
+    Route::middleware('permission:hazards.manage')->group(function () {
+        Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
+        Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
+        Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
+
+        // Investigation workflow (exposes HsInvestigationService)
+        Route::post('/events/{event}/investigations', [HsInvestigationController::class, 'store'])->name('events.investigations.store');
+        Route::post('/events/{event}/investigations/{investigation}/findings', [HsInvestigationController::class, 'recordFindings'])->name('events.investigations.findings');
+        Route::post('/events/{event}/investigations/{investigation}/submit', [HsInvestigationController::class, 'submit'])->name('events.investigations.submit');
+        Route::post('/events/{event}/investigations/{investigation}/return', [HsInvestigationController::class, 'returnForRework'])->name('events.investigations.return');
+        Route::post('/events/{event}/investigations/{investigation}/complete', [HsInvestigationController::class, 'complete'])->name('events.investigations.complete');
+        Route::post('/events/{event}/investigations/{investigation}/seed-action', [HsCorrectiveActionController::class, 'seedFromRecommendation'])->name('events.investigations.seed-action');
+
+        // Corrective-action workflow (exposes HsCorrectiveActionService)
+        Route::post('/events/{event}/corrective-actions', [HsCorrectiveActionController::class, 'store'])->name('events.corrective-actions.store');
+        Route::post('/events/{event}/corrective-actions/{action}/start', [HsCorrectiveActionController::class, 'start'])->name('events.corrective-actions.start');
+        Route::post('/events/{event}/corrective-actions/{action}/complete', [HsCorrectiveActionController::class, 'complete'])->name('events.corrective-actions.complete');
+        Route::post('/events/{event}/corrective-actions/{action}/verify', [HsCorrectiveActionController::class, 'verify'])->name('events.corrective-actions.verify');
+        Route::post('/events/{event}/corrective-actions/{action}/close', [HsCorrectiveActionController::class, 'close'])->name('events.corrective-actions.close');
+        Route::post('/events/{event}/corrective-actions/{action}/return', [HsCorrectiveActionController::class, 'returnForRework'])->name('events.corrective-actions.return');
     });
 
     // ── PR6: Governance & Compliance Reports ──

@@ -126,6 +126,9 @@ export default [
             'node_modules',
             'public',
             'bootstrap/ssr',
+            '.design-drops/**',
+            'playwright-report/**',
+            'test-results/**',
             'tailwind.config.js',
             // Claude Code agent worktrees: each is a full repo checkout so
             // recursing into them duplicates lint work for every parallel
