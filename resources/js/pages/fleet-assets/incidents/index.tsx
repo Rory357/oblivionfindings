@@ -23,6 +23,7 @@ import {
 } from '@/components/rostering';
 import { FleetIncidentDialog, type FleetIncidentDetail } from '@/components/fleet/fleet-incident-dialog';
 import { FleetIncidentReportDialog, type ReportMode } from '@/components/fleet/fleet-incident-report-dialog';
+import { FleetTelematicsStoryboard } from '@/components/fleet/fleet-telematics-storyboard';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
@@ -194,6 +195,7 @@ export default function FleetIncidentsIndex({
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [launcherOpen, setLauncherOpen] = useState(false);
+    const [telematicsOpen, setTelematicsOpen] = useState(false);
     const [reportMode, setReportMode] = useState<ReportMode | null>(
         report && REPORT_MODES.includes(report as ReportMode) ? (report as ReportMode) : null,
     );
@@ -415,6 +417,7 @@ export default function FleetIncidentsIndex({
                             </div>
                         </div>
 
+                        <div className="flex flex-col items-end gap-2">
                         {can.manage ? (
                             <Popover open={launcherOpen} onOpenChange={setLauncherOpen}>
                                 <PopoverTrigger asChild>
@@ -447,6 +450,16 @@ export default function FleetIncidentsIndex({
                                 </PopoverContent>
                             </Popover>
                         ) : null}
+                            {/* eslint-disable-next-line no-restricted-syntax -- onDark dashed PREP-LATER affordance */}
+                            <button
+                                type="button"
+                                onClick={() => setTelematicsOpen(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary-foreground/30 px-3 py-1.5 text-xs font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10"
+                            >
+                                <RadioTower className="h-3.5 w-3.5" /> Telematics preview
+                                <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase">Prep</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* stat clusters */}
@@ -495,6 +508,8 @@ export default function FleetIncidentsIndex({
                     }}
                 />
             ) : null}
+
+            <FleetTelematicsStoryboard open={telematicsOpen} onClose={() => setTelematicsOpen(false)} />
         </AppLayout>
     );
 }
