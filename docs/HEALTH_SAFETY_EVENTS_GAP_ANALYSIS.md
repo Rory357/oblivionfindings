@@ -44,7 +44,7 @@
 ## F. Corrective actions (actionable, verified)
 - [x] F1 — **Create** action (standalone or **from a recommendation**), assign + due + priority.
 - [x] F2 — **Complete** (notes/evidence) → **Verify** (enforce **verifier ≠ completer** + effectiveness) → **Close**.
-- [ ] F3 — Surface the **Corrective-actions register** (sibling view) cross-linked; reflect auto-advance of the event to monitoring when all resolved.
+- [x] F3 — Surface the **Corrective-actions register** (sibling view) cross-linked; reflect auto-advance of the event to monitoring when all resolved. ✅ Register now uses the shared H&S hero/tab/filter/right-click idioms, opens the parent event detail modal on the Corrective actions pane, links every row back to `/health-safety/events?event={id}`, and shows the parent event stage (including Monitoring after the final action closes).
 
 ## G. WorkSafe + closure gates (the governance "make it make sense")
 - [x] G1 — **Record WorkSafe notification** modal (notified date/method/reference → status; acknowledgement → acknowledged); notify-ASAP prompt + **site-preservation** status + keep-5-years note on notifiable events.

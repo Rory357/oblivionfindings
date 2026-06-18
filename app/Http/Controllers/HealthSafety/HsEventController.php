@@ -492,32 +492,34 @@ class HsEventController extends Controller
      */
     public function correctiveActions(Request $request): \Inertia\Response
     {
+        $tab = (string) $request->input('tab', $this->legacyActionTab($request));
+
         $query = HsCorrectiveAction::query()
             ->with([
-                'hsEvent:id,reference_number,event_category,severity,site_id',
+                'hsEvent:id,reference_number,event_category,severity,status,site_id',
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
             ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        $this->applyActionScope($query, $request);
+        $this->applyActionTab($query, $tab);
 
         if ($request->filled('priority')) {
             $query->where('priority', $request->input('priority'));
         }
 
-        if ($request->input('overdue') === 'true') {
-            $query->overdue();
+        if ($request->filled('q')) {
+            $term = trim((string) $request->input('q'));
+            $query->where(function (Builder $q) use ($term) {
+                $q->where('reference_number', 'like', "%{$term}%")
+                    ->orWhere('title', 'like', "%{$term}%")
+                    ->orWhereHas('hsEvent', fn (Builder $event) => $event->where('reference_number', 'like', "%{$term}%"));
+            });
         }
 
-        if ($request->input('awaiting_verification') === 'true') {
-            $query->awaitingVerification();
-        }
-
-        $actions = $query->paginate(25)->through(fn (HsCorrectiveAction $a) => [
+        $actions = $query->paginate(25)->withQueryString()->through(fn (HsCorrectiveAction $a) => [
             'id' => $a->id,
             'reference_number' => $a->reference_number,
             'title' => $a->title,
@@ -527,15 +529,148 @@ class HsEventController extends Controller
             'assigned_to_name' => $a->assignedTo?->name,
             'due_date' => $a->due_date?->toDateString(),
             'is_overdue' => $a->isOverdue(),
-            'event_reference' => $a->hsEvent?->reference_number,
-            'event_category' => $a->hsEvent?->event_category,
-            'site_name' => $a->hsEvent?->site?->name,
+            'completed_at' => $a->completed_at?->toIso8601String(),
+            'verified_at' => $a->verified_at?->toIso8601String(),
+            'event' => $a->hsEvent ? [
+                'id' => $a->hsEvent->id,
+                'reference_number' => $a->hsEvent->reference_number,
+                'event_category' => $a->hsEvent->event_category,
+                'severity' => $a->hsEvent->severity,
+                'status' => $a->hsEvent->status,
+                'site_name' => $a->hsEvent->site?->name,
+                'url' => "/health-safety/events?event={$a->hsEvent->id}",
+                'monitoring' => $a->hsEvent->status === HsEvent::STATUS_MONITORING,
+            ] : null,
         ]);
+
+        $base = $this->actionScopedBase($request);
+        $countStatus = fn (string $status): int => (int) (clone $base)->where('status', $status)->count();
+        $openCount = $countStatus(HsCorrectiveAction::STATUS_OPEN);
+        $inProgressCount = $countStatus(HsCorrectiveAction::STATUS_IN_PROGRESS);
+        $awaitingCount = $countStatus(HsCorrectiveAction::STATUS_COMPLETED);
+        $verifiedCount = $countStatus(HsCorrectiveAction::STATUS_VERIFIED);
+        $closedCount = $countStatus(HsCorrectiveAction::STATUS_CLOSED);
+
+        $tabCounts = [
+            'all' => (int) (clone $base)->count(),
+            'open' => $openCount,
+            'in_progress' => $inProgressCount,
+            'awaiting_verification' => $awaitingCount,
+            'overdue' => (int) (clone $base)->overdue()->count(),
+            'verified' => $verifiedCount,
+            'closed' => $closedCount,
+        ];
+
+        $hero = [
+            'live' => [
+                'open' => $openCount,
+                'in_progress' => $inProgressCount,
+                'awaiting_verification' => $awaitingCount,
+                'verified' => $verifiedCount,
+            ],
+            'attention' => [
+                'overdue' => $tabCounts['overdue'],
+                'critical_open' => (int) (clone $base)
+                    ->whereIn('priority', [HsCorrectiveAction::PRIORITY_HIGH, HsCorrectiveAction::PRIORITY_CRITICAL])
+                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->count(),
+                'unassigned' => (int) (clone $base)
+                    ->whereNull('assigned_to_user_id')
+                    ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED])
+                    ->count(),
+                'monitoring_events' => (int) (clone $base)
+                    ->whereHas('hsEvent', fn (Builder $q) => $q->where('status', HsEvent::STATUS_MONITORING))
+                    ->distinct('hs_event_id')
+                    ->count('hs_event_id'),
+            ],
+        ];
+
+        $detail = null;
+        if ($request->filled('event')) {
+            $target = HsEvent::find($request->integer('event'));
+            $detail = $target ? $this->buildEventDetail($target) : null;
+        }
+
+        $siteIds = $this->actionScopedBase($request)->whereHas('hsEvent', fn (Builder $q) => $q->whereNotNull('site_id'))
+            ->with('hsEvent:id,site_id')
+            ->get()
+            ->pluck('hsEvent.site_id')
+            ->filter()
+            ->unique()
+            ->values();
 
         return Inertia::render('health-safety/corrective-actions/index', [
             'actions' => $actions,
-            'filters' => $request->only(['status', 'priority', 'overdue', 'awaiting_verification']),
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'hero' => $hero,
+            'filters' => [
+                'q' => $request->input('q'),
+                'tab' => $tab,
+                'priority' => $request->input('priority'),
+                'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
+                'from' => $request->input('from'),
+                'to' => $request->input('to'),
+            ],
+            'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
+            'detail' => $detail,
+            'can' => ['manage' => (bool) ($request->user()?->can('hazards.manage') ?? false)],
         ]);
+    }
+
+    private function legacyActionTab(Request $request): string
+    {
+        if ($request->input('overdue') === 'true') {
+            return 'overdue';
+        }
+
+        if ($request->input('awaiting_verification') === 'true') {
+            return 'awaiting_verification';
+        }
+
+        return match ((string) $request->input('status', 'all')) {
+            HsCorrectiveAction::STATUS_IN_PROGRESS => 'in_progress',
+            HsCorrectiveAction::STATUS_COMPLETED => 'awaiting_verification',
+            HsCorrectiveAction::STATUS_VERIFIED => 'verified',
+            HsCorrectiveAction::STATUS_CLOSED => 'closed',
+            HsCorrectiveAction::STATUS_OPEN => 'open',
+            default => 'all',
+        };
+    }
+
+    private function applyActionScope(Builder $query, Request $request): void
+    {
+        if ($request->filled('site_id')) {
+            $siteId = (int) $request->input('site_id');
+            $query->whereHas('hsEvent', fn (Builder $q) => $q->where('site_id', $siteId));
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('due_date', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('due_date', '<=', $request->input('to'));
+        }
+    }
+
+    private function actionScopedBase(Request $request): Builder
+    {
+        $query = HsCorrectiveAction::query();
+        $this->applyActionScope($query, $request);
+
+        return $query;
+    }
+
+    private function applyActionTab(Builder $query, string $tab): void
+    {
+        match ($tab) {
+            'open' => $query->where('status', HsCorrectiveAction::STATUS_OPEN),
+            'in_progress' => $query->where('status', HsCorrectiveAction::STATUS_IN_PROGRESS),
+            'awaiting_verification' => $query->where('status', HsCorrectiveAction::STATUS_COMPLETED),
+            'verified' => $query->where('status', HsCorrectiveAction::STATUS_VERIFIED),
+            'closed' => $query->where('status', HsCorrectiveAction::STATUS_CLOSED),
+            'overdue' => $query->overdue(),
+            default => $query,
+        };
     }
 
     /**
