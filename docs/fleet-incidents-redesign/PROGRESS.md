@@ -20,4 +20,14 @@
 - [ ] **Step 7 — Tests + polish + retire + ship**. Feature tests (schema, endpoints, gate, cascade, observer fix, classifier); tsc/eslint/build; merge→deploy→Chrome-verify on .com.
 
 ## Build log
-- (pending)
+- **Commit `bbf4e390`** — branch + docs (gap-analysis SSOT + this tracker).
+- **Commit `44e23b1d`** — Step 1 backend (4 migrations + 3 models + ClientIncident reverse FK + observer Gap-F4 fix). Migrations applied to local DB; boot-checked.
+
+## NEXT (resume here)
+**Step 2 — controller + routes + services** in `app/Http/Controllers/FleetAssets/IncidentController.php` + `routes/fleet-assets.php`.
+1. Expand `store()` to the full §3 capture set; compute `police_report_due_at` (occurred_at+24h when injury/fatal) + `is_notifiable` server-side (reuse `NotifiableEventClassifier`, feed `injury_severity`+severity); snapshot `vehicle_rego_snapshot`/`asset_category` from the asset; set `fleet_incident_id` on cascaded `ClientIncident`s (Gap F1, in `processIncidentChain`).
+2. `buildDetailPayload($incident)` + content-negotiated `show()` (axios/JSON → payload for the modal, else Inertia thin fallback — see [[reference_inertia_axios_405]]). Include attachments, followups, linkedHsEvent, control-room alert, clientIncidents, all §3 sections.
+3. Expand `index()`: `tab` scoping (use model scopes), Site/Vehicle/Driver/type/severity/search/date filters, new stats (police_due, vor, claims, injury_acc), row flags (police-due countdown, injury/acc, VOR, claim, alert-linked, attachments count).
+4. Workflow endpoints: `updateStatus` (lifecycle + closure gate: require resolution_notes; warn on injury-crash w/o TCR, WorkSafe-notifiable not notified, open followups), `addFollowup`/`completeFollowup`, `uploadAttachment`/`destroyAttachment`/`downloadAttachment` (mirror Safeguarding evidence controller — read it first), `logPoliceReport` (TCR), `logClaim`, `markOffRoad`/`backInService`.
+5. Routes + permissions (`fleet.viewAny|assets.viewAny` read; `fleet.incidents.manage|fleet.manage` write).
+Then Steps 3–5 (frontend: list / detail modal / wizard) — use subagents to read the 296KB prototype + reference components (`hs-hero-kit`, the shipped Incidents `incident-detail-dialog.tsx` + report dialog) to spare context.
