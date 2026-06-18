@@ -206,8 +206,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_fleet_incident_creates_hs_event(): void
     {
+        // Fleet vocab is minor/moderate/major/critical; the observer maps it to the
+        // H&S low/medium/high/critical (moderate -> medium).
         $incident = FleetIncident::factory()->create([
-            'severity' => 'medium',
+            'severity' => 'moderate',
         ]);
 
         $this->assertDatabaseHas('hs_events', [

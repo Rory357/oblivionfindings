@@ -176,17 +176,14 @@ class IncidentController extends Controller
 
     public function show(Request $request, FleetIncident $incident)
     {
-        $payload = $this->buildDetailPayload($incident);
-
-        // Modal/axios callers want JSON; a direct deep-link is a full Inertia page.
+        // Modal/axios callers want the JSON detail payload. A direct deep-link
+        // opens the detail modal over the list (nothing navigates away — the old
+        // full-page show.tsx is retired).
         if ($request->wantsJson()) {
-            return response()->json(['incident' => $payload]);
+            return response()->json(['incident' => $this->buildDetailPayload($incident)]);
         }
 
-        return Inertia::render('fleet-assets/incidents/show', [
-            'incident' => $payload,
-            'can' => ['manage' => $this->userCanManage()],
-        ]);
+        return redirect()->route('fleet-assets.incidents.index', ['incident' => $incident->id]);
     }
 
     public function update(Request $request, FleetIncident $incident)
@@ -970,13 +967,16 @@ class IncidentController extends Controller
                 }
 
                 try {
+                    // alert_type + severity are enums (requires_monitoring + low/medium/high/
+                    // critical) — pass valid values. (The previous raw 'transport_incident'
+                    // + fleet-vocab 'major' silently failed the enum constraints.)
                     $alert = SafeguardingAlert::create([
                         'alertable_type' => 'App\\Models\\Client',
                         'alertable_id' => $clientId,
-                        'alert_type' => 'transport_incident',
+                        'alert_type' => 'requires_monitoring',
                         'alert_summary' => "Transport incident ({$incident->severity}): {$incident->incident_type}",
                         'alert_details' => $incident->description,
-                        'severity' => $incident->severity,
+                        'severity' => $clientSeverity,
                         'active' => true,
                         'created_by' => $request->user()->id,
                     ]);

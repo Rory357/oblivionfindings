@@ -234,11 +234,12 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_fleet_incident_severity_escalated_creates_alert(): void
     {
-        $incident = FleetIncident::factory()->create(['severity' => 'medium']);
+        $incident = FleetIncident::factory()->create(['severity' => 'moderate']);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
 
-        $incident->update(['severity' => 'high']);
+        // Escalate into the high band (fleet vocab: major maps to H&S high).
+        $incident->update(['severity' => 'major']);
 
         $this->assertDatabaseHas('control_room_alerts', [
             'source' => 'operations',
