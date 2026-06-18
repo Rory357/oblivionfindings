@@ -18,7 +18,7 @@
 
 ## B. Backend governance (expose + gate the existing engine — NO new schema)
 - [x] B1 — **`HsEventService::closeEvent()`** + closure gate (E-Gap 1): block unless required investigation completed + no open/unverified corrective actions + `closure_summary`; override w/ logged reason + permission. `HsEventController@close` + route + `hazards.manage`.
-- [ ] B2 — **WorkSafe notification** (E-Gap 2): service methods to record notification (→ `notified`: date/method/reference) + acknowledgement (→ `acknowledged`); reuse `NotifiableEventClassifier`; make the `worksafe-register` report actionable.
+- [x] B2 — **WorkSafe notification** (E-Gap 2): service methods to record notification (→ `notified`: date/method/reference) + acknowledgement (→ `acknowledged`); reuse `NotifiableEventClassifier`; make the `worksafe-register` report actionable.
 - [ ] B3 — **`HsInvestigationController` + routes** (E-Gap 3) exposing `HsInvestigationService` (create/start/recordFindings/submitForReview/returnForRework/complete). Gate `hazards.manage`.
 - [ ] B4 — **`HsCorrectiveActionController` + routes** (E-Gap 3) exposing `HsCorrectiveActionService` (createFromRecommendation/createStandalone/start/complete/returnForRework/verify/close). Gate `hazards.manage`.
 - [ ] B5 — **Auto-advance on investigation complete** (E-Gap 6): event → `corrective_action` + offer `createFromRecommendation()` for each recommendation.
@@ -47,7 +47,7 @@
 - [ ] F3 — Surface the **Corrective-actions register** (sibling view) cross-linked; reflect auto-advance of the event to monitoring when all resolved.
 
 ## G. WorkSafe + closure gates (the governance "make it make sense")
-- [ ] G1 — **Record WorkSafe notification** modal (notified date/method/reference → status; acknowledgement → acknowledged); notify-ASAP prompt + **site-preservation** status + keep-5-years note on notifiable events.
+- [x] G1 — **Record WorkSafe notification** modal (notified date/method/reference → status; acknowledgement → acknowledged); notify-ASAP prompt + **site-preservation** status + keep-5-years note on notifiable events.
 - [x] G2 — **Gated Close event** modal: blocked-reasons state (required investigation incomplete / open-unverified actions); `closure_summary` required; override w/ reason + permission.
 
 ## H. Standardisation, a11y, scope

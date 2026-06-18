@@ -74,6 +74,10 @@ class HsEvent extends Model
         'worksafe_notifiable',
         'worksafe_status',
         'worksafe_reference',
+        'worksafe_notified_at',
+        'worksafe_method',
+        'worksafe_acknowledged_at',
+        'worksafe_site_preserved',
         'investigation_required',
         'control_room_alert_id',
         'closed_at',
@@ -88,6 +92,9 @@ class HsEvent extends Model
         'reported_at' => 'datetime',
         'closed_at' => 'datetime',
         'worksafe_notifiable' => 'boolean',
+        'worksafe_notified_at' => 'datetime',
+        'worksafe_acknowledged_at' => 'datetime',
+        'worksafe_site_preserved' => 'boolean',
         'investigation_required' => 'boolean',
     ];
 

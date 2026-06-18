@@ -238,6 +238,52 @@ class HsEventController extends Controller
     }
 
     /**
+     * Record the WorkSafe NZ notification for a notifiable event (E-Gap 2):
+     * pending → notified, persisting date/method/reference + site preservation.
+     */
+    public function worksafeNotify(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'notified_at' => ['required', 'date'],
+            'method' => ['required', 'string', 'max:50'],
+            'reference' => ['nullable', 'string', 'max:50'],
+            'site_preserved' => ['boolean'],
+        ]);
+
+        try {
+            $this->events->recordWorksafeNotification(
+                $hsEvent,
+                $data['notified_at'],
+                $data['method'],
+                $data['reference'] ?? null,
+                $request->boolean('site_preserved'),
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'WorkSafe notification recorded.');
+    }
+
+    /**
+     * Record WorkSafe's acknowledgement of the notification (notified → acknowledged).
+     */
+    public function worksafeAcknowledge(Request $request, HsEvent $hsEvent)
+    {
+        $data = $request->validate([
+            'acknowledged_at' => ['required', 'date'],
+        ]);
+
+        try {
+            $this->events->acknowledgeWorksafe($hsEvent, $data['acknowledged_at']);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'WorkSafe acknowledgement recorded.');
+    }
+
+    /**
      * The full governance detail payload — the contract behind the HsEventDialog
      * (mirrored by `EventDetail` in event-detail-dialog.tsx). Shared by index()
      * (over-the-list modal on ?event=) and show() (deep-link shell).
@@ -350,9 +396,10 @@ class HsEventController extends Controller
             'worksafe_notifiable' => (bool) $hsEvent->worksafe_notifiable,
             'worksafe_status' => $hsEvent->worksafe_status,
             'worksafe_reference' => $hsEvent->worksafe_reference,
-            'worksafe_notified_at' => null,        // Step 3 (additive migration)
-            'worksafe_acknowledged_at' => null,    // Step 3
-            'worksafe_method' => null,             // Step 3
+            'worksafe_notified_at' => $hsEvent->worksafe_notified_at?->toIso8601String(),
+            'worksafe_acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
+            'worksafe_method' => $hsEvent->worksafe_method,
+            'worksafe_site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
             'worksafe_reason' => null,
             'investigation_required' => (bool) $hsEvent->investigation_required,
             'control_room_alert' => $hsEvent->controlRoomAlert ? [

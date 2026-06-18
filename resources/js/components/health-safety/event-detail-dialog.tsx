@@ -16,9 +16,10 @@
  * to the Options bar as their backend lands — an action appears only when it can
  * actually run (no stubs). */
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
-import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
+import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { formatDateTime } from '@/lib/datetime';
@@ -150,6 +151,7 @@ export type EventDetail = {
     worksafe_notified_at: string | null;
     worksafe_acknowledged_at: string | null;
     worksafe_method: string | null;
+    worksafe_site_preserved: boolean;
     worksafe_reason: string | null;
     investigation_required: boolean;
     control_room_alert: { id: number; severity: string; status: string } | null;
@@ -167,7 +169,7 @@ export type EventDetail = {
 
 export type EventSectionKey = 'overview' | 'investigation' | 'actions' | 'risk' | 'timeline' | 'evidence';
 /** Workflow action panes that replace the body + own their buttons. Grows as backend lands. */
-export type EventActionKey = 'close';
+export type EventActionKey = 'close' | 'worksafe_notify' | 'worksafe_acknowledge';
 
 /* ------------------------------------------------------------------ */
 /*  Token maps (semantic only)                                         */
@@ -310,6 +312,22 @@ export function EventDetailDialog({
             >
                 <ExternalLink className="h-4 w-4" /> Open full page
             </Link>
+            {d.can.manage && d.worksafe_notifiable && d.worksafe_status !== 'acknowledged' ? (
+                d.worksafe_status === 'notified' ? (
+                    <Button size="sm" variant="outline" onClick={() => setAction('worksafe_acknowledge')}>
+                        <ShieldCheck className="mr-1.5 h-4 w-4" /> Record acknowledgement
+                    </Button>
+                ) : (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAction('worksafe_notify')}
+                        className="border-status-critical/40 text-status-critical hover:text-status-critical"
+                    >
+                        <ShieldAlert className="mr-1.5 h-4 w-4" /> Record WorkSafe notification
+                    </Button>
+                )
+            ) : null}
             {canClose ? (
                 <Button
                     size="sm"
@@ -342,6 +360,10 @@ export function EventDetailDialog({
         >
             {action === 'close' ? (
                 <CloseEventPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'worksafe_notify' ? (
+                <WorksafeNotifyPane d={d} onDone={() => setAction(null)} />
+            ) : action === 'worksafe_acknowledge' ? (
+                <WorksafeAcknowledgePane d={d} onDone={() => setAction(null)} />
             ) : (
                 <>
                     {openedFrom ? (
@@ -447,6 +469,113 @@ function GateRow({ ok, label }: { ok: boolean; label: string }) {
             )}
             <span className={ok ? 'text-foreground' : 'text-status-critical'}>{label}</span>
         </div>
+    );
+}
+
+const WORKSAFE_METHODS = [
+    { value: 'phone', label: 'Phone — 0800 030 040' },
+    { value: 'online', label: 'Online notification form' },
+    { value: 'email', label: 'Email' },
+    { value: 'in_person', label: 'In person' },
+];
+
+/** Today as a yyyy-mm-dd value for date inputs (browser-local). */
+function todayInput(): string {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function WorksafeNotifyPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+    const form = useForm<{ notified_at: string; method: string; reference: string; site_preserved: boolean }>({
+        notified_at: todayInput(),
+        method: '',
+        reference: d.worksafe_reference ?? '',
+        site_preserved: d.worksafe_site_preserved,
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/worksafe/notify`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={ShieldAlert}
+                title="Record WorkSafe notification"
+                blurb="A notifiable event must be reported to WorkSafe NZ as soon as possible (HSWA 2015). Record when and how you notified."
+            />
+
+            <InfoCard icon={ShieldCheck} tone="warn">
+                Notify WorkSafe ASAP — phone 0800 030 040 or notify online. Preserve the site until an inspector releases it, and keep records for at least 5 years.
+            </InfoCard>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Notified at" required error={form.errors.notified_at}>
+                    <Input type="date" value={form.data.notified_at} onChange={(e) => form.setData('notified_at', e.target.value)} />
+                </Field>
+                <Field label="Method" required error={form.errors.method}>
+                    <SelectInput value={form.data.method} onChange={(v) => form.setData('method', v)} placeholder="How was WorkSafe notified?" options={WORKSAFE_METHODS} />
+                </Field>
+            </div>
+            <Field label="WorkSafe reference" hint="If provided" error={form.errors.reference}>
+                <Input value={form.data.reference} onChange={(e) => form.setData('reference', e.target.value)} placeholder="e.g. WS-2026-0099" />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                    type="checkbox"
+                    checked={form.data.site_preserved}
+                    onChange={(e) => form.setData('site_preserved', e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                />
+                The site has been preserved until WorkSafe releases it
+            </label>
+
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Record notification
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function WorksafeAcknowledgePane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
+    const form = useForm<{ acknowledged_at: string }>({ acknowledged_at: todayInput() });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(`/health-safety/events/${d.id}/worksafe/acknowledge`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={ShieldCheck} title="Record WorkSafe acknowledgement" blurb="Record the date WorkSafe NZ acknowledged the notification." />
+            <Field label="Acknowledged at" required error={form.errors.acknowledged_at}>
+                <Input type="date" value={form.data.acknowledged_at} onChange={(e) => form.setData('acknowledged_at', e.target.value)} />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing}>
+                    Record acknowledgement
+                </Button>
+            </div>
+        </form>
     );
 }
 
@@ -589,30 +718,42 @@ function OriginatingRecordCard({ source }: { source: EventSource | null }) {
     );
 }
 
+const WORKSAFE_METHOD_LABELS: Record<string, string> = {
+    phone: 'phone',
+    online: 'online form',
+    email: 'email',
+    in_person: 'in person',
+};
+
 function WorkSafeBanner({ d }: { d: EventDetail }) {
     const notified = d.worksafe_status === 'notified' || d.worksafe_status === 'acknowledged';
     const acknowledged = d.worksafe_status === 'acknowledged';
+    const methodLabel = d.worksafe_method ? (WORKSAFE_METHOD_LABELS[d.worksafe_method] ?? d.worksafe_method.replace(/_/g, ' ')) : null;
     return (
         <InfoCard icon={ShieldAlert} tone="crit">
             <span className="font-semibold">WorkSafe NZ notifiable event (HSWA 2015).</span>{' '}
             {acknowledged
                 ? `Acknowledged by WorkSafe${d.worksafe_acknowledged_at ? ` ${formatDateTime(d.worksafe_acknowledged_at)}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''}.`
                 : notified
-                  ? `Notified${d.worksafe_notified_at ? ` ${formatDateTime(d.worksafe_notified_at)}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''} — awaiting acknowledgement.`
+                  ? `Notified${d.worksafe_notified_at ? ` ${formatDateTime(d.worksafe_notified_at)}` : ''}${methodLabel ? ` by ${methodLabel}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''} — awaiting acknowledgement.`
                   : 'Notification to WorkSafe NZ is still pending.'}
             <span className="mt-2 flex flex-wrap gap-1.5">
-                <DutyChip label="Notify ASAP" />
-                <DutyChip label="Preserve the site until released" />
+                <DutyChip label="Notify ASAP" done={notified} />
+                <DutyChip label={d.worksafe_site_preserved ? 'Site preserved' : 'Preserve the site until released'} done={d.worksafe_site_preserved} />
                 <DutyChip label="Keep records ≥ 5 years" />
             </span>
         </InfoCard>
     );
 }
 
-function DutyChip({ label }: { label: string }) {
+function DutyChip({ label, done = false }: { label: string; done?: boolean }) {
     return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-status-critical/30 bg-status-critical-bg/60 px-2 py-0.5 text-[11px] font-medium text-status-critical">
-            <ShieldCheck className="h-3 w-3" /> {label}
+        <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                done ? 'border-status-success/40 bg-status-success-bg text-status-success' : 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
+            }`}
+        >
+            {done ? <CheckCircle2 className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />} {label}
         </span>
     );
 }

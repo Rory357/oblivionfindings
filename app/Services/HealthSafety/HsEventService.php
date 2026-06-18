@@ -238,6 +238,74 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Governance — WorkSafe NZ notification (E-Gap 2)                     */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Record the WorkSafe NZ notification (HSWA 2015 — notify ASAP). Transitions
+     * worksafe_status pending → notified, persisting when/how/reference and the
+     * site-preservation status. Re-recording while notified is allowed (e.g. to
+     * correct the reference); once acknowledged the notification is locked.
+     *
+     * @throws \DomainException when the event is not notifiable or already acknowledged
+     */
+    public function recordWorksafeNotification(
+        HsEvent $event,
+        \DateTimeInterface|string $notifiedAt,
+        string $method,
+        ?string $reference = null,
+        bool $sitePreserved = false,
+    ): HsEvent {
+        if (! $event->worksafe_notifiable) {
+            throw new \DomainException('This event is not WorkSafe-notifiable.');
+        }
+
+        if ($event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED) {
+            throw new \DomainException('WorkSafe has already acknowledged this notification.');
+        }
+
+        $event->update([
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_notified_at' => $notifiedAt,
+            'worksafe_method' => $method,
+            'worksafe_reference' => $reference ?: $event->worksafe_reference,
+            'worksafe_site_preserved' => $sitePreserved,
+        ]);
+
+        Log::info('HsEventService: WorkSafe notification recorded', [
+            'hs_event_id' => $event->id,
+            'reference' => $event->worksafe_reference,
+            'method' => $method,
+            'site_preserved' => $sitePreserved,
+        ]);
+
+        return $event;
+    }
+
+    /**
+     * Record WorkSafe's acknowledgement of a notification (notified → acknowledged).
+     *
+     * @throws \DomainException when the event has not been notified yet
+     */
+    public function acknowledgeWorksafe(HsEvent $event, \DateTimeInterface|string $acknowledgedAt): HsEvent
+    {
+        if ($event->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
+            throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
+        }
+
+        $event->update([
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_acknowledged_at' => $acknowledgedAt,
+        ]);
+
+        Log::info('HsEventService: WorkSafe acknowledgement recorded', [
+            'hs_event_id' => $event->id,
+        ]);
+
+        return $event;
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Severity normalisation                                             */
     /* ------------------------------------------------------------------ */
 

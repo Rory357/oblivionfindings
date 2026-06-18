@@ -44,6 +44,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {
         Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
+        Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
+        Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
     });
 
     // ── PR6: Governance & Compliance Reports ──

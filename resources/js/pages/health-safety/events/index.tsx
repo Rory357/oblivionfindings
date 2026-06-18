@@ -262,7 +262,13 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             { icon: <Search className="h-3.5 w-3.5" />, label: 'Investigation', onClick: () => openEvent(ev.id, { section: 'investigation' }) },
             { icon: <ListChecks className="h-3.5 w-3.5" />, label: 'Corrective actions', onClick: () => openEvent(ev.id, { section: 'actions' }) },
         ];
-        if (ev.worksafe_notifiable) {
+        if (ev.worksafe_notifiable && can.manage && ev.worksafe_status !== 'acknowledged') {
+            if (ev.worksafe_status === 'notified') {
+                items.push({ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Record WorkSafe acknowledgement', onClick: () => openEvent(ev.id, { action: 'worksafe_acknowledge' }) });
+            } else {
+                items.push({ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'Record WorkSafe notification', tone: 'critical', onClick: () => openEvent(ev.id, { action: 'worksafe_notify' }) });
+            }
+        } else if (ev.worksafe_notifiable) {
             items.push({ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'WorkSafe', sub: titleCase(ev.worksafe_status ?? 'pending'), onClick: () => openEvent(ev.id, { section: 'overview' }) });
         }
         if (can.manage && ev.status !== 'closed') {
