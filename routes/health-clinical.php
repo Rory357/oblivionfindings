@@ -30,13 +30,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/observations', [HealthClinicalDashboardController::class, 'observations'])
             ->middleware('permission:clinical.observations.viewAny')
             ->name('observations.index');
-        Route::post('/observations', [HealthClinicalController::class, 'storeObservation'])
+        Route::post('/observations', [HealthClinicalDashboardController::class, 'storeObservation'])
             ->middleware('permission:clinical.observations.record')
             ->name('observations.store');
         Route::get('/events', [HealthClinicalDashboardController::class, 'events'])
             ->middleware('permission:clinical.events.viewAny')
             ->name('events.index');
-        Route::post('/events', [HealthClinicalController::class, 'storeEvent'])
+        Route::post('/events', [HealthClinicalDashboardController::class, 'storeEvent'])
             ->middleware('permission:clinical.events.record')
             ->name('events.store');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])

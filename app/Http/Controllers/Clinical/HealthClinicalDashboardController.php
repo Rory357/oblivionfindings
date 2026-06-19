@@ -5,17 +5,25 @@ namespace App\Http\Controllers\Clinical;
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
+use App\Domain\Clinical\Services\ClinicalEventService;
+use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Enums\AlertSeverity;
+use App\Http\Controllers\Clinical\Concerns\RecordsClinicalRecords;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class HealthClinicalDashboardController extends Controller
 {
+    use RecordsClinicalRecords;
+
     public function __construct(
         private readonly ClinicalDashboardService $dashboardService,
+        private readonly ClinicalObservationService $observationService,
+        private readonly ClinicalEventService $eventService,
     ) {}
 
     public function index(Request $request): \Inertia\Response
@@ -119,5 +127,46 @@ class HealthClinicalDashboardController extends Controller
             ],
             'event_types' => $eventTypes->pluck('label', 'value'),
         ]);
+    }
+
+    /**
+     * Record an observation from the module (no client in the URL — the wizard
+     * supplies `client_id`). Routes through the canonical Domain service via the
+     * shared trait, so the module and client-profile entry points never drift.
+     */
+    public function storeObservation(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        $request->validate(['client_id' => ['required', 'integer', 'exists:clients,id']]);
+        $client = Client::findOrFail($request->integer('client_id'));
+        $this->authorize('view', $client);
+
+        $validated = $this->validateObservationInput($request, $user);
+        $type = ObservationType::from($validated['observation_type']);
+
+        $this->observationService->record($client, $user, $validated);
+
+        return back()->with('success', $type->label().' recorded successfully.');
+    }
+
+    /**
+     * Record a clinical event from the module (no client in the URL — the wizard
+     * supplies `client_id`). High-severity falls/seizures/choking auto-link to an
+     * H&S event inside ClinicalEventService::record().
+     */
+    public function storeEvent(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        $request->validate(['client_id' => ['required', 'integer', 'exists:clients,id']]);
+        $client = Client::findOrFail($request->integer('client_id'));
+        $this->authorize('view', $client);
+
+        $validated = $this->validateClinicalEventInput($request, $user);
+
+        $this->eventService->record($client, $user, $validated);
+
+        return back()->with('success', 'Clinical event recorded successfully.');
     }
 }
