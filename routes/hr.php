@@ -107,6 +107,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/kudos', [MyHrController::class, 'sendKudos'])->name('kudos');
         Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
         Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
+        Route::post('/documents/sign/{signature}', [MyHrController::class, 'signDocument'])->name('documents.sign');
     });
 
     /*

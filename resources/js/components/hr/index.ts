@@ -12,6 +12,7 @@ export * from './hr-tabs';
 export * from './leave-request-dialog';
 export * from './leave-tabs';
 export * from './my-hr-clock-card';
+export * from './my-hr-esign-dialog';
 export * from './my-hr-hero';
 export * from './my-hr-kudos-wizard';
 export * from './my-hr-leave-wizard';

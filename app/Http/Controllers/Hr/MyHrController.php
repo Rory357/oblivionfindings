@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
@@ -20,6 +21,7 @@ use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
@@ -1132,10 +1134,48 @@ class MyHrController extends Controller
                 'created_at' => $d->created_at?->toIso8601String(),
             ]);
 
+        // Documents awaiting this employee's e-signature (reuses ESignature flow).
+        $pendingSignatures = HrDocumentSignature::forSigner($user->id)
+            ->pending()
+            ->with(['document:id,title,category', 'requestedBy:id,name'])
+            ->orderBy('requested_at')
+            ->get()
+            ->map(fn (HrDocumentSignature $s) => [
+                'id' => $s->id,
+                'document_title' => $s->document?->title ?? 'Document',
+                'document_category' => $s->document?->category,
+                'requested_by' => $s->requestedBy?->name,
+                'requested_at' => $s->requested_at?->toIso8601String(),
+                'download_url' => route('hr.signatures.document', $s),
+            ])
+            ->values();
+
         return Inertia::render('hr/my/documents', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'pendingSignatures' => $pendingSignatures,
             'documents' => $documents,
             'categories' => ['contract', 'letter', 'policy', 'certificate', 'offer', 'other'],
         ]);
+    }
+
+    /** Sign a document awaiting this employee's signature (self-service path that
+     *  reuses the shared ESignatureService and stays on the My HR documents page). */
+    public function signDocument(Request $request, HrDocumentSignature $signature)
+    {
+        $user = $request->user();
+        abort_unless($signature->signer_user_id === $user->id, 403);
+
+        $validated = $request->validate([
+            'signature_data' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            app(ESignatureService::class)->sign($signature, $validated['signature_data'], $request);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Document signed & filed.');
     }
 
     public function downloadDocument(Request $request, HrDocument $document)
