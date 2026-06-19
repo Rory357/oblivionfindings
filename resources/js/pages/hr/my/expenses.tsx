@@ -16,12 +16,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { ChevronDown, FileText, Plus, Trash2 } from 'lucide-react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { router } from '@inertiajs/react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type ExpenseClaim = {
@@ -37,6 +34,7 @@ type ExpenseClaim = {
 };
 
 type Props = {
+    myHr: MyHrShellData;
     claims: {
         data: ExpenseClaim[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
@@ -47,12 +45,6 @@ type Props = {
     };
     categories: string[];
 };
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Expenses', href: '/hr/my/expenses' },
-];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
@@ -102,7 +94,7 @@ type ItemForm = {
     expense_date: string;
 };
 
-export default function MyExpenses({ claims, categories }: Props) {
+export default function MyExpenses({ myHr, claims, categories }: Props) {
     const [formOpen, setFormOpen] = useState(false);
     const [title, setTitle] = useState('');
     const [items, setItems] = useState<ItemForm[]>([
@@ -159,28 +151,7 @@ export default function MyExpenses({ claims, categories }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Expenses" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={FileText}
-                        title="My Expenses"
-                        description="Submit, track, and review your expense claims."
-                        stats={[
-                            { label: 'Claims', value: claims.total },
-                            { label: 'Page', value: `${claims.current_page} / ${claims.last_page}` },
-                        ]}
-                        actions={
-                            <Button onClick={() => setFormOpen(!formOpen)}>
-                                <Plus className="mr-1 h-4 w-4" /> New Claim
-                            </Button>
-                        }
-                    />
-                }
-            >
-                <MyHrTabs active="expenses" />
-
+        <MyHrShell active="expenses" myHr={myHr} title="Expenses · My HR">
                 {/* Submit Expense Form */}
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
                     <Card>
@@ -438,7 +409,6 @@ export default function MyExpenses({ claims, categories }: Props) {
                         <LaravelPagination links={claims.links} />
                     </div>
                 )}
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

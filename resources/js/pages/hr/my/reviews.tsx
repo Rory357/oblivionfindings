@@ -9,12 +9,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { ChevronDown, Star, TrendingUp } from 'lucide-react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { useForm } from '@inertiajs/react';
+import { ChevronDown, Star } from 'lucide-react';
 import { useState } from 'react';
 
 interface Review {
@@ -37,6 +34,7 @@ interface Review {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     reviews: {
         data: Review[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
@@ -44,12 +42,6 @@ interface Props {
         last_page: number;
     };
 }
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Reviews', href: '/hr/my/reviews' },
-];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
@@ -299,28 +291,10 @@ function ReviewCard({ review }: { review: Review }) {
     );
 }
 
-export default function MyReviews({ reviews }: Props) {
-    const signedOff = reviews.data.filter((r) => r.employee_signed_off).length;
-
+export default function MyReviews({ myHr, reviews }: Props) {
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Reviews" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={TrendingUp}
-                        title="My Performance Reviews"
-                        description="View and respond to your performance review cycles."
-                        stats={[
-                            { label: 'Total', value: reviews.data.length },
-                            { label: 'Signed Off', value: signedOff },
-                        ]}
-                    />
-                }
-            >
-                <MyHrTabs active="reviews" />
-
-                {reviews.data.length === 0 ? (
+        <MyHrShell active="reviews" myHr={myHr} title="Reviews · My HR">
+            {reviews.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             No performance reviews found.
@@ -337,7 +311,6 @@ export default function MyReviews({ reviews }: Props) {
                 {reviews.last_page > 1 && (
                     <LaravelPagination links={reviews.links} />
                 )}
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

@@ -18,11 +18,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { useForm } from '@inertiajs/react';
 import { ChevronDown, Target } from 'lucide-react';
 import { useState } from 'react';
 
@@ -49,6 +46,7 @@ interface Goal {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     goals: {
         data: Goal[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
@@ -56,12 +54,6 @@ interface Props {
         last_page: number;
     };
 }
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Goals', href: '/hr/my/goals' },
-];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     not_started: {
@@ -343,30 +335,10 @@ function GoalCard({ goal }: { goal: Goal }) {
     );
 }
 
-export default function MyGoals({ goals }: Props) {
-    const completed = goals.data.filter((g) => g.status === 'completed').length;
-    const inProgress = goals.data.filter((g) => g.status === 'in_progress').length;
-
+export default function MyGoals({ myHr, goals }: Props) {
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Goals" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={Target}
-                        title="My Development Goals"
-                        description="Track and update your development and performance goals."
-                        stats={[
-                            { label: 'Total', value: goals.data.length },
-                            { label: 'In Progress', value: inProgress },
-                            { label: 'Completed', value: completed },
-                        ]}
-                    />
-                }
-            >
-                <MyHrTabs active="goals" />
-
-                {goals.data.length === 0 ? (
+        <MyHrShell active="goals" myHr={myHr} title="Goals · My HR">
+            {goals.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             No development goals found.
@@ -383,7 +355,6 @@ export default function MyGoals({ goals }: Props) {
                 {goals.last_page > 1 && (
                     <LaravelPagination links={goals.links} />
                 )}
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

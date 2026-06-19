@@ -4,12 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { User } from 'lucide-react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { useForm } from '@inertiajs/react';
 
 interface EmployeeProfile {
     id: number;
@@ -30,16 +26,11 @@ interface EmployeeProfile {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     profile: EmployeeProfile | null;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Profile', href: '/hr/my/profile' },
-];
-
-export default function MyProfile({ profile }: Props) {
+export default function MyProfile({ myHr, profile }: Props) {
     const form = useForm({
         personal_email: profile?.personal_email || '',
         phone: profile?.phone || '',
@@ -57,58 +48,24 @@ export default function MyProfile({ profile }: Props) {
 
     if (!profile) {
         return (
-            <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title="My Profile" />
-                <PageLayout
-                    hero={
-                        <PageHero category="hr"
-                            icon={User}
-                            title="My Profile"
-                            description="Your employment record and personal contact details."
-                        />
-                    }
-                >
-                <MyHrTabs active="profile" />
-
-                    <Card>
-                        <CardContent className="py-8 text-center text-muted-foreground">
-                            <p>
-                                No employee profile has been set up for your
-                                account yet.
-                            </p>
-                            <p className="mt-1 text-sm">
-                                Please contact your HR administrator.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </PageLayout>
-            </AppLayout>
+            <MyHrShell active="profile" myHr={myHr} title="My Profile">
+                <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                        <p>
+                            No employee profile has been set up for your account
+                            yet.
+                        </p>
+                        <p className="mt-1 text-sm">
+                            Please contact your HR administrator.
+                        </p>
+                    </CardContent>
+                </Card>
+            </MyHrShell>
         );
     }
 
-    const initials = profile.user.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
-
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Profile" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        avatar={{ src: profile.user.avatar ?? null, fallback: initials }}
-                        title={profile.user.name}
-                        description={profile.position_title}
-                        stats={[
-                            { label: 'Status', value: profile.is_active ? 'Active' : 'Inactive' },
-                            { label: 'Site', value: profile.primary_site?.name ?? 'Unassigned' },
-                        ]}
-                    />
-                }
-            >
+        <MyHrShell active="profile" myHr={myHr} title="My Profile">
                 {/* Read-Only Employment Info */}
                 <Card>
                     <CardHeader>
@@ -381,7 +338,6 @@ export default function MyProfile({ profile }: Props) {
                         </form>
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

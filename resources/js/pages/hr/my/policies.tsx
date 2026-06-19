@@ -8,12 +8,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { BookOpen, Eye, FileText, ShieldCheck } from 'lucide-react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { router } from '@inertiajs/react';
+import { Eye, FileText, ShieldCheck } from 'lucide-react';
 
 interface PolicyVersion {
     id: number;
@@ -37,16 +34,11 @@ interface Policy {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     policies: Policy[];
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Policies', href: '/hr/my/policies' },
-];
-
-export default function MyPolicies({ policies }: Props) {
+export default function MyPolicies({ myHr, policies }: Props) {
     function handleAttest(policyId: number) {
         if (
             confirm(
@@ -61,29 +53,9 @@ export default function MyPolicies({ policies }: Props) {
         }
     }
 
-    const attestedCount = policies.filter((p) => p.is_attested).length;
-    const pendingCount = policies.filter((p) => !p.is_attested).length;
-
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Policies" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={BookOpen}
-                        title="My Policies"
-                        description="View and attest to required organisational policies."
-                        stats={[
-                            { label: 'Total', value: policies.length },
-                            { label: 'Attested', value: attestedCount },
-                            { label: 'Pending', value: pendingCount },
-                        ]}
-                    />
-                }
-            >
-                <MyHrTabs active="policies" />
-
-                {/* Policies List */}
+        <MyHrShell active="policies" myHr={myHr} title="Policies · My HR">
+            {/* Policies List */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Policies Requiring Attestation</CardTitle>
@@ -249,7 +221,6 @@ export default function MyPolicies({ policies }: Props) {
                         </table>
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

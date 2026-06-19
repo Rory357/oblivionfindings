@@ -101,8 +101,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/time', [MyHrController::class, 'time'])->name('time');
         Route::post('/time/clock-in', [MyHrController::class, 'clockIn'])->name('time.clock-in');
         Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clock-out');
+        Route::get('/time/shifts/{shift}/calendar', [MyHrController::class, 'shiftCalendar'])->name('time.shift-calendar');
+        Route::get('/one', [MyHrController::class, 'one'])->name('one');
+        Route::post('/one/{note}/acknowledge', [MyHrController::class, 'acknowledgeOne'])->name('one.acknowledge');
+        Route::post('/kudos', [MyHrController::class, 'sendKudos'])->name('kudos');
         Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
         Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
+        Route::post('/documents/sign/{signature}', [MyHrController::class, 'signDocument'])->name('documents.sign');
     });
 
     /*

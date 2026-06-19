@@ -1,12 +1,9 @@
 import { DonutChart } from '@/components/dashboard/donut-chart';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     BookOpen,
@@ -15,7 +12,6 @@ import {
     Clock,
     FileCheck,
     Filter,
-    GraduationCap,
     Shield,
     ShieldAlert,
     ShieldCheck,
@@ -46,6 +42,7 @@ interface ComplianceStatus {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     complianceStatuses: ComplianceStatus[];
     can: { viewCatalog: boolean };
 }
@@ -53,12 +50,6 @@ interface Props {
 /* ------------------------------------------------------------------ */
 /*  Config                                                             */
 /* ------------------------------------------------------------------ */
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Training', href: '/hr/my/training' },
-];
 
 const STATUS_CONFIG = {
     compliant: {
@@ -114,7 +105,7 @@ function formatCategory(cat: string): string {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MyTraining({ complianceStatuses, can }: Props) {
+export default function MyTraining({ myHr, complianceStatuses, can }: Props) {
     const [activeFilter, setActiveFilter] = useState<StatusKey | 'all'>('all');
 
     const summary = useMemo(() => {
@@ -151,36 +142,19 @@ export default function MyTraining({ complianceStatuses, can }: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Training & Compliance" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={GraduationCap}
-                        title="My Training & Compliance"
-                        description="Track your compliance requirements and certifications."
-                        stats={[
-                            { label: 'Compliant', value: summary.compliant },
-                            { label: 'Expiring', value: summary.expiring_soon },
-                            { label: 'Expired', value: summary.expired },
-                            { label: 'Compliance rate', value: `${complianceRate}%` },
-                        ]}
-                        actions={
-                            can.viewCatalog ? (
-                                <Button asChild variant="outline">
-                                    <Link href="/hr/training/catalog">
-                                        <BookOpen className="mr-1.5 h-4 w-4" />
-                                        Browse training courses
-                                    </Link>
-                                </Button>
-                            ) : undefined
-                        }
-                    />
-                }
-            >
-                <MyHrTabs active="training" />
-
-                {/* Urgency Banner */}
+        <MyHrShell active="training" myHr={myHr} title="Training · My HR">
+            {can.viewCatalog ? (
+                <div className="flex justify-end">
+                    <Link
+                        href="/hr/training/catalog"
+                        className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-card px-4 py-2 text-[13px] font-semibold text-primary transition-colors hover:bg-accent"
+                    >
+                        <BookOpen className="h-4 w-4" />
+                        Browse training courses
+                    </Link>
+                </div>
+            ) : null}
+            {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
                     <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">
                         <div className="flex items-start gap-3">
@@ -598,7 +572,6 @@ export default function MyTraining({ complianceStatuses, can }: Props) {
                         </Card>
                     )}
                 </div>
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

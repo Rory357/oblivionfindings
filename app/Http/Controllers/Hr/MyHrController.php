@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
@@ -16,13 +17,18 @@ use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\ESignatureService;
+use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
+use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Models\Shift;
@@ -33,7 +39,7 @@ use Inertia\Inertia;
 
 class MyHrController extends Controller
 {
-    use ResolvesHrTenant;
+    use BuildsMyHrOverview, BuildsMyHrShell, ResolvesHrTenant;
 
     public function __construct(
         private readonly LeaveService $leaveService,
@@ -41,7 +47,34 @@ class MyHrController extends Controller
         private readonly TimeTrackingService $timeTrackingService,
         private readonly AttendanceService $attendanceService,
         private readonly ExpenseService $expenseService,
+        private readonly FeedService $feedService,
     ) {}
+
+    public function sendKudos(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'to_user_id' => ['required', 'integer', 'exists:users,id'],
+            'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->feedService->sendKudos(
+                $user,
+                $validated['to_user_id'],
+                $validated['category'],
+                $validated['message'],
+                $tenantId,
+            );
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Kudos sent! 🎉');
+    }
 
     public function index(Request $request)
     {
@@ -138,6 +171,8 @@ class MyHrController extends Controller
             ->get(['id', 'title', 'priority', 'published_at']);
 
         return Inertia::render('hr/my/index', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'overview' => $this->myHrOverviewProps($user, $tenantId),
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,
@@ -195,6 +230,8 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/leave', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'whosOutWeek' => $this->myHrWhosOutByDay($user, $tenantId),
             'requests' => $requests,
             'balances' => $balances,
             'leaveTypes' => LeaveService::LEAVE_TYPES,
@@ -256,6 +293,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/expenses', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'claims' => $claims,
             'categories' => ExpenseService::CATEGORIES,
         ]);
@@ -329,6 +367,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/training', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'complianceStatuses' => $complianceStatuses,
             'can' => [
                 // Only surface the LMS catalog link to users who can open it
@@ -363,6 +402,7 @@ class MyHrController extends Controller
             });
 
         return Inertia::render('hr/my/policies', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'policies' => $policies,
         ]);
     }
@@ -426,6 +466,7 @@ class MyHrController extends Controller
         ] : null;
 
         return Inertia::render('hr/my/profile', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'profile' => $profileData,
         ]);
     }
@@ -519,6 +560,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/reviews', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'reviews' => $reviews,
         ]);
     }
@@ -585,6 +627,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/goals', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'goals' => $goals,
         ]);
     }
@@ -660,6 +703,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/surveys', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'surveys' => $surveys,
         ]);
     }
@@ -744,6 +788,42 @@ class MyHrController extends Controller
 
         $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
 
+        // This week's roster (read-only from Operations) — 7 day columns.
+        $weekStart = now()->startOfWeek();
+        $weekEnd = now()->endOfWeek();
+        $weekShifts = Shift::where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
+            ->whereBetween('starts_at', [$weekStart, $weekEnd])
+            ->with('client:id,first_name,last_name', 'serviceContext:id,name')
+            ->orderBy('starts_at')
+            ->get();
+
+        $weekRoster = [];
+        for ($i = 0; $i < 7; $i++) {
+            $day = $weekStart->copy()->addDays($i);
+            $dayShifts = $weekShifts
+                ->filter(fn (Shift $s) => $s->starts_at && $s->starts_at->isSameDay($day))
+                ->map(fn (Shift $s) => [
+                    'id' => $s->id,
+                    'service_context_id' => $s->service_context_id,
+                    'site' => $s->serviceContext?->name ?? $s->location ?? 'Shift',
+                    'client_name' => trim(($s->client?->first_name ?? '').' '.($s->client?->last_name ?? '')) ?: null,
+                    'shift_type' => $s->shift_type ?? 'standard',
+                    'time' => $s->starts_at->format('H:i').'–'.($s->ends_at?->format('H:i') ?? '—'),
+                    'starts_at' => $s->starts_at->toIso8601String(),
+                    'ends_at' => $s->ends_at?->toIso8601String(),
+                ])
+                ->values()
+                ->all();
+
+            $weekRoster[] = [
+                'day' => $day->isoFormat('ddd'),
+                'date' => $day->format('j'),
+                'today' => $day->isSameDay(now()),
+                'shifts' => $dayShifts,
+            ];
+        }
+
         // Upcoming shifts for the next 3 days
         $upcomingShifts = Shift::where('user_id', $user->id)
             ->visibleToFrontline($user->organization_id)
@@ -769,6 +849,8 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/time', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'weekRoster' => $weekRoster,
             'activeClock' => $activeClock ? [
                 'id' => $activeClock->id,
                 'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
@@ -890,6 +972,147 @@ class MyHrController extends Controller
         return redirect()->back()->with('success', 'Clocked out successfully.');
     }
 
+    /** Download a single roster shift as a calendar (.ics) event. */
+    public function shiftCalendar(Request $request, Shift $shift)
+    {
+        $user = $request->user();
+        abort_unless($shift->user_id === $user->id, 403);
+
+        $start = $shift->starts_at?->copy()->utc();
+        abort_unless($start, 404);
+        $end = $shift->ends_at?->copy()->utc() ?? $start->copy()->addHours(8);
+
+        $shift->loadMissing('serviceContext:id,name', 'client:id,first_name,last_name');
+        $summary = $shift->serviceContext?->name ?? $shift->location ?? 'Shift';
+        $client = trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? ''));
+        if ($client !== '') {
+            $summary .= ' · '.$client;
+        }
+        $uid = 'shift-'.$shift->id.'@'.($request->getHost() ?: 'kauricare');
+        $stamp = now()->utc()->format('Ymd\THis\Z');
+
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Kauri Care//My HR//EN',
+            'BEGIN:VEVENT',
+            'UID:'.$uid,
+            'DTSTAMP:'.$stamp,
+            'DTSTART:'.$start->format('Ymd\THis\Z'),
+            'DTEND:'.$end->format('Ymd\THis\Z'),
+            'SUMMARY:'.$this->icsEscape($summary),
+        ];
+        if ($shift->location) {
+            $lines[] = 'LOCATION:'.$this->icsEscape($shift->location);
+        }
+        $lines[] = 'END:VEVENT';
+        $lines[] = 'END:VCALENDAR';
+
+        return response(implode("\r\n", $lines)."\r\n", 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="shift-'.$shift->id.'.ics"',
+        ]);
+    }
+
+    private function icsEscape(string $value): string
+    {
+        return str_replace(
+            ["\\", ';', ',', "\r\n", "\n"],
+            ['\\\\', '\\;', '\\,', '\\n', '\\n'],
+            $value,
+        );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  1:1s (Supervision — employee self-service, Phase 1) */
+    /* ------------------------------------------------------------------ */
+
+    public function one(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // Phase 1 surfaces the existing HrSupervisionNote (employee-visible only).
+        // Phase 2 (first-class shared agenda / action-item tables w/ carry-forward
+        // + shared-vs-private notes) is deferred pending confirmation.
+        $notes = HrSupervisionNote::forTenant($tenantId)
+            ->forEmployee($user->id)
+            ->where('is_visible_to_employee', true)
+            ->with('supervisor:id,name')
+            ->orderByDesc('session_date')
+            ->get();
+
+        $sessions = $notes->map(fn (HrSupervisionNote $n) => [
+            'id' => $n->id,
+            'session_date' => $n->session_date?->toDateString(),
+            'session_type' => $n->session_type,
+            'duration_minutes' => $n->duration_minutes,
+            'supervisor' => $n->supervisor ? [
+                'id' => $n->supervisor->id,
+                'name' => $n->supervisor->name,
+            ] : null,
+            'topics_discussed' => $n->topics_discussed,
+            'actions_agreed' => array_values($n->actions_agreed ?? []),
+            'employee_comments' => $n->employee_comments,
+            'employee_acknowledged' => (bool) $n->employee_acknowledged,
+            'employee_acknowledged_at' => $n->employee_acknowledged_at?->toIso8601String(),
+            'next_session_date' => $n->next_session_date?->toDateString(),
+        ])->values();
+
+        // Open actions = unchecked action strings from notes not yet acknowledged.
+        $openActions = $notes
+            ->reject(fn (HrSupervisionNote $n) => $n->employee_acknowledged)
+            ->flatMap(fn (HrSupervisionNote $n) => collect($n->actions_agreed ?? [])->map(fn ($a) => [
+                'note_id' => $n->id,
+                'label' => $a,
+                'from' => $n->supervisor?->name,
+                'session_date' => $n->session_date?->toDateString(),
+            ]))
+            ->values();
+
+        // Next 1:1 = soonest future next_session_date, with the most recent supervisor.
+        $nextDate = $notes
+            ->pluck('next_session_date')
+            ->filter(fn ($d) => $d && $d->isFuture())
+            ->sort()
+            ->first();
+
+        $next = $nextDate ? [
+            'date' => $nextDate->toDateString(),
+            'who' => $notes->firstWhere('next_session_date', $nextDate)?->supervisor?->name
+                ?? $notes->first()?->supervisor?->name,
+            'days_until' => (int) ceil(now()->startOfDay()->diffInDays($nextDate->startOfDay(), false)),
+        ] : null;
+
+        return Inertia::render('hr/my/one', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'sessions' => $sessions,
+            'openActions' => $openActions,
+            'next' => $next,
+        ]);
+    }
+
+    public function acknowledgeOne(Request $request, HrSupervisionNote $note)
+    {
+        $user = $request->user();
+        abort_unless($note->employee_user_id === $user->id, 403);
+        abort_unless($note->is_visible_to_employee, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
+
+        $validated = $request->validate([
+            'employee_comments' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $note->update([
+            'employee_acknowledged' => true,
+            'employee_acknowledged_at' => now(),
+            'employee_comments' => $validated['employee_comments'] ?? $note->employee_comments,
+        ]);
+
+        return redirect()->back()->with('success', 'Marked as reviewed.');
+    }
+
     public function documents(Request $request)
     {
         $user = $request->user();
@@ -918,10 +1141,48 @@ class MyHrController extends Controller
                 'created_at' => $d->created_at?->toIso8601String(),
             ]);
 
+        // Documents awaiting this employee's e-signature (reuses ESignature flow).
+        $pendingSignatures = HrDocumentSignature::forSigner($user->id)
+            ->pending()
+            ->with(['document:id,title,category', 'requestedBy:id,name'])
+            ->orderBy('requested_at')
+            ->get()
+            ->map(fn (HrDocumentSignature $s) => [
+                'id' => $s->id,
+                'document_title' => $s->document?->title ?? 'Document',
+                'document_category' => $s->document?->category,
+                'requested_by' => $s->requestedBy?->name,
+                'requested_at' => $s->requested_at?->toIso8601String(),
+                'download_url' => route('hr.signatures.document', $s),
+            ])
+            ->values();
+
         return Inertia::render('hr/my/documents', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'pendingSignatures' => $pendingSignatures,
             'documents' => $documents,
             'categories' => ['contract', 'letter', 'policy', 'certificate', 'offer', 'other'],
         ]);
+    }
+
+    /** Sign a document awaiting this employee's signature (self-service path that
+     *  reuses the shared ESignatureService and stays on the My HR documents page). */
+    public function signDocument(Request $request, HrDocumentSignature $signature)
+    {
+        $user = $request->user();
+        abort_unless($signature->signer_user_id === $user->id, 403);
+
+        $validated = $request->validate([
+            'signature_data' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            app(ESignatureService::class)->sign($signature, $validated['signature_data'], $request);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Document signed & filed.');
     }
 
     public function downloadDocument(Request $request, HrDocument $document)
