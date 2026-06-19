@@ -5,6 +5,7 @@ import {
     FileText,
     GraduationCap,
     LayoutDashboard,
+    MessagesSquare,
     MessageSquare,
     Receipt,
     ScrollText,
@@ -13,50 +14,59 @@ import {
     User,
     Wallet,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
 export type MyHrTab =
     | 'overview'
-    | 'profile'
     | 'leave'
     | 'time'
+    | 'one'
+    | 'documents'
+    | 'profile'
     | 'expenses'
     | 'payslips'
+    | 'training'
+    | 'policies'
     | 'reviews'
     | 'goals'
-    | 'training'
-    | 'documents'
-    | 'policies'
     | 'surveys';
 
 const TAB_URLS: Record<MyHrTab, string> = {
     overview: '/hr/my',
-    profile: '/hr/my/profile',
     leave: '/hr/my/leave',
     time: '/hr/my/time',
+    one: '/hr/my/one',
+    documents: '/hr/my/documents',
+    profile: '/hr/my/profile',
     expenses: '/hr/my/expenses',
     payslips: '/hr/my/payslips',
+    training: '/hr/my/training',
+    policies: '/hr/my/policies',
     reviews: '/hr/my/reviews',
     goals: '/hr/my/goals',
-    training: '/hr/my/training',
-    documents: '/hr/my/documents',
-    policies: '/hr/my/policies',
     surveys: '/hr/my/surveys',
 };
 
-const ITEMS: HrTabItem[] = [
+/**
+ * Canonical My HR tab order + tones (from the redesign handoff). Time merges
+ * shifts ("Time & Shifts"); a new "1:1s" tab sits after it. The first five are
+ * the fully-designed surfaces; the rest follow in the same strip.
+ */
+const ITEMS: Omit<HrTabItem, 'badge'>[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary' },
-    { id: 'profile', label: 'Profile', icon: User, tone: 'info' },
     { id: 'leave', label: 'Leave', icon: CalendarDays, tone: 'success' },
-    { id: 'time', label: 'Time', icon: Clock, tone: 'violet' },
+    { id: 'time', label: 'Time & Shifts', icon: Clock, tone: 'violet' },
+    { id: 'one', label: '1:1s', icon: MessagesSquare, tone: 'info' },
+    { id: 'documents', label: 'Documents', icon: FileText, tone: 'info' },
+    { id: 'profile', label: 'Profile', icon: User, tone: 'info' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },
     { id: 'payslips', label: 'Payslips', icon: Wallet, tone: 'success' },
+    { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },
+    { id: 'policies', label: 'Policies', icon: ScrollText, tone: 'warning' },
     { id: 'reviews', label: 'Reviews', icon: Star, tone: 'info' },
     { id: 'goals', label: 'Goals', icon: Target, tone: 'primary' },
-    { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },
-    { id: 'documents', label: 'Documents', icon: FileText, tone: 'info' },
-    { id: 'policies', label: 'Policies', icon: ScrollText, tone: 'warning' },
     { id: 'surveys', label: 'Surveys', icon: MessageSquare, tone: 'success' },
 ];
 
@@ -64,15 +74,30 @@ const ITEMS: HrTabItem[] = [
  * Section-level tab strip shared across the My HR (employee self-service) pages
  * so the cluster reads as one hub. The whole my.* route group is open to any
  * authenticated user, so the strip is a static list (no per-tab gating).
+ *
+ * `badges` surfaces live "needs attention" counts per tab (pending leave,
+ * docs-to-sign, policies-due, 1:1s-to-acknowledge); a count of 0/undefined
+ * hides the badge.
  */
-export function MyHrTabs({ active }: { active: MyHrTab }) {
+export function MyHrTabs({
+    active,
+    badges,
+}: {
+    active: MyHrTab;
+    badges?: Partial<Record<MyHrTab, ReactNode>>;
+}) {
+    const items: HrTabItem[] = ITEMS.map((item) => {
+        const badge = badges?.[item.id as MyHrTab];
+        return badge ? { ...item, badge } : item;
+    });
+
     return (
         <HrTabs
             value={active}
             onChange={(id) => {
                 if (id !== active) router.visit(TAB_URLS[id as MyHrTab]);
             }}
-            items={ITEMS}
+            items={items}
             ariaLabel="My HR views"
         />
     );

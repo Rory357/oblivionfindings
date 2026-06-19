@@ -16,6 +16,7 @@ use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
@@ -23,6 +24,7 @@ use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Models\Shift;
@@ -33,7 +35,7 @@ use Inertia\Inertia;
 
 class MyHrController extends Controller
 {
-    use ResolvesHrTenant;
+    use BuildsMyHrShell, ResolvesHrTenant;
 
     public function __construct(
         private readonly LeaveService $leaveService,
@@ -138,6 +140,7 @@ class MyHrController extends Controller
             ->get(['id', 'title', 'priority', 'published_at']);
 
         return Inertia::render('hr/my/index', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,
@@ -888,6 +891,96 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  1:1s (Supervision — employee self-service, Phase 1) */
+    /* ------------------------------------------------------------------ */
+
+    public function one(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // Phase 1 surfaces the existing HrSupervisionNote (employee-visible only).
+        // Phase 2 (first-class shared agenda / action-item tables w/ carry-forward
+        // + shared-vs-private notes) is deferred pending confirmation.
+        $notes = HrSupervisionNote::forTenant($tenantId)
+            ->forEmployee($user->id)
+            ->where('is_visible_to_employee', true)
+            ->with('supervisor:id,name')
+            ->orderByDesc('session_date')
+            ->get();
+
+        $sessions = $notes->map(fn (HrSupervisionNote $n) => [
+            'id' => $n->id,
+            'session_date' => $n->session_date?->toDateString(),
+            'session_type' => $n->session_type,
+            'duration_minutes' => $n->duration_minutes,
+            'supervisor' => $n->supervisor ? [
+                'id' => $n->supervisor->id,
+                'name' => $n->supervisor->name,
+            ] : null,
+            'topics_discussed' => $n->topics_discussed,
+            'actions_agreed' => array_values($n->actions_agreed ?? []),
+            'employee_comments' => $n->employee_comments,
+            'employee_acknowledged' => (bool) $n->employee_acknowledged,
+            'employee_acknowledged_at' => $n->employee_acknowledged_at?->toIso8601String(),
+            'next_session_date' => $n->next_session_date?->toDateString(),
+        ])->values();
+
+        // Open actions = unchecked action strings from notes not yet acknowledged.
+        $openActions = $notes
+            ->reject(fn (HrSupervisionNote $n) => $n->employee_acknowledged)
+            ->flatMap(fn (HrSupervisionNote $n) => collect($n->actions_agreed ?? [])->map(fn ($a) => [
+                'note_id' => $n->id,
+                'label' => $a,
+                'from' => $n->supervisor?->name,
+                'session_date' => $n->session_date?->toDateString(),
+            ]))
+            ->values();
+
+        // Next 1:1 = soonest future next_session_date, with the most recent supervisor.
+        $nextDate = $notes
+            ->pluck('next_session_date')
+            ->filter(fn ($d) => $d && $d->isFuture())
+            ->sort()
+            ->first();
+
+        $next = $nextDate ? [
+            'date' => $nextDate->toDateString(),
+            'who' => $notes->firstWhere('next_session_date', $nextDate)?->supervisor?->name
+                ?? $notes->first()?->supervisor?->name,
+            'days_until' => (int) ceil(now()->startOfDay()->diffInDays($nextDate->startOfDay(), false)),
+        ] : null;
+
+        return Inertia::render('hr/my/one', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'sessions' => $sessions,
+            'openActions' => $openActions,
+            'next' => $next,
+        ]);
+    }
+
+    public function acknowledgeOne(Request $request, HrSupervisionNote $note)
+    {
+        $user = $request->user();
+        abort_unless($note->employee_user_id === $user->id, 403);
+        abort_unless($note->is_visible_to_employee, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
+
+        $validated = $request->validate([
+            'employee_comments' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $note->update([
+            'employee_acknowledged' => true,
+            'employee_acknowledged_at' => now(),
+            'employee_comments' => $validated['employee_comments'] ?? $note->employee_comments,
+        ]);
+
+        return redirect()->back()->with('success', 'Marked as reviewed.');
     }
 
     public function documents(Request $request)
