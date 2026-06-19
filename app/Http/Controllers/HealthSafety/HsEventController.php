@@ -22,6 +22,7 @@ use App\Models\WorkplaceInjury;
 use App\Services\HealthSafety\HsEventService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class HsEventController extends Controller
@@ -74,7 +75,22 @@ class HsEventController extends Controller
             $query->where('reference_number', 'like', "%{$term}%");
         }
 
-        $events = $query->paginate(25)->withQueryString()->through(fn (HsEvent $e) => [
+        $paginator = $query->paginate(25)->withQueryString();
+
+        // Batch-resolve the two source types whose jump URL needs a record lookup
+        // (exposure → substance, inspection → site) so the per-row resolveSource()
+        // below issues no extra queries (was a small N+1 across the page).
+        $rows = $paginator->getCollection();
+        $exposureIds = $rows->where('source_type', SubstanceExposureRecord::class)->pluck('source_id');
+        $inspectionIds = $rows->where('source_type', SiteInspectionRecord::class)->pluck('source_id');
+        $exposureMap = $exposureIds->isEmpty()
+            ? collect()
+            : SubstanceExposureRecord::whereIn('id', $exposureIds)->pluck('hazardous_substance_id', 'id');
+        $inspectionMap = $inspectionIds->isEmpty()
+            ? collect()
+            : SiteInspectionRecord::whereIn('id', $inspectionIds)->pluck('site_id', 'id');
+
+        $events = $paginator->through(fn (HsEvent $e) => [
             'id' => $e->id,
             'reference_number' => $e->reference_number,
             'event_category' => $e->event_category,
@@ -88,7 +104,7 @@ class HsEventController extends Controller
             'worksafe_notifiable' => (bool) $e->worksafe_notifiable,
             'worksafe_status' => $e->worksafe_status,
             'investigation_required' => (bool) $e->investigation_required,
-            'source' => $this->resolveSource($e->source_type, $e->source_id),
+            'source' => $this->resolveSource($e->source_type, $e->source_id, $exposureMap, $inspectionMap),
             'flags' => [
                 'investigation_overdue' => $e->overdue_investigations_count > 0,
                 'awaiting_verification' => (int) $e->awaiting_verification_count,
@@ -316,7 +332,14 @@ class HsEventController extends Controller
      * categories) return null. Modules without a per-record route resolve to a
      * label only (no jump) rather than a broken link.
      */
-    private function resolveSource(?string $sourceType, ?int $sourceId): ?array
+    /**
+     * Resolve a polymorphic source to a label + jump URL. The two source types
+     * whose URL needs a record lookup (exposure → its substance, inspection → its
+     * site) accept an optional pre-loaded id→value map so the list can batch-resolve
+     * them in one query instead of one-per-row (the detail path passes none and
+     * looks the single record up directly).
+     */
+    private function resolveSource(?string $sourceType, ?int $sourceId, ?Collection $exposureMap = null, ?Collection $inspectionMap = null): ?array
     {
         if (! $sourceType || ! $sourceId) {
             return null;
@@ -329,8 +352,8 @@ class HsEventController extends Controller
             'SafeguardingConcern' => ['Safeguarding concern', "/safeguarding/{$sourceId}"],
             'FleetIncident' => ['Fleet incident', "/fleet-assets/incidents?incident={$sourceId}"],
             'WorkplaceInjury' => ['Workplace injury', "/health-safety/injuries/{$sourceId}"],
-            'SubstanceExposureRecord' => $this->resolveSubstanceExposureSource($sourceId),
-            'SiteInspectionRecord' => $this->resolveSiteInspectionSource($sourceId),
+            'SubstanceExposureRecord' => $this->resolveSubstanceExposureSource($sourceId, $exposureMap),
+            'SiteInspectionRecord' => $this->resolveSiteInspectionSource($sourceId, $inspectionMap),
             'FleetWorkOrder' => ['Fleet work order', "/fleet-assets/maintenance/work-orders/{$sourceId}"],
             'EmergencyDrill' => ['Emergency drill', "/health-safety/drills/{$sourceId}"],
             'SiteHazard' => ['Hazard', null],
@@ -347,30 +370,22 @@ class HsEventController extends Controller
         ];
     }
 
-    private function resolveSubstanceExposureSource(int $sourceId): array
+    private function resolveSubstanceExposureSource(int $sourceId, ?Collection $map = null): array
     {
-        $record = SubstanceExposureRecord::query()
-            ->select(['id', 'hazardous_substance_id'])
-            ->find($sourceId);
+        $substanceId = $map !== null
+            ? $map->get($sourceId)
+            : SubstanceExposureRecord::query()->select(['id', 'hazardous_substance_id'])->find($sourceId)?->hazardous_substance_id;
 
-        return [
-            'Substance exposure',
-            $record?->hazardous_substance_id
-                ? "/health-safety/substances/{$record->hazardous_substance_id}"
-                : null,
-        ];
+        return ['Substance exposure', $substanceId ? "/health-safety/substances/{$substanceId}" : null];
     }
 
-    private function resolveSiteInspectionSource(int $sourceId): array
+    private function resolveSiteInspectionSource(int $sourceId, ?Collection $map = null): array
     {
-        $record = SiteInspectionRecord::query()
-            ->select(['id', 'site_id'])
-            ->find($sourceId);
+        $siteId = $map !== null
+            ? $map->get($sourceId)
+            : SiteInspectionRecord::query()->select(['id', 'site_id'])->find($sourceId)?->site_id;
 
-        return [
-            'Site inspection',
-            $record?->site_id ? "/sites/{$record->site_id}/inspections" : null,
-        ];
+        return ['Site inspection', $siteId ? "/sites/{$siteId}/inspections" : null];
     }
 
     /**
@@ -536,7 +551,12 @@ class HsEventController extends Controller
         $this->applyActionTab($query, $tab);
 
         if ($request->filled('priority')) {
-            $query->where('priority', $request->input('priority'));
+            $query->whereIn('priority', array_filter(explode(',', (string) $request->input('priority'))));
+        }
+
+        if ($request->boolean('unassigned')) {
+            $query->whereNull('assigned_to_user_id')
+                ->whereNotIn('status', [HsCorrectiveAction::STATUS_VERIFIED, HsCorrectiveAction::STATUS_CLOSED]);
         }
 
         if ($request->filled('q')) {
@@ -637,6 +657,7 @@ class HsEventController extends Controller
                 'q' => $request->input('q'),
                 'tab' => $tab,
                 'priority' => $request->input('priority'),
+                'unassigned' => $request->boolean('unassigned') ?: null,
                 'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
                 'from' => $request->input('from'),
                 'to' => $request->input('to'),
