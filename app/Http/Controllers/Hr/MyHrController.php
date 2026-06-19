@@ -779,6 +779,42 @@ class MyHrController extends Controller
 
         $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
 
+        // This week's roster (read-only from Operations) — 7 day columns.
+        $weekStart = now()->startOfWeek();
+        $weekEnd = now()->endOfWeek();
+        $weekShifts = Shift::where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
+            ->whereBetween('starts_at', [$weekStart, $weekEnd])
+            ->with('client:id,first_name,last_name', 'serviceContext:id,name')
+            ->orderBy('starts_at')
+            ->get();
+
+        $weekRoster = [];
+        for ($i = 0; $i < 7; $i++) {
+            $day = $weekStart->copy()->addDays($i);
+            $dayShifts = $weekShifts
+                ->filter(fn (Shift $s) => $s->starts_at && $s->starts_at->isSameDay($day))
+                ->map(fn (Shift $s) => [
+                    'id' => $s->id,
+                    'service_context_id' => $s->service_context_id,
+                    'site' => $s->serviceContext?->name ?? $s->location ?? 'Shift',
+                    'client_name' => trim(($s->client?->first_name ?? '').' '.($s->client?->last_name ?? '')) ?: null,
+                    'shift_type' => $s->shift_type ?? 'standard',
+                    'time' => $s->starts_at->format('H:i').'–'.($s->ends_at?->format('H:i') ?? '—'),
+                    'starts_at' => $s->starts_at->toIso8601String(),
+                    'ends_at' => $s->ends_at?->toIso8601String(),
+                ])
+                ->values()
+                ->all();
+
+            $weekRoster[] = [
+                'day' => $day->isoFormat('ddd'),
+                'date' => $day->format('j'),
+                'today' => $day->isSameDay(now()),
+                'shifts' => $dayShifts,
+            ];
+        }
+
         // Upcoming shifts for the next 3 days
         $upcomingShifts = Shift::where('user_id', $user->id)
             ->visibleToFrontline($user->organization_id)
@@ -804,6 +840,8 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/time', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'weekRoster' => $weekRoster,
             'activeClock' => $activeClock ? [
                 'id' => $activeClock->id,
                 'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
@@ -923,6 +961,57 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
+    }
+
+    /** Download a single roster shift as a calendar (.ics) event. */
+    public function shiftCalendar(Request $request, Shift $shift)
+    {
+        $user = $request->user();
+        abort_unless($shift->user_id === $user->id, 403);
+
+        $start = $shift->starts_at?->copy()->utc();
+        abort_unless($start, 404);
+        $end = $shift->ends_at?->copy()->utc() ?? $start->copy()->addHours(8);
+
+        $shift->loadMissing('serviceContext:id,name', 'client:id,first_name,last_name');
+        $summary = $shift->serviceContext?->name ?? $shift->location ?? 'Shift';
+        $client = trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? ''));
+        if ($client !== '') {
+            $summary .= ' · '.$client;
+        }
+        $uid = 'shift-'.$shift->id.'@'.($request->getHost() ?: 'kauricare');
+        $stamp = now()->utc()->format('Ymd\THis\Z');
+
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Kauri Care//My HR//EN',
+            'BEGIN:VEVENT',
+            'UID:'.$uid,
+            'DTSTAMP:'.$stamp,
+            'DTSTART:'.$start->format('Ymd\THis\Z'),
+            'DTEND:'.$end->format('Ymd\THis\Z'),
+            'SUMMARY:'.$this->icsEscape($summary),
+        ];
+        if ($shift->location) {
+            $lines[] = 'LOCATION:'.$this->icsEscape($shift->location);
+        }
+        $lines[] = 'END:VEVENT';
+        $lines[] = 'END:VCALENDAR';
+
+        return response(implode("\r\n", $lines)."\r\n", 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="shift-'.$shift->id.'.ics"',
+        ]);
+    }
+
+    private function icsEscape(string $value): string
+    {
+        return str_replace(
+            ["\\", ';', ',', "\r\n", "\n"],
+            ['\\\\', '\\;', '\\,', '\\n', '\\n'],
+            $value,
+        );
     }
 
     /* ------------------------------------------------------------------ */

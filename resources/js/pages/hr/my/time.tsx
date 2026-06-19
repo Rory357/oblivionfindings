@@ -1,51 +1,32 @@
-import PageShell from '@/components/page-shell';
-import { KpiCard } from '@/components/recruitment/kpi-card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Calendar,
+    CalendarPlus,
     Clock,
-    Loader2,
-    MapPin,
-    Play,
-    Square,
-    Timer,
-    TrendingUp,
+    Coffee,
+    Eye,
+    LogIn,
+    LogOut,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { MyHrShell, hueFromId, type MyHrShellData } from '@/components/hr';
+import {
+    ShiftContextMenu,
+    type ShiftCtxState,
+} from '@/components/rostering/shift-context-menu';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
 interface TimeEntry {
     id: number;
-    entry_date: string;
     clock_in: string;
     clock_out: string | null;
     break_minutes: number;
     total_hours: number | null;
-    entry_type: string;
     status: string;
-    pay_type: string;
-    notes: string | null;
-    shift: {
-        id: number;
-        starts_at: string;
-        ends_at: string;
-        shift_type: string;
-        is_sleepover: boolean;
-        is_on_call: boolean;
-        expected_break_minutes?: number | null;
-        location?: string | null;
-        service_context_name?: string | null;
-        client_name: string;
-    } | null;
     client_name: string | null;
+    shift: { client_name: string } | null;
 }
 
 interface WeeklySummary {
@@ -53,691 +34,304 @@ interface WeeklySummary {
     week_end: string;
     daily_hours: Record<string, number>;
     total_hours: number;
-    total_entries: number;
 }
 
-interface UpcomingShift {
+interface RosterShift {
     id: number;
-    starts_at: string;
-    ends_at: string;
+    service_context_id: number | null;
+    site: string;
+    client_name: string | null;
     shift_type: string;
-    is_sleepover: boolean;
-    is_on_call: boolean;
-    expected_break_minutes?: number | null;
-    client_name: string;
-    location: string | null;
-    service_context_name?: string | null;
-    status: string;
+    time: string;
+    starts_at: string;
+    ends_at: string | null;
+}
+
+interface RosterDay {
+    day: string;
+    date: string;
+    today: boolean;
+    shifts: RosterShift[];
 }
 
 interface Props {
-    activeClock: {
-        id: number;
-        clock_in: string;
-        notes: string | null;
-        shift?: {
-            id: number;
-            starts_at: string;
-            ends_at: string;
-            shift_type: string;
-            is_sleepover: boolean;
-            is_on_call: boolean;
-            expected_break_minutes?: number | null;
-            location?: string | null;
-            service_context_name?: string | null;
-            client_name: string;
-        } | null;
-    } | null;
+    myHr: MyHrShellData;
+    weekRoster: RosterDay[];
+    activeClock: { id: number; clock_in: string } | null;
     todayEntries: TimeEntry[];
     weeklySummary: WeeklySummary;
-    upcomingShifts: UpcomingShift[];
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Time', href: '/hr/my/time' },
-];
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-const defaultStatusConfig = {
-    className: 'border-status-info/30 text-status-info bg-status-info-bg',
-    label: 'Active',
-};
-
-const statusConfig: Record<string, { className: string; label: string }> = {
-    active: defaultStatusConfig,
-    submitted: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Submitted',
-    },
-    approved: {
-        className:
-            'border-status-success/30 text-status-success bg-status-success-bg',
-        label: 'Approved',
-    },
-    rejected: {
-        className:
-            'border-status-critical/30 text-status-critical bg-status-critical-bg',
-        label: 'Rejected',
-    },
-};
-
-const defaultShiftTypeConfig = {
-    className:
-        'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-    label: 'Standard',
-};
-
-const shiftTypeConfig: Record<string, { className: string; label: string }> = {
-    standard: defaultShiftTypeConfig,
-    sleepover: {
-        className: 'border-primary/30 text-primary bg-primary/10',
-        label: 'Sleepover',
-    },
-    on_call: {
-        className: 'border-primary/30 text-primary bg-primary/10',
-        label: 'On-Call',
-    },
-    split: {
-        className: 'border-status-info/30 text-status-info bg-status-info-bg',
-        label: 'Split',
-    },
-    travel: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Travel',
-    },
-};
-
-const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function getShiftTypeConfig(shiftType?: string): {
-    className: string;
+type TimelineRow = {
     label: string;
-} {
-    return shiftTypeConfig[shiftType ?? 'standard'] ?? defaultShiftTypeConfig;
+    time: string;
+    icon: typeof LogIn;
+    tone: 'success' | 'warning' | 'neutral' | 'live';
+};
+
+const TIMELINE_TONE: Record<TimelineRow['tone'], string> = {
+    success: 'bg-status-success-bg text-status-success',
+    warning: 'bg-status-warning-bg text-status-warning',
+    neutral: 'bg-muted text-muted-foreground',
+    live: 'bg-live-bg text-live',
+};
+
+function buildTimeline(entries: TimeEntry[], clockedIn: boolean): TimelineRow[] {
+    const rows: TimelineRow[] = [];
+    for (const e of entries) {
+        rows.push({
+            label: 'Clocked in',
+            time: e.clock_in,
+            icon: LogIn,
+            tone: 'success',
+        });
+        if (e.break_minutes > 0) {
+            rows.push({
+                label: `Break · ${e.break_minutes}m`,
+                time: '',
+                icon: Coffee,
+                tone: 'warning',
+            });
+        }
+        if (e.clock_out) {
+            rows.push({
+                label: 'Clocked out',
+                time: e.clock_out,
+                icon: LogOut,
+                tone: 'neutral',
+            });
+        }
+    }
+    if (clockedIn) {
+        rows.push({
+            label: 'Now — on shift',
+            time: 'live',
+            icon: Clock,
+            tone: 'live',
+        });
+    }
+    return rows;
 }
 
-function getStatusConfig(status?: string): {
-    className: string;
-    label: string;
-} {
-    return statusConfig[status ?? 'active'] ?? defaultStatusConfig;
+function downloadShiftIcs(shiftId: number) {
+    const a = document.createElement('a');
+    a.href = `/hr/my/time/shifts/${shiftId}/calendar`;
+    a.download = `shift-${shiftId}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success('Added to calendar 📅', {
+        description: 'Shift exported as an .ics event.',
+    });
 }
 
 export default function MyTime({
+    myHr,
+    weekRoster,
     activeClock,
     todayEntries,
     weeklySummary,
-    upcomingShifts,
 }: Props) {
-    const [processing, setProcessing] = useState(false);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
-    const todayTotal = todayEntries
-        .filter((e) => e.total_hours != null)
-        .reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
+    const timeline = buildTimeline(todayEntries, !!activeClock);
+    const dailyEntries = Object.entries(weeklySummary.daily_hours ?? {});
+    const maxHours = Math.max(8, ...dailyEntries.map(([, h]) => Number(h) || 0));
+    const target = myHr.weekly.target_hours;
 
-    const pendingCount = todayEntries.filter(
-        (e) => e.status === 'submitted',
-    ).length;
-
-    const nextShift = upcomingShifts.length > 0 ? upcomingShifts[0] : null;
-    const nextShiftLabel = nextShift
-        ? `${nextShift.starts_at.slice(11, 16)} - ${nextShift.client_name || 'Unassigned'}`
-        : 'None scheduled';
-
-    function handleClockIn(shiftId?: number) {
-        setProcessing(true);
-        router.post(
-            '/hr/my/time/clock-in',
-            { shift_id: shiftId ?? null },
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Clocked in successfully'),
-                onError: () => toast.error('Failed to clock in'),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    }
-
-    function handleClockOut() {
-        setProcessing(true);
-        router.post(
-            '/hr/my/time/clock-out',
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Clocked out successfully'),
-                onError: () => toast.error('Failed to clock out'),
-                onFinish: () => setProcessing(false),
-            },
-        );
+    function openShiftCtx(e: React.MouseEvent, s: RosterShift, day: RosterDay) {
+        e.preventDefault();
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: `${day.day} ${day.date}`,
+            tagBg: 'var(--accent)',
+            tagColor: 'var(--primary)',
+            meta: `${s.site} · ${s.time}`,
+            items: [
+                {
+                    icon: <Eye className="h-4 w-4" />,
+                    label: 'View shift',
+                    onClick: () =>
+                        toast.info(s.site, {
+                            description: `${s.client_name ? `${s.client_name} · ` : ''}${s.time}`,
+                        }),
+                },
+                {
+                    icon: <CalendarPlus className="h-4 w-4" />,
+                    label: 'Add to calendar',
+                    sub: 'Export .ics',
+                    onClick: () => downloadShiftIcs(s.id),
+                },
+            ],
+        });
     }
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Time" />
-
-            <PageShell>
-                <PageHero category="hr"
-                    icon={Clock}
-                    title="My Time"
-                    description="Track your shifts, hours, and upcoming roster."
-                    stats={[
-                        {
-                            label: "Today",
-                            value: `${todayTotal.toFixed(1)}h`,
-                        },
-                        {
-                            label: 'This week',
-                            value: `${weeklySummary.total_hours}h`,
-                        },
-                        { label: 'Pending', value: pendingCount },
-                        { label: 'Upcoming shifts', value: upcomingShifts.length },
-                    ]}
-                />
-
-                <MyHrTabs active="time" />
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <KpiCard
-                        label="Today's Hours"
-                        value={Number(todayTotal.toFixed(1))}
-                        icon={Clock}
-                        suffix="h"
-                        decimals={1}
-                        color="bg-primary/10 text-primary"
-                    />
-                    <KpiCard
-                        label="This Week"
-                        value={weeklySummary.total_hours}
-                        icon={TrendingUp}
-                        suffix="h"
-                        decimals={1}
-                        description={`Target: 40h`}
-                        color="bg-status-success-bg text-status-success"
-                    />
-                    <KpiCard
-                        label="Pending Entries"
-                        value={pendingCount}
-                        icon={AlertTriangle}
-                        description="Awaiting approval"
-                        color="bg-status-warning-bg text-status-warning"
-                    />
-                    <KpiCard
-                        label="Next Shift"
-                        value={upcomingShifts.length}
-                        icon={Calendar}
-                        description={nextShiftLabel}
-                        color="bg-status-info-bg text-status-info"
-                    />
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="space-y-4 lg:col-span-2">
-                        {/* Clock In/Out */}
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Clock className="h-4 w-4" />
-                                        Clock Status
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {activeClock ? (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-3 w-3 animate-pulse rounded-full bg-status-success" />
-                                                <span className="text-sm font-medium">
-                                                    Clocked in since{' '}
-                                                    {activeClock.clock_in}
-                                                </span>
-                                            </div>
-                                            {activeClock.shift ? (
-                                                <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-                                                    <div className="font-medium text-foreground">
-                                                        {activeClock.shift
-                                                            ?.client_name ||
-                                                            'Linked shift'}
-                                                    </div>
-                                                    <div className="mt-1">
-                                                        {
-                                                            getShiftTypeConfig(
-                                                                activeClock
-                                                                    .shift
-                                                                    ?.shift_type,
-                                                            ).label
-                                                        }
-                                                        {activeClock.shift
-                                                            ?.service_context_name
-                                                            ? ` • ${activeClock.shift.service_context_name}`
-                                                            : ''}
-                                                        {activeClock.shift
-                                                            ?.location
-                                                            ? ` • ${activeClock.shift.location}`
-                                                            : ''}
-                                                    </div>
-                                                    {(activeClock.shift
-                                                        .is_sleepover ||
-                                                        activeClock.shift
-                                                            .is_on_call ||
-                                                        activeClock.shift
-                                                            .expected_break_minutes) && (
-                                                        <div className="mt-1">
-                                                            {activeClock.shift
-                                                                .is_sleepover
-                                                                ? 'Sleepover'
-                                                                : null}
-                                                            {activeClock.shift
-                                                                .is_sleepover &&
-                                                            activeClock.shift
-                                                                .is_on_call
-                                                                ? ' • '
-                                                                : null}
-                                                            {activeClock.shift
-                                                                .is_on_call
-                                                                ? 'On-call'
-                                                                : null}
-                                                            {(activeClock.shift
-                                                                .is_sleepover ||
-                                                                activeClock
-                                                                    .shift
-                                                                    .is_on_call) &&
-                                                            activeClock.shift
-                                                                .expected_break_minutes
-                                                                ? ' • '
-                                                                : null}
-                                                            {activeClock.shift
-                                                                .expected_break_minutes
-                                                                ? `Break ${activeClock.shift.expected_break_minutes}m`
-                                                                : null}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : null}
-                                            {activeClock.notes && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    {activeClock.notes}
-                                                </p>
-                                            )}
-                                            <Button
-                                                onClick={handleClockOut}
-                                                variant="destructive"
-                                                className="w-full"
-                                                size="sm"
-                                                disabled={processing}
-                                            >
-                                                {processing ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Square className="mr-2 h-4 w-4" />
-                                                )}
-                                                {processing
-                                                    ? 'Clocking Out...'
-                                                    : 'Clock Out'}
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-3 w-3 rounded-full bg-muted" />
-                                                <span className="text-sm text-muted-foreground">
-                                                    Not clocked in
-                                                </span>
-                                            </div>
-                                            <Button
-                                                onClick={() => handleClockIn()}
-                                                className="w-full"
-                                                size="sm"
-                                                disabled={processing}
-                                            >
-                                                {processing ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Play className="mr-2 h-4 w-4" />
-                                                )}
-                                                {processing
-                                                    ? 'Clocking In...'
-                                                    : 'Clock In'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Weekly Chart */}
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Timer className="h-4 w-4" />
-                                        Weekly Hours
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="mb-3 text-center">
-                                        <p className="text-3xl font-bold">
-                                            {weeklySummary.total_hours}h
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {weeklySummary.week_start} to{' '}
-                                            {weeklySummary.week_end}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-end justify-between gap-1">
-                                        {Object.entries(
-                                            weeklySummary.daily_hours ?? {},
-                                        ).map(([date, hours], i) => {
-                                            const safeHours =
-                                                Number(hours) || 0;
-                                            const maxHours = Math.max(
-                                                10,
-                                                ...Object.values(
-                                                    weeklySummary.daily_hours ??
-                                                        {},
-                                                ).map((h) => Number(h) || 0),
-                                            );
-                                            const barHeight =
-                                                maxHours > 0
-                                                    ? (safeHours / maxHours) *
-                                                      50
-                                                    : 0;
-                                            return (
-                                                <div
-                                                    key={date}
-                                                    className="flex flex-1 flex-col items-center gap-1"
-                                                >
-                                                    <div
-                                                        className="w-full rounded bg-primary/20"
-                                                        style={{
-                                                            height: `${Math.max(4, barHeight)}px`,
-                                                        }}
-                                                    >
-                                                        <div
-                                                            className="w-full rounded bg-primary"
-                                                            style={{
-                                                                height: `${barHeight}px`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        {dayLabels[i] ??
-                                                            date.slice(5)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
+        <MyHrShell active="time" myHr={myHr} title="Time & Shifts · My HR">
+            <div className="flex flex-col gap-5">
+                <div className="grid gap-5 lg:grid-cols-[1fr_1.4fr]">
+                    {/* Today punch timeline */}
+                    <Card className="p-[18px]">
+                        <div className="mb-3.5 flex items-center justify-between">
+                            <h3 className="text-sm font-bold">Today</h3>
+                            <span className="text-xs font-bold text-live">
+                                {todayHoursLabel(todayEntries)}
+                            </span>
                         </div>
-
-                        {/* Today's Entries */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    Today's Entries
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                {todayEntries.length === 0 ? (
-                                    <div className="py-12 text-center">
-                                        <Clock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-                                        <p className="font-medium text-muted-foreground">
-                                            No time entries recorded today
-                                        </p>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Clock in above to start tracking
-                                            your hours.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-hidden rounded-b-xl">
-                                        <table className="w-full text-sm">
-                                            <thead className="border-b bg-muted/50">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        In
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Out
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Client
-                                                    </th>
-                                                    <th className="px-4 py-3 text-right font-medium">
-                                                        Break
-                                                    </th>
-                                                    <th className="px-4 py-3 text-right font-medium">
-                                                        Hours
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Status
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {todayEntries.map((entry) => {
-                                                    const config =
-                                                        getStatusConfig(
-                                                            entry.status,
-                                                        );
-                                                    return (
-                                                        <tr
-                                                            key={entry.id}
-                                                            className="hover:bg-muted/30"
-                                                        >
-                                                            <td className="px-4 py-3">
-                                                                {entry.clock_in}
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                {entry.clock_out ??
-                                                                    '-'}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-muted-foreground">
-                                                                {entry.client_name ||
-                                                                    entry.shift
-                                                                        ?.client_name ||
-                                                                    '-'}
-                                                                {entry.shift && (
-                                                                    <div className="mt-1 flex flex-wrap gap-1">
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className={`text-[10px] ${getShiftTypeConfig(entry.shift?.shift_type).className}`}
-                                                                        >
-                                                                            {
-                                                                                getShiftTypeConfig(
-                                                                                    entry
-                                                                                        .shift
-                                                                                        ?.shift_type,
-                                                                                )
-                                                                                    .label
-                                                                            }
-                                                                        </Badge>
-                                                                        {entry
-                                                                            .shift
-                                                                            .service_context_name ? (
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="text-[10px]"
-                                                                            >
-                                                                                {
-                                                                                    entry
-                                                                                        .shift
-                                                                                        .service_context_name
-                                                                                }
-                                                                            </Badge>
-                                                                        ) : null}
-                                                                    </div>
-                                                                )}
-                                                                {entry.shift
-                                                                    ?.location ? (
-                                                                    <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                                                                        <MapPin className="h-3 w-3" />{' '}
-                                                                        {
-                                                                            entry
-                                                                                .shift
-                                                                                .location
-                                                                        }
-                                                                    </div>
-                                                                ) : null}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right text-muted-foreground">
-                                                                {entry.break_minutes >
-                                                                0
-                                                                    ? `${entry.break_minutes}m`
-                                                                    : '-'}
-                                                                {entry.shift
-                                                                    ?.expected_break_minutes ? (
-                                                                    <div className="text-[11px] text-muted-foreground">
-                                                                        planned{' '}
-                                                                        {
-                                                                            entry
-                                                                                .shift
-                                                                                .expected_break_minutes
-                                                                        }
-                                                                        m
-                                                                    </div>
-                                                                ) : null}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right font-medium">
-                                                                {entry.total_hours !=
-                                                                null
-                                                                    ? `${entry.total_hours}h`
-                                                                    : '-'}
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className={
-                                                                        config.className
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        config.label
-                                                                    }
-                                                                </Badge>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Sidebar — Upcoming Shifts */}
-                    <div className="space-y-4">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Calendar className="h-4 w-4" />
-                                    Upcoming Shifts
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                {upcomingShifts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No upcoming shifts in the next 3 days.
-                                    </p>
-                                ) : (
-                                    upcomingShifts.map((shift) => {
-                                        const typeConfig = getShiftTypeConfig(
-                                            shift.shift_type,
-                                        );
-                                        return (
-                                            <div
-                                                key={shift.id}
-                                                className="rounded-lg border p-3 transition-colors hover:bg-accent/30"
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-medium">
-                                                            {shift.client_name ||
-                                                                'Unassigned'}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {shift.starts_at} —{' '}
-                                                            {shift.ends_at?.slice(
-                                                                11,
-                                                                16,
-                                                            )}
-                                                        </p>
-                                                        {shift.location && (
-                                                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                                                <MapPin className="h-3 w-3" />{' '}
-                                                                {shift.location}
-                                                            </p>
-                                                        )}
-                                                        {shift.service_context_name && (
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                {
-                                                                    shift.service_context_name
-                                                                }
-                                                            </p>
-                                                        )}
-                                                        {(shift.is_sleepover ||
-                                                            shift.is_on_call ||
-                                                            shift.expected_break_minutes) && (
-                                                            <p className="mt-1 text-[11px] text-muted-foreground">
-                                                                {shift.is_sleepover
-                                                                    ? 'Sleepover'
-                                                                    : null}
-                                                                {shift.is_sleepover &&
-                                                                shift.is_on_call
-                                                                    ? ' • '
-                                                                    : null}
-                                                                {shift.is_on_call
-                                                                    ? 'On-call'
-                                                                    : null}
-                                                                {(shift.is_sleepover ||
-                                                                    shift.is_on_call) &&
-                                                                shift.expected_break_minutes
-                                                                    ? ' • '
-                                                                    : null}
-                                                                {shift.expected_break_minutes
-                                                                    ? `Break ${shift.expected_break_minutes}m`
-                                                                    : null}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`shrink-0 text-[10px] ${typeConfig.className}`}
-                                                    >
-                                                        {typeConfig.label}
-                                                    </Badge>
-                                                </div>
-                                                {!activeClock && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="mt-2 w-full"
-                                                        onClick={() =>
-                                                            handleClockIn(
-                                                                shift.id,
-                                                            )
-                                                        }
-                                                        disabled={processing}
-                                                    >
-                                                        <Play className="mr-1 h-3 w-3" />{' '}
-                                                        Clock In to This Shift
-                                                    </Button>
+                        {timeline.length === 0 ? (
+                            <div className="flex flex-col items-center gap-2 py-8 text-center">
+                                <Clock className="h-8 w-8 text-muted-foreground/40" />
+                                <p className="text-[13px] text-muted-foreground">
+                                    No punches today yet — clock in from the card above.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col">
+                                {timeline.map((row, i) => {
+                                    const Icon = row.icon;
+                                    return (
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-3 py-2"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg',
+                                                    TIMELINE_TONE[row.tone],
                                                 )}
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
+                                            >
+                                                <Icon className="h-3.5 w-3.5" />
+                                            </span>
+                                            <span className="flex-1 text-[13px] font-semibold">
+                                                {row.label}
+                                            </span>
+                                            <span className="text-[13px] font-semibold tabular-nums">
+                                                {row.time === 'live' ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-live">
+                                                        <span className="relative flex h-2 w-2">
+                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75 motion-reduce:animate-none" />
+                                                            <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
+                                                        </span>
+                                                        live
+                                                    </span>
+                                                ) : (
+                                                    row.time
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Hours this week */}
+                    <Card className="p-[18px]">
+                        <div className="mb-2 flex items-center justify-between">
+                            <h3 className="text-sm font-bold">Hours this week</h3>
+                            <span className="text-[13px] font-bold">
+                                {weeklySummary.total_hours.toFixed(1)}h{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    / {target}h
+                                </span>
+                            </span>
+                        </div>
+                        <div className="flex h-[120px] items-end gap-2.5 pt-3.5">
+                            {dailyEntries.map(([date, hours], i) => {
+                                const h = Number(hours) || 0;
+                                const barH = Math.max(4, Math.round((h / maxHours) * 88));
+                                const weekend = i >= 5;
+                                return (
+                                    <div
+                                        key={date}
+                                        className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+                                    >
+                                        <span className="text-[10px] text-muted-foreground">
+                                            {h > 0 ? `${h}h` : '–'}
+                                        </span>
+                                        <div
+                                            className={cn(
+                                                'w-full rounded-t-md',
+                                                weekend || h === 0
+                                                    ? 'bg-muted'
+                                                    : 'bg-primary',
+                                            )}
+                                            style={{ height: `${barH}px` }}
+                                        />
+                                        <span className="text-[11px] font-semibold text-muted-foreground">
+                                            {DAY_LABELS[i] ?? date.slice(8)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </Card>
                 </div>
-            </PageShell>
-        </AppLayout>
+
+                {/* This week's roster */}
+                <Card className="p-[18px]">
+                    <div className="mb-3.5 flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-bold">This week’s roster</h3>
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                            From Workforce · right-click a shift
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
+                        {weekRoster.map((d) => (
+                            <div
+                                key={`${d.day}-${d.date}`}
+                                className={cn(
+                                    'min-h-[118px] overflow-hidden rounded-xl border border-border',
+                                    d.today && 'bg-accent',
+                                )}
+                            >
+                                <div className="border-b border-border px-2.5 py-2">
+                                    <span className="text-[11px] font-bold text-muted-foreground">
+                                        {d.day}
+                                    </span>{' '}
+                                    <span className="text-[13px] font-bold">
+                                        {d.date}
+                                    </span>
+                                </div>
+                                {d.shifts.map((s) => (
+                                    <div
+                                        key={s.id}
+                                        onContextMenu={(e) => openShiftCtx(e, s, d)}
+                                        className="m-2 cursor-default rounded-lg bg-muted p-2"
+                                        style={{
+                                            borderLeft: `3px solid oklch(0.62 0.17 ${hueFromId(s.service_context_id ?? s.id)})`,
+                                        }}
+                                    >
+                                        <div className="text-[11.5px] font-bold leading-tight">
+                                            {s.site}
+                                        </div>
+                                        <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                                            {s.client_name ?? s.shift_type}
+                                        </div>
+                                        <div className="mt-1 text-[10.5px] font-semibold">
+                                            {s.time}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </Card>
+            </div>
+
+            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+        </MyHrShell>
     );
+}
+
+/** Sum of completed-entry hours today, formatted for the timeline header. */
+function todayHoursLabel(entries: TimeEntry[]): string {
+    const total = entries
+        .filter((e) => e.total_hours != null)
+        .reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
+    return total > 0 ? `${total.toFixed(1)}h` : 'On shift';
 }
