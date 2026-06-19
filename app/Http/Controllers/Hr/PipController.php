@@ -20,7 +20,7 @@ class PipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
 
-        $pips = HrPerformanceImprovementPlan::with(['employeeProfile.user:id,name', 'manager:id,name'])
+        $pips = HrPerformanceImprovementPlan::with(['employee:id,name', 'manager:id,name'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -34,8 +34,8 @@ class PipController extends Controller
             'start_date' => $pip->start_date,
             'end_date' => $pip->end_date,
             'outcome' => $pip->outcome_notes,
-            'employee' => $pip->employeeProfile?->user
-                ? ['id' => $pip->employeeProfile->user->id, 'name' => $pip->employeeProfile->user->name]
+            'employee' => $pip->employee
+                ? ['id' => $pip->employee->id, 'name' => $pip->employee->name]
                 : null,
             'manager' => $pip->manager
                 ? ['id' => $pip->manager->id, 'name' => $pip->manager->name]
