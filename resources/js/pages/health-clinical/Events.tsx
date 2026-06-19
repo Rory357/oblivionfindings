@@ -10,10 +10,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Filter, X } from 'lucide-react';
+import {
+    HealthClinicalShell,
+    RegisterStatStrip,
+    type HealthClinicalKpis,
+} from '@/pages/health-clinical/components/health-clinical-shell';
+import { Link, router } from '@inertiajs/react';
+import { Filter, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -86,6 +89,8 @@ type Props = {
     stats: Stats;
     filters: Filters;
     filter_options: FilterOptions;
+    kpis: HealthClinicalKpis;
+    tab_counts?: Record<string, number>;
 };
 
 const ALL_SENTINEL = '__all__';
@@ -112,6 +117,8 @@ export default function EventRegister({
     stats,
     filters,
     filter_options,
+    kpis,
+    tab_counts,
 }: Props) {
     const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
@@ -152,35 +159,16 @@ export default function EventRegister({
         event.site?.name ?? event.client?.site?.name ?? '—';
 
     return (
-        <AppLayout>
-            <Head title="Clinical Event Register — Health & Clinical" />
+        <HealthClinicalShell activeTab="clinical_events" kpis={kpis} tabCounts={tab_counts}>
+            <RegisterStatStrip
+                stats={[
+                    { label: 'Events · 7d', value: stats.total_7d },
+                    { label: '30d', value: stats.total_30d },
+                    { label: 'Pending follow-up', value: stats.pending_follow_ups, tone: stats.pending_follow_ups > 0 ? 'warning' : 'default' },
+                    { label: 'Unreviewed', value: stats.unreviewed, tone: stats.unreviewed > 0 ? 'warning' : 'default' },
+                ]}
+            />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={AlertTriangle}
-                        title="Clinical Event Register"
-                        description="Cross-client oversight of recorded clinical events."
-                        stats={[
-                            { label: 'Last 7d', value: stats.total_7d },
-                            { label: 'Last 30d', value: stats.total_30d },
-                            { label: 'Pending follow-up', value: stats.pending_follow_ups },
-                            { label: 'Unreviewed', value: stats.unreviewed },
-                        ]}
-                        actions={
-                            <Link href="/health-clinical">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    Dashboard
-                                </Button>
-                            </Link>
-                        }
-                    />
-                }
-            >
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -498,7 +486,6 @@ export default function EventRegister({
                         )}
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+        </HealthClinicalShell>
     );
 }

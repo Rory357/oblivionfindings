@@ -31,8 +31,11 @@ class HealthClinicalDashboardController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.dashboard'), 403);
 
+        $kpis = $this->dashboardService->getKpis();
+
         return inertia('health-clinical/index', [
-            'kpis' => $this->dashboardService->getKpis(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
             'overdue_items' => $this->dashboardService->getOverdueItems(),
             'recent_events' => $this->dashboardService->getRecentEvents(),
             'recent_observations' => $this->dashboardService->getRecentObservations(),
@@ -58,10 +61,13 @@ class HealthClinicalDashboardController extends Controller
 
         $observations = $this->dashboardService->getObservationRegister($filters);
         $stats = $this->dashboardService->getObservationRegisterStats();
+        $kpis = $this->dashboardService->getKpis();
 
         return inertia('health-clinical/observations', [
             'observations' => $observations,
             'stats' => $stats,
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
             'filters' => $filters,
             'filter_options' => [
                 'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
@@ -102,9 +108,13 @@ class HealthClinicalDashboardController extends Controller
             'label' => $type->label(),
         ])->values();
 
+        $kpis = $this->dashboardService->getKpis();
+
         return inertia('health-clinical/Events', [
             'events' => $this->dashboardService->getEventRegister($filters),
             'stats' => $this->dashboardService->getEventRegisterStats(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
             'filters' => $filters,
             'filter_options' => [
                 'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),

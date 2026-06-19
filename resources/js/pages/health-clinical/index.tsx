@@ -45,7 +45,7 @@ type RecentObservation = {
 
 type Props = {
     kpis: HealthClinicalKpis & { protocols_active: number };
-    tabCounts?: Record<string, number>;
+    tab_counts?: Record<string, number>;
     overdue_items: OverdueItem[];
     recent_events: RecentEvent[];
     recent_observations: RecentObservation[];
@@ -69,13 +69,13 @@ const severityColor: Record<string, string> = {
 
 export default function HealthClinicalOverview({
     kpis,
-    tabCounts,
+    tab_counts,
     overdue_items,
     recent_events,
     recent_observations,
 }: Props) {
     return (
-        <HealthClinicalShell activeTab="overview" kpis={kpis} tabCounts={tabCounts}>
+        <HealthClinicalShell activeTab="overview" kpis={kpis} tabCounts={tab_counts}>
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Overdue Observations */}
                 <Card>

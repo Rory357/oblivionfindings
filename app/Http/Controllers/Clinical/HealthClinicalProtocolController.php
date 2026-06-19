@@ -34,9 +34,13 @@ class HealthClinicalProtocolController extends Controller
             ->getProtocolRegister($filters)
             ->through(fn (ClinicalProtocol $protocol) => $this->serializeProtocol($protocol));
 
+        $kpis = $this->dashboardService->getKpis();
+
         return inertia('health-clinical/Protocols', [
             'protocols' => $protocols,
             'stats' => $this->dashboardService->getProtocolRegisterStats(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
             'filters' => $filters,
             'filter_options' => $this->filterOptions(),
             'can_manage' => $request->user()?->canDo('clinical.protocols.manage') ?? false,

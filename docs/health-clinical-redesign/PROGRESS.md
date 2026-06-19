@@ -229,10 +229,11 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 ### 🔧 Step 2 — Hero + two-tier tab shell (FE; wraps existing pages) — **IN PROGRESS**
 - [x] Tab registry `resources/js/pages/health-clinical/lib/tab-groups.ts` (`HC_TABS`/`HC_GROUPS` Monitor/Plan/Analyse + `groupForTab`/`builtTabsForGroup`/`groupsWithBuiltTabs`). `href: null` = not-built (NOT rendered — no stubs; tabs flip on as steps land).
 - [x] Shared shell `resources/js/pages/health-clinical/components/health-clinical-shell.tsx` — hero on `hs-hero-kit` (medallion/status pill/2 clusters/bespoke `ClinicalChips` row mirroring only the CHIP token maps) + two-tier `GroupPills` over `TabStrip`; tab nav = Inertia visit (keeps `/health-clinical/events` a real route for governance). Record buttons + period control are prop-gated (appear in Steps 3/4 — no dead controls now).
-- [x] Refactored Overview `index.tsx` through the shell (kept component name `health-clinical/index`; dropped old PageHero + KPI grid). **tsc green (0 errors).** Commit: `__STEP2A_SHA__`.
-- [ ] Wrap `observations`/`Events`/`Protocols` register pages through the shell + add hero `kpis`/`tabCounts` to their controllers (shared `ClinicalDashboardService` shell payload). Trends → its own module route later (currently per-client).
-- [ ] Tests: shell renders, tabs nav; keep dashboard component-name assertion (`health-clinical/index`). **Ships:** unified command-centre over existing data.
+- [x] Refactored Overview `index.tsx` through the shell (kept component name `health-clinical/index`; dropped old PageHero + KPI grid). **tsc green (0 errors).** Commit: `08bfc1a8`.
+- [x] Wrapped `observations`/`Events`/`Protocols` register pages through the shell (each keeps its filters/table/pager + a `RegisterStatStrip` of its own stats; Protocols' "New Protocol" moved to a register toolbar). Added `kpis` + `tab_counts` to all 3 controllers via new `ClinicalDashboardService::getTabCounts()` (Observations badge = overdue schedules, Clinical Events badge = unreviewed; reuses the kpis snapshot). **tsc + eslint clean.** Commit: `__STEP2B_SHA__`.
+- [x] Tests: existing `HealthClinicalTest` (dashboard `health-clinical/index` + 3 register renders) green with the additive props.
 - **Decision:** registers are SEPARATE routes rendering the shared shell (not one mega-page) — preserves the governance deep-link contract + heterogeneous panels; tab click = Inertia visit.
+- **Deferred to later steps (no stubs now):** Trends tab (currently per-client → needs a module route, Step 8), Health Monitoring (Step 7), Care Plans (Step 7), Assessments (Step 8), Behaviour (Step 7); hero record buttons + period control (Steps 3–4).
 
 ### ☐ Step 3 — NEWS2 + structured vitals (backend + wizard hook)
 - [ ] Migration (additive): `news2_score`/`news2_band` + `on_oxygen`/`consciousness` on `clinical_observations`; reconcile `respiration_rate→respiratory_rate` + `o2_saturation→spo2`. Add `Acvpu` enum.

@@ -186,6 +186,7 @@ function GroupPills({
                     0,
                 );
                 return (
+                    // eslint-disable-next-line no-restricted-syntax -- tier-1 group pill: an intentional segmented tab control, not a shadcn Button
                     <button
                         key={g.key}
                         type="button"
@@ -375,6 +376,42 @@ export function HealthClinicalShell({
                 {children}
             </div>
         </AppLayout>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Register stat strip (per-tab context below the global hero)        */
+/* ------------------------------------------------------------------ */
+
+export type RegisterStat = {
+    label: string;
+    value: string | number;
+    tone?: 'default' | 'warning' | 'critical' | 'success';
+};
+
+const STAT_TONE: Record<NonNullable<RegisterStat['tone']>, string> = {
+    default: 'text-foreground',
+    warning: 'text-status-warning',
+    critical: 'text-status-critical',
+    success: 'text-status-success',
+};
+
+/** A compact strip of register-specific counts, shown above a register's filters. */
+export function RegisterStatStrip({ stats }: { stats: RegisterStat[] }) {
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- compact inline metric strip, not a Card content surface
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-2.5">
+            {stats.map((s, i) => (
+                <div key={i} className="flex items-baseline gap-1.5">
+                    <span className={cn('text-[15px] font-bold tabular-nums', STAT_TONE[s.tone ?? 'default'])}>
+                        {s.value}
+                    </span>
+                    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                        {s.label}
+                    </span>
+                </div>
+            ))}
+        </div>
     );
 }
 

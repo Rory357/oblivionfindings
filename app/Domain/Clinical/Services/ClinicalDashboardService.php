@@ -52,6 +52,29 @@ class ClinicalDashboardService
     }
 
     /**
+     * Attention-badge counts for the command-centre two-tier tabs (group pills
+     * sum their sub-tabs). Reuses the already-computed KPI snapshot where possible
+     * to avoid duplicate queries.
+     *
+     * @param  array{schedules_overdue?: int}|null  $kpis  optional pre-computed getKpis() result
+     * @return array<string, int>
+     */
+    public function getTabCounts(?array $kpis = null): array
+    {
+        $kpis ??= $this->getKpis();
+        $now = Carbon::now();
+
+        return [
+            // Observations needing attention = overdue protocol schedules to record.
+            'observations' => $kpis['schedules_overdue'] ?? 0,
+            // Clinical events awaiting RN sign-off (last 30 days).
+            'clinical_events' => ClinicalEvent::whereNull('reviewed_at')
+                ->where('occurred_at', '>=', $now->copy()->subDays(30))
+                ->count(),
+        ];
+    }
+
+    /**
      * Get overdue observation schedule items with protocol and client context.
      *
      * @return array<int, array{id: int, protocol_name: string, observation_type: string, observation_type_label: string, client_name: string, client_id: int, due_at: string, hours_overdue: int}>
