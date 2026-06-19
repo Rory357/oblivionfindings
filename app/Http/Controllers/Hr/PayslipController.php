@@ -7,6 +7,8 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +16,8 @@ use Inertia\Inertia;
 
 class PayslipController extends Controller
 {
+    use BuildsMyHrShell, ResolvesHrTenant;
+
     public function __construct(
         protected PayslipService $payslipService,
     ) {}
@@ -198,6 +202,7 @@ class PayslipController extends Controller
             ->withQueryString();
 
         return Inertia::render('hr/my/payslips', [
+            'myHr' => $this->myHrShellProps($user, $this->resolveHrTenantIdForUser($user)),
             'payslips' => $payslips,
         ]);
     }

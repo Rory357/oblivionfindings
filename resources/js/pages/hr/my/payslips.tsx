@@ -1,13 +1,10 @@
 import { MiniSparkline } from '@/components/dashboard/mini-sparkline';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     Banknote,
     ChevronRight,
@@ -15,7 +12,6 @@ import {
     Eye,
     FileText,
     Landmark,
-    Receipt,
     TrendingUp,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -49,6 +45,7 @@ interface Payslip {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     payslips: {
         data: Payslip[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
@@ -62,12 +59,6 @@ interface Props {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Payslips', href: '/hr/my/payslips' },
-];
 
 function nzd(amount: string | number): string {
     return new Intl.NumberFormat('en-NZ', {
@@ -131,7 +122,7 @@ const STATUS_CONFIG = {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MyPayslips({ payslips }: Props) {
+export default function MyPayslips({ myHr, payslips }: Props) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [yearFilter, setYearFilter] = useState<string>('all');
 
@@ -152,84 +143,54 @@ export default function MyPayslips({ payslips }: Props) {
         );
     }, [payslips.data, yearFilter]);
 
-    const {
-        latest,
-        ytdGross,
-        ytdNet,
-        ytdPaye,
-        ytdKiwi,
-        netTrend,
-        avgNet,
-        chartData,
-    } = useMemo(() => {
-        const all = payslips.data;
-        const latest = all[0] ?? null;
-        const currentYear = new Date().getFullYear();
-        const ytdSlips = all.filter(
-            (p) => new Date(p.pay_period_end).getFullYear() === currentYear,
-        );
+    const { latest, ytdGross, ytdPaye, netTrend, avgNet, chartData } =
+        useMemo(() => {
+            const all = payslips.data;
+            const latest = all[0] ?? null;
+            const currentYear = new Date().getFullYear();
+            const ytdSlips = all.filter(
+                (p) => new Date(p.pay_period_end).getFullYear() === currentYear,
+            );
 
-        const ytdGross = ytdSlips.reduce((s, p) => s + Number(p.gross_pay), 0);
-        const ytdNet = ytdSlips.reduce((s, p) => s + Number(p.net_pay), 0);
-        const ytdPaye = ytdSlips.reduce((s, p) => s + Number(p.paye), 0);
-        const ytdKiwi = ytdSlips.reduce(
-            (s, p) => s + Number(p.kiwisaver_employee),
-            0,
-        );
+            const ytdGross = ytdSlips.reduce(
+                (s, p) => s + Number(p.gross_pay),
+                0,
+            );
+            const ytdPaye = ytdSlips.reduce((s, p) => s + Number(p.paye), 0);
 
-        const netTrend = all
-            .slice(0, 6)
-            .map((p) => Number(p.net_pay))
-            .reverse();
+            const netTrend = all
+                .slice(0, 6)
+                .map((p) => Number(p.net_pay))
+                .reverse();
 
-        const avgNet =
-            netTrend.length > 0
-                ? netTrend.reduce((a, b) => a + b, 0) / netTrend.length
-                : 0;
+            const avgNet =
+                netTrend.length > 0
+                    ? netTrend.reduce((a, b) => a + b, 0) / netTrend.length
+                    : 0;
 
-        // Chart data (reversed so oldest first)
-        const chartData = [...all].reverse().map((p) => ({
-            period: new Date(p.pay_period_end).toLocaleDateString('en-NZ', {
-                day: 'numeric',
-                month: 'short',
-            }),
-            net: Number(p.net_pay),
-            gross: Number(p.gross_pay),
-        }));
+            // Chart data (reversed so oldest first)
+            const chartData = [...all].reverse().map((p) => ({
+                period: new Date(p.pay_period_end).toLocaleDateString('en-NZ', {
+                    day: 'numeric',
+                    month: 'short',
+                }),
+                net: Number(p.net_pay),
+                gross: Number(p.gross_pay),
+            }));
 
-        return {
-            latest,
-            ytdGross,
-            ytdNet,
-            ytdPaye,
-            ytdKiwi,
-            netTrend,
-            avgNet,
-            chartData,
-        };
-    }, [payslips.data]);
+            return {
+                latest,
+                ytdGross,
+                ytdPaye,
+                netTrend,
+                avgNet,
+                chartData,
+            };
+        }, [payslips.data]);
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Payslips" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={Receipt}
-                        title="My Payslips"
-                        description="View your pay history and download payslips."
-                        stats={[
-                            { label: 'Latest net', value: latest ? nzdShort(latest.net_pay) : '—' },
-                            { label: 'YTD gross', value: nzdShort(ytdGross) },
-                            { label: 'YTD net', value: nzdShort(ytdNet) },
-                            { label: 'Payslips', value: payslips.total },
-                        ]}
-                    />
-                }
-            >
-                <MyHrTabs active="payslips" />
-
-                {/* Summary Cards */}
+        <MyHrShell active="payslips" myHr={myHr} title="Payslips · My HR">
+            {/* Summary Cards */}
                 {payslips.data.length > 0 && (
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                         {/* Latest Net Pay */}
@@ -929,7 +890,6 @@ export default function MyPayslips({ payslips }: Props) {
                         </div>
                     )}
                 </div>
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

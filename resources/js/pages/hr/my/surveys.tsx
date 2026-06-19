@@ -20,11 +20,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
-import { MyHrTabs } from '@/components/hr';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
+import { useForm } from '@inertiajs/react';
 import { CheckCircle2, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
@@ -49,14 +46,9 @@ interface Survey {
 }
 
 interface Props {
+    myHr: MyHrShellData;
     surveys: Survey[];
 }
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/my' },
-    { title: 'My HR', href: '/hr/my' },
-    { title: 'My Surveys', href: '/hr/my/surveys' },
-];
 
 function QuestionRenderer({
     question,
@@ -325,30 +317,13 @@ function SurveyCard({ survey }: { survey: Survey }) {
     );
 }
 
-export default function MySurveys({ surveys }: Props) {
+export default function MySurveys({ myHr, surveys }: Props) {
     const pending = surveys.filter((s) => !s.has_responded);
     const completed = surveys.filter((s) => s.has_responded);
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Surveys" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={MessageSquare}
-                        title="My Surveys"
-                        description="Take part in organisational pulse and feedback surveys."
-                        stats={[
-                            { label: 'Available', value: surveys.length },
-                            { label: 'Pending', value: pending.length },
-                            { label: 'Completed', value: completed.length },
-                        ]}
-                    />
-                }
-            >
-                <MyHrTabs active="surveys" />
-
-                {surveys.length === 0 ? (
+        <MyHrShell active="surveys" myHr={myHr} title="Surveys · My HR">
+            {surveys.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             No surveys available at this time.
@@ -385,7 +360,6 @@ export default function MySurveys({ surveys }: Props) {
                         )}
                     </>
                 )}
-            </PageLayout>
-        </AppLayout>
+        </MyHrShell>
     );
 }

@@ -293,6 +293,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/expenses', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'claims' => $claims,
             'categories' => ExpenseService::CATEGORIES,
         ]);
@@ -366,6 +367,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/training', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'complianceStatuses' => $complianceStatuses,
             'can' => [
                 // Only surface the LMS catalog link to users who can open it
@@ -400,6 +402,7 @@ class MyHrController extends Controller
             });
 
         return Inertia::render('hr/my/policies', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'policies' => $policies,
         ]);
     }
@@ -463,6 +466,7 @@ class MyHrController extends Controller
         ] : null;
 
         return Inertia::render('hr/my/profile', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'profile' => $profileData,
         ]);
     }
@@ -556,6 +560,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/reviews', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'reviews' => $reviews,
         ]);
     }
@@ -622,6 +627,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/goals', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'goals' => $goals,
         ]);
     }
@@ -697,6 +703,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/surveys', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
             'surveys' => $surveys,
         ]);
     }
