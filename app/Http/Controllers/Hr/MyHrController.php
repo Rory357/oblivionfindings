@@ -228,6 +228,8 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/leave', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'whosOutWeek' => $this->myHrWhosOutByDay($user, $tenantId),
             'requests' => $requests,
             'balances' => $balances,
             'leaveTypes' => LeaveService::LEAVE_TYPES,

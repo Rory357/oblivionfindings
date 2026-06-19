@@ -14,6 +14,7 @@ export * from './leave-tabs';
 export * from './my-hr-clock-card';
 export * from './my-hr-hero';
 export * from './my-hr-kudos-wizard';
+export * from './my-hr-leave-wizard';
 export * from './my-hr-shell';
 export * from './my-hr-tabs';
 export * from './my-hr-types';

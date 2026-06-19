@@ -129,6 +129,48 @@ trait BuildsMyHrOverview
             ->all();
     }
 
+    /**
+     * Mon–Fri who's-out columns for the Leave tab's team calendar — each
+     * weekday with the teammates whose approved leave covers that day.
+     */
+    protected function myHrWhosOutByDay(User $user, int $tenantId): array
+    {
+        $now = now();
+        $weekStart = $now->copy()->startOfWeek();
+
+        $leave = HrLeaveRequest::where('tenant_id', $tenantId)
+            ->where('status', 'approved')
+            ->where('user_id', '!=', $user->id)
+            ->whereDate('starts_at', '<=', $weekStart->copy()->addDays(4)->toDateString())
+            ->whereDate('ends_at', '>=', $weekStart->toDateString())
+            ->with('user:id,name')
+            ->get();
+
+        $cols = [];
+        for ($i = 0; $i < 5; $i++) {
+            $day = $weekStart->copy()->addDays($i);
+            $people = $leave
+                ->filter(fn (HrLeaveRequest $l) => $l->user
+                    && $day->between($l->starts_at->copy()->startOfDay(), $l->ends_at->copy()->endOfDay()))
+                ->map(fn (HrLeaveRequest $l) => [
+                    'user_id' => $l->user_id,
+                    'name' => $l->user->name,
+                    'initials' => $this->myHrInitials($l->user->name),
+                ])
+                ->values()
+                ->all();
+
+            $cols[] = [
+                'day' => $day->isoFormat('ddd'),
+                'date' => $day->format('j'),
+                'today' => $day->isSameDay($now),
+                'people' => $people,
+            ];
+        }
+
+        return $cols;
+    }
+
     private function overviewWhosOut(User $user, int $tenantId, Carbon $weekStart, Carbon $weekEnd): array
     {
         return HrLeaveRequest::where('tenant_id', $tenantId)
