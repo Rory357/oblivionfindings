@@ -344,8 +344,6 @@ export default function FleetIncidentsIndex({
             <Head title="Fleet & Asset Incidents" />
 
             <div className="flex flex-col gap-6 p-6">
-                <WorkflowRibbon current="report" />
-
                 {/* ---- Hero ---- */}
                 <HeroShell
                     footer={
@@ -407,6 +405,8 @@ export default function FleetIncidentsIndex({
                         </div>
                     }
                 >
+                    <WorkflowRibbon current="report" />
+
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={Truck} />

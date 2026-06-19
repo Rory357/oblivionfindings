@@ -325,8 +325,6 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             <Head title="Safety events" />
 
             <div className="flex flex-col gap-6 p-6">
-                <WorkflowRibbon current="investigate" />
-
                 {/* ---- Hero ---- */}
                 <HeroShell
                     footer={
@@ -405,6 +403,8 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
                         </div>
                     }
                 >
+                    <WorkflowRibbon current="investigate" />
+
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ShieldCheck} />
