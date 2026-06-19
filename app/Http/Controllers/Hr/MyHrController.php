@@ -20,10 +20,12 @@ use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
@@ -35,7 +37,7 @@ use Inertia\Inertia;
 
 class MyHrController extends Controller
 {
-    use BuildsMyHrShell, ResolvesHrTenant;
+    use BuildsMyHrOverview, BuildsMyHrShell, ResolvesHrTenant;
 
     public function __construct(
         private readonly LeaveService $leaveService,
@@ -43,7 +45,34 @@ class MyHrController extends Controller
         private readonly TimeTrackingService $timeTrackingService,
         private readonly AttendanceService $attendanceService,
         private readonly ExpenseService $expenseService,
+        private readonly FeedService $feedService,
     ) {}
+
+    public function sendKudos(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'to_user_id' => ['required', 'integer', 'exists:users,id'],
+            'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->feedService->sendKudos(
+                $user,
+                $validated['to_user_id'],
+                $validated['category'],
+                $validated['message'],
+                $tenantId,
+            );
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Kudos sent! 🎉');
+    }
 
     public function index(Request $request)
     {
@@ -141,6 +170,7 @@ class MyHrController extends Controller
 
         return Inertia::render('hr/my/index', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
+            'overview' => $this->myHrOverviewProps($user, $tenantId),
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,

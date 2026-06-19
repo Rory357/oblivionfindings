@@ -79,9 +79,31 @@ trait BuildsMyHrShell
             ->where('created_at', '>=', now()->startOfMonth())
             ->count();
 
+        // Teammate directory for the "Send kudos" wizard (hosted in the shell,
+        // so it must be available on every page). Small list for a care org.
+        $teammates = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->where('user_id', '!=', $user->id)
+            ->with(['user:id,name', 'primarySite:id,name'])
+            ->orderBy('position_title')
+            ->limit(150)
+            ->get()
+            ->map(fn (HrEmployeeProfile $p) => $p->user?->name ? [
+                'id' => $p->user_id,
+                'name' => $p->user->name,
+                'initials' => $this->myHrInitials($p->user->name),
+                'role' => $p->position_title,
+                'site' => $p->primarySite?->name,
+            ] : null)
+            ->filter()
+            ->values()
+            ->all();
+
         $name = $profile?->user?->name ?? $user->name ?? 'there';
 
         return [
+            'teammates' => $teammates,
             'profile' => [
                 'name' => $name,
                 'first_name' => trim(explode(' ', $name)[0] ?? $name),

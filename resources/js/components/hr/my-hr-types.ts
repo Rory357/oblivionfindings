@@ -1,8 +1,10 @@
 import type { MyHrActiveClock } from './my-hr-clock-card';
+import type { KudosTeammate } from './my-hr-kudos-wizard';
 
 /** Shared hero/clock/badge payload returned by `BuildsMyHrShell` (PHP) and
  *  merged into every `/hr/my/*` Inertia page under the `myHr` prop. */
 export type MyHrShellData = {
+    teammates: KudosTeammate[];
     profile: {
         name: string;
         first_name: string;

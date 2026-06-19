@@ -103,6 +103,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clock-out');
         Route::get('/one', [MyHrController::class, 'one'])->name('one');
         Route::post('/one/{note}/acknowledge', [MyHrController::class, 'acknowledgeOne'])->name('one.acknowledge');
+        Route::post('/kudos', [MyHrController::class, 'sendKudos'])->name('kudos');
         Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
         Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
     });
