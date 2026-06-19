@@ -224,12 +224,15 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] Refactored `ClientClinicalController` to use the trait (now thin).
 - [x] Retired dead stack: **deleted** `App\Models\Clinical{Observation,Event,Protocol,ProtocolSchedule}`, `App\Services\HealthClinical\{ClinicalObservationService,ClinicalEventService,ProtocolService}`, `health-clinical/Dashboard.tsx`; stripped `HealthClinicalController` to just `clientSummary` (swapped dead `TYPE_LABELS` → Domain enum labels). **Kept** `HealthClinical\HealthSummaryService` — removed its vestigial (unused) dead-service constructor deps first. Zero dangling refs confirmed (repo-wide FQN grep clean).
 - [x] Tests: new `HealthClinicalModuleRecordingTest` (5/16) proves module store → canonical Domain table + timeline + witnesses (B3) + HS auto-link + client_id validation + permission gating. **Regression: 256 clinical tests / 1007 assertions green; all changed PHP lints clean.**
-- **Ships:** module-level recording stops writing the phantom schema; one canonical write path. Commit: `a93c125d`.
+- **Ships:** module-level recording stops writing the phantom schema; one canonical write path. Commit: `f2ceea69` (rolls into next commit).
 
-### ☐ Step 2 — Hero + two-tier tab shell (FE; wraps existing pages)
-- [ ] Build hero on `hs-hero-kit` + bespoke clinical chip row; `HC_TAB_GROUPS` + group pills + `TabStrip` + `?tab=` sync; keep component name `health-clinical/index`.
-- [ ] Wrap existing `observations`/`Events`/`Protocols`/`ClientTrends` bodies as panels; consolidate the lowercase/capital page-name collision (`observations` vs `Observations`).
-- [ ] Tests: shell renders, deep-links activate the right group; update/keep the dashboard component-name assertions. **Dependency:** Step 1 (controllers consolidated). **Ships:** unified command-centre over existing data.
+### 🔧 Step 2 — Hero + two-tier tab shell (FE; wraps existing pages) — **IN PROGRESS**
+- [x] Tab registry `resources/js/pages/health-clinical/lib/tab-groups.ts` (`HC_TABS`/`HC_GROUPS` Monitor/Plan/Analyse + `groupForTab`/`builtTabsForGroup`/`groupsWithBuiltTabs`). `href: null` = not-built (NOT rendered — no stubs; tabs flip on as steps land).
+- [x] Shared shell `resources/js/pages/health-clinical/components/health-clinical-shell.tsx` — hero on `hs-hero-kit` (medallion/status pill/2 clusters/bespoke `ClinicalChips` row mirroring only the CHIP token maps) + two-tier `GroupPills` over `TabStrip`; tab nav = Inertia visit (keeps `/health-clinical/events` a real route for governance). Record buttons + period control are prop-gated (appear in Steps 3/4 — no dead controls now).
+- [x] Refactored Overview `index.tsx` through the shell (kept component name `health-clinical/index`; dropped old PageHero + KPI grid). **tsc green (0 errors).** Commit: `__STEP2A_SHA__`.
+- [ ] Wrap `observations`/`Events`/`Protocols` register pages through the shell + add hero `kpis`/`tabCounts` to their controllers (shared `ClinicalDashboardService` shell payload). Trends → its own module route later (currently per-client).
+- [ ] Tests: shell renders, tabs nav; keep dashboard component-name assertion (`health-clinical/index`). **Ships:** unified command-centre over existing data.
+- **Decision:** registers are SEPARATE routes rendering the shared shell (not one mega-page) — preserves the governance deep-link contract + heterogeneous panels; tab click = Inertia visit.
 
 ### ☐ Step 3 — NEWS2 + structured vitals (backend + wizard hook)
 - [ ] Migration (additive): `news2_score`/`news2_band` + `on_oxygen`/`consciousness` on `clinical_observations`; reconcile `respiration_rate→respiratory_rate` + `o2_saturation→spo2`. Add `Acvpu` enum.
