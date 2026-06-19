@@ -484,7 +484,7 @@ class EmployeeProfileController extends Controller
             ]);
 
         // PIPs
-        $pips = HrPerformanceImprovementPlan::where('employee_profile_id', $profile->id)
+        $pips = HrPerformanceImprovementPlan::where('employee_user_id', $userId)
             ->with('milestones')->orderByDesc('start_date')->limit(5)->get()
             ->map(fn ($p) => [
                 'id' => $p->id, 'title' => $p->title, 'status' => $p->status, 'reason' => $p->reason,
@@ -540,7 +540,7 @@ class EmployeeProfileController extends Controller
             ->with('competency:id,name,category')->orderByDesc('assessment_date')->limit(20)->get()
             ->map(fn ($a) => [
                 'id' => $a->id, 'competency_name' => $a->competency?->name, 'category' => $a->competency?->category,
-                'proficiency_level' => $a->proficiency_level, 'target_level' => $a->target_level,
+                'proficiency_level' => $a->assessed_level, 'target_level' => $a->target_level,
                 'assessment_date' => $a->assessment_date?->toDateString(),
             ]);
 

@@ -10,6 +10,7 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CompetencyController extends Controller
@@ -148,15 +149,27 @@ class CompetencyController extends Controller
             'performance_review_id' => ['nullable', 'integer', 'exists:hr_performance_reviews,id'],
         ]);
 
-        DB::transaction(function () use ($user, $data) {
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $profile = HrEmployeeProfile::query()
+            ->where('user_id', $data['employee_user_id'])
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->first();
+
+        if (! $profile) {
+            throw ValidationException::withMessages([
+                'employee_user_id' => 'Select an employee with an HR profile before recording competencies.',
+            ]);
+        }
+
+        DB::transaction(function () use ($user, $data, $profile, $tenantId) {
             foreach ($data['assessments'] as $assessment) {
                 HrCompetencyAssessment::create([
-                    'tenant_id' => $user->tenant_id,
-                    'employee_user_id' => $data['employee_user_id'],
+                    'tenant_id' => $tenantId,
+                    'employee_profile_id' => $profile->id,
                     'competency_id' => $assessment['competency_id'],
-                    'assessor_user_id' => $user->id,
+                    'assessed_by' => $user->id,
                     'performance_review_id' => $data['performance_review_id'] ?? null,
-                    'proficiency_level' => $assessment['proficiency_level'],
+                    'assessed_level' => $assessment['proficiency_level'],
                     'target_level' => $assessment['target_level'] ?? null,
                     'assessment_date' => now()->toDateString(),
                     'notes' => $assessment['notes'] ?? null,
@@ -178,25 +191,27 @@ class CompetencyController extends Controller
         $employee = User::findOrFail($profile->user_id);
 
         // Latest assessment per competency
-        $latestAssessments = HrCompetencyAssessment::where('employee_user_id', $profile->user_id)
+        $latestAssessments = HrCompetencyAssessment::where('employee_profile_id', $profile->id)
             ->with(['competency', 'assessor:id,name'])
             ->orderByDesc('assessment_date')
             ->get()
             ->unique('competency_id')
-            ->values();
+            ->values()
+            ->map(fn (HrCompetencyAssessment $assessment) => $this->serializeAssessment($assessment));
 
         // Historical assessments
-        $history = HrCompetencyAssessment::where('employee_user_id', $profile->user_id)
+        $history = HrCompetencyAssessment::where('employee_profile_id', $profile->id)
             ->with(['competency:id,name', 'assessor:id,name'])
             ->orderByDesc('assessment_date')
             ->limit(50)
-            ->get();
+            ->get()
+            ->map(fn (HrCompetencyAssessment $assessment) => $this->serializeAssessment($assessment));
 
         // Build radar chart data
         $radarData = $latestAssessments->map(fn ($a) => [
-            'competency' => $a->competency->name,
-            'level' => $a->proficiency_level,
-            'target' => $a->target_level,
+            'competency' => $a['competency']['name'] ?? '',
+            'level' => $a['proficiency_level'],
+            'target' => $a['target_level'],
         ])->toArray();
 
         return Inertia::render('hr/performance/competencies/profile', [
@@ -209,5 +224,26 @@ class CompetencyController extends Controller
                 'manage' => $user->canDo('hr.performance.manage'),
             ],
         ]);
+    }
+
+    private function serializeAssessment(HrCompetencyAssessment $assessment): array
+    {
+        return [
+            'id' => $assessment->id,
+            'competency' => $assessment->competency ? [
+                'id' => $assessment->competency->id,
+                'name' => $assessment->competency->name,
+                'category' => $assessment->competency->category,
+            ] : null,
+            'assessor' => $assessment->assessor ? [
+                'id' => $assessment->assessor->id,
+                'name' => $assessment->assessor->name,
+            ] : null,
+            'assessed_level' => $assessment->assessed_level,
+            'proficiency_level' => $assessment->assessed_level,
+            'target_level' => $assessment->target_level,
+            'assessment_date' => $assessment->assessment_date?->toDateString(),
+            'notes' => $assessment->notes,
+        ];
     }
 }

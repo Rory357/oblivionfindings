@@ -181,20 +181,18 @@ class HrPerformanceSeeder extends Seeder
 
             foreach ($pipData as $idx => $pip) {
                 $empId = $staffIds[$idx % count($staffIds)];
-                $profileId = $profiles[$empId] ?? $profiles->first();
-
-                if (! $profileId) continue;
+                if (! ($profiles[$empId] ?? null)) continue;
 
                 HrPerformanceImprovementPlan::firstOrCreate([
                     'tenant_id' => $tenantId,
+                    'employee_user_id' => $empId,
                     'title' => $pip['title'],
                 ], [
-                    'employee_profile_id' => $profileId,
                     'manager_user_id' => $managerId,
                     'reason' => "Staff member needs support to meet expected standards in this area.",
-                    'areas_for_improvement' => "Key areas identified during performance review.",
-                    'success_criteria' => "Meet targets consistently over 30-day review period.",
-                    'support_provided' => "Additional training, mentoring, and weekly check-ins.",
+                    'expectations' => "Meet targets consistently over 30-day review period.",
+                    'support_offered' => "Additional training, mentoring, and weekly check-ins.",
+                    'consequences' => "Further performance review if the plan outcomes are not met.",
                     'start_date' => Carbon::now()->subMonths(rand(1, 3))->toDateString(),
                     'end_date' => Carbon::now()->addMonths(rand(1, 2))->toDateString(),
                     'review_date' => Carbon::now()->addWeeks(2)->toDateString(),

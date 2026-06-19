@@ -14,13 +14,15 @@ class HrCompetencyAssessment extends Model
 
     protected $table = 'hr_competency_assessments';
 
+    public const UPDATED_AT = null;
+
     protected $fillable = [
         'tenant_id',
-        'employee_user_id',
+        'employee_profile_id',
         'competency_id',
-        'assessor_user_id',
+        'assessed_by',
         'performance_review_id',
-        'proficiency_level',
+        'assessed_level',
         'target_level',
         'assessment_date',
         'notes',
@@ -28,7 +30,7 @@ class HrCompetencyAssessment extends Model
 
     protected $casts = [
         'assessment_date' => 'date',
-        'proficiency_level' => 'integer',
+        'assessed_level' => 'integer',
         'target_level' => 'integer',
     ];
 
@@ -38,12 +40,7 @@ class HrCompetencyAssessment extends Model
 
     public function employeeProfile(): BelongsTo
     {
-        return $this->belongsTo(HrEmployeeProfile::class, 'employee_user_id', 'user_id');
-    }
-
-    public function employee(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'employee_user_id');
+        return $this->belongsTo(HrEmployeeProfile::class, 'employee_profile_id');
     }
 
     public function competency(): BelongsTo
@@ -53,7 +50,7 @@ class HrCompetencyAssessment extends Model
 
     public function assessor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assessor_user_id');
+        return $this->belongsTo(User::class, 'assessed_by');
     }
 
     public function performanceReview(): BelongsTo

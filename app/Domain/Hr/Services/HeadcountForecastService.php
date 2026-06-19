@@ -185,7 +185,7 @@ class HeadcountForecastService
                 ->get(['id', 'user_id', 'start_date', 'department', 'position_title']);
 
             foreach ($employees as $emp) {
-                $tenure = $now->diffInMonths(Carbon::parse($emp->start_date));
+                $tenure = (int) floor(Carbon::parse($emp->start_date)->diffInMonths($now, true));
                 $atRisk[] = [
                     'id' => $emp->id,
                     'name' => $emp->user?->name ?? 'Unknown',
