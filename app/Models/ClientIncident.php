@@ -190,6 +190,32 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->hasMany(IncidentFollowup::class, 'client_incident_id');
     }
 
+    /**
+     * The governance HsEvent this incident converged into, created by the observer.
+     * Category is incident vs near_miss exactly as ClientIncidentObserver records it.
+     * Linked by idempotency key rather than an FK, so resolve on demand.
+     */
+    public function linkedHsEvent(): ?HsEvent
+    {
+        $category = $this->type === 'near_miss'
+            ? HsEvent::CATEGORY_NEAR_MISS
+            : HsEvent::CATEGORY_INCIDENT;
+
+        $key = HsEvent::buildIdempotencyKey(static::class, $this->getKey(), $category);
+
+        return HsEvent::where('idempotency_key', $key)->first();
+    }
+
+    /**
+     * Corrective actions raised against the linked HsEvent (empty collection if none).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\HsCorrectiveAction>
+     */
+    public function linkedCorrectiveActions(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->linkedHsEvent()?->correctiveActions()->with('assignedTo:id,name')->get() ?? collect();
+    }
+
     public function isShiftLinked(): bool
     {
         return ! empty($this->shift_id);

@@ -426,8 +426,29 @@ function EditPane({ d, onDone }: { d: IncidentDetail; onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function OverviewSection({ d, isNearMiss }: { d: IncidentDetail; isNearMiss: boolean }) {
+    const concerns = d.safeguarding_concerns ?? [];
+    const escalation = concerns.length ? (concerns.find((c) => c.can_view) ?? concerns[0]) : null;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
+            {escalation ? (
+                <div className="sm:col-span-2">
+                    <InfoCard icon={ShieldAlert} tone="warn">
+                        <span className="font-semibold">Escalated to safeguarding.</span>{' '}
+                        {escalation.can_view ? (
+                            <>
+                                Concern {escalation.reference_number}
+                                {escalation.status ? ` · ${titleCase(escalation.status)}` : ''}.{' '}
+                                <Link href={`/safeguarding/${escalation.id}`} className="font-medium text-primary hover:underline">
+                                    Open concern
+                                </Link>
+                            </>
+                        ) : (
+                            'A safeguarding concern was raised from this incident (restricted — need-to-know).'
+                        )}
+                    </InfoCard>
+                </div>
+            ) : null}
+
             {d.is_notifiable ? (
                 <div className="sm:col-span-2">
                     <InfoCard icon={ShieldAlert} tone="crit">
@@ -687,7 +708,7 @@ function InvestigationSection({ d }: { d: IncidentDetail }) {
             <div>
                 <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-foreground">Corrective actions</p>
-                    <Link href="/health-safety/corrective-actions" className="text-xs font-medium text-primary hover:underline">
+                    <Link href={`/health-safety/corrective-actions?event=${ev.id}`} className="text-xs font-medium text-primary hover:underline">
                         Open register
                     </Link>
                 </div>
@@ -740,12 +761,16 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
             form.setError('title', 'Give the corrective action a title.');
             return;
         }
+        const hsEventId = d.hs_event?.id;
         form.post(`/incidents/${d.id}/corrective-actions`, {
             preserveScroll: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) {
                     form.reset();
                     setOpen(false);
+                    // Land on the new action: open its parent H&S event on the
+                    // Corrective actions pane in the register (reads ?event=).
+                    if (hsEventId) router.visit(`/health-safety/corrective-actions?event=${hsEventId}`);
                 }
             },
         });

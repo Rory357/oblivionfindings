@@ -13,6 +13,7 @@ import {
     fmt,
     type Tone,
 } from '@/pages/health-safety/components/hs-hero-kit';
+import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -353,6 +354,8 @@ export default function IncidentsIndex({
             <Head title="Incidents" />
 
             <div className="flex flex-col gap-6 p-6">
+                <WorkflowRibbon current="report" />
+
                 {/* ---- Hero ---- */}
                 <HeroShell
                     footer={

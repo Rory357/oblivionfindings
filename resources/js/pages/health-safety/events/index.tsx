@@ -1,12 +1,16 @@
 /* H&S Events register — the governance convergence view. Every incident type
  * lands here as an HsEvent for investigation, corrective action, WorkSafe
- * notification and gated closure. Shares the gold-standard chrome with the
- * Corrective-actions register via `governance-register-kit` so the sibling
- * registers read as one product and can't drift apart. ShiftContextMenu +
+ * notification and gated closure. Shares the gold-standard `hs-hero-kit` hero
+ * chrome + rostering TabStrip/EntityFilter/ShiftContextMenu with /incidents,
+ * /safeguarding, /fleet-assets/incidents and its sibling Corrective-actions
+ * register so the whole safety workflow reads as one product and can't drift
+ * apart. Row helpers come from the neutral register-row-kit. ShiftContextMenu +
  * detail-as-modal workflow preserved. NZ-only, web-only. */
 import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { ShiftContextMenu, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
+import { ShiftContextMenu, EntityFilter, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import {
     EventDetailDialog,
     EVENT_CATEGORY_LABELS,
@@ -15,27 +19,25 @@ import {
     type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
 import {
-    DesignHeroSection,
-    DesignHeroCluster,
-    DesignHeroTile,
-    DesignTabStrip,
-    HeroFilterLabel,
-    HeroRangePill,
-    HeroSelect,
-    HeroToggle,
-    HeroSearch,
-    HeroClear,
+    HeroShell,
+    HeroStatusPill,
+    HeroMedallion,
+    HeroCluster,
+    HeroClusterTile,
+    HeroSegmented,
+    fmt,
+    type Tone,
+} from '@/pages/health-safety/components/hs-hero-kit';
+import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
+import {
     FlagBadge,
     RegisterTableHeader,
     TONE_BG,
     TONE_DOT,
     titleCase,
-    fmt,
     initials,
     entityTone,
-    type Tone,
-    type DesignTabItem,
-} from '@/pages/health-safety/components/governance-register-kit';
+} from '@/pages/health-safety/components/register-row-kit';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -47,21 +49,19 @@ import {
     FileText,
     Flame,
     FlaskConical,
-    Grid2X2,
     Hand,
     HeartPulse,
     LayoutList,
     Link2,
     ListChecks,
-    MapPin,
     MousePointer2,
     Search,
     Shield,
     ShieldAlert,
     ShieldCheck,
-    Sparkles,
     Truck,
     Wrench,
+    X,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -123,7 +123,7 @@ type Props = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Token maps (events-specific; shared chrome lives in the kit)       */
+/*  Token maps (events-specific; shared chrome lives in the kits)      */
 /* ------------------------------------------------------------------ */
 
 const SEV: Record<string, { tone: Tone; label: string }> = {
@@ -137,7 +137,7 @@ const STAGE: Record<string, { label: string; cls: string; icon: LucideIcon }> = 
     open: { label: 'Open', cls: 'bg-status-info-bg text-status-info', icon: AlertTriangle },
     investigating: { label: 'Investigating', cls: 'bg-primary/10 text-primary', icon: Search },
     corrective_action: { label: 'Corrective action', cls: 'bg-status-warning-bg text-status-warning', icon: ListChecks },
-    monitoring: { label: 'Monitoring', cls: 'bg-[var(--live-bg)] text-[var(--live)]', icon: Activity },
+    monitoring: { label: 'Monitoring', cls: 'bg-status-success-bg text-status-success', icon: Activity },
     closed: { label: 'Closed', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
 };
 
@@ -183,6 +183,15 @@ const CATEGORY_OPTIONS = [
     'equipment_fault',
 ];
 
+/** The five governance board reports surfaced from the hero CTA popover. */
+const BOARD_REPORTS = [
+    { label: 'Board summary', href: '/health-safety/reports/board-summary' },
+    { label: 'WorkSafe register', href: '/health-safety/reports/worksafe-register' },
+    { label: 'Investigation outcomes', href: '/health-safety/reports/investigation-outcomes' },
+    { label: 'Corrective-action traceability', href: '/health-safety/reports/corrective-action-traceability' },
+    { label: 'Risk-assessment register', href: '/health-safety/reports/risk-assessment-register' },
+];
+
 /* date helpers (browser-local) */
 const todayStr = () => {
     const d = new Date();
@@ -193,6 +202,13 @@ const daysAgoStr = (n: number) => {
     d.setDate(d.getDate() - n);
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
+
+const RANGE_ITEMS = [
+    { key: 'week', label: 'This week' },
+    { key: '30d', label: '30 days' },
+    { key: 'quarter', label: 'Quarter' },
+    { key: 'custom', label: 'Custom' },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -223,7 +239,7 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
 
     const hasFilters = !!(filters.q || filters.severity || filters.category || filters.source || filters.site_id || filters.worksafe || filters.from || filters.to);
 
-    const TABS: DesignTabItem[] = [
+    const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: tabCounts.all || undefined },
         { id: 'open', label: 'Open', icon: AlertTriangle, tone: 'info', badge: tabCounts.open || undefined },
         { id: 'investigating', label: 'Investigating', icon: Search, tone: 'primary', badge: tabCounts.investigating || undefined },
@@ -243,12 +259,6 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             : filters.from === daysAgoStr(90)
               ? 'quarter'
               : 'custom';
-    const RANGE_ITEMS = [
-        { key: 'week', label: 'This week' },
-        { key: '30d', label: '30 days' },
-        { key: 'quarter', label: 'Quarter' },
-        { key: 'custom', label: 'Custom' },
-    ];
     const onRange = (key: string) => {
         if (key === 'all') {
             go({ from: null, to: null });
@@ -314,88 +324,159 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Events', href: '/health-safety/events' }]}>
             <Head title="Safety events" />
 
-            <div className="min-h-screen bg-[oklch(0.98_0.006_277)] px-4 py-5 md:px-6">
-                <div className="flex flex-col gap-4">
-                    <DesignHeroSection
-                        medallion={ShieldCheck}
-                        eyebrow="Safety events · governance register"
-                        title="Health & Safety events"
-                        description="The governance hub. Every safety event — from Incidents, Safeguarding, Fleet, Injuries, Hazards, Restraints and Drills — lands here to be investigated, driven to verified corrective action, notified to WorkSafe NZ, and closed through a gate."
-                        cornerBadge={{ icon: Sparkles, label: 'Every incident type converges here' }}
-                        clusters={
-                            <>
-                                <DesignHeroCluster title="Live · open governance" icon={Activity}>
-                                    <DesignHeroTile href="/health-safety/events?tab=open" label="Open" value={fmt(live.open)} caption="newest today" tone="info" />
-                                    <DesignHeroTile href="/health-safety/events?tab=investigating" label="Investigating" value={fmt(live.investigating)} caption="in progress" tone="primary" />
-                                    <DesignHeroTile href="/health-safety/events?tab=corrective_actions" label="Corrective" value={fmt(live.corrective_action)} caption="driving actions" tone="warning" />
-                                    <DesignHeroTile href="/health-safety/events?tab=monitoring" label="Monitoring" value={fmt(live.monitoring)} caption="residual review" tone="success" />
-                                </DesignHeroCluster>
-                                <DesignHeroCluster title="Needs attention" icon={AlertTriangle}>
-                                    <DesignHeroTile href="/health-safety/events?tab=investigating" label="Inv due" value={fmt(at.investigation_due)} caption={at.investigation_due > 0 ? 'needs a lead' : 'all started'} tone="critical" />
-                                    <DesignHeroTile href="/health-safety/events?tab=corrective_actions" label="Await verify" value={fmt(at.awaiting_verification)} caption="+ completer" tone="neutral" />
-                                    <DesignHeroTile href="/health-safety/events?tab=worksafe" label="WorkSafe due" value={fmt(at.worksafe_due)} caption={at.worksafe_due > 0 ? 'notify ASAP' : 'none pending'} tone="critical" />
-                                    <DesignHeroTile href="/health-safety/events?tab=closed" label="Closed" value={fmt(at.closed_period)} caption="this period" tone="success" />
-                                </DesignHeroCluster>
-                            </>
-                        }
-                        footer={
-                            <>
-                                <HeroFilterLabel>Period</HeroFilterLabel>
-                                {RANGE_ITEMS.map((item) => (
-                                    <HeroRangePill key={item.key} active={activeRange === item.key} onClick={() => onRange(item.key)}>
-                                        {item.label}
-                                    </HeroRangePill>
-                                ))}
-                                <HeroSelect
-                                    className="ml-auto"
-                                    icon={MapPin}
-                                    value={filters.site_id ?? ''}
-                                    onChange={(e) => go({ site_id: e.target.value ? Number(e.target.value) : null })}
-                                    ariaLabel="Site filter"
+            <div className="flex flex-col gap-6 p-6">
+                <WorkflowRibbon current="investigate" />
+
+                {/* ---- Hero ---- */}
+                <HeroShell
+                    footer={
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <HeroSegmented label="Period" variant="pill" ariaLabel="Date range" items={RANGE_ITEMS} value={activeRange} onChange={onRange} />
+                            {sites?.length ? (
+                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => go({ site_id: id })} onDark />
+                            ) : null}
+                            <label className="inline-flex items-center gap-1.5">
+                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Category</span>
+                                <select
+                                    value={filters.category ?? ''}
+                                    onChange={(e) => go({ category: e.target.value || null })}
+                                    aria-label="Category filter"
+                                    className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
                                 >
-                                    <option value="">All sites</option>
-                                    {sites.map((site) => (
-                                        <option key={site.id} value={site.id}>
-                                            {site.name}
-                                        </option>
-                                    ))}
-                                </HeroSelect>
-                                <HeroSelect icon={Grid2X2} value={filters.category ?? ''} onChange={(e) => go({ category: e.target.value || null })} ariaLabel="Category filter">
                                     <option value="">All categories</option>
                                     {CATEGORY_OPTIONS.map((c) => (
                                         <option key={c} value={c}>
                                             {EVENT_CATEGORY_LABELS[c] ?? titleCase(c)}
                                         </option>
                                     ))}
-                                </HeroSelect>
-                                <HeroSelect icon={FileText} value={filters.source ?? ''} onChange={(e) => go({ source: e.target.value || null })} ariaLabel="Source filter">
+                                </select>
+                            </label>
+                            <label className="inline-flex items-center gap-1.5">
+                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Source</span>
+                                <select
+                                    value={filters.source ?? ''}
+                                    onChange={(e) => go({ source: e.target.value || null })}
+                                    aria-label="Source filter"
+                                    className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
+                                >
                                     <option value="">All sources</option>
                                     {SOURCE_OPTIONS.map((source) => (
                                         <option key={source.value} value={source.value}>
                                             {source.label}
                                         </option>
                                     ))}
-                                </HeroSelect>
-                                <HeroToggle active={!!filters.worksafe} icon={ShieldAlert} onClick={() => go({ worksafe: filters.worksafe ? null : true })}>
-                                    WorkSafe-notifiable
-                                </HeroToggle>
-                                <HeroSearch placeholder="Search events…" defaultValue={filters.q ?? ''} onSubmit={(value) => go({ q: value })} />
-                                {hasFilters ? <HeroClear onClick={clearFilters} /> : null}
-                            </>
-                        }
-                    />
+                                </select>
+                            </label>
+                            {/* eslint-disable-next-line no-restricted-syntax -- onDark WorkSafe toggle on the hero footer; not a shadcn Button. */}
+                            <button
+                                type="button"
+                                aria-pressed={!!filters.worksafe}
+                                onClick={() => go({ worksafe: filters.worksafe ? null : true })}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none ${
+                                    filters.worksafe
+                                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                                        : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20'
+                                }`}
+                            >
+                                <ShieldAlert className="h-3.5 w-3.5" /> WorkSafe-notifiable
+                            </button>
+                            <div className="relative ml-auto">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+                                <input
+                                    type="search"
+                                    placeholder="Search events…"
+                                    defaultValue={filters.q ?? ''}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') go({ q: (e.target as HTMLInputElement).value || null });
+                                    }}
+                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                                />
+                            </div>
+                            {hasFilters ? (
+                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                                >
+                                    <X className="h-3 w-3" /> Clear
+                                </button>
+                            ) : null}
+                        </div>
+                    }
+                >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                            <HeroMedallion icon={ShieldCheck} />
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <HeroStatusPill>Safety events · governance register</HeroStatusPill>
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
+                                        <Activity className="h-3.5 w-3.5" /> Every incident type converges here
+                                    </span>
+                                </div>
+                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">Health &amp; Safety events</h1>
+                                <p className="max-w-xl text-sm text-primary-foreground/70">
+                                    The governance hub. Every safety event — from Incidents, Safeguarding, Fleet, Injuries, Hazards, Restraints
+                                    and Drills — lands here to be investigated, driven to verified corrective action, notified to WorkSafe NZ,
+                                    and closed through a gate.
+                                </p>
+                            </div>
+                        </div>
 
-                    <DesignTabStrip value={tab} items={TABS} onChange={setTab} ariaLabel="Safety event views" />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button size="sm" className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                    <FileText className="mr-1.5 h-4 w-4" /> Board reports
+                                    <span aria-hidden className="ml-1">▾</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-64 p-1.5">
+                                {BOARD_REPORTS.map((report) => (
+                                    // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link), not a form control
+                                    <button
+                                        key={report.href}
+                                        type="button"
+                                        onClick={() => router.visit(report.href)}
+                                        className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+                                    >
+                                        <FileText className="h-4 w-4 shrink-0 text-primary" />
+                                        {report.label}
+                                    </button>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
+                    </div>
 
-                    {showOrphanNote ? <OrphanNotice /> : null}
+                    {/* stat clusters */}
+                    <div className="grid gap-3 lg:grid-cols-2">
+                        <HeroCluster title="Live · open governance" icon={Activity}>
+                            <HeroClusterTile href="/health-safety/events?tab=open" label="Open" value={fmt(live.open)} caption="newest today" tone="neutral" />
+                            <HeroClusterTile href="/health-safety/events?tab=investigating" label="Investigating" value={fmt(live.investigating)} caption="in progress" tone="neutral" />
+                            <HeroClusterTile href="/health-safety/events?tab=corrective_actions" label="Corrective" value={fmt(live.corrective_action)} caption="driving actions" tone="warning" />
+                            <HeroClusterTile href="/health-safety/events?tab=monitoring" label="Monitoring" value={fmt(live.monitoring)} caption="residual review" tone="success" />
+                        </HeroCluster>
+                        <HeroCluster title="Needs attention" icon={AlertTriangle}>
+                            <HeroClusterTile href="/health-safety/events?tab=investigating" label="Inv due" value={fmt(at.investigation_due)} caption={at.investigation_due > 0 ? 'needs a lead' : 'all started'} tone="critical" />
+                            <HeroClusterTile href="/health-safety/events?tab=corrective_actions" label="Await verify" value={fmt(at.awaiting_verification)} caption="+ completer" tone="neutral" />
+                            <HeroClusterTile href="/health-safety/events?tab=worksafe" label="WorkSafe due" value={fmt(at.worksafe_due)} caption={at.worksafe_due > 0 ? 'notify ASAP' : 'none pending'} tone="critical" />
+                            <HeroClusterTile href="/health-safety/events?tab=closed" label="Closed" value={fmt(at.closed_period)} caption="this period" tone="success" />
+                        </HeroCluster>
+                    </div>
+                </HeroShell>
 
-                    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                        <RegisterTableHeader icon={Shield} title={tableTitle} subtitle="the convergence view" hint="Right-click a row for governance actions" hintIcon={MousePointer2} />
-                        <EventTable rows={events.data} onRowCtx={openRowCtx} onOpen={openEvent} />
-                    </section>
+                {/* ---- Tabs ---- */}
+                <TabStrip value={tab} items={TABS} onChange={setTab} ariaLabel="Safety event views" />
 
-                    {events.last_page > 1 ? <LaravelPagination links={events.links} /> : null}
-                </div>
+                {showOrphanNote ? <OrphanNotice /> : null}
+
+                {/* ---- Table ---- */}
+                <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                    <RegisterTableHeader icon={Shield} title={tableTitle} subtitle="the convergence view" hint="Right-click a row for governance actions" hintIcon={MousePointer2} />
+                    <EventTable rows={events.data} onRowCtx={openRowCtx} onOpen={openEvent} />
+                </section>
+
+                {events.last_page > 1 ? <LaravelPagination links={events.links} /> : null}
             </div>
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}

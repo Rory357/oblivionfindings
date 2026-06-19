@@ -154,7 +154,7 @@ export function NeedsAttentionStrip({ attention }: Props) {
                 <AttentionCard
                     item={attention.incidents}
                     title="Open incidents"
-                    href="/incidents?status=open"
+                    href="/incidents?tab=open"
                     icon={ShieldAlert}
                 />
             </div>

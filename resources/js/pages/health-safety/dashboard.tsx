@@ -124,6 +124,9 @@ export default function HealthSafetyDashboard({
                     expiring={worklists.expiring}
                     notifiableEvents={worklists.notifiable_events}
                     activeAlerts={kpis.active_alerts ?? 0}
+                    openSafeguarding={kpis.open_safeguarding ?? 0}
+                    fleetUnresolved={kpis.fleet_unresolved ?? 0}
+                    fleetIncidents30d={kpis.fleet_incidents_30d ?? 0}
                     onReport={() => setLauncherOpen(true)}
                     orgName={org_name}
                 />

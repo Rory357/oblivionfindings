@@ -432,6 +432,9 @@ class HsEventController extends Controller
                 'approved_by_name' => $inv->approvedBy?->name,
             ]);
 
+        $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
+        $currentUserId = auth()->id();
+
         $correctiveActions = $hsEvent->correctiveActions()
             ->with(['assignedTo:id,name', 'completedBy:id,name', 'verifiedBy:id,name'])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
@@ -448,7 +451,11 @@ class HsEventController extends Controller
                 'due_date' => $a->due_date?->toDateString(),
                 'is_overdue' => $a->isOverdue(),
                 'completed_at' => $a->completed_at?->toIso8601String(),
+                'completed_by_user_id' => $a->completed_by_user_id,
                 'completed_by_name' => $a->completedBy?->name,
+                'can_verify' => $canManage
+                    && $a->status === 'completed'
+                    && $a->completed_by_user_id !== $currentUserId,
                 'verified_at' => $a->verified_at?->toIso8601String(),
                 'verified_by_name' => $a->verifiedBy?->name,
                 'effectiveness_confirmed' => $a->effectiveness_confirmed,
@@ -480,8 +487,6 @@ class HsEventController extends Controller
             ]);
 
         $source = $this->resolveSource($hsEvent->source_type, $hsEvent->source_id);
-
-        $canManage = (bool) (auth()->user()?->can('hazards.manage') ?? false);
 
         return [
             'id' => $hsEvent->id,
@@ -538,11 +543,15 @@ class HsEventController extends Controller
     {
         $tab = (string) $request->input('tab', $this->legacyActionTab($request));
 
+        $canManage = (bool) ($request->user()?->can('hazards.manage') ?? false);
+        $currentUserId = $request->user()?->id;
+
         $query = HsCorrectiveAction::query()
             ->with([
                 'hsEvent:id,reference_number,event_category,severity,status,site_id',
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
+                'completedBy:id,name',
             ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'verified', 'closed')")
             ->orderBy('due_date');
@@ -580,6 +589,11 @@ class HsEventController extends Controller
             'is_overdue' => $a->isOverdue(),
             'completed_at' => $a->completed_at?->toIso8601String(),
             'verified_at' => $a->verified_at?->toIso8601String(),
+            'completed_by_user_id' => $a->completed_by_user_id,
+            'completed_by_name' => $a->completedBy?->name,
+            'can_verify' => $canManage
+                && $a->status === 'completed'
+                && $a->completed_by_user_id !== $currentUserId,
             'event' => $a->hsEvent ? [
                 'id' => $a->hsEvent->id,
                 'reference_number' => $a->hsEvent->reference_number,
@@ -664,7 +678,12 @@ class HsEventController extends Controller
             ],
             'sites' => Site::whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']),
             'detail' => $detail,
-            'can' => ['manage' => (bool) ($request->user()?->can('hazards.manage') ?? false)],
+            'can' => [
+                'manage' => $canManage,
+                // Traceability report is a governance artefact, gated on governance.view
+                // (NOT hazards.manage) per the corrective-actions handover.
+                'viewReports' => (bool) ($request->user()?->can('governance.view') ?? false),
+            ],
         ]);
     }
 

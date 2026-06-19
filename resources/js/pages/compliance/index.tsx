@@ -154,7 +154,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                         title="Open Incidents"
                         value={kpis.openIncidents}
                         hint="Submitted / reviewed"
-                        href="/incidents?status=submitted"
+                        href="/incidents?tab=open"
                     />
                     <KpiCard
                         title="CD Discrepancies"

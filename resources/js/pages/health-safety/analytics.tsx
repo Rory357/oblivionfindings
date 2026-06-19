@@ -16,7 +16,7 @@ import { WizardShell } from '@/components/wizard/shell';
 import type { WizardStep } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -656,6 +656,13 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <HeroStatusPill>Safety analytics · {rangeLabel(filters.period)}</HeroStatusPill>
                         <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                                href="/health-safety"
+                                className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                            >
+                                <LayoutDashboard className="h-4 w-4" />
+                                H&amp;S command centre
+                            </Link>
                             <a href={queryFor(tab === 'sites' ? 'sites' : 'incidents')} className="inline-flex">
                                 <Button className="gap-1.5 bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90">
                                     <Download className="h-4 w-4" /> Export
