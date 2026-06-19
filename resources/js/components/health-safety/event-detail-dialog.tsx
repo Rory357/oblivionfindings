@@ -35,6 +35,7 @@ import {
     History,
     LinkIcon,
     ListChecks,
+    Loader2,
     Paperclip,
     Play,
     Plus,
@@ -48,7 +49,7 @@ import {
     User as UserIcon,
     type LucideIcon,
 } from 'lucide-react';
-import { useState, type ComponentType, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type FormEvent, type MutableRefObject, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Contract — mirrors HsEventController::buildEventDetail()            */
@@ -92,7 +93,10 @@ export type EventCorrectiveAction = {
     due_date: string | null;
     is_overdue: boolean;
     completed_at: string | null;
-    completed_by_name?: string | null;
+    completed_by_user_id: number | null;
+    completed_by_name: string | null;
+    /** manage && status==='completed' && completer !== current viewer — gates Verify. */
+    can_verify: boolean;
     verified_at: string | null;
     verified_by_name?: string | null;
     effectiveness_confirmed: boolean | null;
@@ -288,12 +292,17 @@ function paneFromAction(action: EventActionKey | null): ActivePane | null {
     }
 }
 
+/** Deep-link straight to a specific corrective action's workflow pane (prompt E).
+ *  Maps `pane` → the `ca_*` ActivePane and scrolls/highlights the matching card. */
+const CA_TARGET_PANE = { complete: 'ca_complete', verify: 'ca_verify', return: 'ca_return' } as const;
+
 export function EventDetailDialog({
     detail,
     open,
     onClose,
     initialSection = 'overview',
     initialAction = null,
+    initialActionTarget = null,
     openedFrom = null,
 }: {
     detail: EventDetail;
@@ -301,12 +310,50 @@ export function EventDetailDialog({
     onClose: () => void;
     initialSection?: EventSectionKey;
     initialAction?: EventActionKey | null;
+    /** Deep-link to a single corrective action's workflow pane (Complete / Verify /
+     *  Return), opened from the register row menu (prompt E). */
+    initialActionTarget?: { actionId: number; pane: 'complete' | 'verify' | 'return' } | null;
     /** Set when arrived via a source module's "Open in Health & Safety" jump. */
     openedFrom?: string | null;
 }) {
-    const [section, setSection] = useState<EventSectionKey>(initialSection);
-    const [pane, setPane] = useState<ActivePane | null>(() => paneFromAction(initialAction));
+    const [section, setSection] = useState<EventSectionKey>(initialActionTarget ? 'actions' : initialSection);
+    const [pane, setPane] = useState<ActivePane | null>(() =>
+        initialActionTarget ? { kind: CA_TARGET_PANE[initialActionTarget.pane], actionId: initialActionTarget.actionId } : paneFromAction(initialAction),
+    );
+    /** Briefly ring the deep-linked action card once its section is on screen. */
+    const [highlightActionId, setHighlightActionId] = useState<number | null>(initialActionTarget?.actionId ?? null);
+    const actionRowRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const d = detail;
+
+    useEffect(() => {
+        const targetId = initialActionTarget?.actionId;
+        if (targetId == null) return;
+        const node = actionRowRefs.current[targetId];
+        if (!node) return;
+        node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setHighlightActionId(targetId);
+        const timer = window.setTimeout(() => setHighlightActionId(null), 2200);
+        return () => window.clearTimeout(timer);
+        // Re-run when the deep-link target changes or the pane closes back to the section.
+    }, [initialActionTarget?.actionId, pane]);
+
+    // Re-sync the derived section/pane when the register re-targets the SAME
+    // already-open event. Both registers key the dialog by event id, so it does
+    // NOT remount when you open a different corrective action that shares the
+    // parent event (the common case) — without this, the deep-linked pane/section
+    // would stay stale and the lifecycle action would silently do nothing. Depends
+    // only on incoming prop VALUES, so it never overrides the user's in-dialog nav.
+    useEffect(() => {
+        if (initialActionTarget) {
+            setSection('actions');
+            setPane({ kind: CA_TARGET_PANE[initialActionTarget.pane], actionId: initialActionTarget.actionId });
+            setHighlightActionId(initialActionTarget.actionId);
+        } else {
+            setSection(initialSection);
+            setPane(paneFromAction(initialAction));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on incoming prop-value changes; the local setters are stable and intentionally excluded
+    }, [initialActionTarget?.actionId, initialActionTarget?.pane, initialSection, initialAction]);
 
     const cat = EVENT_CATEGORY_LABELS[d.event_category] ?? titleCase(d.event_category);
     const sev = SEV[d.severity] ?? SEV.low;
@@ -415,7 +462,17 @@ export function EventDetailDialog({
 
                     {section === 'overview' ? <OverviewSection d={d} cat={cat} stage={stage} /> : null}
                     {section === 'investigation' ? <InvestigationSection d={d} canAct={canAct} onPane={setPane} /> : null}
-                    {section === 'actions' ? <ActionsSection d={d} openActions={openActions} awaitingVerification={awaitingVerification} canAct={canAct} onPane={setPane} /> : null}
+                    {section === 'actions' ? (
+                        <ActionsSection
+                            d={d}
+                            openActions={openActions}
+                            awaitingVerification={awaitingVerification}
+                            canAct={canAct}
+                            onPane={setPane}
+                            rowRefs={actionRowRefs}
+                            highlightActionId={highlightActionId}
+                        />
+                    ) : null}
                     {section === 'risk' ? <RiskSection d={d} /> : null}
                     {section === 'timeline' ? <TimelineSection d={d} /> : null}
                     {section === 'evidence' ? <EvidenceSection d={d} /> : null}
@@ -963,6 +1020,7 @@ function AddCorrectiveActionPane({ d, onDone }: { d: EventDetail; onDone: () => 
         e.preventDefault();
         form.post(`/health-safety/events/${d.id}/corrective-actions`, {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
             },
@@ -997,6 +1055,7 @@ function AddCorrectiveActionPane({ d, onDone }: { d: EventDetail; onDone: () => 
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
+                    {form.processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
                     Add action
                 </Button>
             </div>
@@ -1011,6 +1070,7 @@ function CompleteActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrec
         e.preventDefault();
         form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/complete`, {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
             },
@@ -1031,6 +1091,7 @@ function CompleteActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrec
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
+                    {form.processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
                     Mark complete
                 </Button>
             </div>
@@ -1045,6 +1106,7 @@ function VerifyActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
         e.preventDefault();
         form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/verify`, {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
             },
@@ -1074,6 +1136,7 @@ function VerifyActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
+                    {form.processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
                     Verify
                 </Button>
             </div>
@@ -1088,6 +1151,7 @@ function ReturnActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
         e.preventDefault();
         form.post(`/health-safety/events/${d.id}/corrective-actions/${ca.id}/return`, {
             preserveScroll: true,
+            preserveState: true,
             onSuccess: (page) => {
                 if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
             },
@@ -1105,6 +1169,7 @@ function ReturnActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
+                    {form.processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
                     Return for rework
                 </Button>
             </div>
@@ -1115,34 +1180,50 @@ function ReturnActionPane({ d, ca, onDone }: { d: EventDetail; ca: EventCorrecti
 /** Per-action workflow buttons, driven by status. */
 function CorrectiveActionControls({ d, ca, onPane }: { d: EventDetail; ca: EventCorrectiveAction; onPane: (p: ActivePane) => void }) {
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}`;
+    // Write controls require manage AND a live event — no lifecycle moves once closed.
+    if (!d.can.manage || d.status === 'closed') return null;
     if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status)) return null;
 
     return (
-        <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-2">
-            {ca.status === 'open' ? (
-                <Button size="sm" variant="outline" onClick={() => router.post(`${base}/start`, {}, { preserveScroll: true })}>
-                    <Play className="mr-1.5 h-3.5 w-3.5" /> Start
-                </Button>
-            ) : null}
-            {ca.status === 'in_progress' ? (
-                <Button size="sm" onClick={() => onPane({ kind: 'ca_complete', actionId: ca.id })}>
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Complete
-                </Button>
-            ) : null}
+        <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
+            <div className="flex flex-wrap gap-2">
+                {ca.status === 'open' ? (
+                    <Button size="sm" variant="outline" onClick={() => router.post(`${base}/start`, {}, { preserveScroll: true, preserveState: true })}>
+                        <Play className="mr-1.5 h-3.5 w-3.5" /> Start
+                    </Button>
+                ) : null}
+                {ca.status === 'in_progress' ? (
+                    <Button size="sm" onClick={() => onPane({ kind: 'ca_complete', actionId: ca.id })}>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Mark complete
+                    </Button>
+                ) : null}
+                {ca.status === 'completed' ? (
+                    <>
+                        <Button
+                            size="sm"
+                            disabled={!ca.can_verify}
+                            onClick={() => onPane({ kind: 'ca_verify', actionId: ca.id })}
+                            title={ca.can_verify ? undefined : 'A different person must verify this action.'}
+                        >
+                            <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Verify
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => onPane({ kind: 'ca_return', actionId: ca.id })}>
+                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Return for rework
+                        </Button>
+                    </>
+                ) : null}
+                {ca.status === 'verified' ? (
+                    <Button size="sm" variant="outline" onClick={() => router.post(`${base}/close`, {}, { preserveScroll: true, preserveState: true })}>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Close
+                    </Button>
+                ) : null}
+            </div>
             {ca.status === 'completed' ? (
-                <>
-                    <Button size="sm" onClick={() => onPane({ kind: 'ca_verify', actionId: ca.id })}>
-                        <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Verify
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => onPane({ kind: 'ca_return', actionId: ca.id })}>
-                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Return
-                    </Button>
-                </>
-            ) : null}
-            {ca.status === 'verified' ? (
-                <Button size="sm" variant="outline" onClick={() => router.post(`${base}/close`, {}, { preserveScroll: true })}>
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Close
-                </Button>
+                <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                    <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
+                    A different person must verify this action than whoever completed it
+                    {ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
+                </p>
             ) : null}
         </div>
     );
@@ -1477,12 +1558,18 @@ function ActionsSection({
     awaitingVerification,
     canAct,
     onPane,
+    rowRefs,
+    highlightActionId,
 }: {
     d: EventDetail;
     openActions: number;
     awaitingVerification: number;
     canAct: boolean;
     onPane: (p: ActivePane) => void;
+    /** Refs keyed by action id so a deep-linked card can be scrolled into view. */
+    rowRefs: MutableRefObject<Record<number, HTMLDivElement | null>>;
+    /** The action id to ring transiently after a deep-link (prompt E). */
+    highlightActionId: number | null;
 }) {
     if (!d.corrective_actions.length) {
         return (
@@ -1515,8 +1602,17 @@ function ActionsSection({
             <div className="flex flex-col gap-2">
                 {d.corrective_actions.map((a) => {
                     const st = CA_STATUS[a.status] ?? CA_STATUS.open;
+                    const highlighted = highlightActionId === a.id;
                     return (
-                        <div key={a.id} className={`rounded-lg border p-3 ${a.is_overdue && a.status !== 'verified' && a.status !== 'closed' ? 'border-status-critical/40 bg-status-critical-bg/40' : 'border-border'}`}>
+                        <div
+                            key={a.id}
+                            ref={(node) => {
+                                rowRefs.current[a.id] = node;
+                            }}
+                            className={`rounded-lg border p-3 transition-shadow duration-300 ${
+                                highlighted ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : ''
+                            } ${a.is_overdue && a.status !== 'verified' && a.status !== 'closed' ? 'border-status-critical/40 bg-status-critical-bg/40' : 'border-border'}`}
+                        >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium text-foreground">{a.reference_number} · {a.title}</p>

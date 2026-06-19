@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/popover';
 import { Link, router } from '@inertiajs/react';
 import {
+    BarChart3,
     ChevronDown,
     Clock,
     Download,
     Plus,
     ShieldCheck,
     TrendingDown,
+    Truck,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -97,6 +99,9 @@ export function CommandCentreHero({
     expiring,
     notifiableEvents,
     activeAlerts,
+    openSafeguarding,
+    fleetUnresolved,
+    fleetIncidents30d,
     onReport,
     orgName,
 }: {
@@ -106,6 +111,9 @@ export function CommandCentreHero({
     expiring: Array<{ type: string }>;
     notifiableEvents: Array<{ status: string }>;
     activeAlerts: number;
+    openSafeguarding: number;
+    fleetUnresolved: number;
+    fleetIncidents30d: number;
     onReport?: () => void;
     orgName?: string | null;
 }) {
@@ -219,6 +227,13 @@ export function CommandCentreHero({
                             Report
                         </Button>
                     ) : null}
+                    <Link
+                        href="/health-safety/analytics"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                    >
+                        <BarChart3 className="h-4 w-4" />
+                        View analytics
+                    </Link>
                     <Popover>
                         <PopoverTrigger asChild>
                             {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
@@ -280,6 +295,14 @@ export function CommandCentreHero({
                     <HeroClusterTile href="/compliance/hazards" label="Open hazards" value={fmt(leading.open_hazards)} caption="open now" tone={leading.open_hazards > 0 ? 'warning' : 'success'} />
                 </HeroCluster>
             </div>
+
+            {/* Cross-module · related safety workflows reachable from the hub */}
+            <HeroCluster title="Across the safety system" icon={ShieldCheck}>
+                <HeroClusterTile href="/safeguarding" label="Safeguarding" value={fmt(openSafeguarding)} caption="open concerns" tone={openSafeguarding > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile href="/fleet-assets/incidents" label="Fleet incidents" value={fmt(fleetUnresolved)} caption="unresolved" tone={fleetUnresolved > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile href="/fleet-assets/incidents" label="Fleet · 30d" value={fmt(fleetIncidents30d)} caption="reported this period" tone={fleetIncidents30d > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile href="/health-safety/analytics" label="Analytics" value="View" caption="trends & root cause" tone="neutral" />
+            </HeroCluster>
         </HeroShell>
     );
 }

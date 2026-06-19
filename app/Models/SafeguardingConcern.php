@@ -250,6 +250,28 @@ class SafeguardingConcern extends Model
     }
 
     /**
+     * The governance HsEvent this concern converged into, created by the observer
+     * (event_category 'safeguarding'). Linked by idempotency key rather than an FK,
+     * so resolve on demand.
+     */
+    public function linkedHsEvent(): ?HsEvent
+    {
+        $key = HsEvent::buildIdempotencyKey(static::class, $this->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
+
+        return HsEvent::where('idempotency_key', $key)->first();
+    }
+
+    /**
+     * Corrective actions raised against the linked HsEvent (empty collection if none).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\HsCorrectiveAction>
+     */
+    public function linkedCorrectiveActions(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->linkedHsEvent()?->correctiveActions()->with('assignedTo:id,name')->get() ?? collect();
+    }
+
+    /**
      * Get the latest investigation.
      */
     public function latestInvestigation()

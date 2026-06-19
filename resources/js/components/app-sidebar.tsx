@@ -1140,7 +1140,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
 
-    // H&S Overview — any hazards/compliance permission grants the dashboard
+    // ── 1. Command centre — the H&S home / "start here" ──────────────────
     const overview: NavItem[] = [];
     if (can?.hazards?.view || can?.compliance?.view)
         overview.push({
@@ -1148,16 +1148,12 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/health-safety',
             icon: ShieldCheck,
         });
-    if (can?.hazards?.view || can?.compliance?.view || can?.reports?.viewAny)
-        overview.push({
-            title: 'Analytics',
-            href: '/health-safety/analytics',
-            icon: BarChart3,
-        });
     if (overview.length > 0)
-        groups.push({ label: 'Health & Safety', items: overview });
+        groups.push({ label: 'Command centre', items: overview });
 
-    // Incident Management
+    // ── 2. Report & respond — the front doors. Every safety event is logged
+    //    here (incident / near miss / fleet / safeguarding) before it converges
+    //    into the governance registers below. ─────────────────────────────────
     const incidents: NavItem[] = [];
     if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
         incidents.push({
@@ -1184,15 +1180,16 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     if (incidents.length > 0)
-        groups.push({ label: 'Incidents & Safeguarding', items: incidents });
+        groups.push({ label: 'Report & respond', items: incidents });
 
-    // Investigate & Remediate — surfaces the two registers that govern the
-    // report → triage → investigate → remediate lifecycle. Both pages exist
-    // but were previously unreachable from the nav.
+    // ── 3. Investigate & resolve — the governance registers where every event
+    //    converges, is investigated, and is driven to a verified corrective
+    //    action. "Events" is the master register (was mislabelled
+    //    "Investigations"); Corrective Actions is the verification register. ───
     const investigate: NavItem[] = [];
     if (can?.hazards?.view || can?.compliance?.view)
         investigate.push({
-            title: 'Investigations',
+            title: 'Events',
             href: '/health-safety/events',
             icon: ClipboardCheck,
         });
@@ -1203,7 +1200,20 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Wrench,
         });
     if (investigate.length > 0)
-        groups.push({ label: 'Investigate & Remediate', items: investigate });
+        groups.push({ label: 'Investigate & resolve', items: investigate });
+
+    // ── 4. Analyse & assure — trends, KPIs and board assurance close the loop.
+    //    Sits after the operational registers so the nav reads report →
+    //    investigate → resolve → analyse top-to-bottom. ───────────────────────
+    const analyse: NavItem[] = [];
+    if (can?.hazards?.view || can?.compliance?.view || can?.reports?.viewAny)
+        analyse.push({
+            title: 'Analytics',
+            href: '/health-safety/analytics',
+            icon: BarChart3,
+        });
+    if (analyse.length > 0)
+        groups.push({ label: 'Analyse & assure', items: analyse });
 
     // H&S Management
     const hsManagement: NavItem[] = [];
@@ -1478,12 +1488,13 @@ function buildFleetAssetsSubPanelGroups({
     }
     if (devices.items.length > 0) groups.push(devices);
 
-    // Safety
+    // Safety — keep label/icon consistent with the Health & Safety flyout's
+    // "Fleet Incidents" entry so the same destination reads the same everywhere.
     const safety: SubPanelGroup = { label: 'Safety', items: [] };
     safety.items.push({
-        title: 'Incidents',
+        title: 'Fleet Incidents',
         href: '/fleet-assets/incidents',
-        icon: AlertOctagon,
+        icon: Truck,
     });
     safety.items.push({
         title: 'Wandering Alerts',
