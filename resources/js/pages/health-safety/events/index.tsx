@@ -325,7 +325,7 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
             <Head title="Safety events" />
 
             <div className="min-h-screen bg-[oklch(0.98_0.006_277)] px-4 py-5 md:px-6">
-                <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
+                <div className="flex flex-col gap-4">
                     <section className="relative overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,oklch(51.1%_0.262_277/.94),oklch(48%_0.255_280),oklch(44%_0.235_286))] text-primary-foreground shadow-[0_24px_60px_-28px_oklch(51.1%_0.262_277/.55)]">
                         <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
                         <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
