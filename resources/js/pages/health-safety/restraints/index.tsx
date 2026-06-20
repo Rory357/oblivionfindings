@@ -368,7 +368,7 @@ export default function RestraintsIndex({ lens, tab, events, plans, tabCounts, h
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
             {detail && detail.kind === 'event' ? (
-                <RestraintEventDetailDialog key={`e-${detail.id}`} detail={detail} open onClose={closeDetail} initialSection={pendingSection} initialAction={pendingAction} onOpenPlan={(id) => openPlan(id)} />
+                <RestraintEventDetailDialog key={`e-${detail.id}`} detail={detail} open onClose={closeDetail} incidents={incidents} initialSection={pendingSection} initialAction={pendingAction} onOpenPlan={(id) => openPlan(id)} />
             ) : null}
             {detail && detail.kind === 'plan' ? (
                 <BspDetailDialog

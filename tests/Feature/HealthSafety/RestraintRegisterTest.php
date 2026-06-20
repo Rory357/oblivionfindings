@@ -207,6 +207,65 @@ class RestraintRegisterTest extends TestCase
             ->assertForbidden();
     }
 
+    /* ---- Post-hoc incident link (D3) ---- */
+
+    public function test_link_incident_attaches_same_client_incident(): void
+    {
+        $client = Client::factory()->create();
+        $event = RestraintEvent::factory()->create(['client_id' => $client->id, 'related_incident_id' => null]);
+        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+
+        $this->actingAs($this->officer())
+            ->from('/health-safety/restraints')
+            ->post('/health-safety/restraints/events/'.$event->id.'/link-incident', [
+                'related_incident_id' => $incident->id,
+            ])->assertRedirect();
+
+        $this->assertSame($incident->id, $event->refresh()->related_incident_id);
+    }
+
+    public function test_link_incident_rejects_cross_client_incident(): void
+    {
+        $event = RestraintEvent::factory()->create(['client_id' => Client::factory()->create()->id, 'related_incident_id' => null]);
+        // An incident belonging to a DIFFERENT client must not be linkable.
+        $otherClientIncident = \App\Models\ClientIncident::factory()->create(['client_id' => Client::factory()->create()->id]);
+
+        $this->actingAs($this->officer())
+            ->from('/health-safety/restraints')
+            ->post('/health-safety/restraints/events/'.$event->id.'/link-incident', [
+                'related_incident_id' => $otherClientIncident->id,
+            ])->assertSessionHasErrors('related_incident_id');
+
+        $this->assertNull($event->refresh()->related_incident_id);
+    }
+
+    public function test_link_incident_can_be_removed(): void
+    {
+        $client = Client::factory()->create();
+        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+        $event = RestraintEvent::factory()->create(['client_id' => $client->id, 'related_incident_id' => $incident->id]);
+
+        $this->actingAs($this->officer())
+            ->from('/health-safety/restraints')
+            ->post('/health-safety/restraints/events/'.$event->id.'/link-incident', [
+                'related_incident_id' => null,
+            ])->assertRedirect();
+
+        $this->assertNull($event->refresh()->related_incident_id);
+    }
+
+    public function test_link_incident_requires_review_permission(): void
+    {
+        $client = Client::factory()->create();
+        $event = RestraintEvent::factory()->create(['client_id' => $client->id]);
+        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+
+        $this->actingAs($this->supportWorker())
+            ->post('/health-safety/restraints/events/'.$event->id.'/link-incident', [
+                'related_incident_id' => $incident->id,
+            ])->assertForbidden();
+    }
+
     /* ---- Plan lifecycle + review history ---- */
 
     public function test_plan_lifecycle_transitions_are_attributed(): void
