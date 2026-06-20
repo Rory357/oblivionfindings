@@ -48,11 +48,11 @@ class DataRetentionPolicyController extends Controller
     /**
      * Show the form for creating a new policy.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         $this->authorizePermission($request);
 
-        return Inertia::render('privacy/retention/create');
+        return redirect('/privacy/dashboard?new=retention');
     }
 
     /**
@@ -76,11 +76,16 @@ class DataRetentionPolicyController extends Controller
             'legal_basis' => 'nullable|string',
             'business_justification' => 'nullable|string',
             'active' => 'boolean',
+            'next_review_at' => 'nullable|date',
         ]);
 
         $validated['created_by'] = auth()->id();
 
-        $policy = DataRetentionPolicy::create($validated);
+        DataRetentionPolicy::create($validated);
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'Retention policy created successfully.');
+        }
 
         return redirect()
             ->route('privacy.retention.index')

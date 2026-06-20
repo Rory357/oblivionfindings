@@ -141,17 +141,27 @@ deletion.execute ← policy_id*, confirm*(accepted). (critical confirm modal)
   a fake per-log "scheduled" state; deletion-logs tab is read-only AnonymizationLog history.
 - [ ] **Step 3** — `PrivacyAttachmentController` (store/download/destroy, allow-list + perm gating) +
   routes; serialize `attachments[]` into detail payloads (Safeguarding shape, sensitive→locked shell).
-- [ ] **Step 4** — `resources/js/pages/privacy/privacy-shared.ts` (tone maps, pill/dot helpers, NZ/IPP
-  enums + labels lifted verbatim from existing pages).
-- [ ] **Step 5** — Rebuild `dashboard.tsx` chrome: HeroShell (2 clusters + badges + segmented footer +
-  New-request CTA + Compliance-reports popover + right-click hero), TabStrip (7), typed worklist per tab
-  (RegisterTableHeader + table + right-click rows + a11y + pagination), router.get wiring.
-- [ ] **Step 6** — Detail dialogs: `PrivacyRequestDetailDialog` (Overview/Subject&verification/Timeline&
-  deadline/Documents/History + Options bar) + breach/hold/dpia/retention/deletion siblings.
-- [ ] **Step 7** — Five wizards on `WizardShell` (add-client style) + `PrivacyAttachmentsPane` step where
-  relevant + Save & add another + success pane. Reconcile 5 create routes → redirect `?new=domain`.
-- [ ] **Step 8** — Lifecycle action modals (shared chrome): verify/extend/complete/refuse/export,
-  notify-opc/notify-subjects/resolve, release, approve/review, execute-deletion (critical confirm).
+- [x] **Step 4** — `privacy-shared.ts` ✅ DONE. PrivacyTone (5, incl. info) + PRIVACY_PILL/PRIVACY_DOT;
+  REQUEST_STATUS/REQUEST_TYPE/BREACH_STATUS/RISK/DPIA_OUTCOME/HOLD maps + safe-fallback lookups; en-NZ
+  fmtDate/fmtDateTime/fmtNum; wizard option sets (tiles/chips) lifted + NZ/IPP re-skinned.
+- [x] **Step 5** — Rebuilt `dashboard.tsx` ✅ DONE. HeroShell (medallion + 2 pills + h1 + desc + New-request
+  CTA + Compliance-reports popover [4 streamed-CSV links] + right-click hero create menu), 2 HeroClusters
+  + 5 NZ HeroComplianceBadges, segmented period + Site EntityFilter + search + clear footer, TabStrip (7),
+  `PrivacyWorklist` (6 per-tab layouts, right-click rows + a11y, empty states) + LaravelPagination.
+  router.get wiring (tab/period/site/search/detail partial-reload/?new strip).
+- [x] **Step 6** — `PrivacyDetailDialog` ✅ DONE. Config-driven per kind (request/breach/hold/dpia) on
+  WizardShell: section rail + ReviewCards + Documents pane + History timeline; footer status chips +
+  Options bar; `initialAction` deep-link from ctx menu.
+- [x] **Step 7** — Five wizards ✅ DONE via ONE config-driven `PrivacyWizard` engine + `privacy-wizard-
+  configs.tsx` (no duplication). Add-client style on WizardShell, per-step validation jump-to-first-fail,
+  Save & add another + success pane. Reconciliation: 5 `create()` routes → `redirect('?new=domain')`;
+  5 stores return `back()` when `_modal` (success pane stays). DPIA `review` now persists review_notes;
+  retention store accepts next_review_at.
+- [x] **Step 8** — `PrivacyActionModal` ✅ DONE. Config-driven small modal: verify/extend/complete/refuse/
+  export, notify-opc/notify-subjects/resolve, release, approve/review, execute-deletion (critical confirm
+  with irreversible checkbox). Premium document upload (`PrivacyAttachmentsPane` reusing `AttachmentUploader`)
+  lives in the detail Documents section (record-exists pattern).
+  ✅ `npx tsc` clean on all privacy files; ✅ `npm run build` green (3m15s, Wayfinder routes generated).
 - [ ] **Step 9** — Client-profile Privacy panel (tab + read-only DSR list); GDPR→NZ/IPP re-skin of legacy
   list/show pages (labels only).
 - [ ] **Step 10** — Polish + verify: lint, typecheck, vite build, tests (dashboard controller, attachments,

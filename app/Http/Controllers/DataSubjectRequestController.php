@@ -67,13 +67,12 @@ class DataSubjectRequestController extends Controller
     /**
      * Show the form for creating a new request.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         $this->authorizePermission($request, 'privacy.processRequests');
 
-        return Inertia::render('privacy/requests/create', [
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-        ]);
+        // Create is now a command-centre modal — open the dashboard wizard.
+        return redirect('/privacy/dashboard?new=request');
     }
 
     /**
@@ -102,9 +101,16 @@ class DataSubjectRequestController extends Controller
 
         $dsr = DataSubjectRequest::create($validated);
 
+        $message = 'Privacy request created with reference: '.$dsr->reference_number;
+
+        // From the command-centre modal, stay on the dashboard (success pane).
+        if ($request->boolean('_modal')) {
+            return back()->with('success', $message);
+        }
+
         return redirect()
             ->route('privacy.requests.show', $dsr)
-            ->with('success', 'Privacy request created with reference: '.$dsr->reference_number);
+            ->with('success', $message);
     }
 
     /**
