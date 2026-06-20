@@ -1254,7 +1254,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.hazards?.view || can?.compliance?.view)
         registers.push({
-            title: 'PPE Management',
+            title: 'PPE & Equipment',
             href: '/health-safety/ppe',
             icon: HardHat,
         });

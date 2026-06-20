@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PpeAllocation extends Model
@@ -24,6 +25,7 @@ class PpeAllocation extends Model
         'training_date',
         'acknowledged',
         'acknowledged_at',
+        'acknowledged_by',
         'notes',
         'created_by',
         'updated_by',
@@ -60,6 +62,16 @@ class PpeAllocation extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function acknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acknowledged_by');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(PpeAllocationAttachment::class);
     }
 
     // Scopes

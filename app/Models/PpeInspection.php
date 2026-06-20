@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PpeInspection extends Model
@@ -40,6 +41,11 @@ class PpeInspection extends Model
     public function inspector(): BelongsTo
     {
         return $this->belongsTo(User::class, 'inspected_by');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(PpeInspectionAttachment::class);
     }
 
     public function createdBy(): BelongsTo

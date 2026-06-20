@@ -317,6 +317,23 @@ export interface MyDayLoneWorkerSession {
     client: { id: number; name: string } | null;
 }
 
+/**
+ * One of the signed-in worker's own active PPE allocations needing attention —
+ * the data behind the My Day "Your PPE needs attention" card. Mirrors
+ * `MyTasksController::getMyPpe()`.
+ */
+export interface MyDayPpe {
+    id: number;
+    type_name: string;
+    category: string | null;
+    serial_number: string | null;
+    site: string | null;
+    allocated_at: string | null;
+    acknowledged: boolean;
+    fit_test_required: boolean;
+    fit_test_completed: boolean;
+}
+
 export interface MyDayPreShiftBriefing {
     id: number;
     starts_at: string;
@@ -377,6 +394,7 @@ export interface MyDayPageProps {
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
     active_round?: MyDayActiveRound | null;
     active_lone_worker_session?: MyDayLoneWorkerSession | null;
+    my_ppe?: MyDayPpe[];
     shiftChecklists?: ShiftChecklistRun[];
     checklistConfig?: MyDayChecklistConfig;
     runDetail?: RunDetail | null;

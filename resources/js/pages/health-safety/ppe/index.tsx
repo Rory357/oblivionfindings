@@ -1,1610 +1,1584 @@
-import { PageHero } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+/**
+ * PPE & Equipment register — H&S gold-standard command centre.
+ * Hero (bespoke Catalogue→Retire ribbon + two clusters + NZ compliance badges +
+ * footer filter bar) · TabStrip (9 server-counted tabs) · three register tables
+ * (inventory / allocations / catalogue) with left-click→detail + right-click→menu
+ * + keyboard · detail-as-modal · every workflow an Add-Client-style modal.
+ * Semantic tokens only. NZ-only, web-only.
+ */
 import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+    EntityFilter,
+    ShiftContextMenu,
+    TabStrip,
+    type RosterTabItem,
+    type ShiftCtxItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
+import { Card, CardContent } from '@/components/ui/card';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
 import {
+    HeroCluster,
+    HeroClusterTile,
+    HeroComplianceBadges,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+    fmt,
+    type HeroComplianceBadge,
+} from '@/pages/health-safety/components/hs-hero-kit';
+import {
+    FlagBadge,
+    RegisterTableHeader,
+    entityTone,
+    initials,
+} from '@/pages/health-safety/components/register-row-kit';
+import { Head, router } from '@inertiajs/react';
+import {
+    Activity,
+    AlertTriangle,
+    BadgeCheck,
+    Ban,
+    BarChart3,
+    Bell,
+    Check,
     CheckCircle2,
     ClipboardCheck,
+    Clock,
+    Copy,
+    ExternalLink,
+    Eye,
+    Hexagon,
+    List,
+    MousePointer2,
     Package,
+    PackageCheck,
+    Pencil,
     Plus,
-    RotateCcw,
+    Reply,
     Search,
     ShieldCheck,
-    XCircle,
+    Trash2,
+    User,
+    UserPlus,
+    X,
 } from 'lucide-react';
-import { useState } from 'react';
+import {
+    createElement,
+    useState,
+    type KeyboardEvent as ReactKeyboardEvent,
+    type MouseEvent as ReactMouseEvent,
+    type ReactNode,
+} from 'react';
+import {
+    CondemnDialog,
+    DisposeDialog,
+    InspectionDialog,
+    ReturnDialog,
+} from './ppe-action-dialogs';
+import {
+    AllocateDialog,
+    InventoryDialog,
+    TypeDialog,
+} from './ppe-create-wizards';
+import { PpeDetailDialog, type DetailAction } from './ppe-detail-dialog';
+import {
+    PpeChip,
+    catIcon,
+    catLabel,
+    catTone,
+    condLabel,
+    condTone,
+    daysUntil,
+    fmtDateNZ,
+    inventoryFlags,
+    statusLabel,
+    statusTone,
+    type AllocationRow,
+    type InventoryRow,
+    type PpePageProps,
+    type TypeRow,
+} from './ppe-shared';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const PPE_URL = '/health-safety/ppe';
 
-type Staff = { id: number; name: string };
-type Site = { id: number; name: string };
+const CAT_FILTER_OPTIONS = [
+    { value: 'respiratory', label: 'Respiratory' },
+    { value: 'head', label: 'Head' },
+    { value: 'eye', label: 'Eye' },
+    { value: 'ear', label: 'Hearing' },
+    { value: 'hand', label: 'Hand' },
+    { value: 'foot', label: 'Foot' },
+    { value: 'high_visibility', label: 'Hi-vis' },
+    { value: 'fall_protection', label: 'Fall protection' },
+    { value: 'body', label: 'Body' },
+    { value: 'other', label: 'Other' },
+];
+const STATUS_FILTER_OPTIONS = [
+    { value: 'available', label: 'Available' },
+    { value: 'allocated', label: 'Allocated' },
+    { value: 'maintenance', label: 'In repair' },
+    { value: 'condemned', label: 'Condemned' },
+    { value: 'disposed', label: 'Disposed' },
+];
 
-type PpeType = {
-    id: number;
-    name: string;
-    category: string;
-    description: string | null;
-    hazards_addressed: string | null;
-    standards_reference: string | null;
-    inspection_frequency: string | null;
-    typical_lifespan_months: number | null;
-};
+// ───────────────────────── Bespoke on-dark workflow ribbon ─────────────────────────
 
-type InventoryItem = {
-    id: number;
-    ppe_type: PpeType | null;
-    site: Site | null;
-    brand: string | null;
-    model: string | null;
-    serial_number: string | null;
-    purchase_date: string | null;
-    expiry_date: string | null;
-    quantity: number;
-    location: string | null;
-    condition: string;
-    status: string;
-    next_inspection_due: string | null;
-};
+const RIBBON = [
+    { label: 'Catalogue', icon: Hexagon, tab: 'types' },
+    { label: 'Stock', icon: Package, tab: 'inv_all' },
+    { label: 'Issue', icon: User, tab: 'alloc_active' },
+    { label: 'Inspect', icon: ClipboardCheck, tab: 'inv_inspection' },
+    { label: 'Retire', icon: Ban, tab: 'inv_condemned' },
+];
 
-type Allocation = {
-    id: number;
-    user: Staff | null;
-    inventory_item: InventoryItem | null;
-    ppe_type_name: string | null;
-    allocated_date: string;
-    fit_test_completed: boolean;
-    training_completed: boolean;
-    acknowledged: boolean;
-    returned_at: string | null;
-};
+function stageForTab(tab: string): number {
+    if (tab === 'types') return 0;
+    if (tab === 'inv_inspection') return 3;
+    if (tab === 'inv_condemned' || tab === 'inv_expiring') return 4;
+    if (tab.startsWith('alloc')) return 2;
+    return 1;
+}
 
-type Props = {
-    types: PpeType[];
-    inventory: {
-        data: InventoryItem[];
-        links: Array<{ label: string; url: string | null; active: boolean }>;
-    };
-    allocations?: {
-        data: Allocation[];
-        links: Array<{ label: string; url: string | null; active: boolean }>;
-    };
-    stats: {
-        total_items: number;
-        allocated: number;
-        inspections_due: number;
-        condemned: number;
-    };
-    sites: Site[];
-    staff: Staff[];
-    can_manage: boolean;
-    filters?: {
-        site_id: string | null;
-        ppe_type_id: string | null;
-        condition: string | null;
-        status: string | null;
-    };
-};
+function PpeRibbon({
+    current,
+    onStage,
+}: {
+    current: number;
+    onStage: (tab: string) => void;
+}) {
+    return (
+        <div className="flex flex-wrap items-center gap-1.5">
+            {RIBBON.map((s, i) => {
+                const lit = i <= current;
+                const Icon = s.icon;
+                return (
+                    <span key={s.label} className="flex items-center gap-1.5">
+                        {/* eslint-disable-next-line no-restricted-syntax -- on-dark ribbon pill, not a shadcn Button */}
+                        <button
+                            type="button"
+                            onClick={() => onStage(s.tab)}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                lit
+                                    ? 'bg-primary-foreground/20 text-primary-foreground'
+                                    : 'bg-primary-foreground/[0.07] text-primary-foreground/55 hover:text-primary-foreground/80'
+                            }`}
+                        >
+                            <Icon className="h-3 w-3" /> {s.label}
+                        </button>
+                        {i < RIBBON.length - 1 ? (
+                            <span className="text-primary-foreground/40">
+                                ›
+                            </span>
+                        ) : null}
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
+function HeroSelect({
+    label,
+    value,
+    onChange,
+    options,
+    allLabel,
+}: {
+    label: string;
+    value: string | null;
+    onChange: (v: string | null) => void;
+    options: { value: string; label: string }[];
+    allLabel: string;
+}) {
+    return (
+        <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+            {label}
+            <select
+                value={value ?? ''}
+                onChange={(e) => onChange(e.target.value || null)}
+                className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+            >
+                <option value="" className="text-foreground">
+                    {allLabel}
+                </option>
+                {options.map((o) => (
+                    <option
+                        key={o.value}
+                        value={o.value}
+                        className="text-foreground"
+                    >
+                        {o.label}
+                    </option>
+                ))}
+            </select>
+        </label>
+    );
+}
 
-const ANY = '__any__';
+// ───────────────────────── Cells ─────────────────────────
 
-const fmtDate = (v: string | null) =>
-    v
-        ? new Date(v).toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          })
-        : '-';
+function DateCell({
+    date,
+    warnWin,
+    icon: Icon,
+}: {
+    date: string | null;
+    warnWin: number;
+    icon: typeof Clock;
+}) {
+    if (!date) return <span className="text-muted-foreground">—</span>;
+    const d = daysUntil(date);
+    let flag: ReactNode = null;
+    if (d !== null && d < 0)
+        flag = (
+            <FlagBadge icon={Icon} tone="critical" title="Overdue">
+                {Math.abs(d)}d overdue
+            </FlagBadge>
+        );
+    else if (d !== null && d <= warnWin)
+        flag = (
+            <FlagBadge icon={Icon} tone="warning" title="Due soon">
+                in {d}d
+            </FlagBadge>
+        );
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-[12.5px]">{fmtDateNZ(date)}</span>
+            {flag}
+        </div>
+    );
+}
 
-const conditionColor = (c: string) => {
-    switch (c) {
-        case 'new':
-            return 'bg-status-success-bg text-status-success';
-        case 'good':
-            return 'bg-status-info-bg text-status-info';
-        case 'fair':
-            return 'bg-status-warning-bg text-status-warning';
-        case 'poor':
-            return 'bg-status-warning-bg text-status-warning';
-        case 'condemned':
-            return 'bg-status-critical-bg text-status-critical';
-        default:
-            return 'bg-muted text-foreground';
+const TH =
+    'px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap';
+const TD = 'px-4 py-3 align-top';
+const rowCls =
+    'cursor-pointer transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary';
+
+function rowKeyOpen(e: ReactKeyboardEvent, open: () => void) {
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
     }
-};
+}
 
-const statusColor = (s: string) => {
-    switch (s) {
-        case 'available':
-            return 'bg-status-success-bg text-status-success';
-        case 'allocated':
-            return 'bg-status-info-bg text-status-info';
-        case 'in_repair':
-            return 'bg-status-warning-bg text-status-warning';
-        case 'condemned':
-            return 'bg-status-critical-bg text-status-critical';
-        case 'retired':
-            return 'bg-muted text-foreground';
-        default:
-            return 'bg-muted text-foreground';
-    }
-};
+function CatTile({ category }: { category?: string | null }) {
+    const tone = catTone(category);
+    const cls = {
+        success: 'bg-status-success-bg text-status-success',
+        warning: 'bg-status-warning-bg text-status-warning',
+        critical: 'bg-status-critical-bg text-status-critical',
+        info: 'bg-accent text-primary',
+        neutral: 'bg-muted text-muted-foreground',
+    }[tone];
+    return (
+        <span
+            className={`grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg ${cls}`}
+        >
+            {createElement(catIcon(category), { className: 'h-4 w-4' })}
+        </span>
+    );
+}
 
-const categoryColor = (c: string) => {
-    switch (c) {
-        case 'head':
-            return 'bg-status-info-bg text-status-info';
-        case 'eye':
-            return 'bg-status-info-bg text-status-info';
-        case 'ear':
-            return 'bg-status-info-bg text-status-info';
-        case 'respiratory':
-            return 'bg-primary/10 text-primary';
-        case 'hand':
-            return 'bg-status-warning-bg text-status-warning';
-        case 'foot':
-            return 'bg-status-warning-bg text-status-warning';
-        case 'body':
-            return 'bg-primary/10 text-primary';
-        case 'fall_protection':
-            return 'bg-status-critical-bg text-status-critical';
-        case 'high_visibility':
-            return 'bg-status-warning-bg text-status-warning';
-        default:
-            return 'bg-muted text-foreground';
-    }
-};
+function EmptyRow({
+    colSpan,
+    icon: Icon,
+    title,
+    sub,
+}: {
+    colSpan: number;
+    icon: typeof Package;
+    title: string;
+    sub: string;
+}) {
+    return (
+        <tr>
+            <td colSpan={colSpan} className="px-4 py-14 text-center">
+                <div className="flex flex-col items-center gap-1.5">
+                    <Icon className="h-9 w-9 text-muted-foreground" />
+                    <div className="text-sm font-semibold">{title}</div>
+                    <div className="text-xs text-muted-foreground">{sub}</div>
+                </div>
+            </td>
+        </tr>
+    );
+}
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+// ───────────────────────── Tables ─────────────────────────
+
+function InventoryTable({
+    rows,
+    onOpen,
+    onCtx,
+}: {
+    rows: InventoryRow[];
+    onOpen: (id: number) => void;
+    onCtx: (e: ReactMouseEvent, r: InventoryRow) => void;
+}) {
+    return (
+        <table className="w-full text-sm">
+            <thead>
+                <tr className="border-b border-border">
+                    <th className={TH}>Type</th>
+                    <th className={TH}>Site / location</th>
+                    <th className={TH}>Identification</th>
+                    <th className={TH}>Condition</th>
+                    <th className={TH}>Status</th>
+                    <th className={TH}>Next inspection</th>
+                    <th className={TH}>Expiry</th>
+                    <th className={TH}>Flags</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+                {rows.length === 0 ? (
+                    <EmptyRow
+                        colSpan={8}
+                        icon={Package}
+                        title="No inventory here"
+                        sub="Nothing matches this tab and the active filters."
+                    />
+                ) : null}
+                {rows.map((r) => {
+                    const flags = inventoryFlags(r);
+                    return (
+                        <tr
+                            key={r.id}
+                            className={rowCls}
+                            tabIndex={0}
+                            onClick={() => onOpen(r.id)}
+                            onContextMenu={(e) => onCtx(e, r)}
+                            onKeyDown={(e) => rowKeyOpen(e, () => onOpen(r.id))}
+                        >
+                            <td className={TD}>
+                                <div className="flex items-center gap-2.5">
+                                    <CatTile category={r.ppe_type?.category} />
+                                    <div className="min-w-0">
+                                        <div className="font-semibold">
+                                            {r.ppe_type?.name ?? '—'}
+                                        </div>
+                                        <div className="truncate text-[11.5px] text-muted-foreground">
+                                            {catLabel(r.ppe_type?.category)}
+                                            {r.ppe_type?.standards_reference
+                                                ? ` · ${r.ppe_type.standards_reference}`
+                                                : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className={TD}>
+                                <div className="font-medium">
+                                    {r.site?.name ?? '—'}
+                                </div>
+                                <div className="text-[12px] text-muted-foreground">
+                                    {r.location ?? ''}
+                                </div>
+                            </td>
+                            <td className={TD}>
+                                <div className="font-medium">
+                                    {[r.brand, r.model]
+                                        .filter(Boolean)
+                                        .join(' ') || '—'}
+                                </div>
+                                <div className="text-[11.5px] text-muted-foreground tabular-nums">
+                                    {r.serial_number ?? '—'}
+                                    {r.quantity > 1 ? ` · ×${r.quantity}` : ''}
+                                </div>
+                            </td>
+                            <td className={TD}>
+                                <PpeChip tone={condTone(r.condition)}>
+                                    {condLabel(r.condition)}
+                                </PpeChip>
+                            </td>
+                            <td className={TD}>
+                                <PpeChip tone={statusTone(r.status)}>
+                                    {statusLabel(r.status)}
+                                </PpeChip>
+                            </td>
+                            <td className={TD}>
+                                <DateCell
+                                    date={r.next_inspection_due}
+                                    warnWin={30}
+                                    icon={Clock}
+                                />
+                            </td>
+                            <td className={TD}>
+                                <DateCell
+                                    date={r.expiry_date}
+                                    warnWin={60}
+                                    icon={AlertTriangle}
+                                />
+                            </td>
+                            <td className={TD}>
+                                {flags.length ? (
+                                    <div className="flex flex-wrap gap-1">
+                                        {flags.map((fl, i) => (
+                                            <FlagBadge
+                                                key={i}
+                                                icon={fl.icon}
+                                                tone={fl.tone}
+                                                title={fl.title}
+                                            >
+                                                {fl.label}
+                                            </FlagBadge>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="text-muted-foreground">
+                                        —
+                                    </span>
+                                )}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    );
+}
+
+function AllocationTable({
+    rows,
+    onOpen,
+    onCtx,
+}: {
+    rows: AllocationRow[];
+    onOpen: (id: number) => void;
+    onCtx: (e: ReactMouseEvent, r: AllocationRow) => void;
+}) {
+    return (
+        <table className="w-full text-sm">
+            <thead>
+                <tr className="border-b border-border">
+                    <th className={TH}>Worker</th>
+                    <th className={TH}>Item</th>
+                    <th className={TH}>Allocated</th>
+                    <th className={TH}>Fit-test</th>
+                    <th className={TH}>Training</th>
+                    <th className={TH}>Acknowledged</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+                {rows.length === 0 ? (
+                    <EmptyRow
+                        colSpan={6}
+                        icon={BadgeCheck}
+                        title="No allocations here"
+                        sub="Nothing matches this tab and the active filters."
+                    />
+                ) : null}
+                {rows.map((r) => {
+                    const rpe = r.ppe_type?.category === 'respiratory';
+                    return (
+                        <tr
+                            key={r.id}
+                            className={rowCls}
+                            tabIndex={0}
+                            onClick={() => onOpen(r.id)}
+                            onContextMenu={(e) => onCtx(e, r)}
+                            onKeyDown={(e) => rowKeyOpen(e, () => onOpen(r.id))}
+                        >
+                            <td className={TD}>
+                                <div className="flex items-center gap-2.5">
+                                    <span
+                                        className={`grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold ${entityTone(r.user?.id ?? 0)}`}
+                                    >
+                                        {initials(r.user?.name)}
+                                    </span>
+                                    <span className="font-semibold">
+                                        {r.user?.name ?? '—'}
+                                    </span>
+                                </div>
+                            </td>
+                            <td className={TD}>
+                                <div className="flex items-center gap-2">
+                                    <CatTile category={r.ppe_type?.category} />
+                                    <div className="min-w-0">
+                                        <div className="font-medium">
+                                            {r.ppe_type?.name ?? '—'}
+                                        </div>
+                                        <div className="text-[11.5px] text-muted-foreground">
+                                            {r.inventory_item?.serial_number ??
+                                                '—'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className={TD}>
+                                <span className="text-[12.5px] text-muted-foreground">
+                                    {fmtDateNZ(r.allocated_at)}
+                                </span>
+                            </td>
+                            <td className={TD}>
+                                {rpe ? (
+                                    r.fit_test_completed ? (
+                                        <PpeChip tone="success" icon={Check}>
+                                            Pass
+                                            {r.fit_test_date
+                                                ? ` · ${fmtDateNZ(r.fit_test_date)}`
+                                                : ''}
+                                        </PpeChip>
+                                    ) : (
+                                        <PpeChip
+                                            tone="critical"
+                                            icon={AlertTriangle}
+                                        >
+                                            Required
+                                        </PpeChip>
+                                    )
+                                ) : (
+                                    <span className="text-[12px] text-muted-foreground">
+                                        N/A
+                                    </span>
+                                )}
+                            </td>
+                            <td className={TD}>
+                                {r.training_completed ? (
+                                    <PpeChip tone="success" icon={Check}>
+                                        Done
+                                    </PpeChip>
+                                ) : (
+                                    <PpeChip tone="warning">
+                                        Outstanding
+                                    </PpeChip>
+                                )}
+                            </td>
+                            <td className={TD}>
+                                {r.acknowledged ? (
+                                    <PpeChip tone="success" icon={BadgeCheck}>
+                                        Acknowledged
+                                    </PpeChip>
+                                ) : (
+                                    <PpeChip tone="warning">Pending</PpeChip>
+                                )}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    );
+}
+
+function TypeTable({
+    rows,
+    onEdit,
+    onCtx,
+}: {
+    rows: TypeRow[];
+    onEdit: (r: TypeRow) => void;
+    onCtx: (e: ReactMouseEvent, r: TypeRow) => void;
+}) {
+    return (
+        <table className="w-full text-sm">
+            <thead>
+                <tr className="border-b border-border">
+                    <th className={TH}>Type</th>
+                    <th className={TH}>Category</th>
+                    <th className={TH}>Standard</th>
+                    <th className={TH}>Inspection</th>
+                    <th className={TH}>Lifespan</th>
+                    <th className={TH}>Status</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+                {rows.length === 0 ? (
+                    <EmptyRow
+                        colSpan={6}
+                        icon={Hexagon}
+                        title="No types"
+                        sub="Nothing matches the active filters."
+                    />
+                ) : null}
+                {rows.map((r) => (
+                    <tr
+                        key={r.id}
+                        className={rowCls}
+                        tabIndex={0}
+                        onClick={() => onEdit(r)}
+                        onContextMenu={(e) => onCtx(e, r)}
+                        onKeyDown={(e) => rowKeyOpen(e, () => onEdit(r))}
+                    >
+                        <td className={TD}>
+                            <div className="flex items-center gap-2.5">
+                                <CatTile category={r.category} />
+                                <div className="min-w-0">
+                                    <div className="font-semibold">
+                                        {r.name}
+                                    </div>
+                                    <div className="max-w-[320px] truncate text-[11.5px] text-muted-foreground">
+                                        {r.hazards_addressed ?? ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td className={TD}>
+                            <PpeChip tone={catTone(r.category)}>
+                                {catLabel(r.category)}
+                            </PpeChip>
+                        </td>
+                        <td className={TD}>
+                            <span className="text-[12.5px] font-medium">
+                                {r.standards_reference ?? '—'}
+                            </span>
+                        </td>
+                        <td className={TD}>
+                            <span className="text-[12.5px] text-muted-foreground capitalize">
+                                {r.inspection_frequency ?? '—'}
+                            </span>
+                        </td>
+                        <td className={TD}>
+                            <span className="text-[12.5px] text-muted-foreground">
+                                {r.typical_lifespan_months
+                                    ? `${r.typical_lifespan_months} mo`
+                                    : '—'}
+                            </span>
+                        </td>
+                        <td className={TD}>
+                            {r.is_active ? (
+                                <PpeChip tone="success" icon={Check}>
+                                    Active
+                                </PpeChip>
+                            ) : (
+                                <PpeChip tone="neutral">Retired</PpeChip>
+                            )}
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
+// ───────────────────────── Modal orchestration state ─────────────────────────
+
+type Modal =
+    | { kind: 'inventory'; edit?: InventoryRow | null; lockedTypeId?: number }
+    | {
+          kind: 'allocate';
+          lockedItem?: {
+              id: number;
+              label: string;
+              category: string | null;
+          } | null;
+      }
+    | { kind: 'type'; edit?: TypeRow | null }
+    | {
+          kind: 'return';
+          allocationId: number;
+          worker: string;
+          itemLabel: string;
+      }
+    | { kind: 'inspect'; inventoryId: number; itemLabel: string }
+    | { kind: 'condemn'; inventoryId: number; itemLabel: string }
+    | { kind: 'dispose'; inventoryId: number; itemLabel: string };
 
 export default function PpeIndex({
-    types,
+    tab,
+    filters,
     inventory,
     allocations,
-    stats,
+    types,
+    tabCounts,
+    hero,
     sites,
     staff,
-    filters,
-    can_manage,
-}: Props) {
-    const currentFilters = filters ?? {
-        site_id: null,
-        ppe_type_id: null,
-        condition: null,
-        status: null,
-    };
+    allocatable,
+    detail,
+    can,
+}: PpePageProps) {
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [launcherOpen, setLauncherOpen] = useState(false);
+    const [modal, setModal] = useState<Modal | null>(null);
+    const closeModal = () => setModal(null);
 
-    /* Dialog states */
-    const [addItemOpen, setAddItemOpen] = useState(false);
-    const [addTypeOpen, setAddTypeOpen] = useState(false);
-    const [allocateOpen, setAllocateOpen] = useState(false);
-    const [allocateItemId, setAllocateItemId] = useState<number | null>(null);
-    const [inspectOpen, setInspectOpen] = useState(false);
-    const [inspectItemId, setInspectItemId] = useState<number | null>(null);
-
-    /* Forms */
-    const addItemForm = useForm({
-        ppe_type_id: '',
-        site_id: '',
-        brand: '',
-        model: '',
-        serial_number: '',
-        purchase_date: '',
-        expiry_date: '',
-        quantity: '1',
-        location: '',
-    });
-
-    const addTypeForm = useForm({
-        name: '',
-        category: '',
-        description: '',
-        hazards_addressed: '',
-        standards_reference: '',
-        inspection_frequency: '',
-        typical_lifespan_months: '',
-    });
-
-    const allocateForm = useForm({
-        user_id: '',
-        fit_test_completed: false as boolean,
-        fit_test_date: '',
-        fit_test_result: '',
-        training_completed: false as boolean,
-        training_date: '',
-    });
-
-    const inspectForm = useForm({
-        result: '',
-        condition_after: '',
-        findings: '',
-        action_taken: '',
-        next_inspection_due: '',
-    });
-
-    /* Filter handler */
-    const onFilter = (next: Partial<typeof currentFilters>) => {
+    const f = filters;
+    const go = (next: Record<string, unknown>) =>
         router.get(
-            '/health-safety/ppe',
-            { ...currentFilters, ...next },
-            { preserveState: true, preserveScroll: true },
+            PPE_URL,
+            { ...f, ...next },
+            { preserveState: true, preserveScroll: true, replace: true },
         );
-    };
-
-    /* Submit handlers */
-    const submitAddItem = () => {
-        addItemForm.post('/health-safety/ppe/inventory', {
-            onSuccess: () => {
-                setAddItemOpen(false);
-                addItemForm.reset();
-            },
-        });
-    };
-
-    const submitAddType = () => {
-        addTypeForm.post('/health-safety/ppe/types', {
-            onSuccess: () => {
-                setAddTypeOpen(false);
-                addTypeForm.reset();
-            },
-        });
-    };
-
-    const submitAllocate = () => {
-        if (!allocateItemId) return;
-        allocateForm.post(
-            `/health-safety/ppe/inventory/${allocateItemId}/allocate`,
-            {
-                onSuccess: () => {
-                    setAllocateOpen(false);
-                    allocateForm.reset();
-                },
-            },
+    const setTab = (id: string) =>
+        router.get(PPE_URL, { ...f, tab: id }, { preserveScroll: true });
+    const openItem = (id: number) =>
+        router.get(
+            PPE_URL,
+            { ...f, item: id },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
         );
-    };
-
-    const submitInspection = () => {
-        if (!inspectItemId) return;
-        inspectForm.post(
-            `/health-safety/ppe/inventory/${inspectItemId}/inspections`,
-            {
-                onSuccess: () => {
-                    setInspectOpen(false);
-                    inspectForm.reset();
-                },
-            },
+    const openAllocation = (id: number) =>
+        router.get(
+            PPE_URL,
+            { ...f, allocation: id },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
         );
-    };
+    const closeDetail = () =>
+        router.get(
+            PPE_URL,
+            { ...f },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
+    const clearFilters = () =>
+        router.get(
+            PPE_URL,
+            { tab },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
-    const submitReturn = (allocationId: number) => {
+    const hasFilters = !!(
+        f.site_id ||
+        f.category ||
+        f.status ||
+        f.ppe_type_id ||
+        f.search
+    );
+    const copyLink = (param: 'item' | 'allocation', id: number) =>
+        navigator.clipboard?.writeText(
+            `${window.location.origin}${PPE_URL}?${param}=${id}`,
+        );
+    const acknowledge = (id: number) =>
         router.post(
-            `/health-safety/ppe/allocations/${allocationId}/return`,
+            `${PPE_URL}/allocations/${id}/acknowledge`,
             {},
-            { preserveScroll: true },
+            { preserveScroll: true, preserveState: true },
         );
+    const toggleType = (r: TypeRow) =>
+        router.patch(
+            `${PPE_URL}/types/${r.id}/${r.is_active ? 'deactivate' : 'activate'}`,
+            {},
+            { preserveScroll: true, preserveState: true },
+        );
+    const exportCsv = () => {
+        const params = new URLSearchParams(
+            Object.entries(f)
+                .filter(([, v]) => v != null && v !== '')
+                .map(([k, v]) => [k, String(v)]),
+        );
+        window.open(`${PPE_URL}/export?${params.toString()}`, '_blank');
     };
+
+    const c = hero.compliance;
+    const badges: HeroComplianceBadge[] = [
+        {
+            icon: c.rpe_fit_test_due > 0 ? AlertTriangle : CheckCircle2,
+            // RPE issued without a current fit-test is an AS/NZS 1715 breach (can't lawfully
+            // use the respirator) — escalate to critical, not a soft warning.
+            tone: c.rpe_fit_test_due > 0 ? 'critical' : 'success',
+            label:
+                c.rpe_fit_test_due > 0
+                    ? `RPE fit-test · ${c.rpe_fit_test_due} due`
+                    : 'RPE fit-test · all current',
+        },
+        {
+            icon: c.inspections_overdue > 0 ? AlertTriangle : CheckCircle2,
+            tone: c.inspections_overdue > 0 ? 'critical' : 'success',
+            label:
+                c.inspections_overdue > 0
+                    ? `Inspections · ${c.inspections_overdue} overdue`
+                    : 'Inspections · current',
+        },
+        {
+            icon: c.items_expiring > 0 ? AlertTriangle : CheckCircle2,
+            tone: c.items_expiring > 0 ? 'warning' : 'success',
+            label:
+                c.items_expiring > 0
+                    ? `Expiry · ${c.items_expiring} item${c.items_expiring === 1 ? '' : 's'} expiring`
+                    : 'Expiry · all in date',
+        },
+        {
+            icon: c.condemned_awaiting > 0 ? Ban : CheckCircle2,
+            tone: c.condemned_awaiting > 0 ? 'warning' : 'success',
+            label:
+                c.condemned_awaiting > 0
+                    ? `Condemned · ${c.condemned_awaiting} awaiting disposal`
+                    : 'Disposal · clear',
+        },
+        {
+            icon: ShieldCheck,
+            tone:
+                c.hi_vis_covered && c.footwear_covered ? 'success' : 'warning',
+            label:
+                c.hi_vis_covered && c.footwear_covered
+                    ? 'Hi-vis & footwear · Covered'
+                    : 'Hi-vis & footwear · Gaps',
+        },
+    ];
+
+    const live = hero.clusters.live;
+    const att = hero.clusters.attention;
+
+    const TABS: RosterTabItem[] = [
+        {
+            id: 'inv_all',
+            label: 'All inventory',
+            icon: List,
+            tone: 'primary',
+            badge: tabCounts.inv_all || undefined,
+        },
+        {
+            id: 'inv_available',
+            label: 'Available',
+            icon: PackageCheck,
+            tone: 'success',
+            badge: tabCounts.inv_available || undefined,
+        },
+        {
+            id: 'inv_allocated',
+            label: 'Allocated',
+            icon: User,
+            tone: 'info',
+            badge: tabCounts.inv_allocated || undefined,
+        },
+        {
+            id: 'inv_inspection',
+            label: 'Inspection due',
+            icon: ClipboardCheck,
+            tone: 'warning',
+            badge: tabCounts.inv_inspection || undefined,
+        },
+        {
+            id: 'inv_expiring',
+            label: 'Expiring',
+            icon: AlertTriangle,
+            tone: 'critical',
+            badge: tabCounts.inv_expiring || undefined,
+        },
+        {
+            id: 'inv_condemned',
+            label: 'Condemned',
+            icon: Ban,
+            tone: 'critical',
+            badge: tabCounts.inv_condemned || undefined,
+        },
+        {
+            id: 'alloc_active',
+            label: 'Allocations',
+            icon: BadgeCheck,
+            tone: 'info',
+            badge: tabCounts.alloc_active || undefined,
+        },
+        {
+            id: 'alloc_unack',
+            label: 'Unacknowledged',
+            icon: AlertTriangle,
+            tone: 'warning',
+            badge: tabCounts.alloc_unack || undefined,
+        },
+        {
+            id: 'types',
+            label: 'Catalogue',
+            icon: Hexagon,
+            tone: 'primary',
+            badge: tabCounts.types || undefined,
+        },
+    ];
+
+    const rowsKind: 'inventory' | 'allocations' | 'types' = tab.startsWith(
+        'alloc',
+    )
+        ? 'allocations'
+        : tab === 'types'
+          ? 'types'
+          : 'inventory';
+
+    const onDetailAction = (a: DetailAction) => {
+        switch (a.kind) {
+            case 'allocate':
+                setModal({
+                    kind: 'allocate',
+                    lockedItem: {
+                        id: a.itemId,
+                        label: a.label,
+                        category: a.category,
+                    },
+                });
+                break;
+            case 'inspect':
+                setModal({
+                    kind: 'inspect',
+                    inventoryId: a.itemId,
+                    itemLabel: a.label,
+                });
+                break;
+            case 'condemn':
+                setModal({
+                    kind: 'condemn',
+                    inventoryId: a.itemId,
+                    itemLabel: a.label,
+                });
+                break;
+            case 'dispose':
+                setModal({
+                    kind: 'dispose',
+                    inventoryId: a.itemId,
+                    itemLabel: a.label,
+                });
+                break;
+            case 'return':
+                setModal({
+                    kind: 'return',
+                    allocationId: a.allocationId,
+                    worker: a.worker,
+                    itemLabel: a.itemLabel,
+                });
+                break;
+            case 'acknowledge':
+                acknowledge(a.allocationId);
+                break;
+        }
+    };
+
+    const invCtx = (e: ReactMouseEvent, r: InventoryRow) => {
+        e.preventDefault();
+        const label = `${r.ppe_type?.name ?? 'PPE'}${r.serial_number ? ` (${r.serial_number})` : ''}`;
+        const condemned = r.status === 'condemned';
+        const disposed = r.status === 'disposed';
+        const items: ShiftCtxItem[] = [
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'View item',
+                sub: r.serial_number ?? undefined,
+                tone: 'primary',
+                onClick: () => openItem(r.id),
+            },
+            ...(can.manage
+                ? [
+                      {
+                          icon: <Pencil className="h-3.5 w-3.5" />,
+                          label: 'Edit item',
+                          onClick: () =>
+                              setModal({ kind: 'inventory', edit: r }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage && r.status === 'available'
+                ? [
+                      {
+                          icon: <UserPlus className="h-3.5 w-3.5" />,
+                          label: 'Allocate to worker',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'allocate',
+                                  lockedItem: {
+                                      id: r.id,
+                                      label,
+                                      category: r.ppe_type?.category ?? null,
+                                  },
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage && !disposed
+                ? [
+                      {
+                          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+                          label: 'Record inspection',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'inspect',
+                                  inventoryId: r.id,
+                                  itemLabel: label,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage && !condemned && !disposed
+                ? [
+                      { sep: true } satisfies ShiftCtxItem,
+                      {
+                          icon: <Ban className="h-3.5 w-3.5" />,
+                          label: 'Condemn',
+                          tone: 'critical',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'condemn',
+                                  inventoryId: r.id,
+                                  itemLabel: label,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage && condemned
+                ? [
+                      {
+                          icon: <Trash2 className="h-3.5 w-3.5" />,
+                          label: 'Dispose',
+                          tone: 'critical',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'dispose',
+                                  inventoryId: r.id,
+                                  itemLabel: label,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            { sep: true },
+            {
+                icon: <Copy className="h-3.5 w-3.5" />,
+                label: 'Copy link',
+                onClick: () => copyLink('item', r.id),
+            },
+        ];
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: catLabel(r.ppe_type?.category),
+            meta: `${r.ppe_type?.name ?? 'PPE'} · ${r.site?.name ?? '—'}`,
+            items,
+        });
+    };
+
+    const allocCtx = (e: ReactMouseEvent, r: AllocationRow) => {
+        e.preventDefault();
+        const label = `${r.ppe_type?.name ?? 'PPE'}${r.inventory_item?.serial_number ? ` (${r.inventory_item.serial_number})` : ''}`;
+        const items: ShiftCtxItem[] = [
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'View allocation',
+                sub: r.user?.name ?? undefined,
+                tone: 'primary',
+                onClick: () => openAllocation(r.id),
+            },
+            ...(can.manage && !r.acknowledged
+                ? [
+                      {
+                          icon: <BadgeCheck className="h-3.5 w-3.5" />,
+                          label: 'Mark acknowledged',
+                          onClick: () => acknowledge(r.id),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage
+                ? [
+                      {
+                          icon: <Reply className="h-3.5 w-3.5" />,
+                          label: 'Return PPE',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'return',
+                                  allocationId: r.id,
+                                  worker: r.user?.name ?? 'worker',
+                                  itemLabel: label,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            ...(can.manage && r.inventory_item
+                ? [
+                      {
+                          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+                          label: 'Record inspection',
+                          onClick: () =>
+                              setModal({
+                                  kind: 'inspect',
+                                  inventoryId: r.inventory_item!.id,
+                                  itemLabel: label,
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            { sep: true },
+            {
+                icon: <Copy className="h-3.5 w-3.5" />,
+                label: 'Copy link',
+                onClick: () => copyLink('allocation', r.id),
+            },
+        ];
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: 'Issued',
+            meta: `${r.user?.name ?? 'Worker'} · ${r.ppe_type?.name ?? 'PPE'}`,
+            items,
+        });
+    };
+
+    const typeCtx = (e: ReactMouseEvent, r: TypeRow) => {
+        e.preventDefault();
+        if (!can.manage) return;
+        const items: ShiftCtxItem[] = [
+            {
+                icon: <Pencil className="h-3.5 w-3.5" />,
+                label: 'Edit type',
+                tone: 'primary',
+                onClick: () => setModal({ kind: 'type', edit: r }),
+            },
+            {
+                icon: r.is_active ? (
+                    <Ban className="h-3.5 w-3.5" />
+                ) : (
+                    <Check className="h-3.5 w-3.5" />
+                ),
+                label: r.is_active ? 'Deactivate' : 'Activate',
+                onClick: () => toggleType(r),
+            },
+            { sep: true },
+            {
+                icon: <Package className="h-3.5 w-3.5" />,
+                label: 'Add inventory of this type',
+                onClick: () =>
+                    setModal({ kind: 'inventory', lockedTypeId: r.id }),
+            },
+        ];
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: catLabel(r.category),
+            meta: r.name,
+            items,
+        });
+    };
+
+    const heroCtx = (e: ReactMouseEvent) => {
+        e.preventDefault();
+        const items: ShiftCtxItem[] = [
+            ...(can.manage
+                ? [
+                      {
+                          icon: <Hexagon className="h-3.5 w-3.5" />,
+                          label: 'Add PPE type',
+                          tone: 'primary',
+                          onClick: () => setModal({ kind: 'type' }),
+                      } satisfies ShiftCtxItem,
+                      {
+                          icon: <Package className="h-3.5 w-3.5" />,
+                          label: 'Add inventory',
+                          onClick: () => setModal({ kind: 'inventory' }),
+                      } satisfies ShiftCtxItem,
+                      {
+                          icon: <User className="h-3.5 w-3.5" />,
+                          label: 'Allocate PPE',
+                          onClick: () => setModal({ kind: 'allocate' }),
+                      } satisfies ShiftCtxItem,
+                      { sep: true } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            {
+                icon: <ExternalLink className="h-3.5 w-3.5" />,
+                label: 'Export register (CSV)',
+                onClick: exportCsv,
+            },
+            {
+                icon: <BarChart3 className="h-3.5 w-3.5" />,
+                label: 'Go to analytics',
+                onClick: () => router.visit('/health-safety/analytics'),
+            },
+        ];
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: 'PPE',
+            meta: 'Quick actions',
+            items,
+        });
+    };
+
+    const addMenu = [
+        {
+            icon: Hexagon,
+            title: 'Add PPE type',
+            blurb: 'New catalogue entry',
+            onClick: () => {
+                setLauncherOpen(false);
+                setModal({ kind: 'type' });
+            },
+        },
+        {
+            icon: Package,
+            title: 'Add inventory item',
+            blurb: 'Physical stock at a site',
+            onClick: () => {
+                setLauncherOpen(false);
+                setModal({ kind: 'inventory' });
+            },
+        },
+        {
+            icon: User,
+            title: 'Allocate PPE',
+            blurb: 'Issue an item to a worker',
+            onClick: () => {
+                setLauncherOpen(false);
+                setModal({ kind: 'allocate' });
+            },
+        },
+    ];
+
+    const tableMeta =
+        rowsKind === 'inventory'
+            ? {
+                  icon: Package,
+                  title: 'Inventory',
+                  sub: `${inventory.total} item${inventory.total === 1 ? '' : 's'}`,
+                  hint: 'Right-click a row for the full lifecycle',
+              }
+            : rowsKind === 'allocations'
+              ? {
+                    icon: BadgeCheck,
+                    title: 'Allocations',
+                    sub: `${allocations.total} active issue${allocations.total === 1 ? '' : 's'}`,
+                    hint: 'Right-click a row for the full lifecycle',
+                }
+              : {
+                    icon: Hexagon,
+                    title: 'PPE catalogue',
+                    sub: `${types.length} type${types.length === 1 ? '' : 's'}`,
+                    hint: 'Right-click to edit or retire',
+                };
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'PPE Management', href: '/health-safety/ppe' },
+                { title: 'PPE & Equipment', href: PPE_URL },
             ]}
         >
-            <Head title="PPE Management" />
+            <Head title="PPE & Equipment" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Hero Header */}
-                <PageHero
-                    title="PPE Management"
-                    description="Manage personal protective equipment inventory, allocations, and inspections"
-                    icon={<Package className="h-7 w-7 text-white" />}
-                    stats={[
-                        { label: 'Total Items', value: stats.total_items },
-                        { label: 'Allocated', value: stats.allocated },
-                        {
-                            label: 'Inspections Due',
-                            value: stats.inspections_due,
-                        },
-                        { label: 'Condemned', value: stats.condemned },
-                    ]}
+                <HeroShell
+                    footer={
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                Filter
+                            </span>
+                            {sites?.length ? (
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites}
+                                    value={f.site_id ? Number(f.site_id) : null}
+                                    onChange={(id) => go({ site_id: id })}
+                                    onDark
+                                />
+                            ) : null}
+                            <HeroSelect
+                                label="Category"
+                                allLabel="All categories"
+                                value={f.category ?? null}
+                                onChange={(v) => go({ category: v })}
+                                options={CAT_FILTER_OPTIONS}
+                            />
+                            <HeroSelect
+                                label="Status"
+                                allLabel="Any status"
+                                value={f.status ?? null}
+                                onChange={(v) => go({ status: v })}
+                                options={STATUS_FILTER_OPTIONS}
+                            />
+                            <div className="relative ml-auto">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+                                <input
+                                    type="search"
+                                    placeholder="Search PPE…"
+                                    defaultValue={f.search ?? ''}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter')
+                                            go({
+                                                search: (
+                                                    e.target as HTMLInputElement
+                                                ).value,
+                                            });
+                                    }}
+                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                                />
+                            </div>
+                            {hasFilters ? (
+                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                                >
+                                    <X className="h-3 w-3" /> Clear
+                                </button>
+                            ) : null}
+                        </div>
+                    }
+                >
+                    <div
+                        onContextMenu={heroCtx}
+                        className="flex flex-col gap-5"
+                    >
+                        <PpeRibbon
+                            current={stageForTab(tab)}
+                            onStage={setTab}
+                        />
+
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                                <HeroMedallion icon={ShieldCheck} />
+                                <div className="flex flex-col gap-1.5">
+                                    <HeroStatusPill>
+                                        PPE register · synced just now
+                                    </HeroStatusPill>
+                                    <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
+                                        PPE &amp; Equipment
+                                    </h1>
+                                    <p className="max-w-xl text-sm text-primary-foreground/70">
+                                        Catalogue, issue, inspect and retire
+                                        personal protective equipment —
+                                        fit-tested, in-date and acknowledged
+                                        across every site.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {can.manage ? (
+                                <Popover
+                                    open={launcherOpen}
+                                    onOpenChange={setLauncherOpen}
+                                >
+                                    <PopoverTrigger asChild>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- white on-dark hero affordance */}
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-foreground px-3.5 py-2 text-[13px] font-semibold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90"
+                                        >
+                                            <Plus className="h-4 w-4" /> Add to
+                                            register
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-64 p-1.5"
+                                    >
+                                        {addMenu.map((m) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- popover menu item, custom icon+label layout
+                                            <button
+                                                key={m.title}
+                                                type="button"
+                                                onClick={m.onClick}
+                                                className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-accent"
+                                            >
+                                                <span className="mt-0.5 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-md bg-accent text-primary">
+                                                    <m.icon className="h-4 w-4" />
+                                                </span>
+                                                <span>
+                                                    <span className="block text-[13px] font-semibold">
+                                                        {m.title}
+                                                    </span>
+                                                    <span className="block text-[11px] text-muted-foreground">
+                                                        {m.blurb}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            ) : null}
+                        </div>
+
+                        <div className="grid gap-3 lg:grid-cols-2">
+                            <HeroCluster
+                                title="Live · register"
+                                icon={Activity}
+                            >
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_all`}
+                                    label="Total items"
+                                    value={fmt(live.total)}
+                                    caption="in register"
+                                    tone="neutral"
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_allocated`}
+                                    label="Allocated"
+                                    value={fmt(live.allocated)}
+                                    caption="issued out"
+                                    tone="neutral"
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_available`}
+                                    label="Available"
+                                    value={fmt(live.available)}
+                                    caption="ready to issue"
+                                    tone="success"
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_inspection`}
+                                    label="Inspections due"
+                                    value={fmt(live.inspections_due)}
+                                    caption="next 30 days"
+                                    tone="warning"
+                                />
+                            </HeroCluster>
+                            <HeroCluster title="Needs attention" icon={Bell}>
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_inspection`}
+                                    label="Insp. overdue"
+                                    value={fmt(att.inspection_overdue)}
+                                    caption="past cadence"
+                                    tone={
+                                        att.inspection_overdue > 0
+                                            ? 'critical'
+                                            : 'success'
+                                    }
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_expiring`}
+                                    label="Expiring"
+                                    value={fmt(att.expiring)}
+                                    caption="≤60 days / expired"
+                                    tone={
+                                        att.expiring > 0 ? 'warning' : 'success'
+                                    }
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=inv_condemned`}
+                                    label="Condemned"
+                                    value={fmt(att.condemned)}
+                                    caption="awaiting disposal"
+                                    tone={
+                                        att.condemned > 0
+                                            ? 'critical'
+                                            : 'success'
+                                    }
+                                />
+                                <HeroClusterTile
+                                    href={`${PPE_URL}?tab=alloc_unack`}
+                                    label="Unacknowledged"
+                                    value={fmt(att.unacknowledged)}
+                                    caption="allocations"
+                                    tone={
+                                        att.unacknowledged > 0
+                                            ? 'warning'
+                                            : 'success'
+                                    }
+                                />
+                            </HeroCluster>
+                        </div>
+
+                        <HeroComplianceBadges items={badges} />
+                    </div>
+                </HeroShell>
+
+                <TabStrip
+                    value={tab}
+                    onChange={setTab}
+                    items={TABS}
+                    ariaLabel="PPE views"
                 />
 
-                {/* Tabs */}
-                <Tabs defaultValue="inventory">
-                    <TabsList>
-                        <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                        <TabsTrigger value="types">PPE Types</TabsTrigger>
-                        <TabsTrigger value="allocations">
-                            Allocations
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* ========== INVENTORY TAB ========== */}
-                    <TabsContent value="inventory" className="space-y-4">
-                        {/* Filters */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center justify-between text-base">
-                                    <span className="flex items-center gap-2">
-                                        <Search className="h-4 w-4" />
-                                        Filters
-                                    </span>
-                                    {can_manage && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setAddItemOpen(true)}
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Item
-                                        </Button>
-                                    )}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                                <div>
-                                    <Label className="text-xs text-muted-foreground">
-                                        Site
-                                    </Label>
-                                    <Select
-                                        value={currentFilters.site_id ?? ANY}
-                                        onValueChange={(v) =>
-                                            onFilter({
-                                                site_id: v === ANY ? null : v,
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Site" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                All Sites
-                                            </SelectItem>
-                                            {sites.map((s) => (
-                                                <SelectItem
-                                                    key={s.id}
-                                                    value={String(s.id)}
-                                                >
-                                                    {s.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground">
-                                        PPE Type
-                                    </Label>
-                                    <Select
-                                        value={
-                                            currentFilters.ppe_type_id ?? ANY
-                                        }
-                                        onValueChange={(v) =>
-                                            onFilter({
-                                                ppe_type_id:
-                                                    v === ANY ? null : v,
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                All Types
-                                            </SelectItem>
-                                            {types.map((t) => (
-                                                <SelectItem
-                                                    key={t.id}
-                                                    value={String(t.id)}
-                                                >
-                                                    {t.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground">
-                                        Condition
-                                    </Label>
-                                    <Select
-                                        value={currentFilters.condition ?? ANY}
-                                        onValueChange={(v) =>
-                                            onFilter({
-                                                condition: v === ANY ? null : v,
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Condition" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                Any
-                                            </SelectItem>
-                                            {[
-                                                'new',
-                                                'good',
-                                                'fair',
-                                                'poor',
-                                                'condemned',
-                                            ].map((c) => (
-                                                <SelectItem key={c} value={c}>
-                                                    {c.charAt(0).toUpperCase() +
-                                                        c.slice(1)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-muted-foreground">
-                                        Status
-                                    </Label>
-                                    <Select
-                                        value={currentFilters.status ?? ANY}
-                                        onValueChange={(v) =>
-                                            onFilter({
-                                                status: v === ANY ? null : v,
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                Any
-                                            </SelectItem>
-                                            {[
-                                                'available',
-                                                'allocated',
-                                                'in_repair',
-                                                'condemned',
-                                                'retired',
-                                            ].map((s) => (
-                                                <SelectItem key={s} value={s}>
-                                                    {s.replace(/_/g, ' ')}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Inventory Table */}
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-xs text-muted-foreground">
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Type
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Brand / Model
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Serial #
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Site
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Location
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Condition
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Status
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Next Inspection
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {inventory.data.map((item) => (
-                                                <tr
-                                                    key={item.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="py-2.5 pr-4 font-medium">
-                                                        {item.ppe_type?.name ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 text-xs">
-                                                        {[
-                                                            item.brand,
-                                                            item.model,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(' ') || '-'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 font-mono text-xs">
-                                                        {item.serial_number ??
-                                                            '-'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 text-xs">
-                                                        {item.site?.name ?? '-'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 text-xs">
-                                                        {item.location ?? '-'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4">
-                                                        <Badge
-                                                            className={conditionColor(
-                                                                item.condition,
-                                                            )}
-                                                        >
-                                                            {item.condition}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="py-2.5 pr-4">
-                                                        <Badge
-                                                            className={statusColor(
-                                                                item.status,
-                                                            )}
-                                                        >
-                                                            {item.status.replace(
-                                                                /_/g,
-                                                                ' ',
-                                                            )}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 text-xs">
-                                                        {item.next_inspection_due ? (
-                                                            <span
-                                                                className={
-                                                                    new Date(
-                                                                        item.next_inspection_due,
-                                                                    ) <
-                                                                    new Date()
-                                                                        ? 'font-medium text-status-critical'
-                                                                        : ''
-                                                                }
-                                                            >
-                                                                {fmtDate(
-                                                                    item.next_inspection_due,
-                                                                )}
-                                                            </span>
-                                                        ) : (
-                                                            '-'
-                                                        )}
-                                                    </td>
-                                                    <td className="py-2.5">
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {can_manage &&
-                                                                item.status ===
-                                                                    'available' && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="h-7 text-xs"
-                                                                        onClick={() => {
-                                                                            setAllocateItemId(
-                                                                                item.id,
-                                                                            );
-                                                                            setAllocateOpen(
-                                                                                true,
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Allocate
-                                                                    </Button>
-                                                                )}
-                                                            {can_manage &&
-                                                                item.status !==
-                                                                    'condemned' &&
-                                                                item.status !==
-                                                                    'retired' && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="h-7 text-xs"
-                                                                        onClick={() => {
-                                                                            setInspectItemId(
-                                                                                item.id,
-                                                                            );
-                                                                            setInspectOpen(
-                                                                                true,
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Inspect
-                                                                    </Button>
-                                                                )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {!inventory.data.length && (
-                                        <div className="py-6 text-center text-sm text-muted-foreground">
-                                            No PPE inventory items found.
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Inventory Pagination */}
-                        {inventory?.links?.length ? (
-                            <div className="flex flex-wrap gap-2">
-                                {inventory.links.map((l) => (
-                                    <Button
-                                        type="button"
-                                        key={l.label}
-                                        disabled={!l.url}
-                                        variant={
-                                            l.active ? 'secondary' : 'outline'
-                                        }
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() =>
-                                            l.url &&
-                                            router.get(
-                                                l.url,
-                                                {},
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            )
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: l.label,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        ) : null}
-                    </TabsContent>
-
-                    {/* ========== PPE TYPES TAB ========== */}
-                    <TabsContent value="types" className="space-y-4">
-                        {can_manage && (
-                            <div className="flex justify-end">
-                                <Button
-                                    size="sm"
-                                    onClick={() => setAddTypeOpen(true)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Type
-                                </Button>
-                            </div>
-                        )}
-
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {types.map((t) => (
-                                <Card key={t.id}>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center justify-between text-sm">
-                                            <span className="font-semibold">
-                                                {t.name}
-                                            </span>
-                                            <Badge
-                                                className={categoryColor(
-                                                    t.category,
-                                                )}
-                                            >
-                                                {t.category.replace(/_/g, ' ')}
-                                            </Badge>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2 text-xs text-muted-foreground">
-                                        {t.description && (
-                                            <p>{t.description}</p>
-                                        )}
-                                        {t.hazards_addressed && (
-                                            <div>
-                                                <span className="font-medium text-foreground">
-                                                    Hazards:{' '}
-                                                </span>
-                                                {t.hazards_addressed}
-                                            </div>
-                                        )}
-                                        {t.standards_reference && (
-                                            <div>
-                                                <span className="font-medium text-foreground">
-                                                    Standards:{' '}
-                                                </span>
-                                                {t.standards_reference}
-                                            </div>
-                                        )}
-                                        {t.inspection_frequency && (
-                                            <div>
-                                                <span className="font-medium text-foreground">
-                                                    Inspection:{' '}
-                                                </span>
-                                                {t.inspection_frequency.replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </div>
-                                        )}
-                                        {t.typical_lifespan_months && (
-                                            <div>
-                                                <span className="font-medium text-foreground">
-                                                    Lifespan:{' '}
-                                                </span>
-                                                {t.typical_lifespan_months}{' '}
-                                                months
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ))}
-                            {!types.length && (
-                                <div className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                                    No PPE types defined yet.
-                                </div>
-                            )}
+                <Card>
+                    <CardContent className="p-0">
+                        <RegisterTableHeader
+                            icon={tableMeta.icon}
+                            title={tableMeta.title}
+                            subtitle={tableMeta.sub}
+                            hint={tableMeta.hint}
+                            hintIcon={MousePointer2}
+                        />
+                        <div className="overflow-x-auto">
+                            {rowsKind === 'inventory' ? (
+                                <InventoryTable
+                                    rows={inventory.data}
+                                    onOpen={openItem}
+                                    onCtx={invCtx}
+                                />
+                            ) : null}
+                            {rowsKind === 'allocations' ? (
+                                <AllocationTable
+                                    rows={allocations.data}
+                                    onOpen={openAllocation}
+                                    onCtx={allocCtx}
+                                />
+                            ) : null}
+                            {rowsKind === 'types' ? (
+                                <TypeTable
+                                    rows={types}
+                                    onEdit={(r) =>
+                                        can.manage &&
+                                        setModal({ kind: 'type', edit: r })
+                                    }
+                                    onCtx={typeCtx}
+                                />
+                            ) : null}
                         </div>
-                    </TabsContent>
+                    </CardContent>
+                </Card>
 
-                    {/* ========== ALLOCATIONS TAB ========== */}
-                    <TabsContent value="allocations" className="space-y-4">
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-xs text-muted-foreground">
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Worker
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    PPE Type
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Item
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Allocated
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Fit Test
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Training
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Acknowledged
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(allocations?.data ?? []).map(
-                                                (a) => (
-                                                    <tr
-                                                        key={a.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2.5 pr-4 font-medium">
-                                                            {a.user?.name ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-xs">
-                                                            {a.ppe_type_name ??
-                                                                a.inventory_item
-                                                                    ?.ppe_type
-                                                                    ?.name ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 font-mono text-xs">
-                                                            {a.inventory_item
-                                                                ?.serial_number ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-xs">
-                                                            {fmtDate(
-                                                                a.allocated_date,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {a.fit_test_completed ? (
-                                                                <CheckCircle2 className="h-4 w-4 text-status-success" />
-                                                            ) : (
-                                                                <XCircle className="h-4 w-4 text-status-critical" />
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {a.training_completed ? (
-                                                                <CheckCircle2 className="h-4 w-4 text-status-success" />
-                                                            ) : (
-                                                                <XCircle className="h-4 w-4 text-status-critical" />
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4">
-                                                            {a.acknowledged ? (
-                                                                <Badge className="bg-status-success-bg text-status-success">
-                                                                    Yes
-                                                                </Badge>
-                                                            ) : (
-                                                                <Badge className="bg-muted text-muted-foreground">
-                                                                    No
-                                                                </Badge>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                            {can_manage &&
-                                                                !a.returned_at && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="h-7 text-xs"
-                                                                        onClick={() =>
-                                                                            submitReturn(
-                                                                                a.id,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <RotateCcw className="mr-1 h-3 w-3" />
-                                                                        Return
-                                                                    </Button>
-                                                                )}
-                                                            {a.returned_at && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    Returned{' '}
-                                                                    {fmtDate(
-                                                                        a.returned_at,
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ),
-                                            )}
-                                        </tbody>
-                                    </table>
-                                    {!(allocations?.data ?? []).length && (
-                                        <div className="py-6 text-center text-sm text-muted-foreground">
-                                            No PPE allocations found.
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Allocations Pagination */}
-                        {allocations?.links?.length ? (
-                            <div className="flex flex-wrap gap-2">
-                                {allocations.links.map((l) => (
-                                    <Button
-                                        type="button"
-                                        key={l.label}
-                                        disabled={!l.url}
-                                        variant={
-                                            l.active ? 'secondary' : 'outline'
-                                        }
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() =>
-                                            l.url &&
-                                            router.get(
-                                                l.url,
-                                                {},
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            )
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: l.label,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        ) : null}
-                    </TabsContent>
-                </Tabs>
+                {rowsKind === 'inventory' && inventory.last_page > 1 ? (
+                    <LaravelPagination links={inventory.links} />
+                ) : null}
+                {rowsKind === 'allocations' && allocations.last_page > 1 ? (
+                    <LaravelPagination links={allocations.links} />
+                ) : null}
             </div>
 
-            {/* ============================================================ */}
-            {/*  Dialogs                                                      */}
-            {/* ============================================================ */}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
+            {detail ? (
+                <PpeDetailDialog
+                    detail={detail}
+                    canManage={can.manage}
+                    onClose={closeDetail}
+                    onAction={onDetailAction}
+                />
+            ) : null}
 
-            {/* Add Item Dialog */}
-            <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Add PPE Item</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>PPE Type</Label>
-                                <Select
-                                    value={addItemForm.data.ppe_type_id}
-                                    onValueChange={(v) =>
-                                        addItemForm.setData('ppe_type_id', v)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {types.map((t) => (
-                                            <SelectItem
-                                                key={t.id}
-                                                value={String(t.id)}
-                                            >
-                                                {t.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {addItemForm.errors.ppe_type_id && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {addItemForm.errors.ppe_type_id}
-                                    </p>
-                                )}
-                            </div>
-                            <div>
-                                <Label>Site</Label>
-                                <Select
-                                    value={addItemForm.data.site_id}
-                                    onValueChange={(v) =>
-                                        addItemForm.setData('site_id', v)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select site" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {sites.map((s) => (
-                                            <SelectItem
-                                                key={s.id}
-                                                value={String(s.id)}
-                                            >
-                                                {s.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {addItemForm.errors.site_id && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {addItemForm.errors.site_id}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Brand</Label>
-                                <Input
-                                    value={addItemForm.data.brand}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'brand',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g. 3M"
-                                />
-                            </div>
-                            <div>
-                                <Label>Model</Label>
-                                <Input
-                                    value={addItemForm.data.model}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'model',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g. SecureFit 400"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Serial Number</Label>
-                                <Input
-                                    value={addItemForm.data.serial_number}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'serial_number',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label>Quantity</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={addItemForm.data.quantity}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'quantity',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Purchase Date</Label>
-                                <Input
-                                    type="date"
-                                    value={addItemForm.data.purchase_date}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'purchase_date',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label>Expiry Date</Label>
-                                <Input
-                                    type="date"
-                                    value={addItemForm.data.expiry_date}
-                                    onChange={(e) =>
-                                        addItemForm.setData(
-                                            'expiry_date',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label>Storage Location</Label>
-                            <Input
-                                value={addItemForm.data.location}
-                                onChange={(e) =>
-                                    addItemForm.setData(
-                                        'location',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="e.g. Main store room, Shelf B3"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setAddItemOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitAddItem}
-                            disabled={addItemForm.processing}
-                        >
-                            Add Item
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Add PPE Type Dialog */}
-            <Dialog open={addTypeOpen} onOpenChange={setAddTypeOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Add PPE Type</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Name</Label>
-                                <Input
-                                    value={addTypeForm.data.name}
-                                    onChange={(e) =>
-                                        addTypeForm.setData(
-                                            'name',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g. Safety Glasses"
-                                />
-                                {addTypeForm.errors.name && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {addTypeForm.errors.name}
-                                    </p>
-                                )}
-                            </div>
-                            <div>
-                                <Label>Category</Label>
-                                <Select
-                                    value={addTypeForm.data.category}
-                                    onValueChange={(v) =>
-                                        addTypeForm.setData('category', v)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[
-                                            'head',
-                                            'eye',
-                                            'ear',
-                                            'respiratory',
-                                            'hand',
-                                            'foot',
-                                            'body',
-                                            'fall_protection',
-                                            'high_visibility',
-                                            'other',
-                                        ].map((c) => (
-                                            <SelectItem key={c} value={c}>
-                                                {c.replace(/_/g, ' ')}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {addTypeForm.errors.category && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {addTypeForm.errors.category}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label>Description</Label>
-                            <Textarea
-                                value={addTypeForm.data.description}
-                                onChange={(e) =>
-                                    addTypeForm.setData(
-                                        'description',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Describe the PPE type"
-                                rows={2}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Hazards Addressed</Label>
-                            <Textarea
-                                value={addTypeForm.data.hazards_addressed}
-                                onChange={(e) =>
-                                    addTypeForm.setData(
-                                        'hazards_addressed',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="e.g. Chemical splash, impact hazards"
-                                rows={2}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Standards Reference</Label>
-                            <Input
-                                value={addTypeForm.data.standards_reference}
-                                onChange={(e) =>
-                                    addTypeForm.setData(
-                                        'standards_reference',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="e.g. AS/NZS 1337.1:2010"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Inspection Frequency</Label>
-                                <Select
-                                    value={
-                                        addTypeForm.data.inspection_frequency
-                                    }
-                                    onValueChange={(v) =>
-                                        addTypeForm.setData(
-                                            'inspection_frequency',
-                                            v,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select frequency" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[
-                                            'before_each_use',
-                                            'weekly',
-                                            'monthly',
-                                            'quarterly',
-                                            'six_monthly',
-                                            'annually',
-                                        ].map((f) => (
-                                            <SelectItem key={f} value={f}>
-                                                {f.replace(/_/g, ' ')}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Typical Lifespan (months)</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={
-                                        addTypeForm.data.typical_lifespan_months
-                                    }
-                                    onChange={(e) =>
-                                        addTypeForm.setData(
-                                            'typical_lifespan_months',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="e.g. 24"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setAddTypeOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitAddType}
-                            disabled={addTypeForm.processing}
-                        >
-                            Add Type
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Allocate Dialog */}
-            <Dialog open={allocateOpen} onOpenChange={setAllocateOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Allocate PPE</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div>
-                            <Label>Worker</Label>
-                            <Select
-                                value={allocateForm.data.user_id}
-                                onValueChange={(v) =>
-                                    allocateForm.setData('user_id', v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select staff member" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {staff.map((s) => (
-                                        <SelectItem
-                                            key={s.id}
-                                            value={String(s.id)}
-                                        >
-                                            {s.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {allocateForm.errors.user_id && (
-                                <p className="mt-1 text-xs text-status-critical">
-                                    {allocateForm.errors.user_id}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="space-y-3 rounded-lg border p-3">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="fit_test"
-                                    checked={
-                                        allocateForm.data.fit_test_completed
-                                    }
-                                    onCheckedChange={(checked) =>
-                                        allocateForm.setData(
-                                            'fit_test_completed',
-                                            checked === true,
-                                        )
-                                    }
-                                />
-                                <Label
-                                    htmlFor="fit_test"
-                                    className="text-sm font-normal"
-                                >
-                                    Fit test completed
-                                </Label>
-                            </div>
-                            {allocateForm.data.fit_test_completed && (
-                                <div className="grid grid-cols-2 gap-3 pl-6">
-                                    <div>
-                                        <Label className="text-xs">
-                                            Fit Test Date
-                                        </Label>
-                                        <Input
-                                            type="date"
-                                            value={
-                                                allocateForm.data.fit_test_date
-                                            }
-                                            onChange={(e) =>
-                                                allocateForm.setData(
-                                                    'fit_test_date',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">
-                                            Result
-                                        </Label>
-                                        <Select
-                                            value={
-                                                allocateForm.data
-                                                    .fit_test_result
-                                            }
-                                            onValueChange={(v) =>
-                                                allocateForm.setData(
-                                                    'fit_test_result',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Result" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="pass">
-                                                    Pass
-                                                </SelectItem>
-                                                <SelectItem value="fail">
-                                                    Fail
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-3 rounded-lg border p-3">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="training"
-                                    checked={
-                                        allocateForm.data.training_completed
-                                    }
-                                    onCheckedChange={(checked) =>
-                                        allocateForm.setData(
-                                            'training_completed',
-                                            checked === true,
-                                        )
-                                    }
-                                />
-                                <Label
-                                    htmlFor="training"
-                                    className="text-sm font-normal"
-                                >
-                                    Training completed
-                                </Label>
-                            </div>
-                            {allocateForm.data.training_completed && (
-                                <div className="pl-6">
-                                    <Label className="text-xs">
-                                        Training Date
-                                    </Label>
-                                    <Input
-                                        type="date"
-                                        value={allocateForm.data.training_date}
-                                        onChange={(e) =>
-                                            allocateForm.setData(
-                                                'training_date',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setAllocateOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitAllocate}
-                            disabled={allocateForm.processing}
-                        >
-                            <ShieldCheck className="mr-1.5 h-4 w-4" />
-                            Allocate
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Inspection Dialog */}
-            <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>PPE Inspection</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div>
-                            <Label>Result</Label>
-                            <Select
-                                value={inspectForm.data.result}
-                                onValueChange={(v) =>
-                                    inspectForm.setData('result', v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select result" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="pass">Pass</SelectItem>
-                                    <SelectItem value="fail">Fail</SelectItem>
-                                    <SelectItem value="needs_repair">
-                                        Needs Repair
-                                    </SelectItem>
-                                    <SelectItem value="condemned">
-                                        Condemned
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {inspectForm.errors.result && (
-                                <p className="mt-1 text-xs text-status-critical">
-                                    {inspectForm.errors.result}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <Label>Condition After Inspection</Label>
-                            <Select
-                                value={inspectForm.data.condition_after}
-                                onValueChange={(v) =>
-                                    inspectForm.setData('condition_after', v)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select condition" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[
-                                        'new',
-                                        'good',
-                                        'fair',
-                                        'poor',
-                                        'condemned',
-                                    ].map((c) => (
-                                        <SelectItem key={c} value={c}>
-                                            {c.charAt(0).toUpperCase() +
-                                                c.slice(1)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label>Findings</Label>
-                            <Textarea
-                                value={inspectForm.data.findings}
-                                onChange={(e) =>
-                                    inspectForm.setData(
-                                        'findings',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Describe any issues or observations"
-                                rows={3}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Action Taken</Label>
-                            <Textarea
-                                value={inspectForm.data.action_taken}
-                                onChange={(e) =>
-                                    inspectForm.setData(
-                                        'action_taken',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Describe any corrective actions"
-                                rows={2}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Next Inspection Due</Label>
-                            <Input
-                                type="date"
-                                value={inspectForm.data.next_inspection_due}
-                                onChange={(e) =>
-                                    inspectForm.setData(
-                                        'next_inspection_due',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setInspectOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitInspection}
-                            disabled={inspectForm.processing}
-                        >
-                            <ClipboardCheck className="mr-1.5 h-4 w-4" />
-                            Save Inspection
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {modal?.kind === 'inventory' ? (
+                <InventoryDialog
+                    open
+                    onClose={closeModal}
+                    types={types}
+                    sites={sites}
+                    edit={modal.edit}
+                    lockedTypeId={modal.lockedTypeId}
+                />
+            ) : null}
+            {modal?.kind === 'allocate' ? (
+                <AllocateDialog
+                    open
+                    onClose={closeModal}
+                    staff={staff}
+                    allocatable={allocatable}
+                    lockedItem={modal.lockedItem}
+                />
+            ) : null}
+            {modal?.kind === 'type' ? (
+                <TypeDialog open onClose={closeModal} edit={modal.edit} />
+            ) : null}
+            {modal?.kind === 'return' ? (
+                <ReturnDialog
+                    open
+                    onClose={closeModal}
+                    allocationId={modal.allocationId}
+                    worker={modal.worker}
+                    itemLabel={modal.itemLabel}
+                />
+            ) : null}
+            {modal?.kind === 'inspect' ? (
+                <InspectionDialog
+                    open
+                    onClose={closeModal}
+                    inventoryId={modal.inventoryId}
+                    itemLabel={modal.itemLabel}
+                />
+            ) : null}
+            {modal?.kind === 'condemn' ? (
+                <CondemnDialog
+                    open
+                    onClose={closeModal}
+                    inventoryId={modal.inventoryId}
+                    itemLabel={modal.itemLabel}
+                />
+            ) : null}
+            {modal?.kind === 'dispose' ? (
+                <DisposeDialog
+                    open
+                    onClose={closeModal}
+                    inventoryId={modal.inventoryId}
+                    itemLabel={modal.itemLabel}
+                />
+            ) : null}
         </AppLayout>
     );
 }
