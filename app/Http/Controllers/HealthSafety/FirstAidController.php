@@ -23,6 +23,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * First Aid Register — H&S gold-standard controller (docs/first-aid-redesign).
@@ -71,12 +72,60 @@ class FirstAidController extends Controller
             // of this prop.
             'firstAiders' => $can['create'] ? fn () => $this->firstAiderPool() : [],
             'clients' => $can['create'] ? fn () => $this->clientOptions() : [],
+            'staff' => $can['create'] ? fn () => $this->staffOptions() : [],
             'incidents' => $can['create'] ? fn () => $this->incidentOptions() : [],
             'can' => $can,
             'detail' => fn () => $recordId ? $this->buildDetailPayload($recordId, $request) : null,
             // Drives the wizard auto-open when arriving from the command-centre launcher.
             'report' => $request->boolean('report'),
         ]);
+    }
+
+    /** Export the filtered register to CSV — honours the same scope/period/tab as index(). */
+    public function export(Request $request): StreamedResponse
+    {
+        abort_unless((bool) $request->user()?->canDo('hazards.view'), 403);
+
+        $filters = $this->filters($request);
+        $tab = $request->string('tab')->toString() ?: 'all';
+        $query = $this->applyTab($this->applyPeriod($this->scopedQuery($request), $filters['period']), $tab)
+            ->with(['site:id,name', 'firstAider:id,name'])
+            ->orderByDesc('treatment_date')
+            ->orderByDesc('id'); // stable tiebreaker so chunk() can't skip/dup rows sharing a timestamp
+
+        $filename = 'first-aid-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Reference', 'Treated', 'Person type', 'Site', 'Treatment date', 'Injury / illness', 'Body part', 'Treatment given', 'Outcome', 'Ambulance', 'First-aider', 'Linked incident']);
+            $query->chunk(200, function ($rows) use ($out) {
+                foreach ($rows as $r) {
+                    fputcsv($out, [
+                        $this->reference($r->id),
+                        $this->csvCell($r->treated_person_name),
+                        $r->treated_person_type,
+                        $this->csvCell($r->site?->name),
+                        optional($r->treatment_date)->format('Y-m-d H:i'),
+                        str_replace('_', ' ', (string) $r->injury_illness_type),
+                        $this->csvCell($r->body_part),
+                        $this->csvCell($r->treatment_given),
+                        str_replace('_', ' ', (string) $r->treatment_outcome),
+                        $r->ambulance_called ? 'Yes' : 'No',
+                        $this->csvCell($r->firstAider?->name),
+                        $r->related_incident_id ? 'INC-'.str_pad((string) $r->related_incident_id, 4, '0', STR_PAD_LEFT) : '',
+                    ]);
+                }
+            });
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** Neutralise spreadsheet formula injection (=,+,-,@,tab,CR prefixes) in a free-text CSV cell. */
+    private function csvCell(?string $value): string
+    {
+        $v = (string) $value;
+
+        return $v !== '' && in_array($v[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$v : $v;
     }
 
     /* ================================================================== */
@@ -186,10 +235,14 @@ class FirstAidController extends Controller
             'description' => $record->injury_illness_description,
             'occurred_at' => $record->treatment_date,
             'reported_by' => $request->user()->id,
-            'severity' => $record->ambulance_called ? 'high' : 'medium',
+            'severity' => ($record->ambulance_called || $record->treatment_outcome === self::REPORTABLE_OUTCOME) ? 'high' : 'medium',
             'status' => 'submitted',
             'submitted_at' => now(),
             'type' => 'first_aid',
+            // Hospital admission (sent_to_hospital) is WorkSafe-notifiable (HSWA s.23); ambulance-only
+            // (assessed, not admitted) is NOT — matching FirstAidObserver so the linked and unlinked
+            // escalation paths return the same verdict for the same treatment.
+            'is_notifiable' => $record->treatment_outcome === self::REPORTABLE_OUTCOME,
         ]);
 
         $record->update([
@@ -248,7 +301,7 @@ class FirstAidController extends Controller
         abort_unless($this->userCanManage($request), 403);
 
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:20480'], // 20 MB
+            'file' => ['required', 'file', 'max:20480', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx'], // 20 MB; ACC45/photos/notes only
             'kind' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'alt_text' => ['nullable', 'string', 'max:255'],
@@ -647,6 +700,20 @@ class FirstAidController extends Controller
     }
 
     /**
+     * General staff list for the "treated staff" picker — links treated_person_id → users.id.
+     * Real staff only (excludes client/next_of_kin), unlike firstAiderPool (is_first_aider).
+     *
+     * @return array<int, array{id:int,name:string}>
+     */
+    private function staffOptions(): array
+    {
+        return User::query()->staff()->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
+            ->values()->all();
+    }
+
+    /**
      * Recent incidents for the "link to incident" picker.
      *
      * @return array<int, array{id:int,reference:string,label:string}>
@@ -717,6 +784,7 @@ class FirstAidController extends Controller
             'sites' => [],
             'firstAiders' => [],
             'clients' => [],
+            'staff' => [],
             'incidents' => [],
             'can' => $this->canBlock($request),
             'detail' => null,

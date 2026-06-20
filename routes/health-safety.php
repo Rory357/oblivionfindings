@@ -99,6 +99,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [FirstAidController::class, 'index'])->name('index');
             // Static sub-routes before the {record} wildcard so they aren't swallowed.
+            Route::get('/export', [FirstAidController::class, 'export'])->name('export');
             Route::get('/{record}/attachments/{attachment}/download', [FirstAidController::class, 'downloadAttachment'])->name('attachments.download');
             Route::get('/{record}', [FirstAidController::class, 'show'])->name('show');
         });

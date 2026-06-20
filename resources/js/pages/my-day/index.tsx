@@ -5,6 +5,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     FileText,
+    HeartPulse,
     Home,
     Pill,
     ShieldAlert,
@@ -52,6 +53,7 @@ import {
 import type {
     MyDayActiveRound,
     MyDayActiveSite,
+    MyDayFirstAidFollowup,
     MyDayHandover,
     MyDayHrTask,
     MyDayLoneWorkerSession,
@@ -838,6 +840,12 @@ export default function MyDay() {
                         />
                     ) : null}
 
+                    {props.first_aid_followups?.length ? (
+                        <FirstAidFollowupsCard
+                            followups={props.first_aid_followups}
+                        />
+                    ) : null}
+
                     {activeRound ? (
                         <ActiveRoundBanner round={activeRound} />
                     ) : null}
@@ -1219,6 +1227,93 @@ function LoneWorkerCheckInCard({
                     <AlertTriangle className="h-4 w-4" />I need help
                 </Button>
             </div>
+        </section>
+    );
+}
+
+/**
+ * Read-only "First-aid follow-ups assigned to me" card (the cross-module half
+ * of the First Aid Register redesign). Lists the signed-in worker's open
+ * follow-ups — re-check a wound, lodge the ACC45, call whānau — each row a
+ * one-tap deep-link into the register's record modal. No write affordances
+ * live here; completing a follow-up happens on the record itself.
+ */
+function FirstAidFollowupsCard({
+    followups,
+}: {
+    followups: MyDayFirstAidFollowup[];
+}) {
+    const overdueCount = followups.filter((f) => f.is_overdue).length;
+
+    return (
+        <section
+            aria-label="First-aid follow-ups assigned to me"
+            className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-4"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
+                    <HeartPulse className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-status-warning">
+                        First-aid follow-ups
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {overdueCount > 0
+                            ? `${overdueCount} overdue · ${followups.length} assigned to you`
+                            : `${followups.length} assigned to you`}
+                    </p>
+                </div>
+            </div>
+
+            <ul className="mt-3 space-y-2">
+                {followups.map((item) => (
+                    <li key={item.id}>
+                        {/* eslint-disable-next-line no-restricted-syntax -- custom card-row selector (tone-by-overdue), not a shadcn Button */}
+                        <button
+                            type="button"
+                            onClick={() => router.visit(item.url)}
+                            className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+                                item.is_overdue
+                                    ? 'border-status-critical/30 bg-status-critical-bg hover:bg-status-critical-bg/70'
+                                    : 'border-border bg-card hover:bg-muted'
+                            }`}
+                        >
+                            <span className="line-clamp-2 text-xs font-medium text-foreground">
+                                {item.notes || 'Follow-up required'}
+                            </span>
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                                {item.treated_person_name ? (
+                                    <span className="truncate">
+                                        {item.treated_person_name}
+                                    </span>
+                                ) : null}
+                                {item.site_name ? (
+                                    <span className="flex items-center gap-1">
+                                        <Home className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">
+                                            {item.site_name}
+                                        </span>
+                                    </span>
+                                ) : null}
+                                {item.due_at ? (
+                                    <span
+                                        className={`flex items-center gap-1 ${
+                                            item.is_overdue
+                                                ? 'font-medium text-status-critical'
+                                                : ''
+                                        }`}
+                                    >
+                                        <Calendar className="h-3 w-3 shrink-0" />
+                                        {item.is_overdue ? 'Overdue · ' : 'Due '}
+                                        {formatRelative(item.due_at)}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
         </section>
     );
 }

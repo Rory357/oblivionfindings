@@ -63,6 +63,7 @@ import {
     FolderOpen,
     Fuel,
     GraduationCap,
+    HeartPulse,
     Home,
     KeyRound,
     Layers,
@@ -1180,6 +1181,17 @@ export default function SiteShow({
         },
         { value: 'checklists', label: 'Checklists', icon: ClipboardCheck },
         { value: 'hazards', label: 'Hazards', icon: ShieldAlert },
+        {
+            value: 'first_aid',
+            label: 'First Aid',
+            icon: HeartPulse,
+            badge:
+                (page.props.firstAidOpenFollowupCount ?? 0) > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {page.props.firstAidOpenFollowupCount}
+                    </Badge>
+                ) : undefined,
+        },
         {
             value: 'risk_assessments',
             label: 'Risk Assessments',
@@ -2354,6 +2366,113 @@ export default function SiteShow({
                                 </Card>
                             );
                         })()}
+                    </TabsContent>
+
+                    <TabsContent value="first_aid">
+                        {page.props.can?.view_hs_first_aid ? (
+                            (() => {
+                                const records = (page.props.firstAidRecords ?? []) as Array<{
+                                    id: number;
+                                    treatment_date: string | null;
+                                    treated_person_name: string | null;
+                                    treated_person_type: string | null;
+                                    injury_illness_type: string | null;
+                                    treatment_outcome: string | null;
+                                    ambulance_called: boolean;
+                                    incident_reported: boolean;
+                                    first_aider_name: string | null;
+                                    related_incident_id: number | null;
+                                    open_followups_count: number;
+                                }>;
+                                const openFollowups = (page.props.firstAidOpenFollowupCount ?? 0) as number;
+                                const humanise = (value: string | null) =>
+                                    value
+                                        ? value
+                                              .replace(/_/g, ' ')
+                                              .replace(/^\w/, (c) => c.toUpperCase())
+                                        : '—';
+                                return (
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                                            <div className="flex items-start gap-3">
+                                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                                    <HeartPulse className="h-5 w-5" />
+                                                </span>
+                                                <div>
+                                                    <CardTitle className="text-base">
+                                                        First aid at this home{' '}
+                                                        <span className="font-normal text-muted-foreground">
+                                                            · {records.length} {records.length === 1 ? 'record' : 'records'} · {openFollowups} open {openFollowups === 1 ? 'follow-up' : 'follow-ups'}
+                                                        </span>
+                                                    </CardTitle>
+                                                    <p className="mt-0.5 text-sm text-muted-foreground">Latest treatments logged for {site.name}. Click any row to open it in the register.</p>
+                                                </div>
+                                            </div>
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/health-safety/first-aid?site_id=${site.id}`}>
+                                                    <ExternalLink className="mr-1.5 h-4 w-4" /> View all
+                                                </Link>
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {records.length === 0 ? (
+                                                <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+                                                    <HeartPulse className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                                                    <p className="text-sm font-medium text-muted-foreground">No first aid records for {site.name}</p>
+                                                    <p className="mt-1 text-xs text-muted-foreground/70">Treatments logged in the register will appear here.</p>
+                                                </div>
+                                            ) : (
+                                                records.map((r) => (
+                                                    <Link
+                                                        key={r.id}
+                                                        href={`/health-safety/first-aid?site_id=${site.id}&record=${r.id}`}
+                                                        className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                                    >
+                                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                                                            <HeartPulse className="h-4 w-4" />
+                                                        </span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-semibold text-foreground">
+                                                                {r.treated_person_name || 'Unknown person'}
+                                                                {r.treated_person_type ? (
+                                                                    <span className="font-normal text-muted-foreground"> · {humanise(r.treated_person_type)}</span>
+                                                                ) : null}
+                                                            </p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {r.injury_illness_type || 'Treatment'} · {humanise(r.treatment_outcome)}
+                                                                {r.treatment_date ? ` · ${formatDate(r.treatment_date)}` : ''}
+                                                            </p>
+                                                        </div>
+                                                        {r.ambulance_called ? (
+                                                            <Badge variant="outline" className="shrink-0 border-status-critical/40 text-status-critical">
+                                                                Ambulance
+                                                            </Badge>
+                                                        ) : null}
+                                                        {r.related_incident_id === null && (r.incident_reported || r.ambulance_called || r.treatment_outcome === 'sent_to_hospital') ? (
+                                                            <Badge variant="outline" className="shrink-0 border-status-warning/40 text-status-warning">
+                                                                Reportable
+                                                            </Badge>
+                                                        ) : null}
+                                                        {r.open_followups_count > 0 ? (
+                                                            <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">
+                                                                {r.open_followups_count} open
+                                                            </span>
+                                                        ) : null}
+                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                                    </Link>
+                                                ))
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()
+                        ) : (
+                            <Card>
+                                <CardContent className="py-10 text-center text-muted-foreground">
+                                    You don&apos;t have permission to view first aid records.
+                                </CardContent>
+                            </Card>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="risk_assessments">
