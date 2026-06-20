@@ -97,7 +97,225 @@ class HealthSafetyDemoSeeder extends Seeder
             $this->command->info('Governance backbone already seeded, skipping.');
         }
 
+        // ── 8. Lone Worker Safety (sessions + check-ins + legacy alerts) ──
+        if (! DB::table('lone_worker_sessions')->where('activity_description', 'like', '%' . self::DEMO_MARKER . '%')->exists()) {
+            $this->command->info('Seeding Lone Worker sessions...');
+            $this->seedLoneWorkers($userIds, $siteIds, $clientIds, $now);
+        } else {
+            $this->command->info('Lone Worker sessions already seeded, skipping.');
+        }
+
+        // ── 9. Safe Work Procedures (controlled SWMS document library) ──
+        if (! DB::table('safe_work_procedures')->where('purpose', 'like', '%'.self::DEMO_MARKER.'%')->exists()) {
+            $this->command->info('Seeding Safe Work Procedures...');
+            $this->seedSafeWorkProcedures($siteIds, $userIds, $now);
+        } else {
+            $this->command->info('Safe Work Procedures already seeded, skipping.');
+        }
+
         $this->command->info('Health & Safety demo data seeded successfully.');
+    }
+
+    /* ==================================================================
+     *  Safe Work Procedures — controlled SWMS document library demo data
+     * ================================================================*/
+
+    private function seedSafeWorkProcedures(array $siteIds, array $userIds, Carbon $now): void
+    {
+        $owner = fn () => $userIds[array_rand($userIds)];
+        $someSites = fn () => count($siteIds) > 1 ? array_slice($siteIds, 0, 2) : $siteIds;
+
+        // [reference, title, category, status, reviewOffsetDays|null, versions, roles, ppe, hazards, steps, sites?]
+        $rows = [
+            ['SWP-001', 'Safe Manual Handling & Client Transfers', 'manual_handling', 'approved', 165, 3,
+                ['support_worker', 'team_lead'], ['Gloves', 'Hoist sling', 'Slide sheet'], ['Musculoskeletal injury', 'Slips, trips & falls'],
+                [['Assess the client and the environment before any transfer.', 'Never lift more than you safely can — use the hoist.'], ['Position the hoist and check the sling rating.', 'Confirm the sling is the correct size and undamaged.'], ['Complete the transfer with a second worker where the care plan requires it.', 'Stop if the client shows distress.']]],
+            ['SWP-002', 'Responding to Behaviours of Concern (PBS)', 'challenging_behaviour', 'approved', -12, 2,
+                ['support_worker', 'team_lead'], ['None'], ['Aggression / challenging behaviour', 'Working alone'],
+                [['Use the client\'s positive behaviour support plan first.', 'Keep yourself and others at a safe distance.'], ['De-escalate using known triggers and calming strategies.', 'Do not restrain unless trained and it is a last resort.']]],
+            ['SWP-003', 'Lone & Community Working', 'lone_working', 'under_review', null, 1,
+                ['support_worker'], ['Mobile phone', 'Hi-vis vest'], ['Working alone', 'Slips, trips & falls'],
+                [['Log your visit and expected return in the lone-worker system.', 'Check in at the agreed interval.']]],
+            ['SWP-004', 'Medication Administration & eMAR', 'medication', 'approved', 20, 2,
+                ['support_worker', 'team_lead'], ['Gloves'], ['Medication error'],
+                [['Confirm the six rights before administering.', 'Witness controlled drugs with a second signatory.'], ['Record administration on the eMAR immediately.', 'Report any error or omission without delay.']]],
+            ['SWP-005', 'Infection Prevention & Control', 'infection_control', 'approved', 240, 1,
+                ['support_worker'], ['Gloves', 'Apron', 'Face mask'], ['Exposure to bodily fluids'],
+                [['Perform hand hygiene before and after every contact.', 'Use PPE appropriate to the task.'], ['Dispose of clinical waste in the correct stream.', null]]],
+            ['SWP-006', 'Fire Evacuation & Assembly', 'fire_safety', 'approved', 300, 1,
+                ['support_worker', 'team_lead'], ['None'], ['Burns / scalds'],
+                [['On discovering a fire, raise the alarm and call 111.', 'Do not tackle the fire unless it is safe to do so.'], ['Evacuate clients via the nearest safe exit to the assembly point.', 'Account for everyone and report to the warden.']]],
+            ['SWP-007', 'Epilepsy & Seizure Response', 'emergency_procedures', 'draft', null, 1,
+                ['support_worker'], ['Gloves'], ['Slips, trips & falls'],
+                [['Protect the person from injury and time the seizure.', 'Do not put anything in their mouth.'], ['Administer rescue medication only as prescribed.', 'Call 111 if the seizure lasts longer than 5 minutes.']]],
+            ['SWP-008', 'Hoist & Mobility Equipment Use', 'equipment_use', 'approved', 90, 1,
+                ['support_worker', 'team_lead'], ['Hoist sling'], ['Musculoskeletal injury'],
+                [['Inspect the hoist and sling before every use.', 'Check the LOLER inspection is in date.'], ['Operate within the safe working load.', null]]],
+            ['SWP-009', 'Personal & Intimate Care', 'personal_care', 'draft', null, 1,
+                ['support_worker'], ['Gloves', 'Apron'], ['Exposure to bodily fluids'],
+                [['Maintain the client\'s dignity and consent throughout.', 'Follow the personal care plan.']]],
+        ];
+
+        foreach ($rows as $r) {
+            [$ref, $title, $category, $status, $reviewOffset, $versionCount, $roles, $ppe, $hazards, $stepPairs] = $r;
+            $approved = $status === 'approved';
+            $ownerId = $owner();
+            $steps = [];
+            foreach ($stepPairs as $i => $pair) {
+                $steps[] = ['step_number' => $i + 1, 'description' => $pair[0], 'safety_notes' => $pair[1] ?? ''];
+            }
+
+            $procedureId = DB::table('safe_work_procedures')->insertGetId([
+                'title' => $title,
+                'reference_number' => $ref,
+                'category' => $category,
+                'purpose' => 'Keep workers and clients safe during '.strtolower($title).'. '.self::DEMO_MARKER,
+                'scope' => 'All supported-living settings where this activity is carried out.',
+                'hazards_addressed' => json_encode($hazards),
+                'ppe_required' => json_encode($ppe),
+                'steps' => json_encode($steps),
+                'emergency_procedures' => json_encode(['Call 111 for any life-threatening emergency.', 'Notify the on-call coordinator and record an incident.']),
+                'status' => $status,
+                'current_version' => $versionCount,
+                'approved_by' => $approved ? $owner() : null,
+                'approved_at' => $approved ? $now->copy()->subDays(30) : null,
+                'owner_id' => $ownerId,
+                'review_date' => $reviewOffset !== null ? $now->copy()->addDays($reviewOffset)->toDateString() : null,
+                'review_frequency_months' => 12,
+                'applicable_roles' => json_encode($roles),
+                'applicable_sites' => json_encode($someSites()),
+                'related_training' => json_encode([]),
+                'created_by' => $ownerId,
+                'updated_by' => $ownerId,
+                'created_at' => $now->copy()->subDays(120),
+                'updated_at' => $now,
+            ]);
+
+            for ($v = 1; $v <= $versionCount; $v++) {
+                DB::table('safe_work_procedure_versions')->insert([
+                    'safe_work_procedure_id' => $procedureId,
+                    'version_number' => $v,
+                    'content_snapshot' => json_encode(['title' => $title, 'version' => $v]),
+                    'change_summary' => $v === 1 ? 'Initial version' : 'Reviewed and updated for v'.$v.'.',
+                    'changed_by' => $ownerId,
+                    'created_at' => $now->copy()->subDays(120 - $v * 20),
+                    'updated_at' => $now->copy()->subDays(120 - $v * 20),
+                ]);
+            }
+        }
+    }
+
+    /* ==================================================================
+     *  Lone Worker Safety — live monitoring register demo data
+     * ================================================================*/
+    private function seedLoneWorkers(array $userIds, array $siteIds, array $clientIds, Carbon $now): void
+    {
+        // NZ field locations (Bay of Plenty / Waikato) for the last-known-location map.
+        $coords = [
+            ['Tauranga community visit', -37.6878, 176.1651],
+            ['Hamilton home support', -37.7870, 175.2793],
+            ['Rotorua site lock-up', -38.1368, 176.2497],
+            ['Mount Maunganui welfare check', -37.6406, 176.1849],
+        ];
+
+        $mk = function (string $status, int $startedMinsAgo, int $expectedMins, ?int $lastCheckinMinsAgo, int $interval, array $coord, ?Carbon $endedAt = null, ?Carbon $emergencyAt = null) use ($userIds, $siteIds, $clientIds, $now): array {
+            $started = $now->copy()->subMinutes($startedMinsAgo);
+
+            return [
+                'user_id' => $userIds[array_rand($userIds)],
+                'site_id' => $siteIds[array_rand($siteIds)],
+                'client_id' => (! empty($clientIds) && rand(0, 1) === 1) ? $clientIds[array_rand($clientIds)] : null,
+                'shift_id' => null,
+                'started_at' => $started,
+                'expected_end_at' => $started->copy()->addMinutes($expectedMins),
+                'ended_at' => $endedAt,
+                'location' => $coord[0],
+                'location_lat' => $coord[1],
+                'location_lng' => $coord[2],
+                'activity_description' => $coord[0] . ' ' . self::DEMO_MARKER,
+                'check_in_interval_minutes' => $interval,
+                'last_check_in_at' => $lastCheckinMinsAgo !== null ? $now->copy()->subMinutes($lastCheckinMinsAgo) : $started,
+                'status' => $status,
+                'emergency_triggered_at' => $emergencyAt,
+                'emergency_notes' => $emergencyAt ? ('No response to welfare call ' . self::DEMO_MARKER) : null,
+                'created_by' => $userIds[array_rand($userIds)],
+                'updated_by' => $userIds[array_rand($userIds)],
+                'created_at' => $started,
+                'updated_at' => $now,
+            ];
+        };
+
+        $rows = [
+            $mk('active', 95, 240, 12, 30, $coords[0]),
+            $mk('active', 50, 180, 8, 60, $coords[1]),
+            $mk('overdue', 200, 180, 75, 30, $coords[2]),
+            $mk('emergency', 40, 180, 35, 30, $coords[3], null, $now->copy()->subMinutes(9)),
+            $mk('completed', 1500, 240, 1260, 60, $coords[0], $now->copy()->subMinutes(1260)),
+            $mk('completed', 1600, 240, 1380, 60, $coords[1], $now->copy()->subMinutes(1370)),
+        ];
+
+        foreach ($rows as $row) {
+            $sessionId = DB::table('lone_worker_sessions')->insertGetId($row);
+
+            $checkIns = [[
+                'lone_worker_session_id' => $sessionId,
+                'checked_in_at' => $row['started_at'],
+                'location_lat' => $row['location_lat'],
+                'location_lng' => $row['location_lng'],
+                'status' => 'ok',
+                'notes' => 'Arrived on site ' . self::DEMO_MARKER,
+                'created_at' => $row['started_at'],
+                'updated_at' => $row['started_at'],
+            ]];
+
+            if (in_array($row['status'], ['active', 'completed'], true)) {
+                $mid = $row['started_at']->copy()->addMinutes(30);
+                $checkIns[] = [
+                    'lone_worker_session_id' => $sessionId,
+                    'checked_in_at' => $mid,
+                    'location_lat' => $row['location_lat'],
+                    'location_lng' => $row['location_lng'],
+                    'status' => 'ok',
+                    'notes' => null,
+                    'created_at' => $mid,
+                    'updated_at' => $mid,
+                ];
+            }
+            if ($row['status'] === 'emergency') {
+                $checkIns[] = [
+                    'lone_worker_session_id' => $sessionId,
+                    'checked_in_at' => $row['emergency_triggered_at'],
+                    'location_lat' => $row['location_lat'],
+                    'location_lng' => $row['location_lng'],
+                    'status' => 'emergency',
+                    'notes' => 'Emergency raised ' . self::DEMO_MARKER,
+                    'created_at' => $row['emergency_triggered_at'],
+                    'updated_at' => $row['emergency_triggered_at'],
+                ];
+            }
+            DB::table('lone_worker_check_ins')->insert($checkIns);
+
+            if ($row['status'] === 'overdue') {
+                DB::table('lone_worker_alerts')->insert([
+                    'lone_worker_session_id' => $sessionId,
+                    'alert_type' => 'overdue_check_in',
+                    'triggered_at' => $now->copy()->subMinutes(45),
+                    'status' => 'active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+            if ($row['status'] === 'emergency') {
+                DB::table('lone_worker_alerts')->insert([
+                    'lone_worker_session_id' => $sessionId,
+                    'alert_type' => 'emergency',
+                    'triggered_at' => $row['emergency_triggered_at'],
+                    'status' => 'active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
     }
 
     /* ==================================================================
@@ -570,15 +788,21 @@ class HealthSafetyDemoSeeder extends Seeder
             $lostTimeDays  = ($severity !== 'minor' && rand(0, 1)) ? rand(1, 10) : 0;
             $accClaim      = $lostTimeDays > 0 || $severity === 'serious';
 
-            $status = $injuryDate->diffInDays($now) > 60
-                ? 'closed'
-                : ($injuryDate->diffInDays($now) > 14 ? 'recovering' : 'active');
+            // Canonical injury lifecycle: reported → under_treatment → return_to_work → recovered → closed.
+            $ageDays = $injuryDate->diffInDays($now);
+            $status = match (true) {
+                $ageDays > 90 => 'closed',
+                $ageDays > 60 => 'recovered',
+                $ageDays > 30 => 'return_to_work',
+                $ageDays > 14 => 'under_treatment',
+                default => 'reported',
+            };
 
             $expectedReturn = $lostTimeDays > 0
                 ? $injuryDate->copy()->addDays($lostTimeDays + rand(0, 5))->toDateString()
                 : null;
 
-            $actualReturn = ($status === 'closed' && $expectedReturn)
+            $actualReturn = (in_array($status, ['closed', 'recovered'], true) && $expectedReturn)
                 ? Carbon::parse($expectedReturn)->addDays(rand(-2, 3))->toDateString()
                 : null;
 

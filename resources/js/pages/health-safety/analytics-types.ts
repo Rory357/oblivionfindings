@@ -82,6 +82,14 @@ export type AnalyticsProps = {
         by_type: TypeCount[];
         by_body_part: BodyPartCount[];
     };
+    /**
+     * First-aid breakdowns (leading care-activity signal; first-aid-only treatment is
+     * excluded from TRIFR). Optional — additive, and empty when the table is absent.
+     */
+    first_aid_data?: {
+        by_type: { type: string; count: number }[];
+        by_outcome: { outcome: string; count: number }[];
+    };
     hazard_data: RiskCount[];
     site_comparison: SiteRow[];
     trends: TrendPoint[];
@@ -105,6 +113,7 @@ export type AnalyticsProps = {
         drills_total: number;
     };
     worksafe_notifiable: { notified: number; awaiting: number };
+    sds_expiring: number;
     hours_meta: { source: string; total_hours: number };
     role_note: string;
     filters: AnalyticsFilters;

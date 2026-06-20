@@ -11,6 +11,7 @@ import {
     type BehaviourPattern,
 } from '@/components/behaviour-insights-card';
 import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
+import { RestraintsBspPanel } from '@/components/clients/profile/restraints-bsp-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -115,6 +116,8 @@ export function BehaviourAbcTab({
 
     return (
         <div className="space-y-6">
+            <RestraintsBspPanel clientId={clientId} />
+
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">

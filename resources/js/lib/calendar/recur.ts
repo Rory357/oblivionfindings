@@ -21,7 +21,8 @@ export type CalendarSourceKey =
     | 'meal'
     | 'damage'
     | 'emergency'
-    | 'respite';
+    | 'respite'
+    | 'participation';
 
 export type CalendarStatus =
     | 'scheduled'

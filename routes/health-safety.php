@@ -8,6 +8,7 @@ use App\Http\Controllers\HealthSafety\HsCorrectiveActionController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
 use App\Http\Controllers\HealthSafety\HsInvestigationController;
+use App\Http\Controllers\HealthSafety\HsRiskAssessmentController;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\RestraintController;
@@ -40,7 +41,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
-        Route::get('/risk-assessments', [HsEventController::class, 'riskAssessments'])->name('risk-assessments.index');
+        Route::get('/risk-assessments', [HsRiskAssessmentController::class, 'index'])->name('risk-assessments.index');
+        Route::get('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'show'])->name('risk-assessments.show');
+        Route::get('/risk-assessments/{assessment}/attachments/{attachment}/download', [HsRiskAssessmentController::class, 'downloadAttachment'])->name('risk-assessments.attachments.download');
     });
 
     // ── Events governance write actions (gated) ──
@@ -66,6 +69,21 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{event}/corrective-actions/{action}/return', [HsCorrectiveActionController::class, 'returnForRework'])->name('events.corrective-actions.return');
     });
 
+    // ── Risk Assessment write actions (gated) — all delegate to HsRiskAssessmentService ──
+    Route::middleware('permission:hazards.manage')->group(function () {
+        Route::post('/risk-assessments', [HsRiskAssessmentController::class, 'store'])->name('risk-assessments.store');
+        Route::put('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'update'])->name('risk-assessments.update');
+        Route::post('/risk-assessments/{assessment}/activate', [HsRiskAssessmentController::class, 'activate'])->name('risk-assessments.activate');
+        Route::post('/risk-assessments/{assessment}/review', [HsRiskAssessmentController::class, 'markForReview'])->name('risk-assessments.review');
+        Route::post('/risk-assessments/{assessment}/residual', [HsRiskAssessmentController::class, 'updateResidual'])->name('risk-assessments.residual');
+        Route::post('/risk-assessments/{assessment}/supersede', [HsRiskAssessmentController::class, 'supersede'])->name('risk-assessments.supersede');
+        Route::post('/risk-assessments/{assessment}/archive', [HsRiskAssessmentController::class, 'archive'])->name('risk-assessments.archive');
+
+        // Premium evidence upload (SWMS, method statements, photos, SDS, plans, PDFs).
+        Route::post('/risk-assessments/{assessment}/attachments', [HsRiskAssessmentController::class, 'uploadAttachment'])->name('risk-assessments.attachments.store');
+        Route::delete('/risk-assessments/{assessment}/attachments/{attachment}', [HsRiskAssessmentController::class, 'destroyAttachment'])->name('risk-assessments.attachments.destroy');
+    });
+
     // ── PR6: Governance & Compliance Reports ──
     Route::middleware('permission:governance.view')->prefix('reports')->name('reports.')->group(function () {
         Route::get('/board-summary', [HsGovernanceReportController::class, 'boardSummary'])->name('board-summary');
@@ -75,60 +93,108 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/risk-assessment-register', [HsGovernanceReportController::class, 'riskAssessmentRegister'])->name('risk-assessment-register');
     });
 
-    // ── Phase 5A: First Aid Register ────────────────────────────────────
+    // ── Phase 5A: First Aid Register (gold-standard rebuild) ────────────
     Route::prefix('first-aid')->name('first-aid.')->group(function () {
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [FirstAidController::class, 'index'])->name('index');
+            // Static sub-routes before the {record} wildcard so they aren't swallowed.
+            Route::get('/export', [FirstAidController::class, 'export'])->name('export');
+            Route::get('/{record}/attachments/{attachment}/download', [FirstAidController::class, 'downloadAttachment'])->name('attachments.download');
+            Route::get('/{record}', [FirstAidController::class, 'show'])->name('show');
         });
 
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::post('/', [FirstAidController::class, 'store'])->name('store');
+            Route::put('/{record}', [FirstAidController::class, 'update'])->name('update');
+            Route::post('/{record}/link-incident', [FirstAidController::class, 'linkIncident'])->name('link-incident');
+            Route::post('/{record}/followups', [FirstAidController::class, 'addFollowup'])->name('followups.add');
+            Route::patch('/{record}/followups/{followup}/complete', [FirstAidController::class, 'completeFollowup'])->name('followups.complete');
+            Route::post('/{record}/attachments', [FirstAidController::class, 'uploadAttachment'])->name('attachments.upload');
+            Route::delete('/{record}/attachments/{attachment}', [FirstAidController::class, 'destroyAttachment'])->name('attachments.destroy');
+        });
+
+        Route::middleware('permission:hazards.manage')->group(function () {
+            Route::delete('/{record}', [FirstAidController::class, 'destroy'])->name('destroy');
         });
     });
 
     // ── Phase 5B: Restraint Register ────────────────────────────────────
     Route::prefix('restraints')->name('restraints.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        // View register + detail (detail-as-modal via ?event= / ?plan=) + export + downloads.
+        Route::middleware('permission:restraints.view')->group(function () {
             Route::get('/', [RestraintController::class, 'index'])->name('index');
+            Route::get('/export', [RestraintController::class, 'export'])->name('export');
+            Route::get('/clients/{client}/summary', [RestraintController::class, 'clientSummary'])->name('clients.summary');
+            Route::get('/events/{event}/attachments/{attachment}/download', [RestraintController::class, 'downloadAttachment'])->name('events.attachments.download');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
-            // Restraint Events
+        // Capture — record events, create plans, upload evidence.
+        Route::middleware('permission:restraints.create|restraints.manage')->group(function () {
             Route::post('/events', [RestraintController::class, 'storeEvent'])->name('events.store');
             Route::post('/plans', [RestraintController::class, 'storePlan'])->name('plans.store');
+            Route::post('/events/{event}/attachments', [RestraintController::class, 'storeAttachment'])->name('events.attachments.store');
         });
-        Route::middleware('permission:hazards.manage')->group(function () {
+
+        // Review — event review + plan review sign-off.
+        Route::middleware('permission:restraints.review|restraints.manage')->group(function () {
             Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
+            Route::post('/plans/{plan}/review', [RestraintController::class, 'reviewPlan'])->name('plans.review');
+        });
+
+        // Manage — plan edit + lifecycle + attachment removal.
+        Route::middleware('permission:restraints.manage')->group(function () {
             Route::put('/plans/{plan}', [RestraintController::class, 'updatePlan'])->name('plans.update');
+            Route::post('/plans/{plan}/activate', [RestraintController::class, 'activatePlan'])->name('plans.activate');
+            Route::post('/plans/{plan}/submit-review', [RestraintController::class, 'submitPlanReview'])->name('plans.submit-review');
+            Route::post('/plans/{plan}/archive', [RestraintController::class, 'archivePlan'])->name('plans.archive');
+            Route::delete('/events/{event}/attachments/{attachment}', [RestraintController::class, 'destroyAttachment'])->name('events.attachments.destroy');
         });
     });
 
     // ── Phase 5C: Safe Work Procedures ──────────────────────────────────
     Route::prefix('procedures')->name('procedures.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/', [SafeWorkProcedureController::class, 'index'])->name('index');
+            // Static export before the {procedure} wildcard so it isn't swallowed.
+            Route::get('/export', [SafeWorkProcedureController::class, 'export'])->name('export');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
+        Route::middleware('permission:procedures.create|procedures.manage')->group(function () {
             Route::get('/create', [SafeWorkProcedureController::class, 'create'])->name('create');
             Route::post('/', [SafeWorkProcedureController::class, 'store'])->name('store');
-        });
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/{procedure}/edit', [SafeWorkProcedureController::class, 'edit'])->name('edit');
             Route::put('/{procedure}', [SafeWorkProcedureController::class, 'update'])->name('update');
             Route::post('/{procedure}/submit-for-review', [SafeWorkProcedureController::class, 'submitForReview'])->name('submit-for-review');
         });
-        Route::middleware('permission:hazards.manage')->group(function () {
+
+        Route::middleware('permission:procedures.manage')->group(function () {
+            Route::post('/{procedure}/request-changes', [SafeWorkProcedureController::class, 'requestChanges'])->name('request-changes');
+            Route::post('/{procedure}/record-review', [SafeWorkProcedureController::class, 'recordReview'])->name('record-review');
+            Route::post('/{procedure}/archive', [SafeWorkProcedureController::class, 'archive'])->name('archive');
+            Route::post('/{procedure}/restore', [SafeWorkProcedureController::class, 'restore'])->name('restore');
+
+            // Controlled-document library (premium upload — reuses polymorphic HsAttachment)
+            Route::post('/{procedure}/attachments', [SafeWorkProcedureController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{procedure}/attachments/{attachment}', [SafeWorkProcedureController::class, 'destroyAttachment'])->name('attachments.destroy');
+        });
+
+        Route::middleware('permission:procedures.approve')->group(function () {
             Route::post('/{procedure}/approve', [SafeWorkProcedureController::class, 'approve'])->name('approve');
         });
 
-        // Show route after /create and /edit to avoid wildcard conflict
-        Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])
-            ->middleware('permission:hazards.view')
-            ->name('show');
+        // View-gated reads — download lets register-only roles read the master document.
+        Route::middleware('permission:procedures.view')->group(function () {
+            Route::get('/{procedure}/attachments/{attachment}/download', [SafeWorkProcedureController::class, 'downloadAttachment'])->name('attachments.download');
+
+            // Any viewer can acknowledge they've read & understood the procedure.
+            Route::post('/{procedure}/acknowledge', [SafeWorkProcedureController::class, 'acknowledge'])->name('acknowledge');
+
+            // Show route LAST to avoid the /{procedure} wildcard swallowing /create etc.
+            Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])->name('show');
+        });
     });
 
     // ── Worker Participation ──────────────────────────────────────────
@@ -136,6 +202,12 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [WorkerParticipationController::class, 'index'])->name('index');
+            Route::get('/export', [WorkerParticipationController::class, 'export'])->name('export');
+
+            // Document downloads are read operations — a register viewer must be
+            // able to read its attached documents (minutes / consultation docs).
+            Route::get('/consultations/{consultation}/documents/{type}', [WorkerParticipationController::class, 'downloadConsultationDocument'])->name('consultations.documents.download');
+            Route::get('/meetings/{meeting}/minutes/download', [WorkerParticipationController::class, 'downloadMeetingMinutes'])->name('meetings.minutes.download');
         });
 
         Route::middleware('permission:hazards.manage')->group(function () {
@@ -157,14 +229,12 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             // Consultation workflow
             Route::put('/consultations/{consultation}/status', [WorkerParticipationController::class, 'updateConsultationStatus'])->name('consultations.status');
             Route::post('/consultations/{consultation}/documents', [WorkerParticipationController::class, 'uploadConsultationDocument'])->name('consultations.documents.upload');
-            Route::get('/consultations/{consultation}/documents/{type}', [WorkerParticipationController::class, 'downloadConsultationDocument'])->name('consultations.documents.download');
 
             // Meeting workflow
             Route::post('/meetings/{meeting}/attendees', [WorkerParticipationController::class, 'addMeetingAttendees'])->name('meetings.attendees');
             Route::put('/meetings/{meeting}/complete', [WorkerParticipationController::class, 'completeMeeting'])->name('meetings.complete');
             Route::put('/meetings/{meeting}/cancel', [WorkerParticipationController::class, 'cancelMeeting'])->name('meetings.cancel');
             Route::post('/meetings/{meeting}/minutes', [WorkerParticipationController::class, 'uploadMeetingMinutes'])->name('meetings.minutes.upload');
-            Route::get('/meetings/{meeting}/minutes/download', [WorkerParticipationController::class, 'downloadMeetingMinutes'])->name('meetings.minutes.download');
         });
     });
 
@@ -182,6 +252,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         });
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{substance}', [HazardousSubstanceController::class, 'update'])->name('update');
+            Route::patch('/{substance}/status', [HazardousSubstanceController::class, 'updateStatus'])
+                ->whereNumber('substance')->name('status');
         });
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
 
@@ -216,15 +288,30 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{drill}', [EmergencyDrillController::class, 'update'])->name('update');
 
+            // Lifecycle
+            Route::post('/{drill}/start', [EmergencyDrillController::class, 'start'])->name('start');
+            Route::post('/{drill}/complete', [EmergencyDrillController::class, 'complete'])->name('complete');
+            Route::post('/{drill}/cancel', [EmergencyDrillController::class, 'cancel'])->name('cancel');
+
             // Participants
             Route::post('/{drill}/participants', [EmergencyDrillController::class, 'addParticipant'])->name('participants.store');
 
             // Findings
             Route::post('/{drill}/findings', [EmergencyDrillController::class, 'addFinding'])->name('findings.store');
             Route::put('/findings/{finding}', [EmergencyDrillController::class, 'updateFinding'])->name('findings.update');
+            Route::post('/{drill}/findings/{finding}/resolve', [EmergencyDrillController::class, 'resolveFinding'])->name('findings.resolve');
+
+            // Evidence (premium upload)
+            Route::post('/{drill}/attachments', [EmergencyDrillController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{drill}/attachments/{attachment}', [EmergencyDrillController::class, 'destroyAttachment'])->name('attachments.destroy');
         });
 
-        // Show route after /create to avoid wildcard conflict
+        // Evidence download (read)
+        Route::get('/{drill}/attachments/{attachment}/download', [EmergencyDrillController::class, 'downloadAttachment'])
+            ->middleware('permission:hazards.view')
+            ->name('attachments.download');
+
+        // Show route after /create + static sub-routes to avoid wildcard conflict
         Route::get('/{drill}', [EmergencyDrillController::class, 'show'])
             ->middleware('permission:hazards.view')
             ->name('show');
@@ -233,8 +320,13 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Workplace Injuries & Return to Work ───────────────────────────
     Route::prefix('injuries')->name('injuries.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        // Read is open to HR wellbeing too — staff injury / RTW is an HR-wellbeing
+        // function (fixes the nav-vs-route 403: the sidebar already shows this to
+        // hr.wellbeing.view). Writes stay hazards.manage; the UI is read-only for
+        // non-managers via the can.manage flag.
+        Route::middleware('permission:hazards.view|hr.wellbeing.view')->group(function () {
             Route::get('/', [ReturnToWorkController::class, 'index'])->name('index');
+            Route::get('/export', [ReturnToWorkController::class, 'export'])->name('export');
         });
 
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
@@ -243,6 +335,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         });
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{injury}', [ReturnToWorkController::class, 'update'])->name('update');
+
+            // Explicit lifecycle transition (Start treatment / Begin RTW / Mark recovered / Close)
+            Route::post('/{injury}/status', [ReturnToWorkController::class, 'transitionStatus'])->name('status');
 
             // Return to Work Plans
             Route::post('/{injury}/rtw-plans', [ReturnToWorkController::class, 'storeRtwPlan'])->name('rtw-plans.store');
@@ -253,11 +348,20 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
             // Modified Duties
             Route::post('/rtw-plans/{rtwPlan}/modified-duties', [ReturnToWorkController::class, 'storeModifiedDuty'])->name('modified-duties.store');
+
+            // Evidence (premium document upload)
+            Route::post('/{injury}/attachments', [ReturnToWorkController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{injury}/attachments/{attachment}', [ReturnToWorkController::class, 'destroyAttachment'])->name('attachments.destroy');
         });
 
-        // Show route after /create to avoid wildcard conflict
+        // Evidence download (read)
+        Route::get('/{injury}/attachments/{attachment}/download', [ReturnToWorkController::class, 'downloadAttachment'])
+            ->middleware('permission:hazards.view|hr.wellbeing.view')
+            ->name('attachments.download');
+
+        // Show route after /create + static sub-routes to avoid wildcard conflict
         Route::get('/{injury}', [ReturnToWorkController::class, 'show'])
-            ->middleware('permission:hazards.view')
+            ->middleware('permission:hazards.view|hr.wellbeing.view')
             ->name('show');
     });
 
@@ -266,11 +370,24 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [LoneWorkerController::class, 'index'])->name('index');
+            // OpenStreetMap (Nominatim) address autocomplete for the Start-session
+            // wizard — reuses the shared geocoder, gated to anyone who can view the page
+            // (the sites/clients geocode proxies require sites.update/clients.update which
+            // an H&S coordinator may not hold).
+            Route::get('/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])->name('geocode.search');
         });
+
+        // Worker self check-in (auth-only). The 3-actor model puts the lone
+        // WORKER's one-tap check-in on My Day, not the coordinator watch-tower.
+        // Frontline support workers have NO hazards.* permission, so this route
+        // must sit OUTSIDE the hazards.manage group or worker self-check-in would
+        // 403. Authorization is enforced inside checkIn(): the session's own
+        // worker, or a coordinator with hazards.manage, may record a check-in.
+        Route::post('/sessions/{session}/check-in', [LoneWorkerController::class, 'checkIn'])->name('sessions.check-in');
 
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::post('/sessions', [LoneWorkerController::class, 'startSession'])->name('sessions.store');
-            Route::post('/sessions/{session}/check-in', [LoneWorkerController::class, 'checkIn'])->name('sessions.check-in');
+            Route::patch('/sessions/{session}', [LoneWorkerController::class, 'updateSession'])->name('sessions.update');
             Route::post('/sessions/{session}/end', [LoneWorkerController::class, 'endSession'])->name('sessions.end');
             Route::post('/sessions/{session}/emergency', [LoneWorkerController::class, 'triggerEmergency'])->name('sessions.emergency');
 

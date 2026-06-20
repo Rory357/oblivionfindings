@@ -31,6 +31,7 @@ use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
+use App\Models\SafeWorkProcedure;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -170,9 +171,33 @@ class MyHrController extends Controller
             ->limit(5)
             ->get(['id', 'title', 'priority', 'published_at']);
 
+        // Safe Work Procedures applicable to my role(s) — deep-link to the register's
+        // detail modal, with a version-stamped "Acknowledge" affordance. Role-matched
+        // + org-wide (approved).
+        $roleKeys = $user->roles()->pluck('name')->all();
+        $ackedVersions = \App\Models\ProcedureAcknowledgement::query()
+            ->where('user_id', $user->id)
+            ->pluck('version_acknowledged', 'safe_work_procedure_id');
+        $safeWorkProcedures = $user->canDo('procedures.view')
+            ? SafeWorkProcedure::query()->applicableToRoles($roleKeys)
+                ->orderBy('title')
+                ->limit(25)
+                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date', 'current_version'])
+                ->map(fn (SafeWorkProcedure $p) => [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number,
+                    'title' => $p->title,
+                    'category' => $p->category,
+                    'status' => $p->status,
+                    'review_date' => $p->review_date?->toDateString(),
+                    'acknowledged' => (int) ($ackedVersions[$p->id] ?? 0) === (int) $p->current_version,
+                ])->values()
+            : collect();
+
         return Inertia::render('hr/my/index', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
             'overview' => $this->myHrOverviewProps($user, $tenantId),
+            'safeWorkProcedures' => $safeWorkProcedures,
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,

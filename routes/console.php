@@ -206,6 +206,18 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:20');
 
+// Injuries & RTW monitoring — return-to-work reviews + capacity reassessments due (daily)
+app(Schedule::class)
+    ->command('injuries:review-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:25');
+
+// First Aid — follow-ups due/overdue on open records (daily)
+app(Schedule::class)
+    ->command('first-aid:followup-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)
@@ -495,6 +507,14 @@ app(Schedule::class)
     ->command('governance:sync-site-risk-reviews')
     ->timezone('Pacific/Auckland')
     ->dailyAt('06:30')
+    ->withoutOverlapping();
+
+// Generate HSWA worker-participation obligations (HSC 3-month cadence, HSR term
+// re-election, HSR training) ahead of their deadlines: daily 06:20
+app(Schedule::class)
+    ->command('participation:sync-obligations')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:20')
     ->withoutOverlapping();
 
 // Timesheet reconciliation: re-sync draft timesheets and re-evaluate submitted timesheets

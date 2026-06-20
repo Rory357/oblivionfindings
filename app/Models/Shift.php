@@ -180,6 +180,15 @@ class Shift extends Model
         return $this->hasMany(ShiftSignal::class);
     }
 
+    /**
+     * The lone worker safety session monitoring this shift, if one was started.
+     * A safety overlay — linked, never merged (payroll-critical fields stay on Shift).
+     */
+    public function loneWorkerSession()
+    {
+        return $this->hasOne(LoneWorkerSession::class);
+    }
+
     public function approvedTimesheets()
     {
         return $this->timesheets()->where('status', 'approved');

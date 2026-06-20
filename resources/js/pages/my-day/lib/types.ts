@@ -296,6 +296,44 @@ export interface MyDayActiveRound {
     url: string;
 }
 
+/**
+ * The signed-in worker's live Lone Worker Safety session — the data behind the
+ * My Day "You're being monitored — check in" card. Present only when the worker
+ * is currently being monitored. Mirrors
+ * `MyTasksController::getActiveLoneWorkerSession()`.
+ */
+export interface MyDayLoneWorkerSession {
+    id: number;
+    status: 'active' | 'overdue' | 'emergency';
+    started_at: string | null;
+    expected_end_at: string | null;
+    last_check_in_at: string | null;
+    check_in_interval_minutes: number;
+    /** When the next check-in is due ((last_check_in_at ?? started_at) + interval). */
+    next_check_in_at: string | null;
+    is_check_in_overdue: boolean;
+    activity_description: string | null;
+    site: { id: number; name: string } | null;
+    client: { id: number; name: string } | null;
+}
+
+/**
+ * One open first-aid follow-up assigned to the signed-in worker — the data
+ * behind the My Day "First-aid follow-ups assigned to me" card. Read-only;
+ * `url` deep-links to the First Aid Register's record modal. Mirrors
+ * `MyTasksController::getFirstAidFollowups()`.
+ */
+export interface MyDayFirstAidFollowup {
+    id: number;
+    notes: string | null;
+    due_at: string | null;
+    is_overdue: boolean;
+    record_id: number;
+    treated_person_name: string | null;
+    site_name: string | null;
+    url: string;
+}
+
 export interface MyDayPreShiftBriefing {
     id: number;
     starts_at: string;
@@ -355,6 +393,8 @@ export interface MyDayPageProps {
     clock?: MyDayClockState;
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
     active_round?: MyDayActiveRound | null;
+    active_lone_worker_session?: MyDayLoneWorkerSession | null;
+    first_aid_followups?: MyDayFirstAidFollowup[];
     shiftChecklists?: ShiftChecklistRun[];
     checklistConfig?: MyDayChecklistConfig;
     runDetail?: RunDetail | null;

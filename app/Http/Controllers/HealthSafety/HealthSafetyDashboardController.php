@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
-use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\HsCommittee;
 use App\Models\HsRepresentative;
@@ -79,14 +78,9 @@ class HealthSafetyDashboardController extends Controller
             ? (int) Carbon::parse($lastNotifiable)->diffInDays($now)
             : null;
 
-        // Drill compliance
-        $totalSites = Site::count();
-        $sitesWithRecentDrill = EmergencyDrill::where('completed_at', '>=', $sixMonthsAgo)
-            ->distinct('site_id')
-            ->count('site_id');
-        $drillCompliancePct = $totalSites > 0
-            ? (int) round(($sitesWithRecentDrill / $totalSites) * 100)
-            : 0;
+        // Drill compliance — single source of truth (reconciles with the drills
+        // register hero, analytics site league + site-profile Drills badge).
+        $drillCompliancePct = app(\App\Services\HealthSafety\DrillComplianceService::class)->compliancePct();
 
         // Lone worker active alerts — canonical ControlRoomAlert is the operational source of truth
         $activeAlerts = ControlRoomAlert::where('source', 'lone_worker')
@@ -218,6 +212,24 @@ class HealthSafetyDashboardController extends Controller
                     'committees' => HsCommittee::count(),
                 ];
             }, ['pct' => null, 'committees' => 0], false),
+
+            // First-aid activity (leading care-activity signal, trailing 30 days) — surfaced
+            // on the Leading tab. First-aid-only treatment is NOT recordable / excluded from TRIFR.
+            'first_aid' => rescue(fn () => $this->kpiService->firstAidActivity(null, null, $siteId), ['treatments' => 0, 'ambulance' => 0, 'hospital' => 0], false),
+
+            // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
+            'procedures' => rescue(function () {
+                $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
+                $covered = \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                    ->whereIn('category', $highRisk)->distinct()->pluck('category')->all();
+
+                return [
+                    'approved' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')->count(),
+                    'review_due' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                        ->whereNotNull('review_date')->where('review_date', '<=', now()->addDays(30))->count(),
+                    'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
+                ];
+            }, ['approved' => 0, 'review_due' => 0, 'coverage_gap_categories' => 0], false),
         ]);
     }
 

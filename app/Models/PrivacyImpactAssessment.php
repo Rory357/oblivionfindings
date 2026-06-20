@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class PrivacyImpactAssessment extends Model
 {
@@ -26,6 +27,7 @@ class PrivacyImpactAssessment extends Model
         'mitigation_measures',
         'residual_risk_level',
         'outcome',
+        'review_notes',
         'approved_by_user_id',
         'approved_at',
         'review_date',
@@ -49,5 +51,13 @@ class PrivacyImpactAssessment extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    /**
+     * Supporting documents (the assessment doc, vendor security attestations).
+     */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(PrivacyAttachment::class, 'attachable')->latest();
     }
 }

@@ -32,6 +32,7 @@ use App\Models\ClientPathPlan;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
 use App\Models\EmergencyDrill;
+use App\Models\FirstAidRecord;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
@@ -57,6 +58,7 @@ use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
 use App\Observers\DeviceEventObserver;
 use App\Observers\EmergencyDrillObserver;
+use App\Observers\FirstAidObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
 use App\Observers\FleetWorkOrderObserver;
@@ -207,6 +209,7 @@ class AppServiceProvider extends ServiceProvider
         SiteInspectionRecord::observe(SiteInspectionRecordObserver::class);
         RestraintEvent::observe(RestraintEventObserver::class);
         EmergencyDrill::observe(EmergencyDrillObserver::class);
+        FirstAidRecord::observe(FirstAidObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);

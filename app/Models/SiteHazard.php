@@ -27,7 +27,10 @@ class SiteHazard extends Model
         'likelihood',
         'risk_rating',
         'description',
+        'location',
+        'witnesses',
         'photo_paths',
+        'document_paths',
         'immediate_action_taken',
         'immediate_action_applied',
         'reported_by_user_id',
@@ -56,6 +59,7 @@ class SiteHazard extends Model
 
     protected $casts = [
         'photo_paths' => 'array',
+        'document_paths' => 'array',
         'resolution_evidence' => 'array',
         'immediate_action_applied' => 'boolean',
         'assigned_at' => 'datetime',
@@ -127,6 +131,28 @@ class SiteHazard extends Model
         return $query->where('assigned_to_user_id', $userId);
     }
 
+    /** Open/in-progress hazards whose due date falls within the next 7 days. */
+    public function scopeDueSoon($query)
+    {
+        return $query->whereNotNull('due_date')
+            ->whereBetween('due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])
+            ->whereIn('status', ['open', 'in_progress']);
+    }
+
+    /** Open/in-progress hazards with no owner. */
+    public function scopeUnassignedOpen($query)
+    {
+        return $query->whereNull('assigned_to_user_id')
+            ->whereIn('status', ['open', 'in_progress']);
+    }
+
+    /** Live critical exposure: extreme-rated or critical-severity, not yet mitigated/closed. */
+    public function scopeCriticalOpen($query)
+    {
+        return $query->where(fn ($q) => $q->where('risk_rating', 'extreme')->orWhere('severity', 'critical'))
+            ->whereIn('status', ['open', 'in_progress']);
+    }
+
     // Helpers
     public function isOpen(): bool
     {
@@ -141,5 +167,24 @@ class SiteHazard extends Model
     public function requiresAssignment(): bool
     {
         return in_array($this->risk_rating, ['high', 'extreme']) && !$this->assigned_to_user_id;
+    }
+
+    /** Due within the next 7 days while still open. */
+    public function isDueSoon(): bool
+    {
+        if (! $this->due_date || ! $this->isOpen()) {
+            return false;
+        }
+
+        return $this->due_date->betweenIncluded(now()->startOfDay(), now()->addDays(7)->endOfDay());
+    }
+
+    /**
+     * WorkSafe-notifiable threshold (HSWA 2015): extreme risk rating or a
+     * critical-severity hazard. Drives the register flag + detail banner.
+     */
+    public function isWorksafeNotifiable(): bool
+    {
+        return $this->risk_rating === 'extreme' || $this->severity === 'critical';
     }
 }

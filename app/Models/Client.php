@@ -279,6 +279,14 @@ class Client extends Model
         return $this->hasMany(ClientIncident::class);
     }
 
+    /**
+     * Privacy Act 2020 access/correction requests made about this client.
+     */
+    public function dataSubjectRequests()
+    {
+        return $this->hasMany(DataSubjectRequest::class);
+    }
+
     public function respiteBookings()
     {
         return $this->hasMany(RespiteBooking::class);

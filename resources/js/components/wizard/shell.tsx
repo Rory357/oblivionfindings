@@ -41,6 +41,8 @@ export function WizardShell({
     footerStart,
     footerEnd,
     success,
+    maxWidth = 'min(94vw, 980px)',
+    maxHeight = 'min(88vh, 760px)',
     children,
 }: {
     open: boolean;
@@ -62,13 +64,17 @@ export function WizardShell({
     footerEnd?: ReactNode;
     /** When set, replaces the whole shell body (rail + steps) — success pane. */
     success?: ReactNode;
+    /** Dialog width — defaults to the Add-Client 980px; pass a wider value for matrix-heavy modals. */
+    maxWidth?: string;
+    /** Dialog body height — defaults to 760px; pass taller (e.g. Add-Client's 860px) for step-heavy modals. */
+    maxHeight?: string;
     children?: ReactNode;
 }) {
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent
                 className="overflow-hidden p-0 [&>button]:hidden"
-                style={{ maxWidth: 'min(94vw, 980px)', width: 'min(94vw, 980px)' }}
+                style={{ maxWidth, width: maxWidth }}
             >
                 <DialogTitle className="sr-only">{title}</DialogTitle>
                 <DialogDescription className="sr-only">
@@ -78,7 +84,7 @@ export function WizardShell({
                 {success ? (
                     success
                 ) : (
-                    <div className="flex h-[min(88vh,760px)] min-h-0 overflow-hidden">
+                    <div className="flex min-h-0 overflow-hidden" style={{ height: maxHeight }}>
                         {/* ── Stepper rail ── */}
                         <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
                             <div className="mb-3 flex items-center gap-2.5">
@@ -160,7 +166,14 @@ export function WizardShell({
                                             {pct}%
                                         </span>
                                     </div>
-                                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className="h-1.5 overflow-hidden rounded-full bg-muted"
+                                        role="progressbar"
+                                        aria-valuenow={pct ?? 0}
+                                        aria-valuemin={0}
+                                        aria-valuemax={100}
+                                        aria-label={pctLabel}
+                                    >
                                         <div
                                             className="h-full rounded-full bg-primary transition-[width] duration-500"
                                             style={{ width: `${pct}%` }}
@@ -174,10 +187,16 @@ export function WizardShell({
                         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                             <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
                                 <div className="text-[13px] font-semibold text-muted-foreground">
-                                    Step {stepIndex + 1} of {steps.length} ·{' '}
-                                    <span className="text-foreground">
-                                        {steps[stepIndex]?.label}
-                                    </span>
+                                    {steps.length > 1 ? (
+                                        <>
+                                            Step {stepIndex + 1} of {steps.length} ·{' '}
+                                            <span className="text-foreground">
+                                                {steps[stepIndex]?.label}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-foreground">{steps[stepIndex]?.label}</span>
+                                    )}
                                 </div>
                                 <button
                                     type="button"

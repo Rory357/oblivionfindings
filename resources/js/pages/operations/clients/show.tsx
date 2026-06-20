@@ -61,6 +61,7 @@ import { CareSupportPlanTab } from './tabs/care-support-plan';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
+import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
     AssessmentsTab,
@@ -91,6 +92,7 @@ import {
     Globe,
     GraduationCap,
     Heart,
+    HeartPulse,
     Home,
     ListTodo,
     MessageSquare as MsgIcon,
@@ -121,7 +123,10 @@ import { LeaveExcursionsTab } from './tabs/leave-excursions';
 import { PersonalDetailsTab } from './tabs/personal-details';
 import { RespiteTab } from './tabs/respite';
 import { RiskManagementTab } from './tabs/risk-management';
+import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
+import type { RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
 import { WorkersTab } from './tabs/workers';
+import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -534,6 +539,7 @@ type TabKey =
     | 'actions_reviews'
     | 'risk_management'
     | 'incidents_accidents'
+    | 'first_aid'
     | 'service_agreements'
     | 'support_plan'
     | 'assessments'
@@ -544,6 +550,7 @@ type TabKey =
     | 'photos'
     | 'consents'
     | 'consent-requests'
+    | 'privacy'
     | 'portal'
     | 'family_notes'
     | 'respite'
@@ -655,6 +662,8 @@ export default function ClientShow({
     ).replace('_', ' ');
     const respiteCan = auth?.can?.respite ?? {};
     const consentsCan = auth?.can?.consents ?? {};
+    const privacyCan = auth?.can?.privacy ?? {};
+    const dataSubjectRequests = pageProps.data_subject_requests ?? [];
     const consents = pageProps.consents ?? [];
     const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
     const pendingVisitCount = pageProps.pending_visit_count ?? 0;
@@ -835,6 +844,13 @@ export default function ClientShow({
                 count: (pageProps.client_incidents ?? []).length || undefined,
             },
             {
+                key: 'first_aid',
+                label: 'First Aid',
+                icon: HeartPulse,
+                show: true,
+                count: (pageProps.first_aid_records ?? []).length || undefined,
+            },
+            {
                 key: 'calendar',
                 label: 'Appointments',
                 icon: Calendar,
@@ -921,6 +937,13 @@ export default function ClientShow({
                 show: Boolean(consentsCan?.viewAny),
             },
             {
+                key: 'privacy',
+                label: 'Privacy',
+                icon: Shield,
+                show: Boolean(privacyCan?.viewRequests),
+                count: dataSubjectRequests.length || undefined,
+            },
+            {
                 key: 'consent-requests',
                 label: 'Consent Requests',
                 icon: Send,
@@ -968,6 +991,8 @@ export default function ClientShow({
             client.status,
             actionsReviewsSummary?.open,
             consentsCan?.viewAny,
+            privacyCan?.viewRequests,
+            dataSubjectRequests.length,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
@@ -3302,17 +3327,44 @@ export default function ClientShow({
                 )}
 
                 {tab === 'risk_management' && (
-                    <RiskManagementTab
-                        clientId={client.id}
-                        risks={(pageProps.client_risks ?? []) as any}
-                        canCreate={Boolean((can as any).create_risks)}
-                        canUpdate={Boolean((can as any).update_risks)}
-                        canDelete={Boolean((can as any).delete_risks)}
-                        onAddRisk={() => openProfileDialog('add_risk')}
-                        onEditRisk={(risk) =>
-                            openProfileDialog('edit_risk', { risk })
-                        }
-                    />
+                    <>
+                        <RiskManagementTab
+                            clientId={client.id}
+                            risks={(pageProps.client_risks ?? []) as any}
+                            canCreate={Boolean((can as any).create_risks)}
+                            canUpdate={Boolean((can as any).update_risks)}
+                            canDelete={Boolean((can as any).delete_risks)}
+                            onAddRisk={() => openProfileDialog('add_risk')}
+                            onEditRisk={(risk) =>
+                                openProfileDialog('edit_risk', { risk })
+                            }
+                            homeHazards={(pageProps.homeHazards ?? []) as any}
+                            homeHazardDetail={(pageProps.homeHazardDetail ?? null) as any}
+                            homeName={(pageProps.homeName ?? null) as any}
+                            homeSiteId={(pageProps.homeSiteId ?? null) as any}
+                            homeProcedures={(pageProps.homeProcedures ?? []) as any}
+                        />
+
+                        {Boolean((can as any).view_hs_risk_assessments) && (
+                            <div className="mt-8 border-t border-border pt-6">
+                                <div className="mb-4 flex items-center gap-2">
+                                    <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+                                    <div>
+                                        <h3 className="text-base font-semibold">Formal H&amp;S risk assessments</h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            ISO 31000 / SafePlus 5×5 assessments attached to this client — separate from the care-risk list above.
+                                        </p>
+                                    </div>
+                                </div>
+                                <RaRegisterSection
+                                    assessments={(pageProps.hs_risk_assessments ?? []) as RaRow[]}
+                                    pickers={(pageProps.ra_pickers ?? { sites: [], clients: [], events: [] }) as RaPickers}
+                                    canManage={Boolean((can as any).manage_hs_risk_assessments)}
+                                    lockedAssessable={{ type: 'client', id: client.id, name: `${client.first_name} ${client.last_name}`.trim() }}
+                                />
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {tab === 'incidents_accidents' && (
@@ -3347,6 +3399,12 @@ export default function ClientShow({
                 {tab === 'incidents_accidents' && (
                     <IncidentsTab
                         incidents={(pageProps.client_incidents ?? []) as any[]}
+                    />
+                )}
+
+                {tab === 'first_aid' && (
+                    <FirstAidTab
+                        records={(pageProps.first_aid_records ?? []) as any[]}
                     />
                 )}
 
@@ -5459,6 +5517,13 @@ export default function ClientShow({
                             (pageProps as any).assignable_workers ?? []
                         }
                         canAssign={Boolean(can.assign_workers)}
+                    />
+                )}
+
+                {tab === 'privacy' && (
+                    <ClientPrivacyPanel
+                        requests={dataSubjectRequests}
+                        canManage={Boolean(privacyCan?.processRequests)}
                     />
                 )}
             </PageShell>

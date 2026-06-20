@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -76,8 +77,10 @@ class HsRiskAssessment extends Model
         'assessed_at',
         'approved_by_user_id',
         'approved_at',
+        'approval_note',
         'review_due_at',
         'review_frequency_days',
+        'last_review_note',
         'superseded_by_id',
         'created_by',
         'updated_by',
@@ -129,6 +132,11 @@ class HsRiskAssessment extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(HsRiskAssessmentAttachment::class)->latest();
     }
 
     /* ------------------------------------------------------------------ */

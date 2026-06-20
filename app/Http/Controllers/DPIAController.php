@@ -55,13 +55,11 @@ class DPIAController extends Controller
     /**
      * Show the form for creating a new PIA.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         $this->authorizePermission($request);
 
-        return Inertia::render('privacy/dpia/create', [
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-        ]);
+        return redirect('/privacy/dashboard?new=dpia');
     }
 
     /**
@@ -91,6 +89,10 @@ class DPIAController extends Controller
         $validated['assessment_date'] = now();
 
         $dpia = PrivacyImpactAssessment::create($validated);
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'PIA created successfully.');
+        }
 
         return redirect()
             ->route('privacy.dpia.show', $dpia)
@@ -174,12 +176,13 @@ class DPIAController extends Controller
     {
         $this->authorizePermission($request);
 
-        $request->validate([
+        $validated = $request->validate([
             'review_notes' => 'required|string',
         ]);
 
         $dpia->update([
             'outcome' => 'requires_dpo_review',
+            'review_notes' => $validated['review_notes'],
         ]);
 
         return back()->with('success', 'PIA sent for review.');

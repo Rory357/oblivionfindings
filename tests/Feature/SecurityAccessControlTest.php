@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\SafeguardingConcern;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,15 +19,18 @@ class SecurityAccessControlTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $supportWorkerA;
+
     protected User $supportWorkerB;
+
     protected User $nextOfKin;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $adminRole = Role::where('name', 'admin')->firstOrFail();
         $supportRole = Role::where('name', 'support_worker')->firstOrFail();
@@ -182,5 +186,103 @@ class SecurityAccessControlTest extends TestCase
             ->get("/portal/clients/{$client->id}/incidents/{$incident->id}/attachments/{$attachment->id}/download")
             ->assertForbidden();
     }
-}
 
+    // ── Cross-organization isolation (ClientPolicy) ──────────────────────────
+    //
+    // There is NO global organization scope on the Client model and the client
+    // index/controllers lean on `authorize('view', $client)` (and friends) as the
+    // per-record tenancy guard. ClientPolicy must therefore confine a
+    // `clients.viewAny` manager/admin to their own organization, otherwise it is a
+    // cross-org IDOR (org A manager reading/acting on an org B client by id).
+
+    /**
+     * A manager (provider_manager holds `clients.viewAny` and is not a support
+     * worker) seeded in organization A must NOT be able to open a client that
+     * belongs to organization B.
+     */
+    public function test_manager_cannot_view_client_in_another_organization(): void
+    {
+        $manager = $this->providerManagerInOrganization(1);
+        $clientInOtherOrg = Client::factory()->create(['organization_id' => 2]);
+
+        $this->actingAs($manager)
+            ->get(route('clients.show', $clientInOtherOrg))
+            ->assertForbidden();
+    }
+
+    /**
+     * The same manager must still be able to open a client in their OWN
+     * organization — proves the tenancy guard does not regress single-org access.
+     */
+    public function test_manager_can_view_client_in_same_organization(): void
+    {
+        $manager = $this->providerManagerInOrganization(1);
+        $clientInSameOrg = Client::factory()->create(['organization_id' => 1]);
+
+        $this->actingAs($manager)
+            ->getJson(route('clients.show', $clientInSameOrg))
+            ->assertOk()
+            ->assertJsonPath('client.id', $clientInSameOrg->id);
+    }
+
+    /**
+     * The medications surface is guarded by the separate `viewMedications`
+     * ability, which must enforce the same org boundary. `exportCsv` calls
+     * `authorize('viewMedications', $client)` directly, so a cross-org manager
+     * gets a hard 403 here (unlike the MAR page, which diverts break-glass
+     * holders to the emergency-access wizard).
+     */
+    public function test_manager_cannot_export_medications_for_client_in_another_organization(): void
+    {
+        $manager = $this->providerManagerInOrganization(1);
+        $clientInOtherOrg = Client::factory()->create(['organization_id' => 2]);
+
+        $this->actingAs($manager)
+            ->get("/clients/{$clientInOtherOrg->id}/mar/export.csv")
+            ->assertForbidden();
+    }
+
+    /**
+     * Policy-level proof across every "global" branch (view / viewMedications /
+     * update). Same org → allowed, different org → denied, and a null org on
+     * either side stays permissive so single-tenant and "lighter schema"
+     * deployments (where the column may be unset) are unaffected.
+     */
+    public function test_client_policy_isolates_organizations_across_global_branches(): void
+    {
+        $manager = $this->providerManagerInOrganization(1);
+
+        $sameOrg = Client::factory()->create(['organization_id' => 1]);
+        $otherOrg = Client::factory()->create(['organization_id' => 2]);
+        $nullOrg = Client::factory()->create(['organization_id' => null]);
+
+        foreach (['view', 'viewMedications', 'update'] as $ability) {
+            $this->assertTrue(
+                $manager->can($ability, $sameOrg),
+                "Manager should be allowed to {$ability} a client in their own organization."
+            );
+            $this->assertFalse(
+                $manager->can($ability, $otherOrg),
+                "Manager must NOT be allowed to {$ability} a client in another organization."
+            );
+            $this->assertTrue(
+                $manager->can($ability, $nullOrg),
+                "A null organization must stay permissive for {$ability} (single-tenant safety)."
+            );
+        }
+    }
+
+    private function providerManagerInOrganization(int $organizationId): User
+    {
+        $role = Role::where('name', 'provider_manager')->firstOrFail();
+
+        $manager = User::factory()->create([
+            'role' => 'provider_manager',
+            'organization_id' => $organizationId,
+            'approved_at' => now(),
+        ]);
+        $manager->roles()->attach($role);
+
+        return $manager;
+    }
+}

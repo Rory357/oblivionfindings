@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BehaviourSupportPlan extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'client_id',
@@ -25,6 +25,8 @@ class BehaviourSupportPlan extends Model
         'developed_at',
         'review_date',
         'status',
+        'status_changed_at',
+        'status_changed_by',
         'notes',
         'created_by',
         'updated_by',
@@ -33,10 +35,11 @@ class BehaviourSupportPlan extends Model
     protected $casts = [
         'developed_at' => 'date',
         'review_date' => 'date',
+        'status_changed_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function client(): BelongsTo
@@ -52,6 +55,16 @@ class BehaviourSupportPlan extends Model
     public function restraintEvents(): HasMany
     {
         return $this->hasMany(RestraintEvent::class, 'behaviour_support_plan_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(BehaviourSupportPlanReview::class, 'behaviour_support_plan_id');
+    }
+
+    public function statusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'status_changed_by');
     }
 
     public function creator(): BelongsTo

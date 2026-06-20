@@ -11,6 +11,7 @@ use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
+use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
@@ -141,6 +142,16 @@ class MyTasksController extends Controller
             'stats' => $stats,
             'clock' => $clock,
             'active_round' => $activeRound,
+            // Worker-facing Lone Worker Safety check-in card. Null unless the
+            // signed-in user is the subject of a live (active/overdue/emergency)
+            // LoneWorkerSession. The one-tap card POSTs to the existing
+            // health-safety.lone-workers.sessions.check-in endpoint.
+            'active_lone_worker_session' => $this->getActiveLoneWorkerSession($user),
+            // Read-only "First-aid follow-ups assigned to me" card. Lists open
+            // (uncompleted) FirstAidFollowup rows owned by the signed-in worker
+            // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
+            // row deep-links to the register's record modal (no write here).
+            'first_aid_followups' => $this->getFirstAidFollowups($user),
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
@@ -907,6 +918,104 @@ class MyTasksController extends Controller
             report($e);
 
             return null;
+        }
+    }
+
+    /**
+     * The signed-in worker's live Lone Worker Safety session, if any.
+     *
+     * Returns the most recent session in a live state (active / overdue /
+     * emergency) where the user is the monitored worker — the data behind the
+     * My Day "You're being monitored — check in" card. Null when the worker is
+     * not currently being monitored (the card is hidden entirely).
+     *
+     * `next_check_in_at` / `is_check_in_overdue` are derived in PHP from the
+     * model's UTC-stored Carbons (never SQL NOW(), which can sit in a different
+     * timezone and skew the comparison — the same trap the coordinator hero hit).
+     */
+    private function getActiveLoneWorkerSession(User $user): ?array
+    {
+        try {
+            $session = LoneWorkerSession::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['active', 'overdue', 'emergency'])
+                ->with(['site:id,name', 'client:id,first_name,last_name'])
+                ->latest('started_at')
+                ->first();
+
+            if (! $session) {
+                return null;
+            }
+
+            $base = $session->last_check_in_at ?? $session->started_at;
+            $nextCheckInAt = $base
+                ? $base->copy()->addMinutes((int) $session->check_in_interval_minutes)
+                : null;
+
+            return [
+                'id' => $session->id,
+                'status' => $session->status,
+                'started_at' => optional($session->started_at)->toIso8601String(),
+                'expected_end_at' => optional($session->expected_end_at)->toIso8601String(),
+                'last_check_in_at' => optional($session->last_check_in_at)->toIso8601String(),
+                'check_in_interval_minutes' => (int) $session->check_in_interval_minutes,
+                'next_check_in_at' => optional($nextCheckInAt)->toIso8601String(),
+                // Overdue when the 5-min job has already flipped it, or the next
+                // check-in window has lapsed on a still-active session.
+                'is_check_in_overdue' => $session->status === 'overdue' || $session->isCheckInOverdue(),
+                'activity_description' => $session->activity_description,
+                'site' => $session->site
+                    ? ['id' => $session->site->id, 'name' => $session->site->name]
+                    : null,
+                'client' => $session->client
+                    ? ['id' => $session->client->id, 'name' => trim($session->client->first_name.' '.$session->client->last_name)]
+                    : null,
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * Open first-aid follow-ups assigned to the signed-in worker.
+     *
+     * Read-only digest data for the My Day "First-aid follow-ups assigned to
+     * me" card. Returns uncompleted FirstAidFollowup rows (whose parent record
+     * still exists) ordered by due date, each with a deep-link into the First
+     * Aid Register's record modal. Fail-soft — the home renders without the
+     * card if anything throws.
+     */
+    private function getFirstAidFollowups(User $user): array
+    {
+        try {
+            return \App\Models\FirstAidFollowup::query()
+                ->where('assigned_to_user_id', $user->id)
+                ->whereNull('completed_at')
+                ->whereHas('record')
+                ->with([
+                    'record:id,treated_person_name,site_id,treatment_date,injury_illness_type',
+                    'record.site:id,name',
+                ])
+                ->orderBy('due_at')
+                ->limit(10)
+                ->get()
+                ->map(fn ($f) => [
+                    'id' => $f->id,
+                    'notes' => $f->notes,
+                    'due_at' => $f->due_at?->toIso8601String(),
+                    'is_overdue' => $f->due_at ? $f->due_at->isPast() : false,
+                    'record_id' => $f->first_aid_record_id,
+                    'treated_person_name' => $f->record?->treated_person_name,
+                    'site_name' => $f->record?->site?->name,
+                    'url' => '/health-safety/first-aid?record='.$f->first_aid_record_id,
+                ])
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
         }
     }
 

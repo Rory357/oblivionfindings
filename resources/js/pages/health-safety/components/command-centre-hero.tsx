@@ -10,7 +10,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Link, router } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     ChevronDown,
@@ -102,6 +103,7 @@ export function CommandCentreHero({
     openSafeguarding,
     fleetUnresolved,
     fleetIncidents30d,
+    procedures,
     onReport,
     orgName,
 }: {
@@ -114,9 +116,14 @@ export function CommandCentreHero({
     openSafeguarding: number;
     fleetUnresolved: number;
     fleetIncidents30d: number;
+    procedures: { approved: number; review_due: number; coverage_gap_categories: number };
     onReport?: () => void;
     orgName?: string | null;
 }) {
+    // The board-summary export targets governance.view-gated report routes; hide
+    // it for register-only roles so they don't hit a 403 from the command centre.
+    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
 
@@ -234,30 +241,32 @@ export function CommandCentreHero({
                         <BarChart3 className="h-4 w-4" />
                         View analytics
                     </Link>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                            >
-                                <Download className="h-4 w-4" />
-                                Export board summary
-                                <ChevronDown className="h-3.5 w-3.5" />
-                            </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-60 p-1">
-                            {GOV_REPORTS.map((r) => (
-                                <Link
-                                    key={r.href}
-                                    href={r.href}
-                                    className="block rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-muted"
+                    {canViewBoardReports ? (
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                                 >
-                                    {r.label}
-                                </Link>
-                            ))}
-                        </PopoverContent>
-                    </Popover>
+                                    <Download className="h-4 w-4" />
+                                    Export board summary
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-60 p-1">
+                                {GOV_REPORTS.map((r) => (
+                                    <Link
+                                        key={r.href}
+                                        href={r.href}
+                                        className="block rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-muted"
+                                    >
+                                        {r.label}
+                                    </Link>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
+                    ) : null}
                 </div>
             </div>
 
@@ -301,6 +310,13 @@ export function CommandCentreHero({
                 <HeroClusterTile href="/safeguarding" label="Safeguarding" value={fmt(openSafeguarding)} caption="open concerns" tone={openSafeguarding > 0 ? 'warning' : 'success'} />
                 <HeroClusterTile href="/fleet-assets/incidents" label="Fleet incidents" value={fmt(fleetUnresolved)} caption="unresolved" tone={fleetUnresolved > 0 ? 'warning' : 'success'} />
                 <HeroClusterTile href="/fleet-assets/incidents" label="Fleet · 30d" value={fmt(fleetIncidents30d)} caption="reported this period" tone={fleetIncidents30d > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile
+                    href="/health-safety/procedures"
+                    label="Procedures"
+                    value={fmt(procedures.approved)}
+                    caption={procedures.review_due > 0 ? `${procedures.review_due} review due` : procedures.coverage_gap_categories > 0 ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}` : 'all in review window'}
+                    tone={procedures.coverage_gap_categories > 0 ? 'critical' : procedures.review_due > 0 ? 'warning' : 'success'}
+                />
                 <HeroClusterTile href="/health-safety/analytics" label="Analytics" value="View" caption="trends & root cause" tone="neutral" />
             </HeroCluster>
         </HeroShell>

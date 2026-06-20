@@ -47,11 +47,13 @@ class EmergencyDrillObserver implements ShouldHandleEventsAfterCommit
     protected function handleDrillFailure(EmergencyDrill $drill): void
     {
         try {
-            // Record HsEvent
+            // Record HsEvent. recordEvent() derives source_type/source_id + the
+            // idempotency key from the `source` MODEL — passing source_type/source_id
+            // strings instead (the original bug) threw on the undefined `source` key
+            // and was silently swallowed, so the drill_failure convergence never fired.
             $this->hsEventService->recordEvent([
-                'source_type' => EmergencyDrill::class,
-                'source_id' => $drill->id,
-                'event_category' => HsEvent::CATEGORY_DRILL_FAILURE ?? 'drill_failure',
+                'source' => $drill,
+                'event_category' => HsEvent::CATEGORY_DRILL_FAILURE,
                 'severity' => 'medium',
                 'site_id' => $drill->site_id,
                 'occurred_at' => $drill->completed_at ?? now(),

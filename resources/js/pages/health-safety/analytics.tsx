@@ -16,7 +16,8 @@ import { WizardShell } from '@/components/wizard/shell';
 import type { WizardStep } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -97,6 +98,7 @@ const REGISTER: Record<string, string> = {
     hazards: '/compliance/hazards',
     sites: '/health-safety',
     root_cause: '/health-safety/events',
+    first_aid: '/health-safety/first-aid',
 };
 
 // Governance report set — same list as the dashboard's export popover; analytics opens each
@@ -523,7 +525,11 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
-    const { trends, scorecard, period_summary, worksafe_notifiable, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+    const { trends, scorecard, period_summary, worksafe_notifiable, sds_expiring, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+
+    // Board-report routes are gated on governance.view; hide the launcher + the
+    // Governance-tab report packs for register-only roles to avoid a hard 403.
+    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
 
     const [tab, setTab] = useState('overview');
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -581,6 +587,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const incidentTypeItems: BreakdownItem[] = incident_data.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const injuryTypeItems: BreakdownItem[] = injury_data.by_type.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const bodyPartItems: BreakdownItem[] = injury_data.by_body_part.map((d, i) => ({ key: d.body_part, label: d.body_part.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    // First-aid breakdowns (optional + additive). Leading care-activity signal — first-aid-only
+    // treatment is excluded from TRIFR, so these navigate to the First Aid register rather than
+    // the recordable-injury drill modal (the records endpoint has no first-aid view).
+    const firstAidTypeItems: BreakdownItem[] = (props.first_aid_data?.by_type ?? []).map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    const firstAidOutcomeItems: DonutDatum[] = (props.first_aid_data?.by_outcome ?? []).map((d, i) => ({ key: d.outcome, label: d.outcome.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
 
     // ── drill builders ──
     const incidentTypeTarget = (it: BreakdownItem): DrillTarget => ({ view: 'incidents', label: `Incidents · ${it.label}`, filters: { type: it.key }, register: REGISTER.incidents });
@@ -590,6 +601,10 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const bodyPartTarget = (it: BreakdownItem): DrillTarget => ({ view: 'injuries', label: `Injuries · ${it.label}`, filters: { body_part: it.key }, register: REGISTER.injuries });
     const riskTarget = (d: DonutDatum): DrillTarget => ({ view: 'hazards', label: `Hazards · ${d.label} risk`, filters: { risk: d.key }, register: REGISTER.hazards });
     const siteTarget = (s: SiteRow): DrillTarget => ({ view: 'incidents', label: `Site · ${s.name}`, filters: { site_id: s.id }, register: REGISTER.incidents });
+    // First-aid breakdowns are a leading care-activity signal (excluded from TRIFR). The drill
+    // records endpoint has no first-aid view, so row/segment clicks navigate straight to the
+    // First Aid register rather than opening the recordable-injury drill modal.
+    const goFirstAid = () => router.visit(REGISTER.first_aid);
 
     // ── hero pieces ──
     // Cluster tiles read from the scorecard split (it carries the period-over-period
@@ -668,32 +683,34 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                     <Download className="h-4 w-4" /> Export
                                 </Button>
                             </a>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                    >
-                                        <FileText className="h-4 w-4" />
-                                        Board reports
-                                        <ChevronDown className="h-3.5 w-3.5" />
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="end" className="w-60 p-1">
-                                    {GOV_REPORTS.map((r) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                            {canViewBoardReports ? (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
                                         <button
-                                            key={r.name}
                                             type="button"
-                                            onClick={() => window.open(reportUrl(r.name), '_blank')}
-                                            className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                                         >
-                                            {r.label}
+                                            <FileText className="h-4 w-4" />
+                                            Board reports
+                                            <ChevronDown className="h-3.5 w-3.5" />
                                         </button>
-                                    ))}
-                                </PopoverContent>
-                            </Popover>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-60 p-1">
+                                        {GOV_REPORTS.map((r) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                                            <button
+                                                key={r.name}
+                                                type="button"
+                                                onClick={() => window.open(reportUrl(r.name), '_blank')}
+                                                className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                            >
+                                                {r.label}
+                                            </button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            ) : null}
                         </div>
                     </div>
 
@@ -706,7 +723,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                 <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteScope}</span>
                                 {' · Ngā Paerewa NZS 8134:2021 · HSWA 2015 · ACC'}
                             </p>
-                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={0} drillsOverdue={drillsOverdue} />
+                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={sds_expiring} drillsOverdue={drillsOverdue} />
                         </div>
                     </div>
 
@@ -757,8 +774,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                         injuryTypeItems={injuryTypeItems}
                         bodyPartItems={bodyPartItems}
                         riskSegments={riskSegments}
+                        firstAidTypeItems={firstAidTypeItems}
+                        firstAidOutcomeItems={firstAidOutcomeItems}
                         onDrill={openDrill}
                         onCtx={openCtx}
+                        onFirstAid={goFirstAid}
                         incidentTypeTarget={incidentTypeTarget}
                         severityTarget={severityTarget}
                         causeTarget={causeTarget}
@@ -792,7 +812,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                 ) : null}
 
                 {tab === 'governance' ? (
-                    <GovernanceTab scorecard={scorecard} trends={trends} reportUrl={reportUrl} exportUrl={() => (window.location.href = queryFor('incidents'))} />
+                    <GovernanceTab scorecard={scorecard} trends={trends} reportUrl={reportUrl} exportUrl={() => (window.location.href = queryFor('incidents'))} canViewReports={canViewBoardReports} />
                 ) : null}
 
                 {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
@@ -963,8 +983,11 @@ function BreakdownsTab({
     injuryTypeItems,
     bodyPartItems,
     riskSegments,
+    firstAidTypeItems,
+    firstAidOutcomeItems,
     onDrill,
     onCtx,
+    onFirstAid,
     incidentTypeTarget,
     severityTarget,
     causeTarget,
@@ -978,6 +1001,9 @@ function BreakdownsTab({
     injuryTypeItems: BreakdownItem[];
     bodyPartItems: BreakdownItem[];
     riskSegments: DonutDatum[];
+    firstAidTypeItems: BreakdownItem[];
+    firstAidOutcomeItems: DonutDatum[];
+    onFirstAid: () => void;
     incidentTypeTarget: (i: BreakdownItem) => DrillTarget;
     severityTarget: (d: DonutDatum) => DrillTarget;
     causeTarget: (cause: string) => DrillTarget;
@@ -1012,6 +1038,13 @@ function BreakdownsTab({
                     <HorizontalBars data={bodyPartItems} />
                     <BreakdownRows items={bodyPartItems} onItem={(d) => onDrill(bodyPartTarget(d))} onItemCtx={(e, d) => onCtx(e, bodyPartTarget(d), String(d.value), 'warning')} />
                 </ChartCard>
+                <ChartCard title="First aid by outcome" subtitle="Care-activity signal — first-aid-only treatment is excluded from TRIFR" aria="First aid by treatment outcome" table={{ caption: 'First aid by outcome', columns: ['Outcome', 'Count'], rows: firstAidOutcomeItems.map((s) => [s.label, s.value]) }}>
+                    <FocusDonut segments={firstAidOutcomeItems} onSegment={onFirstAid} />
+                </ChartCard>
+                <ChartCard title="First aid by type" subtitle="Click to open the First Aid register" aria="First aid by injury or illness type" table={{ caption: 'First aid by type', columns: ['Type', 'Count'], rows: firstAidTypeItems.map((s) => [s.label, s.value]) }}>
+                    <HorizontalBars data={firstAidTypeItems} />
+                    <BreakdownRows items={firstAidTypeItems} onItem={onFirstAid} />
+                </ChartCard>
             </div>
 
             <ChartCard title="Open hazards by risk rating" subtitle="Hover to focus · click to drill" aria="Open hazards by risk rating" className="lg:max-w-xl" table={{ caption: 'Hazards by risk rating', columns: ['Risk', 'Count'], rows: riskSegments.map((s) => [s.label, s.value]) }}>
@@ -1021,7 +1054,7 @@ function BreakdownsTab({
     );
 }
 
-function GovernanceTab({ scorecard, trends, reportUrl, exportUrl }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void }) {
+function GovernanceTab({ scorecard, trends, reportUrl, exportUrl, canViewReports }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void; canViewReports: boolean }) {
     return (
         <div className="grid gap-4">
             <Scorecard leading={scorecard.leading} lagging={scorecard.lagging} />
@@ -1038,11 +1071,18 @@ function GovernanceTab({ scorecard, trends, reportUrl, exportUrl }: { scorecard:
             <div>
                 <h3 className="mb-2 text-sm font-bold text-foreground">Governance packs</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <GovPackCard icon={FileText} title="Board safety summary" desc="Leading-vs-lagging assurance for the board pack." onOpen={() => window.open(reportUrl('board-summary'), '_blank')} />
-                    <GovPackCard icon={Shield} title="WorkSafe register analytics" desc="Notifiable events register (HSWA s.56)." onOpen={() => window.open(reportUrl('worksafe-register'), '_blank')} />
-                    <GovPackCard icon={Activity} title="Investigation outcomes" desc="Investigation status and outcomes summary." onOpen={() => window.open(reportUrl('investigation-outcomes'), '_blank')} />
-                    <GovPackCard icon={ClipboardList} title="Corrective-action traceability" desc="Action close-out evidence trail." onOpen={() => window.open(reportUrl('corrective-action-traceability'), '_blank')} />
-                    <GovPackCard icon={AlertTriangle} title="Risk-assessment register" desc="Current hazard/risk assessment register." onOpen={() => window.open(reportUrl('risk-assessment-register'), '_blank')} />
+                    {/* Report packs open governance.view-gated routes; hide them for
+                        register-only roles. The CSV export below is hazards.view-gated,
+                        so it stays available. */}
+                    {canViewReports ? (
+                        <>
+                            <GovPackCard icon={FileText} title="Board safety summary" desc="Leading-vs-lagging assurance for the board pack." onOpen={() => window.open(reportUrl('board-summary'), '_blank')} />
+                            <GovPackCard icon={Shield} title="WorkSafe register analytics" desc="Notifiable events register (HSWA s.56)." onOpen={() => window.open(reportUrl('worksafe-register'), '_blank')} />
+                            <GovPackCard icon={Activity} title="Investigation outcomes" desc="Investigation status and outcomes summary." onOpen={() => window.open(reportUrl('investigation-outcomes'), '_blank')} />
+                            <GovPackCard icon={ClipboardList} title="Corrective-action traceability" desc="Action close-out evidence trail." onOpen={() => window.open(reportUrl('corrective-action-traceability'), '_blank')} />
+                            <GovPackCard icon={AlertTriangle} title="Risk-assessment register" desc="Current hazard/risk assessment register." onOpen={() => window.open(reportUrl('risk-assessment-register'), '_blank')} />
+                        </>
+                    ) : null}
                     <GovPackCard icon={Download} title="Export current view" desc="CSV of the active analytics view." actionLabel="Download" onOpen={exportUrl} />
                 </div>
             </div>

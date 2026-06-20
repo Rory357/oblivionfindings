@@ -28,6 +28,9 @@ class EmergencyDrill extends Model
         'status',
         'outcome',
         'scenario_description',
+        'is_unannounced',
+        'assembly_point',
+        'evacuation_scheme',
         'total_participants',
         'residents_evacuated',
         'all_areas_checked',
@@ -52,6 +55,7 @@ class EmergencyDrill extends Model
         'all_areas_checked' => 'boolean',
         'assembly_point_reached' => 'boolean',
         'roll_call_completed' => 'boolean',
+        'is_unannounced' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -76,6 +80,11 @@ class EmergencyDrill extends Model
     public function findings(): HasMany
     {
         return $this->hasMany(EmergencyDrillFinding::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(EmergencyDrillAttachment::class, 'emergency_drill_id');
     }
 
     public function creator(): BelongsTo

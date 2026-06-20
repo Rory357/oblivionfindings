@@ -9,12 +9,14 @@ use App\Services\Sites\Calendar\Providers\ChecklistObligationProvider;
 use App\Services\Sites\Calendar\Providers\ComplianceObligationProvider;
 use App\Services\Sites\Calendar\Providers\CredentialReminderProvider;
 use App\Services\Sites\Calendar\Providers\DamageObligationProvider;
+use App\Services\Sites\Calendar\Providers\DrillObligationProvider;
 use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\RespiteObligationProvider;
 use App\Services\Sites\Calendar\Providers\VendorReminderProvider;
+use App\Services\Sites\Calendar\Providers\WorkerParticipationObligationProvider;
 use App\Services\Sites\SiteCalendarService;
 use Illuminate\Support\Carbon;
 
@@ -65,7 +67,9 @@ class SiteCalendarAggregator
             new CredentialReminderProvider(),
             new AssetMaintenanceObligationProvider(),
             new EmergencyPlanObligationProvider(),
+            new DrillObligationProvider(),
             new RespiteObligationProvider(),
+            new WorkerParticipationObligationProvider(),
         ];
     }
 

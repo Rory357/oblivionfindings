@@ -1,4 +1,6 @@
 import { ChecklistsWorkspace } from '@/components/checklists/workspace';
+import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
+import type { RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { MissingFieldButton } from '@/components/missing-field-button';
 import { DonutChart } from '@/components/ops-stat-card';
@@ -30,9 +32,11 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { TabsContent } from '@/components/ui/tabs';
+import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/datetime';
+import { SiteChemicalsPanel, type SiteChemicalsData } from '@/components/health-safety/site-chemicals-panel';
 import { formatCurrency } from '@/lib/fleet-utils';
 import type { ChecklistsData } from '@/components/checklists/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -46,6 +50,7 @@ import {
     Cake,
     Calendar,
     Car,
+    ChevronRight,
     ClipboardCheck,
     ClipboardList,
     Clock,
@@ -53,11 +58,14 @@ import {
     DollarSign,
     Download,
     DoorOpen,
+    ExternalLink,
     Eye,
     FileText,
+    Flame,
     FolderOpen,
     Fuel,
     GraduationCap,
+    HeartPulse,
     Home,
     KeyRound,
     Layers,
@@ -85,6 +93,7 @@ import {
     Utensils,
     Warehouse,
 } from 'lucide-react';
+import { RISK, RiskChip, StatusChip, fmtDueShort } from '@/components/health-safety/hazard-kit';
 import {
     lazy,
     Suspense,
@@ -586,6 +595,14 @@ type InspectionsSummary = {
     }>;
 };
 
+type DrillsSummary = {
+    drill_status: 'compliant' | 'due_soon' | 'overdue';
+    last_drill_at: string | null;
+    next_drill_at: string | null;
+    scheduled_count: number;
+    open_findings: number;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -631,6 +648,8 @@ type Props = {
     fleet?: SiteFleetData;
     checklistsData?: ChecklistsData;
     inspectionsSummary?: InspectionsSummary;
+    drillsSummary?: DrillsSummary;
+    chemicalsStored?: SiteChemicalsData;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -662,6 +681,14 @@ const emptyInspectionsSummary: InspectionsSummary = {
     failed_records: 0,
     schedules: [],
     records: [],
+};
+
+const emptyDrillsSummary: DrillsSummary = {
+    drill_status: 'overdue',
+    last_drill_at: null,
+    next_drill_at: null,
+    scheduled_count: 0,
+    open_findings: 0,
 };
 
 const inspectionResultStyles: Record<
@@ -915,6 +942,8 @@ export default function SiteShow({
     fleet,
     checklistsData,
     inspectionsSummary = emptyInspectionsSummary,
+    drillsSummary = emptyDrillsSummary,
+    chemicalsStored = { rows: [], summary: { count: 0, controlled: 0, sds_to_action: 0, segregation_gaps: 0 }, substances: [], can_add: false },
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -1143,8 +1172,41 @@ export default function SiteShow({
                     </Badge>
                 ) : undefined,
         },
+        {
+            value: 'drills',
+            label: 'Drills',
+            icon: Flame,
+            badge:
+                drillsSummary.drill_status !== 'compliant' ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {drillsSummary.drill_status === 'overdue' ? 'Overdue' : 'Due'}
+                    </Badge>
+                ) : undefined,
+        },
         { value: 'checklists', label: 'Checklists', icon: ClipboardCheck },
         { value: 'hazards', label: 'Hazards', icon: ShieldAlert },
+        {
+            value: 'first_aid',
+            label: 'First Aid',
+            icon: HeartPulse,
+            badge:
+                (page.props.firstAidOpenFollowupCount ?? 0) > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {page.props.firstAidOpenFollowupCount}
+                    </Badge>
+                ) : undefined,
+        },
+        {
+            value: 'risk_assessments',
+            label: 'Risk Assessments',
+            icon: Shield,
+            badge:
+                (page.props.riskAssessments?.length ?? 0) > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {page.props.riskAssessments.length}
+                    </Badge>
+                ) : undefined,
+        },
         {
             value: 'fleet',
             label: 'Fleet',
@@ -1941,6 +2003,102 @@ export default function SiteShow({
                     </TabsContent>
 
                     {/* Inspections Tab */}
+                    <TabsContent value="drills" className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Drill compliance
+                                    </p>
+                                    <p
+                                        className={`mt-2 text-lg font-semibold ${
+                                            drillsSummary.drill_status === 'overdue'
+                                                ? 'text-status-critical'
+                                                : drillsSummary.drill_status === 'due_soon'
+                                                  ? 'text-status-warning'
+                                                  : 'text-status-success'
+                                        }`}
+                                    >
+                                        {drillsSummary.drill_status === 'overdue'
+                                            ? 'Overdue'
+                                            : drillsSummary.drill_status === 'due_soon'
+                                              ? 'Due soon'
+                                              : 'Compliant'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Last completed
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold">
+                                        {drillsSummary.last_drill_at
+                                            ? new Date(drillsSummary.last_drill_at).toLocaleDateString('en-NZ', {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })
+                                            : 'None recorded'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Next scheduled
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold">
+                                        {drillsSummary.next_drill_at
+                                            ? new Date(drillsSummary.next_drill_at).toLocaleDateString('en-NZ', {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })
+                                            : 'None scheduled'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Open findings
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold">
+                                        {drillsSummary.open_findings}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between gap-3">
+                                <CardTitle>Emergency drills</CardTitle>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={`/health-safety/drills?site_id=${site.id}`}>Open register</Link>
+                                    </Button>
+                                    {can_edit && (
+                                        <Button asChild size="sm">
+                                            <Link href={`/health-safety/drills?site_id=${site.id}&schedule=1`}>
+                                                Schedule drill
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-muted-foreground">
+                                    {drillsSummary.scheduled_count > 0
+                                        ? `${drillsSummary.scheduled_count} drill${drillsSummary.scheduled_count === 1 ? '' : 's'} scheduled. `
+                                        : 'No upcoming drills scheduled. '}
+                                    Compliance is graded on the most recent completed drill within 6 months (FENZ evacuation
+                                    scheme). Full lifecycle, findings and evidence live on the Emergency Drills register.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
                     <TabsContent value="inspections" className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Card>
@@ -2132,40 +2290,223 @@ export default function SiteShow({
                         )}
                     </TabsContent>
 
-                    {/* Hazards Tab */}
+                    {/* Hazards Tab — compact embed of the scoped register; rows
+                        deep-link to /sites/{id}/hazards (the full register + modal). */}
                     <TabsContent value="hazards">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Hazards Register</CardTitle>
-                                <Button asChild>
-                                    <Link href={`/sites/${site.id}/hazards`}>
-                                        View All Hazards
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="py-8 text-center text-muted-foreground">
-                                    <ShieldAlert className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                    <p>Logged hazards and risk assessments</p>
-                                    <div className="mt-4 flex justify-center gap-2">
-                                        <Button asChild variant="outline">
-                                            <Link
-                                                href={`/sites/${site.id}/hazards`}
-                                            >
-                                                View Hazards
-                                            </Link>
-                                        </Button>
-                                        <Button asChild>
-                                            <Link
-                                                href={`/sites/${site.id}/hazards?action=add`}
-                                            >
-                                                Log Hazard
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {(() => {
+                            const hazards = (page.props.siteHazards ?? []) as Array<{
+                                id: number;
+                                reference_number: string;
+                                hazard_label: string;
+                                description: string;
+                                risk_rating: string;
+                                severity: string;
+                                status: string;
+                                due_date: string | null;
+                                overdue: boolean;
+                                unassigned: boolean;
+                            }>;
+                            const openCount = (page.props.siteHazardsOpenCount ?? hazards.length) as number;
+                            return (
+                                <Card>
+                                    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                                        <div className="flex items-start gap-3">
+                                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                                <ShieldAlert className="h-5 w-5" />
+                                            </span>
+                                            <div>
+                                                <CardTitle className="text-base">
+                                                    Hazards at this home <span className="font-normal text-muted-foreground">· {openCount} open</span>
+                                                </CardTitle>
+                                                <p className="mt-0.5 text-sm text-muted-foreground">Same register chrome, scoped to {site.name}. Click any row to open it in the register.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/sites/${site.id}/hazards`}>
+                                                    <ExternalLink className="mr-1.5 h-4 w-4" /> View all
+                                                </Link>
+                                            </Button>
+                                            <Button asChild size="sm">
+                                                <Link href={`/sites/${site.id}/hazards?action=add`}>
+                                                    <Plus className="mr-1.5 h-4 w-4" /> Log hazard
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {hazards.length === 0 ? (
+                                            <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+                                                <ShieldAlert className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                                                <p className="text-sm font-medium text-muted-foreground">No open hazards at {site.name}</p>
+                                                <p className="mt-1 text-xs text-muted-foreground/70">Log a hazard to start the register for this home.</p>
+                                            </div>
+                                        ) : (
+                                            hazards.map((h) => {
+                                                const tone = RISK[h.risk_rating]?.tone ?? 'neutral';
+                                                const dot = tone === 'critical' ? 'bg-status-critical' : tone === 'warning' ? 'bg-status-warning' : tone === 'success' ? 'bg-status-success' : 'bg-muted-foreground';
+                                                return (
+                                                    <Link
+                                                        key={h.id}
+                                                        href={`/sites/${site.id}/hazards?hazard=${h.id}`}
+                                                        className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                                    >
+                                                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-semibold text-foreground">{h.hazard_label}</p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {h.reference_number} · {h.description}
+                                                            </p>
+                                                        </div>
+                                                        <RiskChip rating={h.risk_rating} />
+                                                        <StatusChip status={h.status} />
+                                                        <span className={`hidden text-xs whitespace-nowrap sm:inline ${h.overdue ? 'font-bold text-status-critical' : 'text-muted-foreground'}`}>Due {fmtDueShort(h.due_date)}</span>
+                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                                    </Link>
+                                                );
+                                            })
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
+                        {((page.props.safeWorkProcedures ?? []) as ApplicableProcedure[]).length > 0 ? (
+                            <div className="mt-4">
+                                <ApplicableProceduresPanel
+                                    procedures={(page.props.safeWorkProcedures ?? []) as ApplicableProcedure[]}
+                                    subtitle={`Procedures that apply at ${site.name} (and organisation-wide)`}
+                                />
+                            </div>
+                        ) : null}
+
+                        {/* Chemicals stored at this site (read-mostly; managed from the Chemical register) */}
+                        <div className="mt-4">
+                            <SiteChemicalsPanel data={chemicalsStored} siteId={site.id} siteName={site.name} />
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="first_aid">
+                        {page.props.can?.view_hs_first_aid ? (
+                            (() => {
+                                const records = (page.props.firstAidRecords ?? []) as Array<{
+                                    id: number;
+                                    treatment_date: string | null;
+                                    treated_person_name: string | null;
+                                    treated_person_type: string | null;
+                                    injury_illness_type: string | null;
+                                    treatment_outcome: string | null;
+                                    ambulance_called: boolean;
+                                    incident_reported: boolean;
+                                    first_aider_name: string | null;
+                                    related_incident_id: number | null;
+                                    open_followups_count: number;
+                                }>;
+                                const openFollowups = (page.props.firstAidOpenFollowupCount ?? 0) as number;
+                                const humanise = (value: string | null) =>
+                                    value
+                                        ? value
+                                              .replace(/_/g, ' ')
+                                              .replace(/^\w/, (c) => c.toUpperCase())
+                                        : '—';
+                                return (
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                                            <div className="flex items-start gap-3">
+                                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                                    <HeartPulse className="h-5 w-5" />
+                                                </span>
+                                                <div>
+                                                    <CardTitle className="text-base">
+                                                        First aid at this home{' '}
+                                                        <span className="font-normal text-muted-foreground">
+                                                            · {records.length} {records.length === 1 ? 'record' : 'records'} · {openFollowups} open {openFollowups === 1 ? 'follow-up' : 'follow-ups'}
+                                                        </span>
+                                                    </CardTitle>
+                                                    <p className="mt-0.5 text-sm text-muted-foreground">Latest treatments logged for {site.name}. Click any row to open it in the register.</p>
+                                                </div>
+                                            </div>
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/health-safety/first-aid?site_id=${site.id}`}>
+                                                    <ExternalLink className="mr-1.5 h-4 w-4" /> View all
+                                                </Link>
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {records.length === 0 ? (
+                                                <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+                                                    <HeartPulse className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                                                    <p className="text-sm font-medium text-muted-foreground">No first aid records for {site.name}</p>
+                                                    <p className="mt-1 text-xs text-muted-foreground/70">Treatments logged in the register will appear here.</p>
+                                                </div>
+                                            ) : (
+                                                records.map((r) => (
+                                                    <Link
+                                                        key={r.id}
+                                                        href={`/health-safety/first-aid?site_id=${site.id}&record=${r.id}`}
+                                                        className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                                    >
+                                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                                                            <HeartPulse className="h-4 w-4" />
+                                                        </span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-semibold text-foreground">
+                                                                {r.treated_person_name || 'Unknown person'}
+                                                                {r.treated_person_type ? (
+                                                                    <span className="font-normal text-muted-foreground"> · {humanise(r.treated_person_type)}</span>
+                                                                ) : null}
+                                                            </p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {r.injury_illness_type || 'Treatment'} · {humanise(r.treatment_outcome)}
+                                                                {r.treatment_date ? ` · ${formatDate(r.treatment_date)}` : ''}
+                                                            </p>
+                                                        </div>
+                                                        {r.ambulance_called ? (
+                                                            <Badge variant="outline" className="shrink-0 border-status-critical/40 text-status-critical">
+                                                                Ambulance
+                                                            </Badge>
+                                                        ) : null}
+                                                        {r.related_incident_id === null && (r.incident_reported || r.ambulance_called || r.treatment_outcome === 'sent_to_hospital') ? (
+                                                            <Badge variant="outline" className="shrink-0 border-status-warning/40 text-status-warning">
+                                                                Reportable
+                                                            </Badge>
+                                                        ) : null}
+                                                        {r.open_followups_count > 0 ? (
+                                                            <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">
+                                                                {r.open_followups_count} open
+                                                            </span>
+                                                        ) : null}
+                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                                    </Link>
+                                                ))
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()
+                        ) : (
+                            <Card>
+                                <CardContent className="py-10 text-center text-muted-foreground">
+                                    You don&apos;t have permission to view first aid records.
+                                </CardContent>
+                            </Card>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="risk_assessments">
+                        {page.props.can?.view_hs_risk_assessments ? (
+                            <RaRegisterSection
+                                assessments={(page.props.riskAssessments ?? []) as RaRow[]}
+                                pickers={(page.props.ra_pickers ?? { sites: [], clients: [], events: [] }) as RaPickers}
+                                canManage={Boolean(page.props.can?.manage_hs_risk_assessments)}
+                                lockedAssessable={{ type: 'site', id: site.id, name: site.name }}
+                            />
+                        ) : (
+                            <Card>
+                                <CardContent className="py-10 text-center text-muted-foreground">
+                                    You don&apos;t have permission to view risk assessments.
+                                </CardContent>
+                            </Card>
+                        )}
                     </TabsContent>
 
                     {/* Fleet Tab */}

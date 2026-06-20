@@ -9,6 +9,9 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\CredentialType;
+use App\Models\FirstAidRecord;
+use App\Models\HsRiskAssessment;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
@@ -17,6 +20,9 @@ use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SafeWorkProcedure;
+use App\Models\SiteHazard;
+use App\Support\HazardDetailPresenter;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
@@ -698,8 +704,86 @@ class SiteController extends Controller
             'runDetail' => $checklistsData['runDetail'],
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
+            'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            'siteHazards' => SiteHazard::where('site_id', $site->id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->with('assignedTo:id,name')
+                ->orderByDesc('created_at')
+                ->limit(6)
+                ->get()
+                ->map(fn (SiteHazard $h) => [
+                    'id' => $h->id,
+                    'reference_number' => $h->reference_number,
+                    'hazard_label' => HazardDetailPresenter::hazardLabel($h),
+                    'description' => $h->description,
+                    'risk_rating' => $h->risk_rating,
+                    'severity' => $h->severity,
+                    'status' => $h->status,
+                    'due_date' => $h->due_date?->toDateString(),
+                    'overdue' => $h->isOverdue(),
+                    'unassigned' => ! $h->assigned_to_user_id,
+                ])->values(),
+            'siteHazardsOpenCount' => SiteHazard::where('site_id', $site->id)->open()->count(),
+            // Safe Work Procedures that apply to this site (or org-wide), read-only.
+            'safeWorkProcedures' => ($user && $user->canDo('procedures.view'))
+                ? SafeWorkProcedure::query()->applicableToSite($site->id)
+                    ->orderBy('title')
+                    ->limit(15)
+                    ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                    ->map(fn (SafeWorkProcedure $p) => [
+                        'id' => $p->id,
+                        'reference_number' => $p->reference_number,
+                        'title' => $p->title,
+                        'category' => $p->category,
+                        'status' => $p->status,
+                        'review_date' => $p->review_date?->toDateString(),
+                    ])->values()
+                : collect(),
+            // Formal H&S risk assessments attached to this site (full inline register tab).
+            'riskAssessments' => ($user && $user->canDo('hazards.view'))
+                ? HsRiskAssessment::forAssessable(Site::class, $site->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
+                    ->withCount('attachments')
+                    ->orderByDesc('created_at')
+                    ->limit(100)
+                    ->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
+                    ->values()
+                : [],
+            'ra_pickers' => ($user && $user->canDo('hazards.view'))
+                ? RiskAssessmentPresenter::pickers()
+                : ['sites' => [], 'clients' => [], 'events' => []],
+            'chemicalsStored' => array_merge(
+                app(HsModuleSummaryService::class)->chemicalsStoredForSite($site->id),
+                ['can_add' => (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'))],
+            ),
+            // First aid records logged at this site (read-only inline panel).
+            'firstAidRecords' => ($user && $user->canDo('hazards.view'))
+                ? FirstAidRecord::query()->where('site_id', $site->id)->with(['firstAider:id,name'])
+                    ->withCount(['attachments', 'followups as open_followups_count' => fn ($q) => $q->whereNull('completed_at')])
+                    ->orderByDesc('treatment_date')->limit(8)->get()
+                    ->map(fn (FirstAidRecord $r) => [
+                        'id' => $r->id,
+                        'treatment_date' => $r->treatment_date?->toISOString(),
+                        'treated_person_name' => $r->treated_person_name,
+                        'treated_person_type' => $r->treated_person_type,
+                        'injury_illness_type' => $r->injury_illness_type,
+                        'treatment_outcome' => $r->treatment_outcome,
+                        'ambulance_called' => (bool) $r->ambulance_called,
+                        'incident_reported' => (bool) $r->incident_reported,
+                        'first_aider_name' => $r->firstAider?->name,
+                        'related_incident_id' => $r->related_incident_id,
+                        'open_followups_count' => (int) ($r->open_followups_count ?? 0),
+                    ])->values()
+                : [],
+            'firstAidOpenFollowupCount' => ($user && $user->canDo('hazards.view'))
+                ? FirstAidRecord::where('site_id', $site->id)->whereHas('followups', fn ($q) => $q->whereNull('completed_at'))->count()
+                : 0,
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
+                'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),
+                'manage_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.manage')),
+                'view_hs_first_aid' => (bool) ($user && $user->canDo('hazards.view')),
             ],
             'fleet' => Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
