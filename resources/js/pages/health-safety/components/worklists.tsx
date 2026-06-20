@@ -10,7 +10,8 @@ import {
 } from '@/components/rostering';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Link, router } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -266,7 +267,7 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
     }));
 }
 
-function notifiableRows(rows: NotifiableRow[]): NormRow[] {
+function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
     return rows.map((r) => {
         const awaiting = r.status === 'pending';
         const notifiedSub = [r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null, r.notified_at ? fmtDate(r.notified_at) : null]
@@ -283,7 +284,7 @@ function notifiableRows(rows: NotifiableRow[]): NormRow[] {
             due: null,
             clientId: null,
             staffId: null,
-            registerUrl: '/health-safety/reports/worksafe-register',
+            registerUrl,
             registerLabel: 'WorkSafe register',
             tag: 'WS',
             tagTone: awaiting ? 'warning' : 'success',
@@ -296,7 +297,7 @@ function notifiableRows(rows: NotifiableRow[]): NormRow[] {
                 railSub: titleCase(r.incident_type),
                 cardTitle: 'Notifiable event',
                 cardIcon: ShieldAlert,
-                registerUrl: '/health-safety/reports/worksafe-register',
+                registerUrl,
                 registerLabel: 'WorkSafe register',
                 rows: [
                     { label: 'Title', value: r.title },
@@ -380,6 +381,14 @@ export function HsWorklists({
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [detail, setDetail] = useState<HsDetail | null>(null);
 
+    // The WorkSafe register report is governance.view-gated; for register-only
+    // roles (hazards.view) fall back to the non-gated events WorkSafe tab so the
+    // worklist's register links (card, context menu, detail dialog) don't 403.
+    const canViewGovReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+    const worksafeRegisterUrl = canViewGovReports
+        ? '/health-safety/reports/worksafe-register'
+        : '/health-safety/events?tab=worksafe';
+
     const openCtx = (e: React.MouseEvent, row: NormRow) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [
@@ -434,9 +443,9 @@ export function HsWorklists({
             iconTone: 'critical',
             title: 'WorkSafe-notifiable events',
             subtitle: 'HSWA 2015 · notified / awaiting',
-            registerUrl: '/health-safety/reports/worksafe-register',
+            registerUrl: worksafeRegisterUrl,
             registerLabel: 'Register',
-            rows: notifiableRows(worklists.notifiable_events),
+            rows: notifiableRows(worklists.notifiable_events, worksafeRegisterUrl),
             emptyText: 'No notifiable events on record.',
         },
         expiring: {

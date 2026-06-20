@@ -5,7 +5,8 @@
 import type { RosterTabItem } from '@/components/rostering';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 import {
     CheckCircle2,
     ClipboardCheck,
@@ -320,6 +321,13 @@ const GOVERNANCE_REPORTS: Array<{ label: string; desc: string; icon: LucideIcon;
 ];
 
 export function GovernanceExports() {
+    // Every export here links to a governance.view-gated report route; hide the
+    // whole strip for register-only roles so they don't hit a 403 on click.
+    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+    if (!canViewBoardReports) {
+        return null;
+    }
+
     return (
         <Card>
             <CardContent className="p-4">

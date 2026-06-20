@@ -39,7 +39,8 @@ import {
     entityTone,
 } from '@/pages/health-safety/components/register-row-kit';
 import { formatDateTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
     Activity,
@@ -218,6 +219,10 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [pendingSection, setPendingSection] = useState<EventSectionKey>('overview');
     const [pendingAction, setPendingAction] = useState<EventActionKey | null>(null);
+
+    // Board-report routes are gated on governance.view; hide the launcher for
+    // register-only roles (Team Lead, H&S Officer, …) so they don't hit a 403.
+    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
 
     const go = (next: Partial<Filters>) =>
         router.get('/health-safety/events', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
@@ -424,28 +429,30 @@ export default function HsEventsIndex({ events, tab, tabCounts, hero, filters, s
                             </div>
                         </div>
 
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button size="sm" className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
-                                    <FileText className="mr-1.5 h-4 w-4" /> Board reports
-                                    <span aria-hidden className="ml-1">▾</span>
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent align="end" className="w-64 p-1.5">
-                                {BOARD_REPORTS.map((report) => (
-                                    // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link), not a form control
-                                    <button
-                                        key={report.href}
-                                        type="button"
-                                        onClick={() => router.visit(report.href)}
-                                        className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                                    >
-                                        <FileText className="h-4 w-4 shrink-0 text-primary" />
-                                        {report.label}
-                                    </button>
-                                ))}
-                            </PopoverContent>
-                        </Popover>
+                        {canViewBoardReports ? (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button size="sm" className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                        <FileText className="mr-1.5 h-4 w-4" /> Board reports
+                                        <span aria-hidden className="ml-1">▾</span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-64 p-1.5">
+                                    {BOARD_REPORTS.map((report) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link), not a form control
+                                        <button
+                                            key={report.href}
+                                            type="button"
+                                            onClick={() => router.visit(report.href)}
+                                            className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted"
+                                        >
+                                            <FileText className="h-4 w-4 shrink-0 text-primary" />
+                                            {report.label}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
+                        ) : null}
                     </div>
 
                     {/* stat clusters */}
