@@ -281,7 +281,7 @@ function RtwSection({ d, manage, onAddPlan, onEditPlan, onAddDuty }: { d: Injury
                             <div className="grid gap-2 sm:grid-cols-3">
                                 <MiniStat label="Hours / week" value={firstStage?.hours_per_week != null ? String(firstStage.hours_per_week) : '—'} />
                                 <MiniStat label="Target return" value={p.plan_end_date ? formatDateLong(p.plan_end_date) : '—'} />
-                                <MiniStat label="Medical clearance" value={p.medical_clearance_provider || (p.medical_clearance_notes ? 'On file' : 'Pending')} />
+                                <MiniStat label="Medical clearance" value={p.medical_clearance_provider || (p.medical_clearance_notes || p.medical_clearance_date ? 'On file' : 'Pending')} tone={p.medical_clearance_provider || p.medical_clearance_notes || p.medical_clearance_date ? 'success' : 'warning'} />
                             </div>
                             {p.goals?.length ? (
                                 <ul className="mt-3 list-inside list-disc text-[13px] text-muted-foreground">{p.goals.map((g, i) => <li key={i}>{g}</li>)}</ul>
@@ -341,7 +341,7 @@ function HistorySection({ d }: { d: InjuryDetail }) {
             {d.audits.map((log, i) => (
                 <div key={log.id} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${log.action.endsWith('.create') ? 'bg-status-warning' : log.action.endsWith('.delete') ? 'bg-status-critical' : 'bg-primary'}`} />
                         {i < d.audits.length - 1 ? <span className="w-px flex-1 bg-border" /> : null}
                     </div>
                     <div className="pb-4">
@@ -354,11 +354,12 @@ function HistorySection({ d }: { d: InjuryDetail }) {
     );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value, tone }: { label: string; value: string; tone?: 'success' | 'warning' }) {
+    const cls = tone === 'success' ? 'text-status-success' : tone === 'warning' ? 'text-status-warning' : '';
     return (
         <div className="rounded-lg bg-muted/50 p-2.5">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-            <div className="mt-0.5 text-sm font-bold">{value}</div>
+            <div className={`mt-0.5 text-sm font-bold ${cls}`}>{value}</div>
         </div>
     );
 }

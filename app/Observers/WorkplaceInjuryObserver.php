@@ -203,7 +203,8 @@ class WorkplaceInjuryObserver implements ShouldHandleEventsAfterCommit
 
         try {
             $occurred = $injury->injury_date ?? $injury->created_at ?? now();
-            $severity = in_array($injury->severity, ['serious', 'critical'], true) ? $injury->severity : 'serious';
+            // Map the injury severity vocabulary to the governance taxonomy (critical|high|medium).
+            $severity = $injury->severity === 'critical' ? 'critical' : 'high';
             $reference = 'WI-'.str_pad((string) $injury->id, 4, '0', STR_PAD_LEFT);
 
             $incident = NotifiableIncident::create([
@@ -218,7 +219,10 @@ class WorkplaceInjuryObserver implements ShouldHandleEventsAfterCommit
                 'discovered_at' => $injury->created_at ?? now(),
                 // HSWA requires notifying WorkSafe as soon as possible — track a 24h window from the event.
                 'notification_deadline' => Carbon::parse($occurred)->addDay(),
-                'submitted_by' => $injury->created_by,
+                // notifiable_incidents.submitted_by is NOT NULL — fall back so a seeded/
+                // imported injury (null created_by) flipped to notifiable via the edit
+                // wizard still registers the statutory record.
+                'submitted_by' => $injury->created_by ?? $injury->updated_by ?? auth()->id(),
             ]);
 
             try {

@@ -467,8 +467,9 @@ class ReturnToWorkController extends Controller
             'description' => ['sometimes', 'string', 'max:5000'],
             'medical_treatment_type' => ['sometimes', 'string', 'in:'.implode(',', array_keys(self::TREATMENT_LABELS))],
             'immediate_treatment' => ['sometimes', 'nullable', 'string', 'max:2000'],
-            // Lifecycle / claim fields (detail panes).
-            'status' => ['sometimes', 'string', 'in:reported,under_treatment,return_to_work,recovered,closed'],
+            // Claim / lifecycle-data fields (detail panes). NOTE: status is intentionally
+            // NOT accepted here — all lifecycle moves go through transitionStatus() so the
+            // allowed-transition graph is always enforced.
             'lost_time_days' => ['sometimes', 'integer', 'min:0'],
             'expected_return_date' => ['sometimes', 'nullable', 'date'],
             'actual_return_date' => ['sometimes', 'nullable', 'date'],
@@ -497,7 +498,11 @@ class ReturnToWorkController extends Controller
         $from = (string) $injury->status;
         $to = $validated['status'];
 
-        if ($to !== $from && ! in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
+        if ($to === $from) {
+            return back(); // no-op — don't bump updated_by or emit a phantom audit entry
+        }
+
+        if (! in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
             return back()->with('error', 'That status change is not allowed from "'.str_replace('_', ' ', $from).'".');
         }
 
@@ -661,7 +666,9 @@ class ReturnToWorkController extends Controller
     public function uploadAttachment(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            // Allowlist the expected evidence formats — never accept scriptable types
+            // (svg/html) since attachments are served same-origin from the public disk.
+            'file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,gif,doc,docx'],
             'kind' => ['nullable', 'string', 'in:medical_cert,acc_form,rtw_clearance,photo,document'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'alt_text' => ['nullable', 'string', 'max:255'],
@@ -691,8 +698,10 @@ class ReturnToWorkController extends Controller
         abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
 
         $disk = $attachment->disk ?: 'public';
+        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
 
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // nosniff so a mislabelled file can't be re-interpreted as executable content.
+        return Storage::disk($disk)->download($attachment->path, $attachment->original_name, ['X-Content-Type-Options' => 'nosniff']);
     }
 
     public function destroyAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): RedirectResponse

@@ -247,10 +247,10 @@ class InjuriesControllerTest extends TestCase
         $inj = $this->injury();
         $other = $this->injury();
 
-        // Upload
+        // Upload (real fake image so it passes the mimes allowlist)
         $this->actingAs($this->admin)
             ->post('/health-safety/injuries/'.$inj->id.'/attachments', [
-                'file' => UploadedFile::fake()->create('medical-cert.pdf', 200, 'application/pdf'),
+                'file' => UploadedFile::fake()->image('injury-evidence.jpg'),
                 'kind' => 'medical_cert',
             ])
             ->assertSessionHasNoErrors();
@@ -275,6 +275,49 @@ class InjuriesControllerTest extends TestCase
             ->delete('/health-safety/injuries/'.$inj->id.'/attachments/'.$att->id)
             ->assertSessionHasNoErrors();
         $this->assertSoftDeleted('workplace_injury_attachments', ['id' => $att->id]);
+    }
+
+    public function test_attachment_rejects_scriptable_type(): void
+    {
+        Storage::fake('public');
+        $inj = $this->injury();
+
+        $this->actingAs($this->admin)
+            ->from('/health-safety/injuries?injury='.$inj->id)
+            ->post('/health-safety/injuries/'.$inj->id.'/attachments', [
+                'file' => UploadedFile::fake()->create('evil.svg', 5, 'image/svg+xml'),
+            ])
+            ->assertSessionHasErrors('file');
+
+        $this->assertDatabaseCount('workplace_injury_attachments', 0);
+    }
+
+    public function test_worksafe_flip_on_null_created_by_still_registers_notifiable(): void
+    {
+        // Seeded/imported injury with no created_by, later flagged via the edit wizard.
+        $inj = $this->injury(['created_by' => null, 'worksafe_notifiable' => false]);
+
+        $this->actingAs($this->admin)
+            ->put('/health-safety/injuries/'.$inj->id, ['worksafe_notifiable' => true])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('notifiable_incidents', [
+            'workplace_injury_id' => $inj->id,
+            'notification_authority' => 'worksafe',
+        ]);
+    }
+
+    public function test_update_does_not_change_status(): void
+    {
+        $inj = $this->injury(['status' => 'reported']);
+
+        $this->actingAs($this->admin)
+            ->put('/health-safety/injuries/'.$inj->id, ['status' => 'recovered', 'lost_time_days' => 3])
+            ->assertSessionHasNoErrors();
+
+        $inj->refresh();
+        $this->assertSame('reported', $inj->status, 'status must not be settable via update() — only via transitionStatus()');
+        $this->assertSame(3, (int) $inj->lost_time_days);
     }
 
     public function test_client_incident_reverse_relation(): void
