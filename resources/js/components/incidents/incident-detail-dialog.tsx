@@ -13,6 +13,7 @@ import {
     Download,
     ExternalLink,
     FileText,
+    Hand,
     LinkIcon,
     ListTodo,
     Paperclip,
@@ -108,6 +109,7 @@ export type IncidentDetail = {
     assignable_staff: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
     fleet_incident?: { id: number; reference: string; type: string } | null;
+    restraint_events?: Array<{ id: number; reference: string; restraint_type: string; severity: string; within_support_plan: boolean; injury_occurred: boolean }>;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -845,8 +847,19 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
             {d.fleet_incident ? (
                 <LinkedRow icon={Truck} title="Fleet incident" sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`} href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`} />
             ) : null}
+            {(d.restraint_events ?? []).map((r) => (
+                <LinkedRow
+                    key={r.id}
+                    icon={Hand}
+                    title="Restraint event"
+                    sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
+                    href={`/health-safety/restraints?event=${r.id}`}
+                />
+            ))}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
+            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length ? (
+                <p className="text-sm text-muted-foreground">No linked records.</p>
+            ) : null}
         </div>
     );
 }

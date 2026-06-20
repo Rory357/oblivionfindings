@@ -449,6 +449,13 @@ class HandleInertiaRequests extends Middleware
                 'manageTypes' => $user->canDo('hazards.manage_types'),
             ],
 
+            'restraints' => [
+                'view' => $user->canDo('restraints.view'),
+                'create' => $user->canDo('restraints.create'),
+                'manage' => $user->canDo('restraints.manage'),
+                'review' => $user->canDo('restraints.review'),
+            ],
+
             'checklists' => [
                 'view' => $user->canDo('checklists.view'),
                 'run' => $user->canDo('checklists.run'),
