@@ -201,13 +201,13 @@ export default function Assessments({ records, stats, filters, filter_options, k
 
                                 <div className="mt-2 flex items-center justify-between gap-3">
                                     <p className="text-[13px] text-foreground">{a.summary}</p>
-                                    <button type="button" onClick={() => setExpanded(isOpen ? null : a.id)} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-foreground">
+                                    <button type="button" onClick={() => setExpanded(isOpen ? null : a.id)} aria-expanded={isOpen} aria-controls={`assessment-breakdown-${a.id}`} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-foreground">
                                         {isOpen ? <>Hide breakdown <ChevronUp className="h-3.5 w-3.5" /></> : <>View breakdown <ChevronDown className="h-3.5 w-3.5" /></>}
                                     </button>
                                 </div>
 
                                 {isOpen ? (
-                                    <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                                    <div id={`assessment-breakdown-${a.id}`} className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
                                         <div className="flex flex-col gap-1.5">
                                             {a.breakdown.map((row) => (
                                                 <div key={row.key} className="flex items-center justify-between gap-3 text-[13px]">
@@ -247,7 +247,9 @@ export default function Assessments({ records, stats, filters, filter_options, k
                 </div>
             ) : null}
 
-            <RecordAssessmentDialog open={recordOpen} onClose={() => setRecordOpen(false)} onSaved={() => setRecordOpen(false)} />
+            {/* No onSaved close — let the wizard show its success pane (parity with the
+                sibling record dialogs); the register refreshes via the controller's back(). */}
+            <RecordAssessmentDialog open={recordOpen} onClose={() => setRecordOpen(false)} />
         </HealthClinicalShell>
     );
 }

@@ -72,7 +72,7 @@ function must(inputs: AssessmentInputs): ScoreResult {
                   : 'Routine clinical care — re-screen per setting.',
         breakdown: [
             { key: 'bmi', label: 'BMI', detail: bmi === null ? 'Not provided' : `${bmi.toFixed(1)} kg/m²`, points: bmiPts },
-            { key: 'weight_loss', label: 'Unplanned weight loss (3–6 months)', detail: `${wl}%`, points: wlPts },
+            { key: 'weight_loss', label: 'Unplanned weight loss (3–6 months)', detail: `${wl.toFixed(1)}%`, points: wlPts },
             { key: 'acute_disease', label: 'Acute disease effect (no intake >5 days)', detail: acute ? 'Yes' : 'No', points: acutePts },
         ],
     };

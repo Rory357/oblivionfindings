@@ -70,7 +70,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/clients/' . $client->id . '/trends?date_from=' . now()->subDays(7)->toDateString() . '&date_to=' . now()->toDateString())
+            ->get('/health-clinical/clients/'.$client->id.'/trends?date_from='.now()->subDays(7)->toDateString().'&date_to='.now()->toDateString())
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientTrends')
@@ -87,7 +87,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($user)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.date_from', now()->subDays(29)->toDateString())
@@ -97,7 +97,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($supportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientTrends')
@@ -106,11 +106,11 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($unassignedSupportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertForbidden();
 
         $this->actingAs($unauthorizedUser)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertForbidden();
     }
 
@@ -146,7 +146,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
 
         // Client selected → trend sets incl. the module-only NEWS2 series.
         $this->actingAs($user)
-            ->get('/health-clinical/trends?client_id=' . $client->id)
+            ->get('/health-clinical/trends?client_id='.$client->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/Trends')
@@ -158,6 +158,35 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         // No clinical-observation permission → forbidden.
         $this->actingAs($unauthorizedUser)
             ->get('/health-clinical/trends')
+            ->assertForbidden();
+    }
+
+    public function test_module_trends_enforces_per_client_assignment_for_assigned_only_users(): void
+    {
+        // A viewAssigned-only user must not chart a client they are not assigned to:
+        // the module Trends tab must apply the same per-client guard as the per-client page.
+        $assigned = $this->createUserWithRole('support_worker');
+        $unassigned = $this->createUserWithRole('support_worker');
+        $client = Client::factory()->create();
+        $client->supportWorkers()->attach($assigned->id);
+
+        ClinicalObservation::factory()->weight()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(2),
+            'data' => ['weight_kg' => 70.5],
+        ]);
+
+        $this->actingAs($assigned)
+            ->get('/health-clinical/trends?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->where('selected_client.id', $client->id)
+                ->where('trend_sets.weight.points.0.weight_kg', 70.5));
+
+        // Unassigned worker swapping in another client's id → 403, no PHI leaked.
+        $this->actingAs($unassigned)
+            ->get('/health-clinical/trends?client_id='.$client->id)
             ->assertForbidden();
     }
 

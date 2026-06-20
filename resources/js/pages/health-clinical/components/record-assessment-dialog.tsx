@@ -134,7 +134,8 @@ function Body({ onClose, client, onSaved }: RecordAssessmentDialogProps) {
         notes: '',
         attachments: [],
     });
-    const { data, setData, processing } = form;
+    const { data, setData, processing, errors } = form;
+    const hasErrors = Object.keys(errors).length > 0;
 
     const type = data.assessment_type as AssessmentTypeValue | '';
     const result = useMemo(() => (type ? computeAssessment(type, data.inputs) : null), [type, data.inputs]);
@@ -156,10 +157,15 @@ function Body({ onClose, client, onSaved }: RecordAssessmentDialogProps) {
     const formValid = (): boolean => {
         if (!type) return false;
         const i = data.inputs;
+        const has = (v: string | number | boolean | null | undefined) => v !== undefined && v !== null && v !== '';
         if (type === 'falls_frat') return ['recent_falls', 'medications', 'psychological', 'cognitive'].every((k) => !!i[k]);
         if (type === 'pressure_braden') return BRADEN_SUBSCALES.every((s) => !!i[s.key]);
-        if (type === 'malnutrition_must') return i.weight_loss_percent !== undefined && i.weight_loss_percent !== '';
-        if (type === 'dysphagia_iddsi') return i.drink_level !== undefined || i.food_level !== undefined;
+        if (type === 'malnutrition_must') {
+            // Mirror the server: weight loss + a BMI basis (direct BMI, or height+weight).
+            const bmiBasis = has(i.bmi) || (has(i.height_cm) && has(i.weight_kg));
+            return has(i.weight_loss_percent) && bmiBasis;
+        }
+        if (type === 'dysphagia_iddsi') return has(i.drink_level) || has(i.food_level);
         return false;
     };
 
@@ -281,6 +287,11 @@ function Body({ onClose, client, onSaved }: RecordAssessmentDialogProps) {
             {STEPS[stepIndex].key === 'form' ? (
                 <WizardStepPane>
                     <StepHead icon={ClipboardList} title={typeMeta?.label ?? 'Assessment'} blurb="Complete each item — the score updates live and is verified on save." />
+                    {hasErrors ? (
+                        <InfoCard icon={ShieldAlert} tone="crit">
+                            Couldn’t record this assessment — please check the values below and try again.
+                        </InfoCard>
+                    ) : null}
                     <AssessmentFields type={type} inputs={data.inputs} setInput={setInput} />
                     {result ? <LiveScore result={result} /> : null}
                 </WizardStepPane>
@@ -343,19 +354,20 @@ function AssessmentFields({ type, inputs, setInput }: { type: AssessmentTypeValu
         return (
             <div className="grid gap-4">
                 <SubHead icon={Scale}>Body mass index</SubHead>
+                <p className="-mt-2 text-[13px] text-muted-foreground">Enter a BMI, or a height and weight to derive it — a BMI basis is required.</p>
                 <div className="grid gap-3 sm:grid-cols-3">
-                    <Field label="BMI" hint="if known">
-                        <Input type="number" step="0.1" value={str(inputs.bmi)} onChange={(e) => setInput('bmi', e.target.value)} placeholder="e.g. 21.4" />
+                    <Field label="BMI" hint="or height + weight">
+                        <Input type="number" step="0.1" min={5} max={120} value={str(inputs.bmi)} onChange={(e) => setInput('bmi', e.target.value)} placeholder="e.g. 21.4" />
                     </Field>
-                    <Field label="Height (cm)" hint="or derive BMI">
-                        <Input type="number" value={str(inputs.height_cm)} onChange={(e) => setInput('height_cm', e.target.value)} placeholder="170" />
+                    <Field label="Height (cm)" hint="with weight">
+                        <Input type="number" min={30} max={260} value={str(inputs.height_cm)} onChange={(e) => setInput('height_cm', e.target.value)} placeholder="170" />
                     </Field>
-                    <Field label="Weight (kg)">
-                        <Input type="number" step="0.1" value={str(inputs.weight_kg)} onChange={(e) => setInput('weight_kg', e.target.value)} placeholder="68" />
+                    <Field label="Weight (kg)" hint="with height">
+                        <Input type="number" step="0.1" min={1} max={500} value={str(inputs.weight_kg)} onChange={(e) => setInput('weight_kg', e.target.value)} placeholder="68" />
                     </Field>
                 </div>
                 <Field label="Unplanned weight loss (3–6 months, %)" required>
-                    <Input type="number" step="0.1" value={str(inputs.weight_loss_percent)} onChange={(e) => setInput('weight_loss_percent', e.target.value)} placeholder="e.g. 7" />
+                    <Input type="number" step="0.1" min={0} max={100} value={str(inputs.weight_loss_percent)} onChange={(e) => setInput('weight_loss_percent', e.target.value)} placeholder="e.g. 7" />
                 </Field>
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                     <label className="flex items-start gap-3">

@@ -270,6 +270,13 @@ class HealthClinicalDashboardController extends Controller
 
         $client = isset($validated['client_id']) ? Client::find($validated['client_id']) : null;
 
+        // Assignment guard: a viewAssigned-only user may only chart a client they
+        // can view (mirrors HealthClinicalClientTrendsController::show) — without
+        // this, a client_id swap would leak any client's vitals/NEWS2.
+        if ($client && ! $auth->canDo('clinical.observations.viewAny')) {
+            $this->authorize('view', $client);
+        }
+
         $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to'])->endOfDay() : now()->endOfDay();
         $from = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : $to->copy()->subDays(13)->startOfDay();
 
@@ -447,9 +454,11 @@ class HealthClinicalDashboardController extends Controller
     {
         return match ($type) {
             ClinicalAssessmentType::MalnutritionMust => [
-                'inputs.bmi' => ['nullable', 'numeric', 'min:5', 'max:120'],
-                'inputs.height_cm' => ['nullable', 'numeric', 'min:30', 'max:260'],
-                'inputs.weight_kg' => ['nullable', 'numeric', 'min:1', 'max:500'],
+                // Require a BMI basis — either a direct BMI or a height+weight pair — so a
+                // non-measurable BMI can never silently score 0 and under-band the result.
+                'inputs.bmi' => ['required_without_all:inputs.height_cm,inputs.weight_kg', 'nullable', 'numeric', 'min:5', 'max:120'],
+                'inputs.height_cm' => ['required_with:inputs.weight_kg', 'nullable', 'numeric', 'min:30', 'max:260'],
+                'inputs.weight_kg' => ['required_with:inputs.height_cm', 'nullable', 'numeric', 'min:1', 'max:500'],
                 'inputs.weight_loss_percent' => ['required', 'numeric', 'min:0', 'max:100'],
                 'inputs.acute_disease_effect' => ['nullable', 'boolean'],
             ],

@@ -103,6 +103,32 @@ class HealthClinicalAssessmentsTest extends TestCase
         $this->assertDatabaseCount('clinical_risk_assessments', 0);
     }
 
+    public function test_must_requires_a_bmi_basis(): void
+    {
+        $user = $this->userWithRole('clinical_lead', 1);
+        $client = Client::factory()->create(['organization_id' => 1]);
+
+        // No BMI and no height/weight → rejected, so a non-measurable BMI can't silently score 0.
+        $this->actingAs($user)
+            ->post('/health-clinical/assessments', [
+                'client_id' => $client->id,
+                'assessment_type' => 'malnutrition_must',
+                'inputs' => ['weight_loss_percent' => 3],
+            ])
+            ->assertSessionHasErrors('inputs.bmi');
+        $this->assertDatabaseCount('clinical_risk_assessments', 0);
+
+        // A height + weight pair is a valid basis (BMI derived) → accepted.
+        $this->actingAs($user)
+            ->post('/health-clinical/assessments', [
+                'client_id' => $client->id,
+                'assessment_type' => 'malnutrition_must',
+                'inputs' => ['height_cm' => 170, 'weight_kg' => 50, 'weight_loss_percent' => 3],
+            ])
+            ->assertRedirect();
+        $this->assertDatabaseCount('clinical_risk_assessments', 1);
+    }
+
     public function test_register_renders_with_records_and_stats(): void
     {
         $user = $this->userWithRole('clinical_lead', 1);

@@ -73,7 +73,11 @@ class MustScorer implements ClinicalAssessmentScorer
     private function scoreBmi(?float $bmi): int
     {
         if ($bmi === null) {
-            return 0; // BMI not measurable (e.g. unable to weigh) — documented, scores 0 per chart guidance.
+            // Defensive floor only — the store endpoint requires a BMI basis (direct
+            // BMI, or a height+weight pair), so a null BMI cannot reach storage. If
+            // BMI is truly unobtainable, BAPEN directs using surrogate measures
+            // (MUAC / ulna length) rather than scoring it 0.
+            return 0;
         }
 
         return match (true) {
