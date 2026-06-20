@@ -270,6 +270,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::post('/sessions', [LoneWorkerController::class, 'startSession'])->name('sessions.store');
+            Route::patch('/sessions/{session}', [LoneWorkerController::class, 'updateSession'])->name('sessions.update');
             Route::post('/sessions/{session}/check-in', [LoneWorkerController::class, 'checkIn'])->name('sessions.check-in');
             Route::post('/sessions/{session}/end', [LoneWorkerController::class, 'endSession'])->name('sessions.end');
             Route::post('/sessions/{session}/emergency', [LoneWorkerController::class, 'triggerEmergency'])->name('sessions.emergency');

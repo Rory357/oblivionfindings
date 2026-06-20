@@ -17,6 +17,7 @@ class LoneWorkerSession extends Model
         'user_id',
         'site_id',
         'client_id',
+        'shift_id',
         'started_at',
         'expected_end_at',
         'ended_at',
@@ -58,6 +59,11 @@ class LoneWorkerSession extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 
     public function checkIns(): HasMany
