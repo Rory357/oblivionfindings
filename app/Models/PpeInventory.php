@@ -29,6 +29,12 @@ class PpeInventory extends Model
         'status',
         'last_inspected_at',
         'next_inspection_due',
+        'condemned_at',
+        'condemned_by',
+        'condemned_reason',
+        'disposed_at',
+        'disposed_by',
+        'disposal_method',
         'created_by',
         'updated_by',
     ];
@@ -38,6 +44,8 @@ class PpeInventory extends Model
         'expiry_date' => 'date',
         'last_inspected_at' => 'date',
         'next_inspection_due' => 'date',
+        'condemned_at' => 'datetime',
+        'disposed_at' => 'datetime',
     ];
 
     // Relationships
@@ -62,6 +70,11 @@ class PpeInventory extends Model
         return $this->hasMany(PpeInspection::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(PpeAttachment::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -70,6 +83,16 @@ class PpeInventory extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function condemnedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'condemned_by');
+    }
+
+    public function disposedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'disposed_by');
     }
 
     // Scopes
