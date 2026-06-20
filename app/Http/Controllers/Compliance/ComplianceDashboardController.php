@@ -63,7 +63,7 @@ class ComplianceDashboardController extends Controller
                     ->get()
                     ->map(fn (ClientIncident $i) => [
                         'id' => $i->id,
-                        'label' => $i->reference ?? $i->title ?? "Incident #{$i->id}",
+                        'label' => $i->title ?? "Incident #{$i->id}",
                     ])
                     ->values()
                 : [],

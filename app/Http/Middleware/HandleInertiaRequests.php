@@ -406,15 +406,6 @@ class HandleInertiaRequests extends Middleware
                 'reportsView' => $user->canDo('controlRoom.reports.view'),
             ],
 
-            // Compliance command centre (/compliance). `view` gates the page; the
-            // create/record/respond wizards POST to governance endpoints and so are
-            // gated on the governance.compliance.* capabilities (a distinct role set).
-            'compliance' => [
-                'view' => $user->canDo('compliance.view'),
-                'governanceView' => $user->canDo('governance.compliance.view'),
-                'governanceManage' => $user->canDo('governance.compliance.manage'),
-            ],
-
             'securityDevices' => [
                 'viewAny' => $user->canDo('securityDevices.viewAny'),
                 'devicesView' => $user->canDo('securityDevices.devices.view'),

@@ -628,7 +628,15 @@ export default function ComplianceIndex({
                                                 {dueLabel(row)}
                                             </span>
                                             <StatusBadge variant={obligationStatusVariant(row.status)} size="sm">
-                                                {row.status === 'due_soon' ? 'Due soon' : row.status === 'not_due' ? 'On track' : undefined}
+                                                {row.status === 'overdue'
+                                                    ? 'Overdue'
+                                                    : row.status === 'due_soon'
+                                                      ? 'Due soon'
+                                                      : row.status === 'complete'
+                                                        ? 'Complete'
+                                                        : row.status === 'not_due'
+                                                          ? 'On track'
+                                                          : row.status.replace(/_/g, ' ')}
                                             </StatusBadge>
                                             <Kebab header={row.title} actions={actions} />
                                         </li>

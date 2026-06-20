@@ -38,7 +38,7 @@ import {
     Trash2,
     UploadCloud,
 } from 'lucide-react';
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { toast } from 'sonner';
 
 type ObligationOption = { id: number; title: string; framework: string; due_date?: string | null };
@@ -109,6 +109,10 @@ function DocumentDropzone({
         () => (file && isImage(file) ? URL.createObjectURL(file) : null),
         [file],
     );
+    // Free the blob URL when the preview changes or the dropzone unmounts.
+    useEffect(() => () => {
+        if (preview) URL.revokeObjectURL(preview);
+    }, [preview]);
 
     const accept = (f?: File | null) => {
         if (!f) return;

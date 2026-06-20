@@ -80,6 +80,7 @@ export function CompleteObligationDialog({
                 toast.success('Obligation marked complete');
                 setDone(true);
             },
+            onError: () => toast.error('Could not complete the obligation'),
         });
     };
 

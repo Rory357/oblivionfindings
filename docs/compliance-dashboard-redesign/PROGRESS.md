@@ -173,6 +173,24 @@ documented repo gotcha (see memory `reference_worktree_vendor` / prior loops).
 - Migration hardened: independent guarded column adds + `SHOW INDEX` guard (idempotent; safe under the per-column
   `ALTER` behavior of this Laravel build). MAR-trend query made portable (`CASE WHEN … = 'x'`, single-quoted).
 
+## §Adversarial review pass (2 parallel agents, static — worktree can't run PHP)
+Both agents confirmed the core contracts hold (all 10 controller props ⇆ index.tsx Props match;
+all 4 wizard endpoints + field names + enum values match server validation; WizardShell add-client
+idiom correct; `set()` casts sound; no `.find()` crashes; tone 'info'→'neutral' cast correct; empty
+manage-arrays handled). **No HIGH bugs.** 5 confirmed findings — ALL FIXED (commit after `5d163e61`):
+- **MED** `HandleInertiaRequests` — my added `compliance` perms block was a **duplicate array key** (PHP
+  keeps the last → my `governanceView`/`governanceManage` silently dropped) AND redundant (page uses
+  controller `can.manage`/`can.triage` props; `governance.compliance.{view,manage}` already exposed). → **Removed** my block (net no change vs main).
+- **MED** index.tsx "what's due" `StatusBadge` rendered an **empty pill** for `overdue`/`complete` rows
+  (children `undefined`). → labels for every status + humanised fallback.
+- **LOW** record-evidence `URL.createObjectURL` never revoked (blob leak). → `useEffect` revoke cleanup.
+- **LOW** complete-obligation `form.post` had no `onError` (silent fail). → added error toast for parity.
+- **LOW** controller `relatedIncidents` mapped non-existent `$i->reference` (dead branch; ClientIncident
+  has no such column). → dropped to `title ?? "Incident #{id}"`.
+Re-verified after fixes: **tsc 0, php -l clean, pint clean.** Non-findings (verified clean): authz/IDOR
+(single-org app; consistent with canonical ControlRoom no-scope), metrics queries/columns/scopes, store
+path threading, migration idempotency, permission keys, Carbon usage, empty-string→null middleware.
+
 ## §Notes / status log
 - Audit done by direct reads (two sub-agent workflows hit transient rate-limit then a hard session limit
   resetting 4:50pm Pacific/Auckland — pivoted to self-serve reads). Workflows can be retried after reset for
