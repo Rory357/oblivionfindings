@@ -17,6 +17,7 @@ import {
     Segmented,
     StepHead,
 } from '@/components/wizard/primitives';
+import { AddressAutocomplete, type GeocodeResult } from '@/components/address-autocomplete';
 import { initials } from '@/pages/health-safety/components/register-row-kit';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
@@ -155,6 +156,29 @@ export function LoneWorkerWizard({
             location_lng: s.location_lng != null ? String(s.location_lng) : '',
         }));
         setErrors((e) => ({ ...e, user_id: '' }));
+    };
+
+    // OpenStreetMap (Nominatim) suggestion picked — fill address + coordinates.
+    const onGeocode = (r: GeocodeResult) => {
+        form.setData((prev) => ({
+            ...prev,
+            location: r.address_line_1 || r.display_name || prev.location,
+            location_lat: r.lat != null ? String(r.lat) : prev.location_lat,
+            location_lng: r.lng != null ? String(r.lng) : prev.location_lng,
+        }));
+    };
+
+    // Ad-hoc: picking a site prefills the location + coordinates from the Site record
+    // ("selectable from site"). Typing / OSM autocomplete still overrides afterwards.
+    const selectSite = (siteId: string) => {
+        const site = options.sites.find((s) => String(s.id) === siteId);
+        form.setData((prev) => ({
+            ...prev,
+            site_id: siteId,
+            location: site?.address ? site.address : prev.location,
+            location_lat: site?.latitude != null ? String(site.latitude) : prev.location_lat,
+            location_lng: site?.longitude != null ? String(site.longitude) : prev.location_lng,
+        }));
     };
 
     const switchMode = (m: WizMode) => {
@@ -350,10 +374,10 @@ export function LoneWorkerWizard({
                                     />
                                 </Field>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <Field label="Site">
+                                    <Field label="Site" hint="prefills the address">
                                         <SelectInput
                                             value={d.site_id}
-                                            onChange={(v) => form.setData('site_id', v)}
+                                            onChange={selectSite}
                                             placeholder="No site"
                                             options={options.sites.map((s) => ({ value: String(s.id), label: s.name }))}
                                         />
@@ -371,12 +395,13 @@ export function LoneWorkerWizard({
                         )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <Field label="Location" hint="street address or area" span>
-                                <input
+                            <Field label="Location" hint="search OpenStreetMap or type an address" span>
+                                <AddressAutocomplete
                                     value={d.location}
-                                    onChange={(e) => form.setData('location', e.target.value)}
+                                    onChange={(v) => form.setData('location', v)}
+                                    onSelect={onGeocode}
+                                    endpoint="/health-safety/lone-workers/geocode/search"
                                     placeholder="e.g. 14 Cameron Rd, Tauranga"
-                                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/30 focus:outline-none"
                                 />
                             </Field>
                             <Field label="Latitude">
@@ -397,7 +422,7 @@ export function LoneWorkerWizard({
                             </Field>
                         </div>
                         <InfoCard icon={MapPin} tone="info">
-                            Coordinates are optional — on a shift they default to the worker's last GPS ping (ShiftGpsLog).
+                            Coordinates auto-fill from the chosen site or an OpenStreetMap address — on a shift they default to the worker's last GPS ping (ShiftGpsLog). All optional.
                         </InfoCard>
                     </div>
                 )}

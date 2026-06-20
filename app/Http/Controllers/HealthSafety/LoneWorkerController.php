@@ -133,7 +133,18 @@ class LoneWorkerController extends Controller
             'hero' => $this->heroBlock($shiftData['unmonitored_lone']),
             'filters' => $filters,
             'options' => [
-                'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+                'sites' => Site::select('id', 'name', 'address_line_1', 'suburb', 'city', 'postcode', 'latitude', 'longitude')
+                    ->where('is_active', true)->orderBy('name')->get()
+                    ->map(fn ($s) => [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        // Composed one-line address so the wizard can prefill the location
+                        // field when a site is chosen ("selectable from site").
+                        'address' => collect([$s->address_line_1, $s->suburb, $s->city, $s->postcode])
+                            ->filter()->implode(', ') ?: null,
+                        'latitude' => $s->latitude,
+                        'longitude' => $s->longitude,
+                    ]),
                 'staff' => User::select('id', 'name')->orderBy('name')->get(),
                 'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->get()
                     ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)]),
