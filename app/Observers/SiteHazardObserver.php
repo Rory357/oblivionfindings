@@ -80,8 +80,10 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
             $updates['status_changed_at'] = now();
             $updates['status_changed_by_user_id'] = auth()->id();
 
-            // If closing, set closed info
-            if (in_array($hazard->status, ['mitigated', 'closed'])) {
+            // Closure timestamps record terminal closure only. `mitigated` is an
+            // active "awaiting closure" state, so it must NOT be stamped as
+            // closed (doing so corrupts closed-by-month analytics).
+            if ($hazard->status === 'closed') {
                 $updates['closed_at'] = now();
                 $updates['closed_by_user_id'] = auth()->id();
             }
@@ -230,8 +232,20 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
 
     private function generateReferenceNumber(): string
     {
+        // Derive from the highest existing reference (incl. soft-deleted) rather
+        // than a row count, so a soft-deleted hazard can't make two creates
+        // compute the same number under the unique constraint.
         $year = now()->year;
-        $count = SiteHazard::whereYear('created_at', $year)->count() + 1;
-        return sprintf('HAZ-%d-%04d', $year, $count);
+        $latest = SiteHazard::withTrashed()
+            ->where('reference_number', 'like', "HAZ-{$year}-%")
+            ->orderByDesc('id')
+            ->value('reference_number');
+
+        $next = 1;
+        if ($latest && preg_match('/HAZ-\d{4}-(\d+)/', $latest, $m)) {
+            $next = (int) $m[1] + 1;
+        }
+
+        return sprintf('HAZ-%d-%04d', $year, $next);
     }
 }

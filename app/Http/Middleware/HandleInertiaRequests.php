@@ -442,6 +442,7 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('hazards.create'),
                 'assign' => $user->canDo('hazards.assign'),
                 'close' => $user->canDo('hazards.close'),
+                'manage' => $user->canDo('hazards.manage'),
                 'manageTypes' => $user->canDo('hazards.manage_types'),
             ],
 

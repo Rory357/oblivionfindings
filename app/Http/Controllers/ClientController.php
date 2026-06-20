@@ -22,6 +22,8 @@ use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\AssetGeofence;
 use App\Models\AuditLog;
 use App\Models\CarePlan;
+use App\Models\SiteHazard;
+use App\Support\HazardDetailPresenter;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientBowelEntry;
@@ -517,7 +519,47 @@ class ClientController extends Controller
 
         $actionsReviews = app(ActionsAggregator::class)->forClient($client, $request->user());
 
+        // Site / environmental hazards at the client's current home (read-only
+        // context — managed from the Hazards register). Open + mitigated only.
+        $siteId = $client->site_id;
+        $homeHazards = $siteId
+            ? SiteHazard::query()
+                ->where('site_id', $siteId)
+                ->whereIn('status', ['open', 'in_progress', 'mitigated'])
+                ->with('assignedTo:id,name')
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get()
+                ->map(fn (SiteHazard $h) => [
+                    'id' => $h->id,
+                    'reference_number' => $h->reference_number,
+                    'hazard_label' => HazardDetailPresenter::hazardLabel($h),
+                    'description' => $h->description,
+                    'risk_rating' => $h->risk_rating,
+                    'severity' => $h->severity,
+                    'status' => $h->status,
+                    'due_date' => $h->due_date?->toDateString(),
+                    'overdue' => $h->isOverdue(),
+                    'site_id' => $h->site_id,
+                ])->values()
+            : collect();
+
+        $homeHazardDetail = null;
+        if ($request->filled('hazard') && $siteId) {
+            $hz = SiteHazard::query()
+                ->where('site_id', $siteId)
+                ->with(['site:id,name,type', 'reportedBy:id,name', 'assignedTo:id,name', 'statusChangedBy:id,name', 'closedBy:id,name', 'actions.assignedTo:id,name', 'actions.completedBy:id,name'])
+                ->find($request->query('hazard'));
+            if ($hz) {
+                $homeHazardDetail = HazardDetailPresenter::make($hz, ['manage' => false, 'assign' => false, 'close' => false]);
+            }
+        }
+
         return inertia('operations/clients/show', [
+            'homeHazards' => $homeHazards,
+            'homeHazardDetail' => $homeHazardDetail,
+            'homeName' => $client->site?->name,
+            'homeSiteId' => $siteId,
             'client' => [
                 'id' => $client->id,
                 'nhi_number' => $client->nhi_number,
