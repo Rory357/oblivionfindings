@@ -240,6 +240,9 @@ class HandleInertiaRequests extends Middleware
                 // after creating a NEW committee so it can chain the meeting POST
                 // to /committees/{id}/meetings on the freshly created committee.
                 'created_committee_id' => session('created_committee_id'),
+                // The Safe Work Procedure wizard reads this after a successful
+                // create so its success pane can open the new procedure.
+                'created_procedure_id' => session('created_procedure_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
@@ -276,7 +279,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v2';
+    protected const PERMISSIONS_CACHE_VERSION = 'v3';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -448,6 +451,13 @@ class HandleInertiaRequests extends Middleware
                 'close' => $user->canDo('hazards.close'),
                 'manage' => $user->canDo('hazards.manage'),
                 'manageTypes' => $user->canDo('hazards.manage_types'),
+            ],
+
+            'procedures' => [
+                'view' => $user->canDo('procedures.view'),
+                'create' => $user->canDo('procedures.create'),
+                'manage' => $user->canDo('procedures.manage'),
+                'approve' => $user->canDo('procedures.approve'),
             ],
 
             'checklists' => [

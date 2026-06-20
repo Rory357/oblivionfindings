@@ -105,7 +105,104 @@ class HealthSafetyDemoSeeder extends Seeder
             $this->command->info('Lone Worker sessions already seeded, skipping.');
         }
 
+        // ── 9. Safe Work Procedures (controlled SWMS document library) ──
+        if (! DB::table('safe_work_procedures')->where('purpose', 'like', '%'.self::DEMO_MARKER.'%')->exists()) {
+            $this->command->info('Seeding Safe Work Procedures...');
+            $this->seedSafeWorkProcedures($siteIds, $userIds, $now);
+        } else {
+            $this->command->info('Safe Work Procedures already seeded, skipping.');
+        }
+
         $this->command->info('Health & Safety demo data seeded successfully.');
+    }
+
+    /* ==================================================================
+     *  Safe Work Procedures — controlled SWMS document library demo data
+     * ================================================================*/
+
+    private function seedSafeWorkProcedures(array $siteIds, array $userIds, Carbon $now): void
+    {
+        $owner = fn () => $userIds[array_rand($userIds)];
+        $someSites = fn () => count($siteIds) > 1 ? array_slice($siteIds, 0, 2) : $siteIds;
+
+        // [reference, title, category, status, reviewOffsetDays|null, versions, roles, ppe, hazards, steps, sites?]
+        $rows = [
+            ['SWP-001', 'Safe Manual Handling & Client Transfers', 'manual_handling', 'approved', 165, 3,
+                ['support_worker', 'team_lead'], ['Gloves', 'Hoist sling', 'Slide sheet'], ['Musculoskeletal injury', 'Slips, trips & falls'],
+                [['Assess the client and the environment before any transfer.', 'Never lift more than you safely can — use the hoist.'], ['Position the hoist and check the sling rating.', 'Confirm the sling is the correct size and undamaged.'], ['Complete the transfer with a second worker where the care plan requires it.', 'Stop if the client shows distress.']]],
+            ['SWP-002', 'Responding to Behaviours of Concern (PBS)', 'challenging_behaviour', 'approved', -12, 2,
+                ['support_worker', 'team_lead'], ['None'], ['Aggression / challenging behaviour', 'Working alone'],
+                [['Use the client\'s positive behaviour support plan first.', 'Keep yourself and others at a safe distance.'], ['De-escalate using known triggers and calming strategies.', 'Do not restrain unless trained and it is a last resort.']]],
+            ['SWP-003', 'Lone & Community Working', 'lone_working', 'under_review', null, 1,
+                ['support_worker'], ['Mobile phone', 'Hi-vis vest'], ['Working alone', 'Slips, trips & falls'],
+                [['Log your visit and expected return in the lone-worker system.', 'Check in at the agreed interval.']]],
+            ['SWP-004', 'Medication Administration & eMAR', 'medication', 'approved', 20, 2,
+                ['support_worker', 'team_lead'], ['Gloves'], ['Medication error'],
+                [['Confirm the six rights before administering.', 'Witness controlled drugs with a second signatory.'], ['Record administration on the eMAR immediately.', 'Report any error or omission without delay.']]],
+            ['SWP-005', 'Infection Prevention & Control', 'infection_control', 'approved', 240, 1,
+                ['support_worker'], ['Gloves', 'Apron', 'Face mask'], ['Exposure to bodily fluids'],
+                [['Perform hand hygiene before and after every contact.', 'Use PPE appropriate to the task.'], ['Dispose of clinical waste in the correct stream.', null]]],
+            ['SWP-006', 'Fire Evacuation & Assembly', 'fire_safety', 'approved', 300, 1,
+                ['support_worker', 'team_lead'], ['None'], ['Burns / scalds'],
+                [['On discovering a fire, raise the alarm and call 111.', 'Do not tackle the fire unless it is safe to do so.'], ['Evacuate clients via the nearest safe exit to the assembly point.', 'Account for everyone and report to the warden.']]],
+            ['SWP-007', 'Epilepsy & Seizure Response', 'emergency_procedures', 'draft', null, 1,
+                ['support_worker'], ['Gloves'], ['Slips, trips & falls'],
+                [['Protect the person from injury and time the seizure.', 'Do not put anything in their mouth.'], ['Administer rescue medication only as prescribed.', 'Call 111 if the seizure lasts longer than 5 minutes.']]],
+            ['SWP-008', 'Hoist & Mobility Equipment Use', 'equipment_use', 'approved', 90, 1,
+                ['support_worker', 'team_lead'], ['Hoist sling'], ['Musculoskeletal injury'],
+                [['Inspect the hoist and sling before every use.', 'Check the LOLER inspection is in date.'], ['Operate within the safe working load.', null]]],
+            ['SWP-009', 'Personal & Intimate Care', 'personal_care', 'draft', null, 1,
+                ['support_worker'], ['Gloves', 'Apron'], ['Exposure to bodily fluids'],
+                [['Maintain the client\'s dignity and consent throughout.', 'Follow the personal care plan.']]],
+        ];
+
+        foreach ($rows as $r) {
+            [$ref, $title, $category, $status, $reviewOffset, $versionCount, $roles, $ppe, $hazards, $stepPairs] = $r;
+            $approved = $status === 'approved';
+            $ownerId = $owner();
+            $steps = [];
+            foreach ($stepPairs as $i => $pair) {
+                $steps[] = ['step_number' => $i + 1, 'description' => $pair[0], 'safety_notes' => $pair[1] ?? ''];
+            }
+
+            $procedureId = DB::table('safe_work_procedures')->insertGetId([
+                'title' => $title,
+                'reference_number' => $ref,
+                'category' => $category,
+                'purpose' => 'Keep workers and clients safe during '.strtolower($title).'. '.self::DEMO_MARKER,
+                'scope' => 'All supported-living settings where this activity is carried out.',
+                'hazards_addressed' => json_encode($hazards),
+                'ppe_required' => json_encode($ppe),
+                'steps' => json_encode($steps),
+                'emergency_procedures' => json_encode(['Call 111 for any life-threatening emergency.', 'Notify the on-call coordinator and record an incident.']),
+                'status' => $status,
+                'current_version' => $versionCount,
+                'approved_by' => $approved ? $owner() : null,
+                'approved_at' => $approved ? $now->copy()->subDays(30) : null,
+                'owner_id' => $ownerId,
+                'review_date' => $reviewOffset !== null ? $now->copy()->addDays($reviewOffset)->toDateString() : null,
+                'review_frequency_months' => 12,
+                'applicable_roles' => json_encode($roles),
+                'applicable_sites' => json_encode($someSites()),
+                'related_training' => json_encode([]),
+                'created_by' => $ownerId,
+                'updated_by' => $ownerId,
+                'created_at' => $now->copy()->subDays(120),
+                'updated_at' => $now,
+            ]);
+
+            for ($v = 1; $v <= $versionCount; $v++) {
+                DB::table('safe_work_procedure_versions')->insert([
+                    'safe_work_procedure_id' => $procedureId,
+                    'version_number' => $v,
+                    'content_snapshot' => json_encode(['title' => $title, 'version' => $v]),
+                    'change_summary' => $v === 1 ? 'Initial version' : 'Reviewed and updated for v'.$v.'.',
+                    'changed_by' => $ownerId,
+                    'created_at' => $now->copy()->subDays(120 - $v * 20),
+                    'updated_at' => $now->copy()->subDays(120 - $v * 20),
+                ]);
+            }
+        }
     }
 
     /* ==================================================================

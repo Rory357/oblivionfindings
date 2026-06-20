@@ -103,6 +103,7 @@ export function CommandCentreHero({
     openSafeguarding,
     fleetUnresolved,
     fleetIncidents30d,
+    procedures,
     onReport,
     orgName,
 }: {
@@ -115,6 +116,7 @@ export function CommandCentreHero({
     openSafeguarding: number;
     fleetUnresolved: number;
     fleetIncidents30d: number;
+    procedures: { approved: number; review_due: number; coverage_gap_categories: number };
     onReport?: () => void;
     orgName?: string | null;
 }) {
@@ -308,6 +310,13 @@ export function CommandCentreHero({
                 <HeroClusterTile href="/safeguarding" label="Safeguarding" value={fmt(openSafeguarding)} caption="open concerns" tone={openSafeguarding > 0 ? 'warning' : 'success'} />
                 <HeroClusterTile href="/fleet-assets/incidents" label="Fleet incidents" value={fmt(fleetUnresolved)} caption="unresolved" tone={fleetUnresolved > 0 ? 'warning' : 'success'} />
                 <HeroClusterTile href="/fleet-assets/incidents" label="Fleet · 30d" value={fmt(fleetIncidents30d)} caption="reported this period" tone={fleetIncidents30d > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile
+                    href="/health-safety/procedures"
+                    label="Procedures"
+                    value={fmt(procedures.approved)}
+                    caption={procedures.review_due > 0 ? `${procedures.review_due} review due` : procedures.coverage_gap_categories > 0 ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}` : 'all in review window'}
+                    tone={procedures.coverage_gap_categories > 0 ? 'critical' : procedures.review_due > 0 ? 'warning' : 'success'}
+                />
                 <HeroClusterTile href="/health-safety/analytics" label="Analytics" value="View" caption="trends & root cause" tone="neutral" />
             </HeroCluster>
         </HeroShell>

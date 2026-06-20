@@ -212,6 +212,20 @@ class HealthSafetyDashboardController extends Controller
                     'committees' => HsCommittee::count(),
                 ];
             }, ['pct' => null, 'committees' => 0], false),
+
+            // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
+            'procedures' => rescue(function () {
+                $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
+                $covered = \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                    ->whereIn('category', $highRisk)->distinct()->pluck('category')->all();
+
+                return [
+                    'approved' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')->count(),
+                    'review_due' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                        ->whereNotNull('review_date')->where('review_date', '<=', now()->addDays(30))->count(),
+                    'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
+                ];
+            }, ['approved' => 0, 'review_due' => 0, 'coverage_gap_categories' => 0], false),
         ]);
     }
 
