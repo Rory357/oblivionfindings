@@ -6,6 +6,7 @@ import {
     FolderOpen,
     HeartPulse,
     Landmark,
+    ShieldCheck,
     Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,9 @@ const MODULE_TILES = [
     { label: 'Documents', href: '/governance/documents', icon: FolderOpen, tone: 'text-status-success bg-status-success-bg' },
     { label: 'Clinical', href: '/governance/clinical', icon: HeartPulse, tone: 'text-status-critical bg-status-critical-bg' },
     { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: Landmark, tone: 'text-status-info bg-status-info-bg' },
+    // Operational compliance command centre (org-wide exception roll-up — board assurance).
+    // Distinct from the governance "Compliance" obligations register (/governance/compliance).
+    { label: 'Compliance Centre', href: '/compliance', icon: ShieldCheck, tone: 'text-primary bg-primary/10' },
 ] as const;
 
 /**

@@ -191,6 +191,24 @@ Re-verified after fixes: **tsc 0, php -l clean, pint clean.** Non-findings (veri
 (single-org app; consistent with canonical ControlRoom no-scope), metrics queries/columns/scopes, store
 path threading, migration idempotency, permission keys, Carbon usage, empty-string→null middleware.
 
+## §Deferrals completed (follow-up loop, 2026-06-21)
+After the main redesign merged/deployed/live-verified, the two deferrals were revisited:
+- **Governance surfacing (was deferred)** — implemented per `COMPLIANCE_GOVERNANCE_SURFACING_PLAN.md`
+  §2.3/2.4/2.5, frontend-only (the metrics are already in the cockpit's control_room/incidents widgets,
+  so no risky snapshot-pipeline change): (1) **cockpit module tile** "Compliance Centre" → `/compliance`
+  in `CockpitLayout` MODULE_TILES; (2) **governance nav entry** "Operational Compliance" → `/compliance`
+  in `buildGovernanceSubPanelGroups` "Risk & Compliance" group (gated `compliance.view || governance.view`,
+  labelled to disambiguate from the obligations register "Compliance"); (3) **reverse cross-link**
+  "Compliance Centre" button on `Governance/Compliance/Index.tsx` (gated on `compliance.view`). Bidirectional
+  cross-links now complete (`/compliance` → register + calendar was already done).
+- **"Registers due" (was deferred)** — confirmed **NOT a real gap**: the design's "What's due"
+  (GAP_ANALYSIS row 3) maps to the obligations register + `ClientSupportPlan.next_review_at`, both already
+  shipped. No separate "registers" data source exists to wire — nothing to build.
+- **PHP tests** — now run from the **parent** (worktree junction blocked them): `ComplianceDashboardTest`
+  **13 passed / 115 assertions** incl. the 3 new metrics tests. (`GovernanceComplianceTest` run separately.)
+- Quality gates re-run: **tsc 0, ESLint clean (3 files), vite build exit 0.** Frontend-only; no migrations,
+  no new permissions.
+
 ## §Notes / status log
 - Audit done by direct reads (two sub-agent workflows hit transient rate-limit then a hard session limit
   resetting 4:50pm Pacific/Auckland — pivoted to self-serve reads). Workflows can be retried after reset for

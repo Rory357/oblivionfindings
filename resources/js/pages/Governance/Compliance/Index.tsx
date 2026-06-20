@@ -97,6 +97,11 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
             ]}
             actions={
               <div className="flex gap-2">
+                {(auth.can?.compliance as { view?: boolean } | undefined)?.view && (
+                  <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                    <Link href="/compliance">Compliance Centre</Link>
+                  </Button>
+                )}
                 <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                   <Link href={complianceCalendar.url()}>Calendar View</Link>
                 </Button>
