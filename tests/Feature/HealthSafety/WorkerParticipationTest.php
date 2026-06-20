@@ -302,6 +302,24 @@ class WorkerParticipationTest extends TestCase
         $this->assertSame('closed', $consultation->fresh()->status);
     }
 
+    public function test_consultation_status_never_regresses(): void
+    {
+        $consultation = $this->consultation(['status' => 'actioned', 'outcome' => 'Training scheduled.']);
+
+        // Recording late feedback must not drag an actioned consultation back to
+        // feedback_received — the stage is preserved, but the content still saves.
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/consultations/{$consultation->id}/status", [
+                'status' => 'feedback_received',
+                'worker_feedback_summary' => 'Late feedback captured.',
+            ])
+            ->assertRedirect();
+
+        $consultation->refresh();
+        $this->assertSame('actioned', $consultation->status);
+        $this->assertSame('Late feedback captured.', $consultation->worker_feedback_summary);
+    }
+
     public function test_store_consultation_with_supporting_document(): void
     {
         Storage::fake('private');

@@ -565,6 +565,16 @@ class WorkerParticipationController extends Controller
             'workers_consulted.*' => ['integer', 'exists:users,id'],
         ]);
 
+        // The lifecycle is monotonic — never regress the stage (e.g. recording
+        // late feedback on an already-actioned consultation keeps the later
+        // stage); content fields still save. Defense-in-depth — the front-end
+        // already computes a non-regressing target.
+        $current = array_search($consultation->status, self::CONSULT_STAGES, true);
+        $target = array_search($validated['status'], self::CONSULT_STAGES, true);
+        if ($current !== false && $target !== false && $target < $current) {
+            $validated['status'] = $consultation->status;
+        }
+
         $consultation->update($validated);
 
         return back()->with('success', 'Consultation status updated successfully.');
