@@ -1649,11 +1649,32 @@ function ActionsSection({
 }
 
 function RiskSection({ d }: { d: EventDetail }) {
+    const registerLink = (
+        <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">Risk assessments linked to this event</span>
+            <Link
+                href={`/health-safety/risk-assessments?hs_event_id=${d.id}`}
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
+            >
+                View in register <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+        </div>
+    );
     if (!d.risk_assessments.length) {
-        return <EmptyState icon={Activity} title="No linked risk assessments" blurb="5×5 likelihood × consequence assessments linked to this event appear here." />;
+        return (
+            <div className="flex flex-col gap-3">
+                {registerLink}
+                <EmptyState
+                    icon={Activity}
+                    title="No linked risk assessments"
+                    blurb="5×5 likelihood × consequence assessments linked to this event appear here. Open the register to create one for this event."
+                />
+            </div>
+        );
     }
     return (
         <div className="flex flex-col gap-4">
+            {registerLink}
             {d.risk_assessments.map((ra) => (
                 // eslint-disable-next-line no-restricted-syntax -- custom governance layout surface
                 <div key={ra.id} className="rounded-xl border border-border bg-card/70 p-4">

@@ -270,7 +270,7 @@ class HsDashboardService
             ->orderBy('review_due_at')
             ->limit($limit)
             ->get() as $ra) {
-            $items[] = $this->expiringItem('risk_assessment', 'Risk assessment review', $ra->title ?: $ra->reference_number, $ra->review_due_at, '/health-safety/risk-assessments');
+            $items[] = $this->expiringItem('risk_assessment', 'Risk assessment review', $ra->title ?: $ra->reference_number, $ra->review_due_at, '/health-safety/risk-assessments?assessment='.$ra->id);
         }
 
         foreach (SafetyDataSheet::query()
