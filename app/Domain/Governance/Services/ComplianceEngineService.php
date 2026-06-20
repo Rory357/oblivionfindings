@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Services;
 
+use App\Domain\Governance\Jobs\SendComplianceReminder;
 use App\Domain\Governance\Models\ComplianceEvidence;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\ComplianceReminder;
@@ -22,7 +23,9 @@ class ComplianceEngineService
         User $owner,
         ?Carbon $dueDate = null,
         ?string $obligationCode = null,
-        ?array $reminderDays = null
+        ?array $reminderDays = null,
+        string $priority = 'medium',
+        ?string $requirements = null
     ): ComplianceObligation {
         $dueDate = $dueDate ?? $this->calculateNextDueDate($frequency);
 
@@ -31,6 +34,8 @@ class ComplianceEngineService
             'obligation_code' => $obligationCode,
             'obligation_title' => $title,
             'description' => $description,
+            'requirements' => $requirements,
+            'priority' => $priority,
             'frequency' => $frequency,
             'due_date' => $dueDate,
             'next_due_date' => $dueDate,
@@ -48,7 +53,7 @@ class ComplianceEngineService
     {
         $from = $from ?? now();
 
-        return match($frequency) {
+        return match ($frequency) {
             'monthly' => $from->copy()->endOfMonth(),
             'quarterly' => $from->copy()->endOfQuarter(),
             'annual' => $from->copy()->endOfYear(),
@@ -70,7 +75,7 @@ class ComplianceEngineService
         if ($evidenceIds) {
             ComplianceEvidence::whereIn('id', $evidenceIds)
                 ->update(['compliance_obligation_id' => $obligation->id]);
-            
+
             $obligation->update(['evidence_provided' => true]);
         }
 
@@ -86,14 +91,14 @@ class ComplianceEngineService
     protected function scheduleNextOccurrence(ComplianceObligation $completed): void
     {
         $nextDueDate = $this->calculateNextDueDate($completed->frequency, $completed->due_date);
-        
+
         // Check if obligation already exists for this date
         $existing = ComplianceObligation::where('framework', $completed->framework)
             ->where('obligation_code', $completed->obligation_code)
             ->whereDate('due_date', $nextDueDate)
             ->first();
 
-        if (!$existing) {
+        if (! $existing) {
             $this->createObligation(
                 $completed->framework,
                 $completed->obligation_title,
@@ -118,7 +123,7 @@ class ComplianceEngineService
         User $uploadedBy,
         ?Carbon $validUntil = null
     ): ComplianceEvidence {
-        $path = $file->store('compliance-evidence/' . $obligation->framework);
+        $path = $file->store('compliance-evidence/'.$obligation->framework);
 
         $evidence = ComplianceEvidence::create([
             'compliance_obligation_id' => $obligation->id,
@@ -145,7 +150,7 @@ class ComplianceEngineService
 
         foreach ($obligation->reminder_days as $daysBefore) {
             $scheduledAt = $obligation->due_date->copy()->subDays($daysBefore);
-            
+
             // Don't schedule if already passed
             if ($scheduledAt->isPast()) {
                 continue;
@@ -171,10 +176,10 @@ class ComplianceEngineService
 
         foreach ($reminders as $reminder) {
             $obligation = $reminder->obligation;
-            
+
             // Send notification to owner
-            \App\Domain\Governance\Jobs\SendComplianceReminder::dispatch($reminder);
-            
+            SendComplianceReminder::dispatch($reminder);
+
             $reminder->markSent();
             $count++;
 
@@ -246,14 +251,14 @@ class ComplianceEngineService
     public function getComplianceStatus(): array
     {
         $frameworks = [
-            'charities', 'nga_paerewa', 'hdsa_safety', 'privacy_act', 
-            'hip_code', 'hswa', 'employment', 'funding_moh'
+            'charities', 'nga_paerewa', 'hdsa_safety', 'privacy_act',
+            'hip_code', 'hswa', 'employment', 'funding_moh',
         ];
-        
+
         $summary = [];
         foreach ($frameworks as $framework) {
             $obligations = ComplianceObligation::byFramework($framework);
-            
+
             $summary[$framework] = [
                 'total' => $obligations->count(),
                 'complete' => (clone $obligations)->where('status', 'complete')->count(),
@@ -280,7 +285,7 @@ class ComplianceEngineService
             ->where('status', '!=', 'complete')
             ->orderBy('due_date')
             ->get()
-            ->map(fn($o) => [
+            ->map(fn ($o) => [
                 'id' => $o->id,
                 'framework' => $o->getFrameworkLabel(),
                 'title' => $o->obligation_title,
@@ -382,8 +387,8 @@ class ComplianceEngineService
                 ->where('obligation_code', $obligation['code'])
                 ->exists();
 
-            if (!$exists && $admin) {
-                $dueDate = isset($obligation['due_month']) 
+            if (! $exists && $admin) {
+                $dueDate = isset($obligation['due_month'])
                     ? now()->month($obligation['due_month'])->endOfMonth()
                     : now()->addMonth();
 

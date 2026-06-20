@@ -19,6 +19,7 @@ class StoreComplianceObligationRequest extends FormRequest
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'requirements' => 'nullable|string',
+            'frequency' => 'nullable|string|in:monthly,quarterly,annual,ad_hoc,event_driven',
             'due_date' => 'nullable|date',
             'owner_id' => 'nullable|exists:users,id',
             'priority' => 'nullable|string|in:low,medium,high,critical',
