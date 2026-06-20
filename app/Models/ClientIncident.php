@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -185,6 +186,11 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->hasMany(SafeguardingConcern::class, 'related_incident_id');
     }
 
+    public function restraintEvents(): HasMany
+    {
+        return $this->hasMany(RestraintEvent::class, 'related_incident_id');
+    }
+
     /** First-aid treatments escalated to / linked with this incident. */
     public function firstAidRecords(): HasMany
     {
@@ -225,9 +231,9 @@ class ClientIncident extends Model implements EmitsToTimeline
     /**
      * Corrective actions raised against the linked HsEvent (empty collection if none).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\HsCorrectiveAction>
+     * @return Collection<int, HsCorrectiveAction>
      */
-    public function linkedCorrectiveActions(): \Illuminate\Database\Eloquent\Collection
+    public function linkedCorrectiveActions(): Collection
     {
         return $this->linkedHsEvent()?->correctiveActions()->with('assignedTo:id,name')->get() ?? collect();
     }

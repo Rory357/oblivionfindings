@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- Overview "delight" surfaces use bespoke
  * tinted cards, reaction chips, congratulate/acknowledge and CTA pills sized to
  * the design handoff; the shadcn <Button> can't express these on-tint layouts. */
+import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -98,6 +99,7 @@ interface Props {
         attention: AttentionItem[];
     };
     announcements: Announcement[];
+    safeWorkProcedures?: ApplicableProcedure[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -212,7 +214,7 @@ function DelightCard({
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MyHrIndex({ myHr, overview, announcements }: Props) {
+export default function MyHrIndex({ myHr, overview, announcements, safeWorkProcedures = [] }: Props) {
     const openKudos = useSendKudos();
     const { weekly, nextShift } = myHr;
     const firstName = myHr.profile.first_name;
@@ -840,6 +842,13 @@ export default function MyHrIndex({ myHr, overview, announcements }: Props) {
                         </DelightCard>
                     </div>
                 </div>
+
+                {safeWorkProcedures.length > 0 ? (
+                    <ApplicableProceduresPanel
+                        procedures={safeWorkProcedures}
+                        subtitle="Applicable to your role(s) — open any to read the controlled document"
+                    />
+                ) : null}
             </div>
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}

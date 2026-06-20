@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class LegalHold extends Model
@@ -53,5 +54,13 @@ class LegalHold extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Supporting documents (court order, ERA/HDC notice, the legal authority).
+     */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(PrivacyAttachment::class, 'attachable')->latest();
     }
 }

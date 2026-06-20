@@ -450,6 +450,12 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
 
+            // Restraints & Behaviour Support
+            ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.create', 'description' => 'Record restraint events & create behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.manage', 'description' => 'Manage restraint events & behaviour support plan lifecycle', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.review', 'description' => 'Review restraint events & sign off plan reviews', 'group' => 'restraints', 'module' => 'Compliance'],
+
             // Safe Work Procedures (controlled SWMS document library)
             ['key' => 'procedures.view', 'description' => 'View safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
             ['key' => 'procedures.create', 'description' => 'Create safe work procedures (draft)', 'group' => 'procedures', 'module' => 'Compliance'],
@@ -845,6 +851,27 @@ class RbacSeeder extends Seeder
             'medications.administer.record', 'medications.audit.view',
             'clients.viewAny',
         ]);
+
+        // Restraints & Behaviour Support: mirror the dedicated scheme onto every
+        // role that already holds the equivalent hazards permission, so the
+        // register's move off hazards.* regresses nobody. (Mirrors the deploy
+        // migration 2026_06_20_000002.) Runs after all role syncs above; uses
+        // syncWithoutDetaching so it augments rather than replaces.
+        $restraintGrantMap = [
+            'hazards.view' => ['restraints.view'],
+            'hazards.create' => ['restraints.view', 'restraints.create'],
+            'hazards.manage' => ['restraints.view', 'restraints.create', 'restraints.manage', 'restraints.review'],
+        ];
+        foreach ($restraintGrantMap as $hazardKey => $grantKeys) {
+            $hazard = Permission::where('key', $hazardKey)->first();
+            if (! $hazard) {
+                continue;
+            }
+            $grantIds = Permission::whereIn('key', $grantKeys)->pluck('id')->all();
+            foreach ($hazard->roles()->pluck('roles.id')->all() as $roleId) {
+                Role::find($roleId)?->permissions()->syncWithoutDetaching($grantIds);
+            }
+        }
 
         /*
         |--------------------------------------------------------------------------
