@@ -122,6 +122,7 @@ import { PersonalDetailsTab } from './tabs/personal-details';
 import { RespiteTab } from './tabs/respite';
 import { RiskManagementTab } from './tabs/risk-management';
 import { WorkersTab } from './tabs/workers';
+import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -544,6 +545,7 @@ type TabKey =
     | 'photos'
     | 'consents'
     | 'consent-requests'
+    | 'privacy'
     | 'portal'
     | 'family_notes'
     | 'respite'
@@ -655,6 +657,8 @@ export default function ClientShow({
     ).replace('_', ' ');
     const respiteCan = auth?.can?.respite ?? {};
     const consentsCan = auth?.can?.consents ?? {};
+    const privacyCan = auth?.can?.privacy ?? {};
+    const dataSubjectRequests = pageProps.data_subject_requests ?? [];
     const consents = pageProps.consents ?? [];
     const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
     const pendingVisitCount = pageProps.pending_visit_count ?? 0;
@@ -921,6 +925,13 @@ export default function ClientShow({
                 show: Boolean(consentsCan?.viewAny),
             },
             {
+                key: 'privacy',
+                label: 'Privacy',
+                icon: Shield,
+                show: Boolean(privacyCan?.viewRequests),
+                count: dataSubjectRequests.length || undefined,
+            },
+            {
                 key: 'consent-requests',
                 label: 'Consent Requests',
                 icon: Send,
@@ -968,6 +979,8 @@ export default function ClientShow({
             client.status,
             actionsReviewsSummary?.open,
             consentsCan?.viewAny,
+            privacyCan?.viewRequests,
+            dataSubjectRequests.length,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
@@ -5459,6 +5472,13 @@ export default function ClientShow({
                             (pageProps as any).assignable_workers ?? []
                         }
                         canAssign={Boolean(can.assign_workers)}
+                    />
+                )}
+
+                {tab === 'privacy' && (
+                    <ClientPrivacyPanel
+                        requests={dataSubjectRequests}
+                        canManage={Boolean(privacyCan?.processRequests)}
                     />
                 )}
             </PageShell>

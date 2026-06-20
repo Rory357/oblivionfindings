@@ -1304,6 +1304,20 @@ class ClientController extends Controller
             'transport' => Inertia::optional(fn () => $this->buildTransportData($client)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
             'safety' => ClientSafetyPayload::forClient($client),
+            // Read-only Privacy panel — the client's Privacy Act 2020 access/
+            // correction requests (gated on the privacy view permission).
+            'data_subject_requests' => $request->user()?->canDo('privacy.viewRequests')
+                ? $client->dataSubjectRequests()->with('assignedTo:id,name')->latest('received_at')->get()->map(fn ($r) => [
+                    'id' => $r->id,
+                    'reference' => $r->reference_number,
+                    'request_type' => $r->request_type,
+                    'status' => $r->status,
+                    'received_at' => optional($r->received_at)->toDateString(),
+                    'due_date' => optional($r->extended_due_date ?: $r->due_date)->toDateString(),
+                    'is_overdue' => $r->isOverdue(),
+                    'assigned_to' => $r->assignedTo?->name,
+                ])->all()
+                : [],
         ]);
     }
 
