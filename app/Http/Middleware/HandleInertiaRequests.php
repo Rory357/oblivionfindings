@@ -240,6 +240,9 @@ class HandleInertiaRequests extends Middleware
                 // after creating a NEW committee so it can chain the meeting POST
                 // to /committees/{id}/meetings on the freshly created committee.
                 'created_committee_id' => session('created_committee_id'),
+                // The Injury record wizard reads this so its success pane can open
+                // the newly-recorded injury straight on its RTW section.
+                'created_injury_id' => session('created_injury_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
