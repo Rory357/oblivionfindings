@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -90,5 +91,35 @@ class SafeWorkProcedure extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Cross-module resolution scopes                                     */
+    /*                                                                     */
+    /*  Reusable so Site profiles, HR staff / self-service and the client  */
+    /*  risk tab can surface the procedures that apply to them without     */
+    /*  re-implementing the JSON membership logic. An empty/absent         */
+    /*  applicable_* array means "applies organisation-wide / to all".     */
+    /* ------------------------------------------------------------------ */
+
+    /** Approved procedures that apply to a site (listed, or org-wide). */
+    public function scopeApplicableToSite(Builder $query, int $siteId): Builder
+    {
+        return $query->where('status', 'approved')->where(function (Builder $q) use ($siteId) {
+            $q->whereJsonContains('applicable_sites', $siteId)
+                ->orWhereJsonLength('applicable_sites', 0)
+                ->orWhereNull('applicable_sites');
+        });
+    }
+
+    /** Approved procedures that apply to any of the given role keys (or are role-agnostic). */
+    public function scopeApplicableToRoles(Builder $query, array $roleKeys): Builder
+    {
+        return $query->where('status', 'approved')->where(function (Builder $q) use ($roleKeys) {
+            $q->whereJsonLength('applicable_roles', 0)->orWhereNull('applicable_roles');
+            foreach ($roleKeys as $key) {
+                $q->orWhereJsonContains('applicable_roles', $key);
+            }
+        });
     }
 }
