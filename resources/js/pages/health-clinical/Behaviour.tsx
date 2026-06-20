@@ -17,9 +17,10 @@ import {
     RegisterStatStrip,
     type HealthClinicalKpis,
 } from '@/pages/health-clinical/components/health-clinical-shell';
+import { RecordAbcDialog } from '@/pages/health-clinical/components/record-abc-dialog';
 import { cn } from '@/lib/utils';
-import { Link, router } from '@inertiajs/react';
-import { ArrowUpRight, Brain, Clock, Filter, Info, Lock, ShieldAlert, X } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ArrowUpRight, Brain, Clock, Filter, Lock, ShieldAlert, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -108,7 +109,10 @@ function formatNzDate(iso: string | null): string {
 }
 
 export default function BehaviourRegister({ entries, stats, filters, filter_options, restraint, kpis, tab_counts }: Props) {
+    const page = usePage<{ auth?: { can?: { clinical?: { eventsRecord?: boolean } } } }>();
+    const canRecord = !!page.props.auth?.can?.clinical?.eventsRecord;
     const [view, setView] = useState<'abc' | 'restraint'>('abc');
+    const [recordOpen, setRecordOpen] = useState(false);
     const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
         behaviour_function: filters.behaviour_function ?? '',
@@ -145,14 +149,21 @@ export default function BehaviourRegister({ entries, stats, filters, filter_opti
 
             {view === 'restraint' ? <RestraintLensView restraint={restraint} /> : (
             <>
-            <RegisterStatStrip
-                stats={[
-                    { label: 'ABC · 7d', value: stats.total_7d },
-                    { label: '30d', value: stats.total_30d },
-                    { label: 'Escalated', value: stats.escalated_30d, tone: stats.escalated_30d > 0 ? 'warning' : 'default' },
-                    { label: 'Harm', value: stats.harm_30d, tone: stats.harm_30d > 0 ? 'critical' : 'default' },
-                ]}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <RegisterStatStrip
+                    stats={[
+                        { label: 'ABC · 7d', value: stats.total_7d },
+                        { label: '30d', value: stats.total_30d },
+                        { label: 'Escalated', value: stats.escalated_30d, tone: stats.escalated_30d > 0 ? 'warning' : 'default' },
+                        { label: 'Harm', value: stats.harm_30d, tone: stats.harm_30d > 0 ? 'critical' : 'default' },
+                    ]}
+                />
+                {canRecord ? (
+                    <Button size="sm" onClick={() => setRecordOpen(true)}>
+                        <Brain className="mr-1.5 h-4 w-4" /> Record ABC
+                    </Button>
+                ) : null}
+            </div>
 
             <Card>
                 <CardHeader className="pb-3">
@@ -190,7 +201,9 @@ export default function BehaviourRegister({ entries, stats, filters, filter_opti
                     <CardContent className="p-12 text-center">
                         <Brain className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                         <p className="font-medium text-muted-foreground">No ABC entries here</p>
-                        <p className="mt-1 text-sm text-muted-foreground/70">Use “Record ABC” above to chart a behaviour, or adjust the filters.</p>
+                        <p className="mt-1 text-sm text-muted-foreground/70">
+                            {canRecord ? 'Use “Record ABC” above to chart a behaviour, or adjust the filters.' : 'No ABC entries match the current filters.'}
+                        </p>
                     </CardContent>
                 </Card>
             ) : (
@@ -248,6 +261,8 @@ export default function BehaviourRegister({ entries, stats, filters, filter_opti
             ) : null}
             </>
             )}
+
+            <RecordAbcDialog open={recordOpen} onClose={() => setRecordOpen(false)} />
         </HealthClinicalShell>
     );
 }
