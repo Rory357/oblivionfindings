@@ -67,7 +67,7 @@ export const HC_TABS: HcTab[] = [
     { id: 'assessments', label: 'Assessments & Risk', icon: AlertTriangle, tone: 'critical', group: 'plan', href: null },
     // ── Analyse ──────────────────────────────────────────────────────────
     { id: 'behaviour', label: 'Behaviour', icon: Brain, tone: 'violet', group: 'analyse', href: '/health-clinical/behaviour' },
-    { id: 'trends', label: 'Trends', icon: TrendingUp, tone: 'info', group: 'analyse', href: null },
+    { id: 'trends', label: 'Trends', icon: TrendingUp, tone: 'info', group: 'analyse', href: '/health-clinical/trends' },
 ];
 
 export function tabById(id: HcTabId): HcTab | undefined {

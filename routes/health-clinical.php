@@ -57,6 +57,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/health-monitoring', [HealthClinicalDashboardController::class, 'healthMonitoring'])
             ->middleware('permission:clinical.monitoring.viewAny')
             ->name('health-monitoring.index');
+        Route::get('/trends', [HealthClinicalDashboardController::class, 'trends'])
+            ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
+            ->name('trends.index');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');

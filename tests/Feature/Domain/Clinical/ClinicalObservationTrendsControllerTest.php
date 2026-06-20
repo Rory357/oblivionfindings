@@ -114,6 +114,53 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_module_trends_tab_renders_and_scopes_by_client(): void
+    {
+        $user = $this->createUserWithRole('clinical_lead');
+        $unauthorizedUser = User::factory()->create(['approved_at' => now()]);
+        $client = Client::factory()->create();
+
+        ClinicalObservation::factory()->weight()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(3),
+            'data' => ['weight_kg' => 70.5],
+        ]);
+        ClinicalObservation::factory()->vitals()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(2),
+            'data' => ['systolic' => 150, 'diastolic' => 92, 'pulse' => 110],
+            'news2_score' => 4,
+            'news2_band' => 'medium',
+        ]);
+
+        // No client selected → client-picker state, no trend sets yet.
+        $this->actingAs($user)
+            ->get('/health-clinical/trends')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->has('clients')
+                ->has('kpis')
+                ->where('selected_client', null)
+                ->where('trend_sets', null));
+
+        // Client selected → trend sets incl. the module-only NEWS2 series.
+        $this->actingAs($user)
+            ->get('/health-clinical/trends?client_id=' . $client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->where('selected_client.id', $client->id)
+                ->where('trend_sets.weight.points.0.weight_kg', 70.5)
+                ->where('trend_sets.news2.points.0.score', 4)
+                ->where('trend_sets.news2.points.0.band', 'medium'));
+
+        // No clinical-observation permission → forbidden.
+        $this->actingAs($unauthorizedUser)
+            ->get('/health-clinical/trends')
+            ->assertForbidden();
+    }
+
     protected function createUserWithRole(string $roleName): User
     {
         $user = User::factory()->create([

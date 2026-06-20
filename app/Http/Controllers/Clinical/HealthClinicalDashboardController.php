@@ -16,6 +16,7 @@ use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -239,6 +240,49 @@ class HealthClinicalDashboardController extends Controller
             'rollup' => $this->dashboardService->getMonitoringRollup((int) ($auth->organization_id ?? 0), $filters),
             'filters' => $filters,
             'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+        ]);
+    }
+
+    /**
+     * Module-level Trends tab — pick a client, see their NEWS2 / vitals / weight /
+     * pain / fluid trends. Reuses ClinicalObservationService::buildTrendSets.
+     */
+    public function trends(Request $request): \Inertia\Response
+    {
+        $auth = $request->user();
+        abort_unless($auth && (
+            $auth->canDo('clinical.observations.viewAny')
+            || $auth->canDo('clinical.observations.viewAssigned')
+        ), 403);
+
+        $validated = $request->validate([
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $client = isset($validated['client_id']) ? Client::find($validated['client_id']) : null;
+
+        $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to'])->endOfDay() : now()->endOfDay();
+        $from = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : $to->copy()->subDays(13)->startOfDay();
+
+        $trendSets = $client
+            ? $this->observationService->buildTrendSets($client, $from, $to, includeNews2: true)
+            : null;
+
+        $kpis = $this->dashboardService->getKpis();
+
+        return inertia('health-clinical/Trends', [
+            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'selected_client' => $client?->only(['id', 'first_name', 'last_name']),
+            'filters' => [
+                'client_id' => $validated['client_id'] ?? null,
+                'date_from' => $from->toDateString(),
+                'date_to' => $to->toDateString(),
+            ],
+            'trend_sets' => $trendSets,
             'kpis' => $kpis,
             'tab_counts' => $this->dashboardService->getTabCounts($kpis),
         ]);

@@ -127,8 +127,69 @@ class ClinicalObservationService
             ->ofType($type)
             ->recordedBetween($from, $to)
             ->orderBy('recorded_at')
-            ->select(['id', 'recorded_at', 'data'])
+            ->select(['id', 'recorded_at', 'data', 'news2_score', 'news2_band'])
             ->get();
+    }
+
+    /**
+     * Build the chartable trend sets (weight / pain / vitals / fluid, plus NEWS2
+     * when requested) for a client over a date range. Shared by the per-client
+     * Trends page and the module Trends tab so the two never drift.
+     *
+     * @return array<string, array{key: string, label: string, description: string, points: array<int, array<string, mixed>>, count: int, latest: array<string, mixed>|null}>
+     */
+    public function buildTrendSets(Client $client, \DateTimeInterface $from, \DateTimeInterface $to, bool $includeNews2 = false): array
+    {
+        $sets = [
+            'weight' => $this->trendSet('weight', 'Weight', 'Track body weight over time.', $client, ObservationType::Weight, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['weight_kg'] ?? null) ? ['weight_kg' => round((float) $o->data['weight_kg'], 1)] : null),
+            'pain' => $this->trendSet('pain', 'Pain Score', 'Track pain score observations on the 0 to 10 scale.', $client, ObservationType::Pain, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['score'] ?? null) ? ['score' => (float) $o->data['score'], 'location' => $o->data['location'] ?? null] : null),
+            'vitals' => $this->trendSet('vitals', 'Vitals', 'Blood pressure and pulse trends.', $client, ObservationType::Vitals, $from, $to,
+                fn (ClinicalObservation $o) => (is_numeric($o->data['systolic'] ?? null) && is_numeric($o->data['diastolic'] ?? null) && is_numeric($o->data['pulse'] ?? null))
+                    ? ['systolic' => (float) $o->data['systolic'], 'diastolic' => (float) $o->data['diastolic'], 'pulse' => (float) $o->data['pulse']] : null),
+            'fluid_intake' => $this->trendSet('fluid_intake', 'Fluid Intake', 'Track fluid intake amounts in millilitres.', $client, ObservationType::FluidIntake, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['amount_ml'] ?? null) ? ['amount_ml' => (float) $o->data['amount_ml'], 'fluid_type' => $o->data['fluid_type'] ?? null] : null),
+        ];
+
+        if ($includeNews2) {
+            $sets['news2'] = $this->trendSet('news2', 'NEWS2', 'Early-warning score from recorded vitals.', $client, ObservationType::Vitals, $from, $to,
+                fn (ClinicalObservation $o) => $o->news2_score === null ? null : ['score' => (int) $o->news2_score, 'band' => $o->news2_band?->value]);
+        }
+
+        return $sets;
+    }
+
+    /**
+     * @param  callable(ClinicalObservation): (array<string, mixed>|null)  $mapPoint
+     * @return array{key: string, label: string, description: string, points: array<int, array<string, mixed>>, count: int, latest: array<string, mixed>|null}
+     */
+    private function trendSet(string $key, string $label, string $description, Client $client, ObservationType $type, \DateTimeInterface $from, \DateTimeInterface $to, callable $mapPoint): array
+    {
+        $points = $this->getTrends($client, $type, $from, $to)
+            ->map(function (ClinicalObservation $observation) use ($mapPoint) {
+                $extra = $mapPoint($observation);
+                if ($extra === null) {
+                    return null;
+                }
+
+                return array_merge([
+                    'id' => $observation->id,
+                    'recorded_at' => $observation->recorded_at->toISOString(),
+                    'short_label' => $observation->recorded_at->format('j M'),
+                ], $extra);
+            })
+            ->filter()
+            ->values();
+
+        return [
+            'key' => $key,
+            'label' => $label,
+            'description' => $description,
+            'points' => $points->all(),
+            'count' => $points->count(),
+            'latest' => $points->last(),
+        ];
     }
 
     // ── Validation ───────────────────────────────────────────────────────

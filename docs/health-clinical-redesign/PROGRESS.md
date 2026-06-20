@@ -272,7 +272,15 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] **7c Health Monitoring** — DONE. `getMonitoringRollup($orgId, $filters)` aggregates the four per-client stores (`ClientFluid/Bowel/Seizure/SleepEntry`) — **all carry `organization_id`** so org-scoping is direct (no client join needed); sleep keys on `slept_at`, seizure `escalated` precomputed (decision #3: read both stores, don't migrate). `GET /health-clinical/health-monitoring` (perm `clinical.monitoring.viewAny`, NEW — both seeders). `HealthMonitoring.tsx`: info banner + client filter + 4 stat cards (fluid/bowel/seizures+escalated/sleep-avg) + recent-entry lists. `health_monitoring` tab flipped on → **Monitor group complete**. Test `HealthClinicalMonitoringTest` (2). (Per decision #4 existing capture perms unchanged; only the read rollup is gated.)
 - **Dependency:** Steps 2, 5. **Ships:** Behaviour/Health-Monitoring/Care-Plans/Restraint tabs. **Commit (7b+7c): `8df1150d`.** 7 of 9 tabs live + restraint sub-view (Trends + Assessments → Step 8).
 
-### ☐ Step 8 — Assessments & Risk + cross-module Trends signals (B8, §4)
+### ◐ Step 8 — Trends module tab (8a ✅) + Assessments & Risk + cross-module signals (8b, deferred)
+
+#### ✅ Step 8a — Trends module tab (the 9th tab goes live)
+- [x] **Backend trend-building extracted** to `ClinicalObservationService::buildTrendSets($client, $from, $to, includeNews2)` — the single implementation now shared by the per-client page (`HealthClinicalClientTrendsController`, no NEWS2) and the module tab (NEWS2 on). `getTrends` carries `news2_score`/`news2_band` columns.
+- [x] **Module route + controller:** `GET /health-clinical/trends` → `HealthClinicalDashboardController::trends()` (gated `clinical.observations.viewAny|viewAssigned`); searchable client picker over **all** clients, 14-day default window (`subDays(13)`), `includeNews2: true` so the NEWS2 early-warning series leads the grid. Tab href flipped on in `tab-groups.ts`.
+- [x] **Shared `components/trend-charts.tsx`** (`TrendChartCard` + `TrendChartsGrid`) consumed by BOTH `ClientTrends.tsx` (refactored — inline chart code removed) and the new `Trends.tsx` module panel (on `HealthClinicalShell activeTab="trends"`). **De-hardcoded** the hex line colours (`#059669`/`#dc2626`/`#2563eb`/`#0f766e`/`#f59e0b`/`#0891b2`) → `--status-success`/`--status-critical`/`--status-info`/`--primary`/`--status-warning` tokens.
+- [x] tsc 0 + eslint 0 on the 3 touched files; `ClinicalObservationTrendsControllerTest` +1 method (`module_trends_tab_renders_and_scopes_by_client`, asserts NEWS2 series + client scope + 403) → **2 passed / 98 assertions**. **9 of 9 tabs now render.**
+
+#### ☐ Step 8b — Assessments & Risk + cross-module Trends signals (B8, §4) — DEFERRED (new table + scorers)
 - [ ] `clinical_risk_assessments` migration + FRAT/Waterlow-Braden/MUST/IDDSI scorers + index/store/detail; Assessments tab (banner until live).
 - [ ] Trends cross-module signal cards: PRN↔behaviour join, weight↔nutrition, H&S fall; My Day/notification fanout for watchlist + overdue.
 - [ ] Governance deep-link regression test (§4).
