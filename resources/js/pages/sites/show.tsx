@@ -46,6 +46,7 @@ import {
     Cake,
     Calendar,
     Car,
+    ChevronRight,
     ClipboardCheck,
     ClipboardList,
     Clock,
@@ -53,6 +54,7 @@ import {
     DollarSign,
     Download,
     DoorOpen,
+    ExternalLink,
     Eye,
     FileText,
     Flame,
@@ -86,6 +88,7 @@ import {
     Utensils,
     Warehouse,
 } from 'lucide-react';
+import { RISK, RiskChip, StatusChip, fmtDueShort } from '@/components/health-safety/hazard-kit';
 import {
     lazy,
     Suspense,
@@ -2258,40 +2261,86 @@ export default function SiteShow({
                         )}
                     </TabsContent>
 
-                    {/* Hazards Tab */}
+                    {/* Hazards Tab — compact embed of the scoped register; rows
+                        deep-link to /sites/{id}/hazards (the full register + modal). */}
                     <TabsContent value="hazards">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Hazards Register</CardTitle>
-                                <Button asChild>
-                                    <Link href={`/sites/${site.id}/hazards`}>
-                                        View All Hazards
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="py-8 text-center text-muted-foreground">
-                                    <ShieldAlert className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                    <p>Logged hazards and risk assessments</p>
-                                    <div className="mt-4 flex justify-center gap-2">
-                                        <Button asChild variant="outline">
-                                            <Link
-                                                href={`/sites/${site.id}/hazards`}
-                                            >
-                                                View Hazards
-                                            </Link>
-                                        </Button>
-                                        <Button asChild>
-                                            <Link
-                                                href={`/sites/${site.id}/hazards?action=add`}
-                                            >
-                                                Log Hazard
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {(() => {
+                            const hazards = (page.props.siteHazards ?? []) as Array<{
+                                id: number;
+                                reference_number: string;
+                                hazard_label: string;
+                                description: string;
+                                risk_rating: string;
+                                severity: string;
+                                status: string;
+                                due_date: string | null;
+                                overdue: boolean;
+                                unassigned: boolean;
+                            }>;
+                            const openCount = (page.props.siteHazardsOpenCount ?? hazards.length) as number;
+                            return (
+                                <Card>
+                                    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                                        <div className="flex items-start gap-3">
+                                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                                <ShieldAlert className="h-5 w-5" />
+                                            </span>
+                                            <div>
+                                                <CardTitle className="text-base">
+                                                    Hazards at this home <span className="font-normal text-muted-foreground">· {openCount} open</span>
+                                                </CardTitle>
+                                                <p className="mt-0.5 text-sm text-muted-foreground">Same register chrome, scoped to {site.name}. Click any row to open it in the register.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/sites/${site.id}/hazards`}>
+                                                    <ExternalLink className="mr-1.5 h-4 w-4" /> View all
+                                                </Link>
+                                            </Button>
+                                            <Button asChild size="sm">
+                                                <Link href={`/sites/${site.id}/hazards?action=add`}>
+                                                    <Plus className="mr-1.5 h-4 w-4" /> Log hazard
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {hazards.length === 0 ? (
+                                            <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+                                                <ShieldAlert className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+                                                <p className="text-sm font-medium text-muted-foreground">No open hazards at {site.name}</p>
+                                                <p className="mt-1 text-xs text-muted-foreground/70">Log a hazard to start the register for this home.</p>
+                                            </div>
+                                        ) : (
+                                            hazards.map((h) => {
+                                                const tone = RISK[h.risk_rating]?.tone ?? 'neutral';
+                                                const dot = tone === 'critical' ? 'bg-status-critical' : tone === 'warning' ? 'bg-status-warning' : tone === 'success' ? 'bg-status-success' : 'bg-muted-foreground';
+                                                return (
+                                                    <Link
+                                                        key={h.id}
+                                                        href={`/sites/${site.id}/hazards?hazard=${h.id}`}
+                                                        className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                                    >
+                                                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-semibold text-foreground">{h.hazard_label}</p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {h.reference_number} · {h.description}
+                                                            </p>
+                                                        </div>
+                                                        <RiskChip rating={h.risk_rating} />
+                                                        <StatusChip status={h.status} />
+                                                        <span className={`hidden text-xs whitespace-nowrap sm:inline ${h.overdue ? 'font-bold text-status-critical' : 'text-muted-foreground'}`}>Due {fmtDueShort(h.due_date)}</span>
+                                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                                    </Link>
+                                                );
+                                            })
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
                     </TabsContent>
 
                     {/* Fleet Tab */}

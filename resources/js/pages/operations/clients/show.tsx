@@ -3312,6 +3312,10 @@ export default function ClientShow({
                         onEditRisk={(risk) =>
                             openProfileDialog('edit_risk', { risk })
                         }
+                        homeHazards={(pageProps.homeHazards ?? []) as any}
+                        homeHazardDetail={(pageProps.homeHazardDetail ?? null) as any}
+                        homeName={(pageProps.homeName ?? null) as any}
+                        homeSiteId={(pageProps.homeSiteId ?? null) as any}
                     />
                 )}
 

@@ -17,6 +17,8 @@ use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SiteHazard;
+use App\Support\HazardDetailPresenter;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
@@ -699,6 +701,25 @@ class SiteController extends Controller
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
             'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            'siteHazards' => SiteHazard::where('site_id', $site->id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->with('assignedTo:id,name')
+                ->orderByDesc('created_at')
+                ->limit(6)
+                ->get()
+                ->map(fn (SiteHazard $h) => [
+                    'id' => $h->id,
+                    'reference_number' => $h->reference_number,
+                    'hazard_label' => HazardDetailPresenter::hazardLabel($h),
+                    'description' => $h->description,
+                    'risk_rating' => $h->risk_rating,
+                    'severity' => $h->severity,
+                    'status' => $h->status,
+                    'due_date' => $h->due_date?->toDateString(),
+                    'overdue' => $h->isOverdue(),
+                    'unassigned' => ! $h->assigned_to_user_id,
+                ])->values(),
+            'siteHazardsOpenCount' => SiteHazard::where('site_id', $site->id)->open()->count(),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
