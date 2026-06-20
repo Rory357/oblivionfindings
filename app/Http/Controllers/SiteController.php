@@ -9,6 +9,8 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\CredentialType;
+use App\Models\HsRiskAssessment;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
@@ -699,8 +701,24 @@ class SiteController extends Controller
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
             'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            // Formal H&S risk assessments attached to this site (full inline register tab).
+            'riskAssessments' => ($user && $user->canDo('hazards.view'))
+                ? HsRiskAssessment::forAssessable(Site::class, $site->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
+                    ->withCount('attachments')
+                    ->orderByDesc('created_at')
+                    ->limit(100)
+                    ->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
+                    ->values()
+                : [],
+            'ra_pickers' => ($user && $user->canDo('hazards.view'))
+                ? RiskAssessmentPresenter::pickers()
+                : ['sites' => [], 'clients' => [], 'events' => []],
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
+                'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),
+                'manage_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.manage')),
             ],
             'fleet' => Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),

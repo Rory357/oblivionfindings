@@ -121,6 +121,8 @@ import { LeaveExcursionsTab } from './tabs/leave-excursions';
 import { PersonalDetailsTab } from './tabs/personal-details';
 import { RespiteTab } from './tabs/respite';
 import { RiskManagementTab } from './tabs/risk-management';
+import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
+import type { RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
 import { WorkersTab } from './tabs/workers';
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -3302,17 +3304,39 @@ export default function ClientShow({
                 )}
 
                 {tab === 'risk_management' && (
-                    <RiskManagementTab
-                        clientId={client.id}
-                        risks={(pageProps.client_risks ?? []) as any}
-                        canCreate={Boolean((can as any).create_risks)}
-                        canUpdate={Boolean((can as any).update_risks)}
-                        canDelete={Boolean((can as any).delete_risks)}
-                        onAddRisk={() => openProfileDialog('add_risk')}
-                        onEditRisk={(risk) =>
-                            openProfileDialog('edit_risk', { risk })
-                        }
-                    />
+                    <>
+                        <RiskManagementTab
+                            clientId={client.id}
+                            risks={(pageProps.client_risks ?? []) as any}
+                            canCreate={Boolean((can as any).create_risks)}
+                            canUpdate={Boolean((can as any).update_risks)}
+                            canDelete={Boolean((can as any).delete_risks)}
+                            onAddRisk={() => openProfileDialog('add_risk')}
+                            onEditRisk={(risk) =>
+                                openProfileDialog('edit_risk', { risk })
+                            }
+                        />
+
+                        {Boolean((can as any).view_hs_risk_assessments) && (
+                            <div className="mt-8 border-t border-border pt-6">
+                                <div className="mb-4 flex items-center gap-2">
+                                    <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+                                    <div>
+                                        <h3 className="text-base font-semibold">Formal H&amp;S risk assessments</h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            ISO 31000 / SafePlus 5×5 assessments attached to this client — separate from the care-risk list above.
+                                        </p>
+                                    </div>
+                                </div>
+                                <RaRegisterSection
+                                    assessments={(pageProps.hs_risk_assessments ?? []) as RaRow[]}
+                                    pickers={(pageProps.ra_pickers ?? { sites: [], clients: [], events: [] }) as RaPickers}
+                                    canManage={Boolean((can as any).manage_hs_risk_assessments)}
+                                    lockedAssessable={{ type: 'client', id: client.id, name: `${client.first_name} ${client.last_name}`.trim() }}
+                                />
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {tab === 'incidents_accidents' && (

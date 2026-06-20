@@ -8,6 +8,7 @@ use App\Http\Controllers\HealthSafety\HsCorrectiveActionController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
 use App\Http\Controllers\HealthSafety\HsInvestigationController;
+use App\Http\Controllers\HealthSafety\HsRiskAssessmentController;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\RestraintController;
@@ -40,7 +41,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
         Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
         Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
-        Route::get('/risk-assessments', [HsEventController::class, 'riskAssessments'])->name('risk-assessments.index');
+        Route::get('/risk-assessments', [HsRiskAssessmentController::class, 'index'])->name('risk-assessments.index');
+        Route::get('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'show'])->name('risk-assessments.show');
+        Route::get('/risk-assessments/{assessment}/attachments/{attachment}/download', [HsRiskAssessmentController::class, 'downloadAttachment'])->name('risk-assessments.attachments.download');
     });
 
     // ── Events governance write actions (gated) ──
@@ -64,6 +67,21 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{event}/corrective-actions/{action}/verify', [HsCorrectiveActionController::class, 'verify'])->name('events.corrective-actions.verify');
         Route::post('/events/{event}/corrective-actions/{action}/close', [HsCorrectiveActionController::class, 'close'])->name('events.corrective-actions.close');
         Route::post('/events/{event}/corrective-actions/{action}/return', [HsCorrectiveActionController::class, 'returnForRework'])->name('events.corrective-actions.return');
+    });
+
+    // ── Risk Assessment write actions (gated) — all delegate to HsRiskAssessmentService ──
+    Route::middleware('permission:hazards.manage')->group(function () {
+        Route::post('/risk-assessments', [HsRiskAssessmentController::class, 'store'])->name('risk-assessments.store');
+        Route::put('/risk-assessments/{assessment}', [HsRiskAssessmentController::class, 'update'])->name('risk-assessments.update');
+        Route::post('/risk-assessments/{assessment}/activate', [HsRiskAssessmentController::class, 'activate'])->name('risk-assessments.activate');
+        Route::post('/risk-assessments/{assessment}/review', [HsRiskAssessmentController::class, 'markForReview'])->name('risk-assessments.review');
+        Route::post('/risk-assessments/{assessment}/residual', [HsRiskAssessmentController::class, 'updateResidual'])->name('risk-assessments.residual');
+        Route::post('/risk-assessments/{assessment}/supersede', [HsRiskAssessmentController::class, 'supersede'])->name('risk-assessments.supersede');
+        Route::post('/risk-assessments/{assessment}/archive', [HsRiskAssessmentController::class, 'archive'])->name('risk-assessments.archive');
+
+        // Premium evidence upload (SWMS, method statements, photos, SDS, plans, PDFs).
+        Route::post('/risk-assessments/{assessment}/attachments', [HsRiskAssessmentController::class, 'uploadAttachment'])->name('risk-assessments.attachments.store');
+        Route::delete('/risk-assessments/{assessment}/attachments/{attachment}', [HsRiskAssessmentController::class, 'destroyAttachment'])->name('risk-assessments.attachments.destroy');
     });
 
     // ── PR6: Governance & Compliance Reports ──

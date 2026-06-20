@@ -240,6 +240,10 @@ class HandleInertiaRequests extends Middleware
                 // after creating a NEW committee so it can chain the meeting POST
                 // to /committees/{id}/meetings on the freshly created committee.
                 'created_committee_id' => session('created_committee_id'),
+                // The Risk Assessment wizard reads this after a successful create/
+                // supersede so it can upload staged evidence to the new draft and
+                // its success pane can open it.
+                'created_risk_assessment_id' => session('created_risk_assessment_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
