@@ -87,6 +87,19 @@ export type LinkedShift = {
     is_on_call: boolean;
 };
 
+/** A GPS tracker (Queclink) actively paired to the worker, for the detail location card. */
+export type WorkerTracker = {
+    name: string | null;
+    imei: string | null;
+    latitude: string | number | null;
+    longitude: string | number | null;
+    last_seen_at: string | null;
+    battery_level: number | null;
+    panic_active: boolean;
+    locate_url: string;
+    acknowledge_panic_url: string;
+};
+
 export type SessionDetail = Session & {
     _type: 'session';
     emergency_triggered_at: string | null;
@@ -94,6 +107,7 @@ export type SessionDetail = Session & {
     check_ins: CheckIn[];
     alerts: SessionAlertRef[];
     shift: LinkedShift | null;
+    tracker: WorkerTracker | null;
 };
 
 export type AlertDetail = Alert & {

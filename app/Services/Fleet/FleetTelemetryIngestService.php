@@ -2,9 +2,13 @@
 
 namespace App\Services\Fleet;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Events\FleetVehiclePositionUpdated;
 use App\Jobs\ReverseGeocodeFleetTelemetryEvent;
 use App\Models\Asset;
+use App\Models\LoneWorkerSession;
+use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
@@ -257,7 +261,14 @@ class FleetTelemetryIngestService
                     ],
                 ]);
 
-                if ($this->isResidentSafetyTracker($asset)) {
+                // A staff-paired (lone worker) tracker routes a panic / man-down into the
+                // Lone Worker Safety emergency pipeline INSTEAD of the resident path —
+                // isResidentSafetyTracker() also matches a staff personal_tracker, so this
+                // branch must take precedence to avoid mislabelling a worker SOS as resident.
+                $loneWorkerUserId = $this->resolveLoneWorkerUserId($device, $asset);
+                if ($loneWorkerUserId !== null) {
+                    $this->routeLoneWorkerPanic($loneWorkerUserId, $normalized, $occurredAt, $event, $asset, $tracker, $device);
+                } elseif ($this->isResidentSafetyTracker($asset)) {
                     $this->signals->emit([
                         'asset_id' => $asset->id,
                         'asset_tracker_id' => $tracker->id,
@@ -355,6 +366,97 @@ class FleetTelemetryIngestService
 
         return $asset->category === 'personal_tracker'
             || $asset->categoryRef?->slug === 'personal_tracker';
+    }
+
+    /**
+     * The staff member a tracker is paired to (lone worker), if any. Canonical link
+     * is the active TARGET_STAFF DeviceAssignment; falls back to a personal_tracker
+     * asset keyed to a staff driver with no client (the pairing-hub shape).
+     */
+    protected function resolveLoneWorkerUserId(?Device $device, Asset $asset): ?int
+    {
+        if ($device) {
+            $assignment = DeviceAssignment::query()
+                ->where('device_id', $device->id)
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+                ->latest('id')
+                ->first();
+
+            if ($assignment && $assignment->assignable_id) {
+                return (int) $assignment->assignable_id;
+            }
+        }
+
+        if (
+            ! $asset->client_id
+            && $asset->primary_driver_user_id
+            && ($asset->category === 'personal_tracker' || $asset->categoryRef?->slug === 'personal_tracker')
+        ) {
+            return (int) $asset->primary_driver_user_id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Route a tracker panic / man-down to the Lone Worker Safety emergency pipeline.
+     * If the worker has a live session, flip it to emergency and emit via the canonical
+     * LoneWorkerSignalService (→ ControlRoomAlert source='lone_worker', 15-min idempotent).
+     * If there is no live session, emit a raw lone_worker.sos signal so the alert is
+     * never dropped.
+     */
+    protected function routeLoneWorkerPanic(
+        int $userId,
+        array $normalized,
+        \Carbon\CarbonInterface $occurredAt,
+        FleetTelemetryEvent $event,
+        Asset $asset,
+        AssetTracker $tracker,
+        ?Device $device
+    ): void {
+        $eventType = $normalized['event_type'] ?? 'sos';
+        $notes = 'Tracker ' . str_replace('_', ' ', (string) $eventType) . ' alarm';
+
+        $session = LoneWorkerSession::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', ['active', 'overdue'])
+            ->latest('started_at')
+            ->first();
+
+        if ($session) {
+            // Idempotency: emitEmergency dedups the alert in a 15-min window; only the
+            // status write would otherwise repeat per inbound frame.
+            if ($session->status !== 'emergency') {
+                $session->update([
+                    'status' => 'emergency',
+                    'emergency_triggered_at' => now(),
+                    'emergency_notes' => $notes,
+                    'location_lat' => $normalized['latitude'] ?? $session->location_lat,
+                    'location_lng' => $normalized['longitude'] ?? $session->location_lng,
+                ]);
+            }
+
+            app(LoneWorkerSignalService::class)->emitEmergency($session, $notes);
+
+            return;
+        }
+
+        // No live session — never drop a lone-worker SOS.
+        $this->signals->emit([
+            'asset_id' => $asset->id,
+            'asset_tracker_id' => $tracker->id,
+            'device_id' => $device?->id,
+            'signal_type' => 'lone_worker.sos',
+            'severity_hint' => 'critical',
+            'occurred_at' => $occurredAt,
+            'idempotency_key' => "fleet-telemetry:{$event->id}:lone_worker.sos",
+            'payload' => [
+                'event_id' => $event->id,
+                'worker_user_id' => $userId,
+                'event_type' => $eventType,
+            ],
+        ]);
     }
 
     protected function modelHintFromImei(string $imei): ?string

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -12,6 +14,7 @@ use App\Models\ShiftGpsLog;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\Queclink\LocateNowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -364,6 +367,51 @@ class LoneWorkerController extends Controller
             ->with('success', 'Alert resolved. Ensure the corresponding Control Room alert is also resolved.');
     }
 
+    /**
+     * Queue a "Locate now" request to the worker's paired GPS tracker. Async — the
+     * tracker reports its fix on its next connection (reuses LocateNowService).
+     */
+    public function locateNow(Request $request, LoneWorkerSession $session, LocateNowService $locateNow): RedirectResponse
+    {
+        $device = $this->workerTrackerDevice((int) $session->user_id);
+
+        if (! $device) {
+            return back()->with('error', 'This worker does not have a paired GPS tracker.');
+        }
+
+        $locateNow->queueForDevice($device, $request->user());
+
+        return back()->with('success', 'Locate now queued — the tracker will report on its next connection.');
+    }
+
+    /**
+     * Acknowledge a tracker panic: clear the device panic flag and ack the open
+     * Control Room lone-worker alerts for this session.
+     */
+    public function acknowledgePanic(Request $request, LoneWorkerSession $session): RedirectResponse
+    {
+        $device = $this->workerTrackerDevice((int) $session->user_id);
+
+        if ($device) {
+            $meta = $device->meta ?? [];
+            $meta['panic_active'] = false;
+            $meta['panic_acknowledged_at'] = now()->toISOString();
+            $meta['panic_acknowledged_by'] = $request->user()->id;
+            $device->forceFill(['meta' => $meta])->save();
+        }
+
+        ControlRoomAlert::where('source', 'lone_worker')
+            ->where('context->normalized_data->lone_worker_session_id', $session->id)
+            ->whereIn('status', ['open', 'triaging'])
+            ->update([
+                'status' => 'ack',
+                'acknowledged_at' => now(),
+                'acknowledged_by_user_id' => $request->user()->id,
+            ]);
+
+        return back()->with('success', 'Panic acknowledged.');
+    }
+
     /* ───────────────────────────── Payload builders ───────────────────────────── */
 
     /**
@@ -446,8 +494,9 @@ class LoneWorkerController extends Controller
      * In-progress rostered shifts available to monitor (for the wizard "from a
      * shift" mode) + how many "lone" ones are not yet monitored (hero KPI).
      *
-     * "Lone" is derived (no Shift.is_lone_worker flag yet): on-call shifts, or a
-     * worker who is the only person currently on shift at their site (solo cover).
+     * "Lone" prefers the explicit Shift.is_lone_worker roster flag; for shifts not
+     * yet flagged it falls back to the heuristic (on-call, or solo cover — the
+     * worker is the only person currently on shift at their site).
      */
     private function monitorableShifts(): array
     {
@@ -587,7 +636,55 @@ class LoneWorkerController extends Controller
             'is_on_call' => (bool) $s->shift->is_on_call,
         ] : null;
 
+        // Paired GPS tracker (staff/lone-worker Queclink device), if any — last-known
+        // location + Locate-now / acknowledge-panic actions for the detail card.
+        $device = $s->user_id ? $this->workerTrackerDevice((int) $s->user_id) : null;
+        $data['tracker'] = $device ? $this->buildWorkerTrackerPayload($device, (int) $s->id) : null;
+
         return $data;
+    }
+
+    /**
+     * The GPS tracker actively assigned to a staff member (lone worker), if any.
+     * Resolves via the canonical TARGET_STAFF DeviceAssignment (per-user, tenant-safe).
+     */
+    private function workerTrackerDevice(int $userId): ?Device
+    {
+        $assignment = DeviceAssignment::query()
+            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+            ->where('assignable_id', $userId)
+            ->whereNull('released_at')
+            ->latest('id')
+            ->first();
+
+        if (! $assignment) {
+            return null;
+        }
+
+        return Device::query()
+            ->where('id', $assignment->device_id)
+            ->where('domain', 'tracking')
+            ->first();
+    }
+
+    /**
+     * Lean tracker payload for the session detail "Last-known location" card.
+     */
+    private function buildWorkerTrackerPayload(Device $device, int $sessionId): array
+    {
+        $meta = $device->meta ?? [];
+
+        return [
+            'name' => $device->name,
+            'imei' => $device->imei,
+            'latitude' => $device->latitude,
+            'longitude' => $device->longitude,
+            'last_seen_at' => $device->last_seen_at,
+            'battery_level' => $device->battery_level,
+            'panic_active' => (bool) ($meta['panic_active'] ?? false),
+            'locate_url' => route('health-safety.lone-workers.sessions.locate', $sessionId),
+            'acknowledge_panic_url' => route('health-safety.lone-workers.sessions.acknowledge-panic', $sessionId),
+        ];
     }
 
     /**
