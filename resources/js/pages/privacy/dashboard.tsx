@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax -- The hero footer uses custom on-dark
+ * search/clear controls (the sanctioned H&S hero pattern); semantic tokens only. */
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

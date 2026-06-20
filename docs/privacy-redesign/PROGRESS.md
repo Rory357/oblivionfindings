@@ -162,10 +162,15 @@ deletion.execute ← policy_id*, confirm*(accepted). (critical confirm modal)
   with irreversible checkbox). Premium document upload (`PrivacyAttachmentsPane` reusing `AttachmentUploader`)
   lives in the detail Documents section (record-exists pattern).
   ✅ `npx tsc` clean on all privacy files; ✅ `npm run build` green (3m15s, Wayfinder routes generated).
-- [ ] **Step 9** — Client-profile Privacy panel (tab + read-only DSR list); GDPR→NZ/IPP re-skin of legacy
-  list/show pages (labels only).
-- [ ] **Step 10** — Polish + verify: lint, typecheck, vite build, tests (dashboard controller, attachments,
-  working-days). NZ/IPP sweep (no GDPR/Article/72h/DSAR/ICO/DPO labels).
+- [x] **Step 9** — Client-profile Privacy panel ✅ DONE (commit `6752feb0`). `ClientPrivacyPanel` + a
+  'privacy' tab on `operations/clients/show.tsx` (gated on privacy.viewRequests); `ClientController::show`
+  passes `data_subject_requests`. NZ/IPP re-skin of the reachable `requests.tsx`/`requests/show.tsx`
+  labels; retired (deleted) the 5 now-dead create pages. No GDPR/Article/DSAR labels remain.
+- [x] **Step 10** — Polish + verify ✅ DONE. `npx tsc` clean (privacy + client-show); `npm run build`
+  green; `eslint` 0 errors (added sanctioned disable comments). **Privacy tests: 208/208 green** —
+  rewrote 7 dashboard tests for the new payload, 5 create tests → redirect, export → CSV, due_date →
+  +20-working-days; new `StatutoryDueDateTest` (3) + `PrivacyAttachmentTest` (5). Fixed a latent flaky
+  `DataSubjectRequestFactory` bug (`status='pending'` invalid → `received`). NZ/IPP sweep clean.
 - [ ] **Step 11 (optional)** — Reminders: request-overdue + breach-OPC-due notifications + scheduled command.
 
 ## §4 RISKS / WATCH-OUTS

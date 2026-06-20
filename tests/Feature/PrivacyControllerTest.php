@@ -439,7 +439,7 @@ class PrivacyControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get('/privacy/requests/create')
-            ->assertOk();
+            ->assertRedirect('/privacy/dashboard?new=request');
     }
 
     public function test_dsr_store_forbidden_without_process_requests_permission(): void
@@ -766,8 +766,12 @@ class PrivacyControllerTest extends TestCase
 
         $this->assertNotNull($dsr->received_at);
         $this->assertNotNull($dsr->due_date);
-        // Due date should be approximately 30 days from now
-        $this->assertTrue($dsr->due_date->isSameDay(now()->addDays(30)));
+        // Privacy Act 2020 IPP 6 — due date is +20 working days from received.
+        // 20 working days is ~26-28 calendar days (no holidays in the test DB),
+        // which also distinguishes the rule from the old GDPR +30-calendar-days.
+        $gap = $dsr->received_at->copy()->startOfDay()->diffInDays($dsr->due_date->copy()->startOfDay());
+        $this->assertGreaterThanOrEqual(25, $gap);
+        $this->assertLessThanOrEqual(29, $gap);
     }
 
     public function test_breach_auto_generates_reference_number(): void
@@ -1457,14 +1461,11 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_retention_create_returns_inertia_page(): void
+    public function test_retention_create_redirects_to_dashboard_wizard(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/retention/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('privacy/retention/create')
-            );
+            ->assertRedirect('/privacy/dashboard?new=retention');
     }
 
     public function test_retention_store_creates_policy(): void
@@ -1587,67 +1588,65 @@ class PrivacyControllerTest extends TestCase
     //  SECTION 15: Privacy Dashboard Stats Verification
     // ══════════════════════════════════════════════════
 
-    public function test_dashboard_returns_inertia_page_with_all_stats(): void
+    public function test_dashboard_returns_command_centre_payload(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('privacy/dashboard')
-                ->has('dsrStats')
-                ->has('recentRequests')
-                ->has('breachStats')
-                ->has('activeHolds')
-                ->has('retentionStats')
-                ->has('dpiaStats')
+                ->has('hero.live')
+                ->has('hero.attention')
+                ->has('hero.badges')
+                ->has('tabCounts')
+                ->has('worklist.data')
+                ->has('can')
+                ->has('filters')
+                ->where('can.viewRequests', true)
             );
     }
 
-    public function test_dashboard_reflects_dsr_stats(): void
+    public function test_dashboard_reflects_request_counts_and_overdue(): void
     {
         $this->createDSR(['status' => 'in_progress']);
         $this->createDSR(['status' => 'completed', 'completed_at' => now()]);
-        $this->createDSR([
-            'status' => 'in_progress',
-            'due_date' => now()->subDays(5),
-        ]);
+        $this->createDSR(['status' => 'in_progress', 'due_date' => now()->subDays(5)]);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('dsrStats.total', 3)
+                ->where('tabCounts.requests', 2) // open (not completed/rejected/withdrawn)
+                ->where('hero.attention.overdue', 1)
+                ->where('worklist.total', 3)
             );
     }
 
-    public function test_dashboard_shows_recent_requests(): void
+    public function test_dashboard_default_worklist_is_requests(): void
     {
-        $this->createDSR(['subject_name' => 'Recent 1']);
-        $this->createDSR(['subject_name' => 'Recent 2']);
+        $this->createDSR(['subject_name' => 'Aroha Tane']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('recentRequests', 2)
+                ->where('tab', 'overview')
+                ->where('worklist.data.0.subject_name', 'Aroha Tane')
             );
     }
 
-    public function test_dashboard_reflects_breach_stats(): void
+    public function test_dashboard_reflects_breach_counts(): void
     {
         $this->createBreach(['status' => 'discovered']);
         $this->createBreach(['status' => 'under_investigation']);
-        $this->createBreach([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolution_notes' => 'Done.',
-        ]);
+        $this->createBreach(['status' => 'resolved', 'resolved_at' => now(), 'resolution_notes' => 'Done.']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('breachStats.total', 3)
+                ->where('hero.live.breaches', 3)
+                ->where('tabCounts.breaches', 2) // not resolved
             );
     }
 
@@ -1661,11 +1660,12 @@ class PrivacyControllerTest extends TestCase
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('activeHolds', 2)
+                ->where('hero.attention.active_holds', 2)
+                ->where('tabCounts.legal_holds', 2)
             );
     }
 
-    public function test_dashboard_reflects_dpia_stats(): void
+    public function test_dashboard_reflects_dpia_counts(): void
     {
         $this->createPIA(['overall_risk_level' => 'high', 'outcome' => null]);
         $this->createPIA(['overall_risk_level' => 'low', 'outcome' => 'approved']);
@@ -1674,8 +1674,37 @@ class PrivacyControllerTest extends TestCase
             ->get('/privacy/dashboard')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('dpiaStats.total', 2)
-                ->where('dpiaStats.pending_review', 1)
+                ->where('hero.attention.high_risk_dpia', 1)
+                ->where('tabCounts.dpia', 1) // outcome null
+            );
+    }
+
+    public function test_dashboard_loads_request_detail_when_param_present(): void
+    {
+        $dsr = $this->createDSR(['subject_name' => 'Mere Tait']);
+
+        $this->actingAs($this->admin)
+            ->get("/privacy/dashboard?request={$dsr->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.kind', 'request')
+                ->where('detail.id', $dsr->id)
+                ->where('detail.subject_name', 'Mere Tait')
+                ->has('detail.timeline')
+                ->has('detail.attachments')
+            );
+    }
+
+    public function test_dashboard_breaches_tab_swaps_worklist(): void
+    {
+        $this->createBreach(['nature_of_breach' => 'Misdirected email']);
+
+        $this->actingAs($this->admin)
+            ->get('/privacy/dashboard?tab=breaches')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tab', 'breaches')
+                ->where('worklist.data.0.nature_of_breach', 'Misdirected email')
             );
     }
 
@@ -1744,12 +1773,12 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_reports_export_responds(): void
+    public function test_reports_export_streams_csv(): void
     {
         $this->actingAs($this->admin)
-            ->get('/privacy/reports/export')
-            ->assertRedirect()
-            ->assertSessionHas('info');
+            ->get('/privacy/reports/export?type=full')
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
     }
 
     // ══════════════════════════════════════════════════
@@ -2203,15 +2232,11 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_dsr_create_returns_correct_inertia_component(): void
+    public function test_dsr_create_redirects_to_dashboard_wizard(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/requests/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('privacy/requests/create')
-                ->has('staff')
-            );
+            ->assertRedirect('/privacy/dashboard?new=request');
     }
 
     public function test_dsr_show_returns_correct_inertia_component(): void
@@ -2241,15 +2266,11 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_breach_create_returns_correct_inertia_component(): void
+    public function test_breach_create_redirects_to_dashboard_wizard(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/breaches/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('privacy/breaches/create')
-                ->has('staff')
-            );
+            ->assertRedirect('/privacy/dashboard?new=breach');
     }
 
     public function test_breach_show_returns_correct_inertia_component(): void
@@ -2265,14 +2286,11 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_legal_holds_create_returns_correct_inertia_component(): void
+    public function test_legal_holds_create_redirects_to_dashboard_wizard(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/legal-holds/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('privacy/legal-holds/create')
-            );
+            ->assertRedirect('/privacy/dashboard?new=hold');
     }
 
     public function test_legal_holds_index_returns_correct_inertia_component(): void
@@ -2301,15 +2319,11 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_dpia_create_returns_correct_inertia_component(): void
+    public function test_dpia_create_redirects_to_dashboard_wizard(): void
     {
         $this->actingAs($this->admin)
             ->get('/privacy/pia/create')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('privacy/dpia/create')
-                ->has('staff')
-            );
+            ->assertRedirect('/privacy/dashboard?new=dpia');
     }
 
     // ══════════════════════════════════════════════════

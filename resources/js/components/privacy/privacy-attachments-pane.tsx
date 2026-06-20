@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax -- Bespoke attachment list surfaces (locked
+ * shells, file rows, icon-button actions) with semantic design tokens only. */
 /**
  * Privacy command-centre — documents/evidence pane for a detail dialog.
  *
