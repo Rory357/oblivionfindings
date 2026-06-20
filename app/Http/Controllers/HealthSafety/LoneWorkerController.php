@@ -221,9 +221,21 @@ class LoneWorkerController extends Controller
 
     /**
      * Record a check-in for a session.
+     *
+     * Authorization (the route is auth-only — this is the real gate):
+     *  - the session's OWN worker may self-check-in (the My Day one-tap card), or
+     *  - a coordinator / H&S lead with hazards.manage may check in on a worker's
+     *    behalf from the watch-tower detail modal.
+     * Frontline support workers hold no hazards.* permission, so the own-worker
+     * branch is what makes the My Day card work.
      */
     public function checkIn(Request $request, LoneWorkerSession $session): RedirectResponse
     {
+        abort_unless(
+            $request->user()->id === $session->user_id || $request->user()->canDo('hazards.manage'),
+            403,
+        );
+
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:ok,concern,emergency'],
             'notes' => ['nullable', 'string', 'max:1000'],

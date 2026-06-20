@@ -12,6 +12,7 @@ use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\LoneWorkerSession;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
@@ -216,7 +217,55 @@ class AttendanceService
             return $session->fresh(['shift.client', 'timesheet']);
         });
 
+        // Safety overlay: end any lone-worker monitoring tied to this shift now
+        // that the worker has clocked out (outside the transaction — it must
+        // never be able to roll back or block the clock-out itself).
+        $this->completeLinkedLoneWorkerSessions($closedSession, $user);
+
         return $closedSession;
+    }
+
+    /**
+     * Auto-end Lone Worker Safety monitoring when a monitored shift is clocked
+     * out. A worker who safely finishes their shift shouldn't have to also end
+     * the session, and — more importantly — leaving it live would let the
+     * 5-minute overdue job (CheckLoneWorkerOverdueJob) later flip the now-idle
+     * session to "overdue" and raise a false Control Room alert after the worker
+     * is already safely off shift.
+     *
+     * Deliberately narrow and safety-conscious:
+     *  - only sessions linked to THE shift being clocked out (its `shift_id`),
+     *    for this worker — never ad-hoc sessions (no shift link), which a
+     *    coordinator ends explicitly;
+     *  - only `active` / `overdue` sessions. An `emergency` session is an
+     *    unresolved safety event that must be resolved deliberately via the
+     *    Control Room — never silently cleared by a routine clock-out.
+     *
+     * Fail-soft: a problem here must never block the clock-out itself.
+     */
+    private function completeLinkedLoneWorkerSessions(HrAttendanceSession $session, User $user): void
+    {
+        $shiftId = $session->shift_id;
+        if (! $shiftId) {
+            return;
+        }
+
+        try {
+            LoneWorkerSession::query()
+                ->where('shift_id', $shiftId)
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['active', 'overdue'])
+                ->get()
+                // Per-model update (not a mass update) so model events and the
+                // AuditableChanges trail fire for each ended session.
+                ->each(fn (LoneWorkerSession $loneWorkerSession) => $loneWorkerSession->update([
+                    'ended_at' => now(),
+                    'status' => 'completed',
+                    'updated_by' => $user->id,
+                ]));
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

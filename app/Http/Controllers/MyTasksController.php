@@ -11,6 +11,7 @@ use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
+use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
@@ -141,6 +142,11 @@ class MyTasksController extends Controller
             'stats' => $stats,
             'clock' => $clock,
             'active_round' => $activeRound,
+            // Worker-facing Lone Worker Safety check-in card. Null unless the
+            // signed-in user is the subject of a live (active/overdue/emergency)
+            // LoneWorkerSession. The one-tap card POSTs to the existing
+            // health-safety.lone-workers.sessions.check-in endpoint.
+            'active_lone_worker_session' => $this->getActiveLoneWorkerSession($user),
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
@@ -902,6 +908,63 @@ class MyTasksController extends Controller
                 'completed' => $progress['completed'],
                 'percent' => $progress['percent'],
                 'url' => route('meds.round.show', $round),
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+
+    /**
+     * The signed-in worker's live Lone Worker Safety session, if any.
+     *
+     * Returns the most recent session in a live state (active / overdue /
+     * emergency) where the user is the monitored worker — the data behind the
+     * My Day "You're being monitored — check in" card. Null when the worker is
+     * not currently being monitored (the card is hidden entirely).
+     *
+     * `next_check_in_at` / `is_check_in_overdue` are derived in PHP from the
+     * model's UTC-stored Carbons (never SQL NOW(), which can sit in a different
+     * timezone and skew the comparison — the same trap the coordinator hero hit).
+     */
+    private function getActiveLoneWorkerSession(User $user): ?array
+    {
+        try {
+            $session = LoneWorkerSession::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['active', 'overdue', 'emergency'])
+                ->with(['site:id,name', 'client:id,first_name,last_name'])
+                ->latest('started_at')
+                ->first();
+
+            if (! $session) {
+                return null;
+            }
+
+            $base = $session->last_check_in_at ?? $session->started_at;
+            $nextCheckInAt = $base
+                ? $base->copy()->addMinutes((int) $session->check_in_interval_minutes)
+                : null;
+
+            return [
+                'id' => $session->id,
+                'status' => $session->status,
+                'started_at' => optional($session->started_at)->toIso8601String(),
+                'expected_end_at' => optional($session->expected_end_at)->toIso8601String(),
+                'last_check_in_at' => optional($session->last_check_in_at)->toIso8601String(),
+                'check_in_interval_minutes' => (int) $session->check_in_interval_minutes,
+                'next_check_in_at' => optional($nextCheckInAt)->toIso8601String(),
+                // Overdue when the 5-min job has already flipped it, or the next
+                // check-in window has lapsed on a still-active session.
+                'is_check_in_overdue' => $session->status === 'overdue' || $session->isCheckInOverdue(),
+                'activity_description' => $session->activity_description,
+                'site' => $session->site
+                    ? ['id' => $session->site->id, 'name' => $session->site->name]
+                    : null,
+                'client' => $session->client
+                    ? ['id' => $session->client->id, 'name' => trim($session->client->first_name.' '.$session->client->last_name)]
+                    : null,
             ];
         } catch (\Throwable $e) {
             report($e);

@@ -268,10 +268,17 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [LoneWorkerController::class, 'index'])->name('index');
         });
 
+        // Worker self check-in (auth-only). The 3-actor model puts the lone
+        // WORKER's one-tap check-in on My Day, not the coordinator watch-tower.
+        // Frontline support workers have NO hazards.* permission, so this route
+        // must sit OUTSIDE the hazards.manage group or worker self-check-in would
+        // 403. Authorization is enforced inside checkIn(): the session's own
+        // worker, or a coordinator with hazards.manage, may record a check-in.
+        Route::post('/sessions/{session}/check-in', [LoneWorkerController::class, 'checkIn'])->name('sessions.check-in');
+
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::post('/sessions', [LoneWorkerController::class, 'startSession'])->name('sessions.store');
             Route::patch('/sessions/{session}', [LoneWorkerController::class, 'updateSession'])->name('sessions.update');
-            Route::post('/sessions/{session}/check-in', [LoneWorkerController::class, 'checkIn'])->name('sessions.check-in');
             Route::post('/sessions/{session}/end', [LoneWorkerController::class, 'endSession'])->name('sessions.end');
             Route::post('/sessions/{session}/emergency', [LoneWorkerController::class, 'triggerEmergency'])->name('sessions.emergency');
 
