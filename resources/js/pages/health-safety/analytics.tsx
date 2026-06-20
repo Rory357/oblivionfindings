@@ -16,7 +16,8 @@ import { WizardShell } from '@/components/wizard/shell';
 import type { WizardStep } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -525,6 +526,10 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const { trends, scorecard, period_summary, worksafe_notifiable, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
 
+    // Board-report routes are gated on governance.view; hide the launcher + the
+    // Governance-tab report packs for register-only roles to avoid a hard 403.
+    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+
     const [tab, setTab] = useState('overview');
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [drill, setDrill] = useState<DrillTarget | null>(null);
@@ -668,32 +673,34 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                     <Download className="h-4 w-4" /> Export
                                 </Button>
                             </a>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                    >
-                                        <FileText className="h-4 w-4" />
-                                        Board reports
-                                        <ChevronDown className="h-3.5 w-3.5" />
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="end" className="w-60 p-1">
-                                    {GOV_REPORTS.map((r) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                            {canViewBoardReports ? (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
                                         <button
-                                            key={r.name}
                                             type="button"
-                                            onClick={() => window.open(reportUrl(r.name), '_blank')}
-                                            className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                                         >
-                                            {r.label}
+                                            <FileText className="h-4 w-4" />
+                                            Board reports
+                                            <ChevronDown className="h-3.5 w-3.5" />
                                         </button>
-                                    ))}
-                                </PopoverContent>
-                            </Popover>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-60 p-1">
+                                        {GOV_REPORTS.map((r) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- governance report row; opens the dated report in a new tab.
+                                            <button
+                                                key={r.name}
+                                                type="button"
+                                                onClick={() => window.open(reportUrl(r.name), '_blank')}
+                                                className="block w-full rounded-md px-2.5 py-2 text-left text-[13px] text-foreground transition-colors hover:bg-muted"
+                                            >
+                                                {r.label}
+                                            </button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            ) : null}
                         </div>
                     </div>
 
@@ -792,7 +799,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                 ) : null}
 
                 {tab === 'governance' ? (
-                    <GovernanceTab scorecard={scorecard} trends={trends} reportUrl={reportUrl} exportUrl={() => (window.location.href = queryFor('incidents'))} />
+                    <GovernanceTab scorecard={scorecard} trends={trends} reportUrl={reportUrl} exportUrl={() => (window.location.href = queryFor('incidents'))} canViewReports={canViewBoardReports} />
                 ) : null}
 
                 {/* hours-worked honesty footnote — frequency rates need a meaningful exposure basis */}
@@ -1021,7 +1028,7 @@ function BreakdownsTab({
     );
 }
 
-function GovernanceTab({ scorecard, trends, reportUrl, exportUrl }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void }) {
+function GovernanceTab({ scorecard, trends, reportUrl, exportUrl, canViewReports }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void; canViewReports: boolean }) {
     return (
         <div className="grid gap-4">
             <Scorecard leading={scorecard.leading} lagging={scorecard.lagging} />
@@ -1038,11 +1045,18 @@ function GovernanceTab({ scorecard, trends, reportUrl, exportUrl }: { scorecard:
             <div>
                 <h3 className="mb-2 text-sm font-bold text-foreground">Governance packs</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <GovPackCard icon={FileText} title="Board safety summary" desc="Leading-vs-lagging assurance for the board pack." onOpen={() => window.open(reportUrl('board-summary'), '_blank')} />
-                    <GovPackCard icon={Shield} title="WorkSafe register analytics" desc="Notifiable events register (HSWA s.56)." onOpen={() => window.open(reportUrl('worksafe-register'), '_blank')} />
-                    <GovPackCard icon={Activity} title="Investigation outcomes" desc="Investigation status and outcomes summary." onOpen={() => window.open(reportUrl('investigation-outcomes'), '_blank')} />
-                    <GovPackCard icon={ClipboardList} title="Corrective-action traceability" desc="Action close-out evidence trail." onOpen={() => window.open(reportUrl('corrective-action-traceability'), '_blank')} />
-                    <GovPackCard icon={AlertTriangle} title="Risk-assessment register" desc="Current hazard/risk assessment register." onOpen={() => window.open(reportUrl('risk-assessment-register'), '_blank')} />
+                    {/* Report packs open governance.view-gated routes; hide them for
+                        register-only roles. The CSV export below is hazards.view-gated,
+                        so it stays available. */}
+                    {canViewReports ? (
+                        <>
+                            <GovPackCard icon={FileText} title="Board safety summary" desc="Leading-vs-lagging assurance for the board pack." onOpen={() => window.open(reportUrl('board-summary'), '_blank')} />
+                            <GovPackCard icon={Shield} title="WorkSafe register analytics" desc="Notifiable events register (HSWA s.56)." onOpen={() => window.open(reportUrl('worksafe-register'), '_blank')} />
+                            <GovPackCard icon={Activity} title="Investigation outcomes" desc="Investigation status and outcomes summary." onOpen={() => window.open(reportUrl('investigation-outcomes'), '_blank')} />
+                            <GovPackCard icon={ClipboardList} title="Corrective-action traceability" desc="Action close-out evidence trail." onOpen={() => window.open(reportUrl('corrective-action-traceability'), '_blank')} />
+                            <GovPackCard icon={AlertTriangle} title="Risk-assessment register" desc="Current hazard/risk assessment register." onOpen={() => window.open(reportUrl('risk-assessment-register'), '_blank')} />
+                        </>
+                    ) : null}
                     <GovPackCard icon={Download} title="Export current view" desc="CSV of the active analytics view." actionLabel="Download" onOpen={exportUrl} />
                 </div>
             </div>
