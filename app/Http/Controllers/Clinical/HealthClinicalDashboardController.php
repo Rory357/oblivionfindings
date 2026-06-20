@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Clinical;
 
+use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
@@ -11,12 +12,14 @@ use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Enums\AlertSeverity;
 use App\Http\Controllers\Clinical\Concerns\RecordsClinicalRecords;
 use App\Http\Controllers\Controller;
+use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class HealthClinicalDashboardController extends Controller
 {
@@ -139,6 +142,61 @@ class HealthClinicalDashboardController extends Controller
                 ]),
             ],
             'event_types' => $eventTypes->pluck('label', 'value'),
+        ]);
+    }
+
+    /**
+     * Cross-client Behaviour (ABC) register — paginated, filterable.
+     */
+    public function behaviour(Request $request): \Inertia\Response
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clinical.behaviour.viewAny'), 403);
+
+        $filters = $request->validate([
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'behaviour_function' => ['nullable', 'string', Rule::in(array_column(BehaviourFunction::cases(), 'value'))],
+            'intensity' => ['nullable', 'string', 'in:low,medium,high'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $entries = $this->dashboardService->getBehaviourRegister($filters)
+            ->through(fn (BehaviourAbcEntry $e) => [
+                'id' => $e->id,
+                'occurred_at' => $e->occurred_at?->toISOString(),
+                'setting' => $e->setting,
+                'antecedent' => $e->antecedent,
+                'behaviour' => $e->behaviour,
+                'consequence' => $e->consequence,
+                'behaviour_tags' => $e->behaviour_tags ?? [],
+                'behaviour_function' => $e->behaviour_function?->value,
+                'behaviour_function_label' => $e->behaviour_function?->label(),
+                'intensity' => $e->intensity,
+                'duration_seconds' => $e->duration_seconds,
+                'harm_occurred' => $e->harm_occurred,
+                'escalated' => $e->escalated,
+                'requires_followup' => $e->requires_followup,
+                'followup_completed' => $e->followup_completed_at !== null,
+                'client' => $e->client ? [
+                    'id' => $e->client->id,
+                    'first_name' => $e->client->first_name,
+                    'last_name' => $e->client->last_name,
+                    'site' => $e->client->site?->name,
+                ] : null,
+                'recorder' => $e->recorder ? ['id' => $e->recorder->id, 'name' => $e->recorder->name] : null,
+            ]);
+
+        $kpis = $this->dashboardService->getKpis();
+
+        return inertia('health-clinical/Behaviour', [
+            'entries' => $entries,
+            'stats' => $this->dashboardService->getBehaviourRegisterStats(),
+            'filters' => $filters,
+            'filter_options' => $this->dashboardService->getBehaviourFilterOptions(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
         ]);
     }
 

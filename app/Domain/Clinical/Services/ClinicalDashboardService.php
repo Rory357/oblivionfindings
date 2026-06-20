@@ -10,7 +10,9 @@ use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
+use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Enums\AlertSeverity;
+use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use Carbon\Carbon;
@@ -351,6 +353,74 @@ class ClinicalDashboardService
             'total_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
             'total_30d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(30))->count(),
             'by_type' => $byType,
+        ];
+    }
+
+    /**
+     * Paginated cross-client ABC behaviour register (Behaviour tab).
+     *
+     * @param  array{client_id?: int|null, behaviour_function?: string|null, intensity?: string|null, site_id?: int|null, date_from?: string|null, date_to?: string|null}  $filters
+     */
+    public function getBehaviourRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        return BehaviourAbcEntry::query()
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'recorder:id,name'])
+            ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+            ->when($filters['behaviour_function'] ?? null, fn ($q, $f) => $q->where('behaviour_function', $f))
+            ->when($filters['intensity'] ?? null, fn ($q, $i) => $q->where('intensity', $i))
+            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->where('site_id', $id))
+            ->when($filters['date_from'] ?? null, fn ($q, $d) => $q->where('occurred_at', '>=', Carbon::parse($d)->startOfDay()))
+            ->when($filters['date_to'] ?? null, fn ($q, $d) => $q->where('occurred_at', '<=', Carbon::parse($d)->endOfDay()))
+            ->orderByDesc('occurred_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Stat cards for the Behaviour tab: volume, escalation/harm counts and the
+     * function-of-behaviour + intensity breakdowns (last 30 days).
+     *
+     * @return array{total_7d: int, total_30d: int, escalated_30d: int, harm_30d: int, function_breakdown: array<string, int>, intensity_mix: array<string, int>}
+     */
+    public function getBehaviourRegisterStats(): array
+    {
+        $now = Carbon::now();
+        $from = $now->copy()->subDays(30);
+
+        $functionBreakdown = BehaviourAbcEntry::where('occurred_at', '>=', $from)
+            ->whereNotNull('behaviour_function')
+            ->selectRaw('behaviour_function, COUNT(*) as count')
+            ->groupBy('behaviour_function')
+            ->pluck('count', 'behaviour_function')
+            ->toArray();
+
+        $intensityMix = BehaviourAbcEntry::where('occurred_at', '>=', $from)
+            ->selectRaw('intensity, COUNT(*) as count')
+            ->groupBy('intensity')
+            ->pluck('count', 'intensity')
+            ->toArray();
+
+        return [
+            'total_7d' => BehaviourAbcEntry::where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->count(),
+            'escalated_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->where('escalated', true)->count(),
+            'harm_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->where('harm_occurred', true)->count(),
+            'function_breakdown' => $functionBreakdown,
+            'intensity_mix' => $intensityMix,
+        ];
+    }
+
+    /**
+     * Filter options for the Behaviour tab (clients, sites, function + intensity).
+     *
+     * @return array<string, mixed>
+     */
+    public function getBehaviourFilterOptions(): array
+    {
+        return [
+            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'functions' => BehaviourFunction::options(),
+            'intensities' => collect(BehaviourAbcEntry::INTENSITIES)->map(fn ($i) => ['value' => $i, 'label' => ucfirst($i)])->values(),
         ];
     }
 

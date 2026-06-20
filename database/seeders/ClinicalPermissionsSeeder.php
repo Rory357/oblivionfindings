@@ -30,6 +30,9 @@ class ClinicalPermissionsSeeder extends Seeder
             ['key' => 'clinical.events.review', 'description' => 'Review and close clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.escalate', 'description' => 'Escalate clinical events to on-call clinical leadership', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
+            // Behaviour (ABC)
+            ['key' => 'clinical.behaviour.viewAny', 'description' => 'View the cross-client behaviour (ABC) register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
             // Protocols
             ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Create, edit, and deactivate clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
@@ -82,6 +85,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.record',
             'clinical.observations.recordClinical',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
             'clinical.events.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
@@ -95,6 +99,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',
@@ -112,6 +117,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',
@@ -129,6 +135,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',

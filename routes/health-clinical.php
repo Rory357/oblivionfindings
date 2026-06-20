@@ -48,6 +48,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/events/{event}/escalate', [HealthClinicalDashboardController::class, 'escalateEvent'])
             ->middleware('permission:clinical.events.escalate')
             ->name('events.escalate');
+        Route::get('/behaviour', [HealthClinicalDashboardController::class, 'behaviour'])
+            ->middleware('permission:clinical.behaviour.viewAny')
+            ->name('behaviour.index');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');

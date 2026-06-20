@@ -274,6 +274,7 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.events.record', 'description' => 'Record clinical events', 'group' => 'clinical', 'module' => 'Clinical'],
             ['key' => 'clinical.events.review', 'description' => 'Review and close clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.escalate', 'description' => 'Escalate clinical events to on-call clinical leadership', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.behaviour.viewAny', 'description' => 'View the cross-client behaviour (ABC) register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Manage clinical protocols', 'group' => 'clinical', 'module' => 'Clinical'],
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
@@ -661,6 +662,7 @@ class RbacSeeder extends Seeder
             'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
             'clinical.events.viewAny', 'clinical.events.review', 'clinical.events.escalate',
+            'clinical.behaviour.viewAny',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard',
         ]);
@@ -829,6 +831,7 @@ class RbacSeeder extends Seeder
             'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
             'clinical.events.viewAny', 'clinical.events.review', 'clinical.events.escalate',
+            'clinical.behaviour.viewAny',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard',
             'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',

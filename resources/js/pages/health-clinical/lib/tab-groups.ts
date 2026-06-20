@@ -66,7 +66,7 @@ export const HC_TABS: HcTab[] = [
     { id: 'protocols', label: 'Protocols', icon: Workflow, tone: 'primary', group: 'plan', href: '/health-clinical/protocols' },
     { id: 'assessments', label: 'Assessments & Risk', icon: AlertTriangle, tone: 'critical', group: 'plan', href: null },
     // ── Analyse ──────────────────────────────────────────────────────────
-    { id: 'behaviour', label: 'Behaviour', icon: Brain, tone: 'violet', group: 'analyse', href: null },
+    { id: 'behaviour', label: 'Behaviour', icon: Brain, tone: 'violet', group: 'analyse', href: '/health-clinical/behaviour' },
     { id: 'trends', label: 'Trends', icon: TrendingUp, tone: 'info', group: 'analyse', href: null },
 ];
 

@@ -257,7 +257,7 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] Endpoints `PATCH events/{event}/review`, `PATCH events/{event}/follow-up/complete`, `POST events/{event}/escalate` on `HealthClinicalDashboardController`, route-middleware gated. `ClinicalEventService::review/completeFollowup/escalate` (+ `recordActionTimeline`); escalate raises a forced HIGH Control Room signal via new `ClinicalSignalService::emitForEscalation` (distinct idempotency key). NEW perm `clinical.events.escalate` added to **both** RbacSeeder + ClinicalPermissionsSeeder (clinical_lead/coordinator/provider_manager). `clinical.events.review` already existed.
 - [x] `eventsReview`/`eventsEscalate` added to shared `auth.can.clinical` (HandleInertiaRequests) for client-side gating.
 - [x] Events register rework: table → **card list** (severity left-border accent, icon tile, type+severity pill, Needs-sign-off/Reviewed + Follow-up-due badges, client·site, description, when+reporter) + **right-click `ShiftContextMenu`** (View client / Review & sign off / Mark follow-up complete / Escalate — each gated). Kept the full filter card + pager.
-- [x] Tests: `ClinicalEventWorkflowTest` 5/12 (review sets reviewed_*; follow-up sets completed_*; escalate emits signal + timeline; review/escalate forbidden without permission). tsc + eslint clean. Commit: `__STEP5_SHA__`.
+- [x] Tests: `ClinicalEventWorkflowTest` 5/12 (review sets reviewed_*; follow-up sets completed_*; escalate emits signal + timeline; review/escalate forbidden without permission). tsc + eslint clean. Commit: `bfb10c9f`.
 - **Deferred (no stubs):** "Create H&S incident" ctx action (the auto-link already covers fall/seizure/choking; manual link → later); on-call-specific notification fanout → Step 8 (Control Room signal is the escalation surface now).
 
 ### ☐ Step 6 — Attachments (B4) + register §9 polish
@@ -266,11 +266,11 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [ ] `GET /clients/search?q=` (B10) + shared client picker; toolbar/search/pagination/empty-state rework across all four registers; URL filter persistence; caseload default.
 - [ ] Tests: sensitive-download gate; multipart `is_sensitive` boolean; search/pagination. **Dependency:** Steps 2, 4. **Ships:** evidence capture + scalable client selection.
 
-### ☐ Step 7 — Behaviour index + Health-Monitoring rollup + lenses (B5, B6, §1B)
-- [ ] `GET /health-clinical/behaviour` + behaviour register/stats (perm `clinical.behaviour.viewAny`).
-- [ ] `getMonitoringRollup()`/`Stats()` (perm `clinical.monitoring.viewAny`); reconcile the medications.* vs clinical.* permission story.
-- [ ] Care Plans lens (→ `/operations/care-plans`) + Restraint lens (→ `/health-safety/restraints`, scoped via `client.organization_id`); extend `getKpis()` with restraint/care-plan/`nga_paerewa_certified` chips (B7 finish).
-- [ ] Tests: behaviour aggregates; rollup site-scoping; lens org-scoping (no cross-tenant leak). **Dependency:** Steps 2, 5. **Ships:** Behaviour/Health-Monitoring/Care-Plans/Restraint tabs.
+### 🔧 Step 7 — Behaviour index + Health-Monitoring rollup + lenses (B5, B6, §1B) — **IN PROGRESS**
+- [x] **7a Behaviour tab** — `GET /health-clinical/behaviour` (perm `clinical.behaviour.viewAny`, NEW — added to both seeders for team_lead/clinical_lead/coordinator/provider_manager) + `getBehaviourRegister`/`getBehaviourRegisterStats`/`getBehaviourFilterOptions` on ClinicalDashboardService. Panel `Behaviour.tsx`: ABC entries as **A·B·C three-column cards** (client/site/function pill/intensity/harm/escalated/follow-up flags) + stat strip (escalated/harm counts) + filters + pager. `behaviour` tab flipped on in `HC_TABS` → activates the **Analyse group**. Record ABC = the hero button (already mounted on this tab). Test `HealthClinicalBehaviourTest` (2). tsc + eslint + php-lint clean. Commit: `__STEP7A_SHA__`.
+- [ ] **7b lenses** — Care Plans lens (→ `/operations/care-plans`) + Restraint lens (→ `/health-safety/restraints`, scope via `client.organization_id`); extend `getKpis()` with restraint/care-plan/`nga_paerewa_certified` chips.
+- [ ] **7c Health Monitoring** — `getMonitoringRollup()`/`Stats()` (perm `clinical.monitoring.viewAny`); reconcile medications.* vs clinical.* permission story.
+- **Dependency:** Steps 2, 5. **Ships:** Behaviour/Health-Monitoring/Care-Plans/Restraint tabs.
 
 ### ☐ Step 8 — Assessments & Risk + cross-module Trends signals (B8, §4)
 - [ ] `clinical_risk_assessments` migration + FRAT/Waterlow-Braden/MUST/IDDSI scorers + index/store/detail; Assessments tab (banner until live).
