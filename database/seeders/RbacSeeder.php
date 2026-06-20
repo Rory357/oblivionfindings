@@ -790,6 +790,8 @@ class RbacSeeder extends Seeder
             'clinical.observations.viewAny', 'clinical.observations.recordClinical',
             'clinical.events.view', 'clinical.events.record',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny', 'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
             'medications.view', 'medications.orders.verify',

@@ -560,10 +560,14 @@ class HealthClinicalDashboardController extends Controller
     }
 
     /**
-     * Review & sign off a clinical event. Permission gated by route middleware.
+     * Review & sign off a clinical event. Permission gated by route middleware;
+     * the per-record `authorize('view')` enforces the assignment boundary (a
+     * viewAssigned-only user can only act on a client they are assigned to),
+     * matching the store methods + the incidents register's assignment scope.
      */
     public function reviewEvent(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->review($event, $request->user());
 
         return back()->with('success', 'Clinical event reviewed and signed off.');
@@ -574,6 +578,7 @@ class HealthClinicalDashboardController extends Controller
      */
     public function completeEventFollowup(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->completeFollowup($event, $request->user());
 
         return back()->with('success', 'Follow-up marked complete.');
@@ -584,6 +589,7 @@ class HealthClinicalDashboardController extends Controller
      */
     public function escalateEvent(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->escalate($event, $request->user());
 
         return back()->with('success', 'Clinical event escalated to on-call leadership.');

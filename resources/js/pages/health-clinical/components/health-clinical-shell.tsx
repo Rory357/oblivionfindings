@@ -47,6 +47,7 @@ import {
     builtTabsForGroup,
     groupForTab,
     groupsWithBuiltTabs,
+    type ClinicalCan,
     type HcGroupKey,
     type HcTabId,
 } from '@/pages/health-clinical/lib/tab-groups';
@@ -82,7 +83,7 @@ export type HealthClinicalShellProps = {
     children: ReactNode;
 };
 
-type ClinicalAbilities = {
+type ClinicalAbilities = ClinicalCan & {
     observationsRecord?: boolean;
     observationsRecordClinical?: boolean;
     eventsRecord?: boolean;
@@ -177,18 +178,20 @@ function complianceTone(rate: number): 'success' | 'warning' | 'critical' {
 function GroupPills({
     activeGroup,
     tabCounts,
+    can,
     onSelect,
 }: {
     activeGroup: HcGroupKey;
     tabCounts?: Partial<Record<HcTabId, number>>;
+    can: ClinicalCan;
     onSelect: (group: HcGroupKey) => void;
 }) {
-    const groups = groupsWithBuiltTabs();
+    const groups = groupsWithBuiltTabs(can);
     return (
         <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Clinical navigation groups">
             {groups.map((g) => {
                 const active = g.key === activeGroup;
-                const attention = builtTabsForGroup(g.key).reduce(
+                const attention = builtTabsForGroup(g.key, can).reduce(
                     (sum, t) => sum + (tabCounts?.[t.id] ?? 0),
                     0,
                 );
@@ -249,11 +252,11 @@ export function HealthClinicalShell({
     };
 
     const selectGroup = (group: HcGroupKey) => {
-        const first = builtTabsForGroup(group)[0];
+        const first = builtTabsForGroup(group, can)[0];
         if (first && first.id !== activeTab) go(first.href);
     };
 
-    const tabItems: RosterTabItem[] = builtTabsForGroup(activeGroup).map((t) => ({
+    const tabItems: RosterTabItem[] = builtTabsForGroup(activeGroup, can).map((t) => ({
         id: t.id,
         label: t.label,
         icon: t.icon,
@@ -385,10 +388,10 @@ export function HealthClinicalShell({
 
                 {/* ── Two-tier navigation ── */}
                 <div className="flex flex-col gap-2.5">
-                    <GroupPills activeGroup={activeGroup} tabCounts={tabCounts} onSelect={selectGroup} />
+                    <GroupPills activeGroup={activeGroup} tabCounts={tabCounts} can={can} onSelect={selectGroup} />
                     <TabStrip
                         value={activeTab}
-                        onChange={(id) => go(builtTabsForGroup(activeGroup).find((t) => t.id === id)?.href ?? null)}
+                        onChange={(id) => go(builtTabsForGroup(activeGroup, can).find((t) => t.id === id)?.href ?? null)}
                         items={tabItems}
                         ariaLabel="Clinical views"
                     />

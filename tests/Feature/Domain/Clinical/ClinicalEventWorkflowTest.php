@@ -91,6 +91,28 @@ class ClinicalEventWorkflowTest extends TestCase
         $this->assertSame($lead->id, $event->followup_completed_by);
     }
 
+    public function test_complete_followup_enforces_client_assignment(): void
+    {
+        // completeEventFollowup is reachable by a support_worker via clinical.events.record,
+        // so the per-record authorize('view') is what stops them completing follow-up on a
+        // client they are not assigned to (the route permission alone would let them through).
+        $worker = $this->userWithRole('support_worker');
+        $event = $this->event(['requires_followup' => true]);
+
+        $this->actingAs($worker)
+            ->patch("/health-clinical/events/{$event->id}/follow-up/complete")
+            ->assertForbidden();
+
+        // Once assigned to the client, the same worker can complete it.
+        $this->client->supportWorkers()->attach($worker->id);
+        $this->actingAs($worker)
+            ->from('/health-clinical/events')
+            ->patch("/health-clinical/events/{$event->id}/follow-up/complete")
+            ->assertRedirect();
+
+        $this->assertNotNull($event->refresh()->followup_completed_at);
+    }
+
     public function test_escalate_emits_signal_and_records_timeline(): void
     {
         $signals = $this->mock(ClinicalSignalService::class);
