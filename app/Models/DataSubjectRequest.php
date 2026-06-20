@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Domain\Privacy\Services\StatutoryDueDate;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class DataSubjectRequest extends Model
 {
@@ -81,7 +83,9 @@ class DataSubjectRequest extends Model
                 $request->received_at = now();
             }
             if (empty($request->due_date)) {
-                $request->due_date = now()->addDays(30); // Privacy Act 2020 requirement
+                // Privacy Act 2020 IPP 6 — respond within 20 working days
+                // (skipping weekends + NZ public holidays).
+                $request->due_date = app(StatutoryDueDate::class)->dueFrom($request->received_at);
             }
         });
     }
@@ -154,6 +158,14 @@ class DataSubjectRequest extends Model
     public function dataExports(): HasMany
     {
         return $this->hasMany(DataExport::class);
+    }
+
+    /**
+     * Evidence / response-pack documents (identity verification, disclosed records).
+     */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(PrivacyAttachment::class, 'attachable')->latest();
     }
 
     /**

@@ -3,153 +3,473 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\ClientIncident;
 use App\Models\ModifiedDuty;
 use App\Models\ReturnToWorkPlan;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkCapacityAssessment;
 use App\Models\WorkplaceInjury;
+use App\Models\WorkplaceInjuryAttachment;
+use App\Services\HealthSafety\HsKpiService;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/**
+ * Injuries & Return-to-Work register (Health & Safety gold standard).
+ *
+ * Modal-first register at /health-safety/injuries — mirrors the Events / Incidents /
+ * Safeguarding / Fleet / Hazards pattern: HeroShell + TabStrip + detail-over-list
+ * (?injury=). Lifecycle: reported → under_treatment → return_to_work → recovered →
+ * closed. Staff data (user_id = injured worker), gated by hazards.view / hazards.manage.
+ */
 class ReturnToWorkController extends Controller
 {
-    /**
-     * List active injuries and RTW plans.
-     */
-    public function index(Request $request): \Inertia\Response
-    {
-        $filters = $request->only(['q', 'site_id', 'status', 'severity']);
+    /** Canonical injury_type → human label (15 enum values). */
+    private const TYPE_LABELS = [
+        'strain' => 'Muscle strain',
+        'laceration' => 'Laceration',
+        'fracture' => 'Fracture',
+        'burn' => 'Burn',
+        'contusion' => 'Contusion / bruise',
+        'concussion' => 'Concussion',
+        'repetitive_strain' => 'Repetitive strain',
+        'chemical_exposure' => 'Chemical exposure',
+        'biological_exposure' => 'Biological exposure',
+        'needle_stick' => 'Needle-stick',
+        'slip_trip_fall' => 'Slip / trip / fall',
+        'manual_handling' => 'Manual handling',
+        'psychological' => 'Psychological',
+        'illness' => 'Work illness',
+        'other' => 'Other',
+    ];
 
-        $injuries = WorkplaceInjury::with(['user:id,name', 'site:id,name'])
-            ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
-            ->when(!empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
-            ->when(!empty($filters['severity']), fn ($q) => $q->where('severity', $filters['severity']))
-            ->when(!empty($filters['q']), function ($q) use ($filters) {
-                $search = $filters['q'];
-                $q->where(function ($q2) use ($search) {
-                    $q2->where('description', 'like', "%{$search}%")
-                       ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', "%{$search}%"));
-                });
-            })
+    private const TREATMENT_LABELS = [
+        'none' => 'None required',
+        'first_aid' => 'First aid',
+        'gp_visit' => 'GP visit',
+        'hospital' => 'Hospital',
+        'emergency_department' => 'Emergency department',
+        'hospitalisation' => 'Hospitalisation',
+        'specialist' => 'Specialist',
+        'ongoing' => 'Ongoing treatment',
+    ];
+
+    /** Allowed lifecycle transitions (from → [to,...]). 'closed' reachable from any non-closed. */
+    private const TRANSITIONS = [
+        'reported' => ['under_treatment', 'closed'],
+        'under_treatment' => ['return_to_work', 'recovered', 'closed'],
+        'return_to_work' => ['recovered', 'closed'],
+        'recovered' => ['closed'],
+        'closed' => [],
+    ];
+
+    public function __construct(private readonly HsKpiService $kpi) {}
+
+    /* ================================================================== */
+    /*  Register */
+    /* ================================================================== */
+
+    public function index(Request $request): Response
+    {
+        $tab = (string) $request->input('tab', 'all');
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        // ── List query (scope + tab + refinements + paginate) ──
+        $injuries = $this->applyRefinements(
+            $this->applyTab($this->scopedBase($request), $tab),
+            $request
+        )
+            ->with(['user:id,name', 'site:id,name'])
+            ->withCount(['returnToWorkPlans', 'capacityAssessments', 'attachments'])
             ->orderByDesc('injury_date')
             ->paginate(25)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (WorkplaceInjury $i) => $this->shapeRow($i));
 
-        // Stats
-        $activeInjuries = WorkplaceInjury::whereIn('status', ['reported', 'under_treatment', 'return_to_work'])->count();
+        // ── Aggregates (scope-only — never the tab/refinements, so badges stay stable) ──
+        $statusCounts = $this->scopedBase($request)
+            ->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
+        $count = fn (string $s): int => (int) ($statusCounts[$s] ?? 0);
 
-        $activeRtwPlans = ReturnToWorkPlan::whereIn('status', ['active', 'in_progress'])->count();
+        $worksafeAwaiting = (int) $this->scopedBase($request)->where('worksafe_notifiable', true)->where('status', 'reported')->count();
+        $accOpen = (int) $this->scopedBase($request)->where('acc_claim_lodged', true)->where('status', '!=', 'closed')->count();
+        $accUnlodged = (int) $this->scopedBase($request)->where('acc_claim_lodged', false)->whereNotIn('status', ['closed', 'recovered'])->count();
+        $lostTimeCount = (int) $this->scopedBase($request)->where('lost_time_days', '>', 0)->count();
+        $lostTimeDays = (int) $this->scopedBase($request)->sum('lost_time_days');
 
-        $thirtyDaysAgo = now()->subDays(30);
-        $totalLostDays30d = (int) WorkplaceInjury::where('injury_date', '>=', $thirtyDaysAgo)
-            ->sum('lost_time_days');
+        $rtwReviewDue = ReturnToWorkPlan::query()
+            ->whereNotNull('next_review_date')->whereDate('next_review_date', '<=', now())->where('status', 'active')
+            ->when($siteId, fn (Builder $q) => $q->whereHas('workplaceInjury', fn (Builder $w) => $w->where('site_id', $siteId)))
+            ->count();
 
-        $pendingAssessments = WorkCapacityAssessment::where('capacity_status', 'requires_review')->count();
+        $tabCounts = [
+            'all' => (int) $statusCounts->sum(),
+            'reported' => $count('reported'),
+            'under_treatment' => $count('under_treatment'),
+            'return_to_work' => $count('return_to_work'),
+            'recovered' => $count('recovered'),
+            'closed' => $count('closed'),
+            'worksafe' => (int) $this->scopedBase($request)->where('worksafe_notifiable', true)->count(),
+            'acc' => $accOpen,
+        ];
+
+        $hero = [
+            'live' => [
+                'reported' => $count('reported'),
+                'under_treatment' => $count('under_treatment'),
+                'return_to_work' => $count('return_to_work'),
+                'recovered' => $count('recovered'),
+            ],
+            'attention' => [
+                'worksafe_awaiting' => $worksafeAwaiting,
+                'acc_unlodged' => $accUnlodged,
+                'rtw_review_due' => $rtwReviewDue,
+                'lost_time' => $lostTimeCount,
+            ],
+            'badges' => [
+                'worksafe_awaiting' => $worksafeAwaiting,
+                'acc_open' => $accOpen,
+                'ltifr' => $this->kpi->ltifr(null, null, $siteId),
+                'trifr' => $this->kpi->trifr(null, null, $siteId),
+                'lost_time_days' => $lostTimeDays,
+            ],
+        ];
+
+        // ── Detail-over-list (?injury=) ──
+        $detail = null;
+        if ($request->filled('injury')) {
+            $target = WorkplaceInjury::find($request->integer('injury'));
+            $detail = $target ? $this->buildInjuryDetail($target) : null;
+        }
 
         return Inertia::render('health-safety/injuries/index', [
             'injuries' => $injuries,
-            'stats' => [
-                'active_injuries' => $activeInjuries,
-                'active_rtw_plans' => $activeRtwPlans,
-                'lost_days_30d' => $totalLostDays30d,
-                'pending_assessments' => $pendingAssessments,
+            'tab' => $tab,
+            'tabCounts' => $tabCounts,
+            'hero' => $hero,
+            'filters' => [
+                'q' => $request->input('q', ''),
+                'site_id' => $siteId,
+                'severity' => $request->input('severity'),
+                'status' => $request->input('status'),
+                'treatment' => $request->input('treatment'),
+                'acc_open' => $request->boolean('acc_open') ?: null,
+                'worksafe' => $request->boolean('worksafe') ?: null,
+                'period' => $request->input('period', 'all'),
+                'from' => $request->input('from'),
+                'to' => $request->input('to'),
+                'type' => $request->input('type'),
+                'body_part' => $request->input('body_part'),
             ],
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
             'staff' => User::select('id', 'name')->orderBy('name')->get(),
-            'filters' => $filters,
+            'incidents' => $this->incidentOptions(),
+            'detail' => $detail,
+            'can' => ['manage' => (bool) ($request->user()?->canDo('hazards.manage') ?? false)],
         ]);
     }
 
-    /**
-     * Show the create form for a workplace injury.
-     */
-    public function create(): \Inertia\Response
+    /* ================================================================== */
+    /*  Scope / tab / refinement helpers */
+    /* ================================================================== */
+
+    private function scopedBase(Request $request): Builder
     {
-        return Inertia::render('health-safety/injuries/create', [
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
-            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
-        ]);
+        $query = WorkplaceInjury::query();
+        if ($request->filled('site_id')) {
+            $query->where('site_id', (int) $request->input('site_id'));
+        }
+        [$from, $to] = $this->resolveRange($request);
+        if ($from) {
+            $query->where('injury_date', '>=', $from);
+        }
+        if ($to) {
+            $query->where('injury_date', '<=', $to);
+        }
+
+        return $query;
     }
 
-    /**
-     * Store a new workplace injury.
-     */
+    private function applyTab(Builder $query, string $tab): Builder
+    {
+        return match ($tab) {
+            'reported', 'under_treatment', 'return_to_work', 'recovered', 'closed' => $query->where('status', $tab),
+            'worksafe' => $query->where('worksafe_notifiable', true),
+            'acc' => $query->where('acc_claim_lodged', true)->where('status', '!=', 'closed'),
+            default => $query, // 'all'
+        };
+    }
+
+    private function applyRefinements(Builder $query, Request $request): Builder
+    {
+        return $query
+            ->when($request->filled('severity'), fn (Builder $q) => $q->where('severity', $request->input('severity')))
+            ->when($request->filled('status'), fn (Builder $q) => $q->where('status', $request->input('status')))
+            ->when($request->filled('treatment'), fn (Builder $q) => $q->where('medical_treatment_type', $request->input('treatment')))
+            ->when($request->filled('type'), fn (Builder $q) => $q->where('injury_type', $request->input('type')))
+            ->when($request->filled('body_part'), fn (Builder $q) => $q->where('body_part_affected', 'like', '%'.$request->input('body_part').'%'))
+            ->when($request->boolean('acc_open'), fn (Builder $q) => $q->where('acc_claim_lodged', true)->where('status', '!=', 'closed'))
+            ->when($request->boolean('worksafe'), fn (Builder $q) => $q->where('worksafe_notifiable', true))
+            ->when($request->filled('q'), function (Builder $q) use ($request) {
+                $search = $request->input('q');
+                $q->where(function (Builder $q2) use ($search) {
+                    $q2->where('description', 'like', "%{$search}%")
+                        ->orWhere('body_part_affected', 'like', "%{$search}%")
+                        ->orWhereHas('user', fn (Builder $uq) => $uq->where('name', 'like', "%{$search}%"));
+                });
+            });
+    }
+
+    /** Resolve a [from, to] window from explicit from/to or the period preset (default = all-time). */
+    private function resolveRange(Request $request): array
+    {
+        if ($request->filled('from') || $request->filled('to')) {
+            return [
+                $request->filled('from') ? Carbon::parse($request->input('from'))->startOfDay() : null,
+                $request->filled('to') ? Carbon::parse($request->input('to'))->endOfDay() : null,
+            ];
+        }
+
+        return match ((string) $request->input('period', 'all')) {
+            'week' => [now()->subDays(7), null],
+            '30d' => [now()->subDays(30), null],
+            'quarter' => [now()->subDays(90), null],
+            'year' => [now()->subDays(365), null],
+            default => [null, null], // all
+        };
+    }
+
+    private function reference(int $id): string
+    {
+        return 'WI-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function shapeRow(WorkplaceInjury $i): array
+    {
+        return [
+            'id' => $i->id,
+            'reference' => $this->reference($i->id),
+            'status' => $i->status,
+            'severity' => $i->severity,
+            'injury_type' => $i->injury_type,
+            'injury_type_label' => self::TYPE_LABELS[$i->injury_type] ?? ucfirst(str_replace('_', ' ', (string) $i->injury_type)),
+            'body_part_affected' => $i->body_part_affected,
+            'injury_date' => optional($i->injury_date)->toIso8601String(),
+            'lost_time_days' => (int) $i->lost_time_days,
+            'worksafe_notifiable' => (bool) $i->worksafe_notifiable,
+            'acc_claim_lodged' => (bool) $i->acc_claim_lodged,
+            'acc_claim_number' => $i->acc_claim_number,
+            'related_incident_id' => $i->related_incident_id,
+            'worker' => $i->user ? ['id' => $i->user->id, 'name' => $i->user->name] : null,
+            'site' => $i->site ? ['id' => $i->site->id, 'name' => $i->site->name] : null,
+            'rtw_count' => (int) ($i->return_to_work_plans_count ?? 0),
+            'capacity_count' => (int) ($i->capacity_assessments_count ?? 0),
+            'attachment_count' => (int) ($i->attachments_count ?? 0),
+        ];
+    }
+
+    /** Recent client incidents for the wizard's "link to incident" picker. */
+    private function incidentOptions()
+    {
+        return ClientIncident::query()
+            ->latest('occurred_at')
+            ->limit(100)
+            ->get(['id', 'type', 'title', 'occurred_at'])
+            ->map(fn (ClientIncident $c) => [
+                'id' => $c->id,
+                'label' => 'INC-'.str_pad((string) $c->id, 4, '0', STR_PAD_LEFT),
+                'title' => $c->title ?: ucfirst(str_replace('_', ' ', (string) $c->type)),
+                'occurred_at' => optional($c->occurred_at)->toIso8601String(),
+            ]);
+    }
+
+    /* ================================================================== */
+    /*  Detail payload (shared by ?injury= modal) */
+    /* ================================================================== */
+
+    private function buildInjuryDetail(WorkplaceInjury $injury): array
+    {
+        $injury->load([
+            'user:id,name', 'site:id,name',
+            'relatedIncident:id,type,title,occurred_at',
+            'returnToWorkPlans' => fn ($q) => $q->with(['worker:id,name', 'manager:id,name', 'modifiedDuties.user:id,name'])->orderByDesc('created_at'),
+            'capacityAssessments' => fn ($q) => $q->with('user:id,name')->orderByDesc('assessment_date'),
+            'attachments' => fn ($q) => $q->with('uploader:id,name')->orderByDesc('created_at'),
+        ]);
+
+        return [
+            'id' => $injury->id,
+            'reference' => $this->reference($injury->id),
+            'status' => $injury->status,
+            'severity' => $injury->severity,
+            'injury_type' => $injury->injury_type,
+            'injury_type_label' => self::TYPE_LABELS[$injury->injury_type] ?? ucfirst(str_replace('_', ' ', (string) $injury->injury_type)),
+            'body_part_affected' => $injury->body_part_affected,
+            'description' => $injury->description,
+            'injury_date' => optional($injury->injury_date)->toIso8601String(),
+            'immediate_treatment' => $injury->immediate_treatment,
+            'medical_treatment_type' => $injury->medical_treatment_type,
+            'medical_treatment_label' => self::TREATMENT_LABELS[$injury->medical_treatment_type] ?? null,
+            'worksafe_notifiable' => (bool) $injury->worksafe_notifiable,
+            'acc_claim_lodged' => (bool) $injury->acc_claim_lodged,
+            'acc_claim_number' => $injury->acc_claim_number,
+            'lost_time_days' => (int) $injury->lost_time_days,
+            'expected_return_date' => optional($injury->expected_return_date)->toIso8601String(),
+            'actual_return_date' => optional($injury->actual_return_date)->toIso8601String(),
+            'notes' => $injury->notes,
+            'worker' => $injury->user ? ['id' => $injury->user->id, 'name' => $injury->user->name] : null,
+            'site' => $injury->site ? ['id' => $injury->site->id, 'name' => $injury->site->name] : null,
+            'related_incident' => $injury->relatedIncident ? [
+                'id' => $injury->relatedIncident->id,
+                'label' => 'INC-'.str_pad((string) $injury->relatedIncident->id, 4, '0', STR_PAD_LEFT),
+                'title' => $injury->relatedIncident->title ?: ucfirst(str_replace('_', ' ', (string) $injury->relatedIncident->type)),
+            ] : null,
+            'rtw_plans' => $injury->returnToWorkPlans->map(fn (ReturnToWorkPlan $p) => [
+                'id' => $p->id,
+                'status' => $p->status,
+                'plan_start_date' => optional($p->plan_start_date)->toIso8601String(),
+                'plan_end_date' => optional($p->plan_end_date)->toIso8601String(),
+                'goals' => $p->goals ?? [],
+                'stages' => $p->stages ?? [],
+                'medical_clearance_notes' => $p->medical_clearance_notes,
+                'medical_clearance_provider' => $p->medical_clearance_provider,
+                'medical_clearance_date' => optional($p->medical_clearance_date)->toIso8601String(),
+                'next_review_date' => optional($p->next_review_date)->toIso8601String(),
+                'review_notes' => $p->review_notes,
+                'worker' => $p->worker ? ['id' => $p->worker->id, 'name' => $p->worker->name] : null,
+                'manager' => $p->manager ? ['id' => $p->manager->id, 'name' => $p->manager->name] : null,
+                'modified_duties' => $p->modifiedDuties->map(fn (ModifiedDuty $d) => [
+                    'id' => $d->id,
+                    'status' => $d->status,
+                    'start_date' => optional($d->start_date)->toIso8601String(),
+                    'end_date' => optional($d->end_date)->toIso8601String(),
+                    'modified_duties_description' => $d->modified_duties_description,
+                    'restrictions' => $d->restrictions,
+                    'accommodations' => $d->accommodations,
+                    'hours_per_day' => $d->hours_per_day !== null ? (float) $d->hours_per_day : null,
+                    'user' => $d->user ? ['id' => $d->user->id, 'name' => $d->user->name] : null,
+                ])->values(),
+            ])->values(),
+            'capacity_assessments' => $injury->capacityAssessments->map(fn (WorkCapacityAssessment $a) => [
+                'id' => $a->id,
+                'assessment_date' => optional($a->assessment_date)->toIso8601String(),
+                'assessor_name' => $a->assessor_name,
+                'assessor_type' => $a->assessor_type,
+                'capacity_status' => $a->capacity_status,
+                'restrictions' => $a->restrictions,
+                'recommendations' => $a->recommendations,
+                'next_assessment_date' => optional($a->next_assessment_date)->toIso8601String(),
+                'assessment_summary' => $a->assessment_summary,
+                'assessor' => $a->user ? ['id' => $a->user->id, 'name' => $a->user->name] : null,
+            ])->values(),
+            'attachments' => $injury->attachments->map(fn (WorkplaceInjuryAttachment $a) => [
+                'id' => $a->id,
+                'original_name' => $a->original_name,
+                'url' => Storage::disk($a->disk ?: 'public')->url($a->path),
+                'mime' => $a->mime,
+                'kind' => $a->kind,
+                'notes' => $a->notes,
+                'alt_text' => $a->alt_text,
+                'size' => $a->size,
+                'is_image' => $a->isImage(),
+                'uploaded_by' => $a->uploader?->name,
+                'created_at' => optional($a->created_at)->toIso8601String(),
+            ])->values(),
+            'audits' => $this->auditTimeline($injury),
+            'created_at' => optional($injury->created_at)->toIso8601String(),
+            'updated_at' => optional($injury->updated_at)->toIso8601String(),
+            'can' => ['manage' => (bool) (request()->user()?->canDo('hazards.manage') ?? false)],
+        ];
+    }
+
+    private function auditTimeline(WorkplaceInjury $injury): array
+    {
+        return AuditLog::query()
+            ->where('auditable_type', $injury->getMorphClass())
+            ->where('auditable_id', $injury->id)
+            ->with('user:id,name')
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (AuditLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'fields' => $log->meta['fields'] ?? [],
+                'actor' => $log->user?->name,
+                'at' => optional($log->created_at)->toIso8601String(),
+            ])->values()->all();
+    }
+
+    /* ================================================================== */
+    /*  Create / store / update */
+    /* ================================================================== */
+
+    /** Full-page create is retired — the wizard is modal-first. Redirect to the register. */
+    public function create(): RedirectResponse
+    {
+        return redirect()->route('health-safety.injuries.index');
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'site_id' => ['required', 'exists:sites,id'],
+            'related_incident_id' => ['nullable', 'exists:client_incidents,id'],
             'injury_date' => ['required', 'date'],
-            'injury_type' => ['required', 'string', 'in:strain,laceration,fracture,burn,contusion,concussion,repetitive_strain,chemical_exposure,biological_exposure,needle_stick,slip_trip_fall,manual_handling,psychological,illness,other'],
+            'injury_type' => ['required', 'string', 'in:'.implode(',', array_keys(self::TYPE_LABELS))],
             'body_part_affected' => ['required', 'string', 'max:255'],
             'severity' => ['required', 'string', 'in:minor,moderate,serious,critical'],
             'description' => ['required', 'string', 'max:5000'],
-            'medical_treatment_type' => ['required', 'string', 'in:none,first_aid,gp_visit,hospital,emergency_department,hospitalisation,specialist,ongoing'],
+            'medical_treatment_type' => ['required', 'string', 'in:'.implode(',', array_keys(self::TREATMENT_LABELS))],
             'immediate_treatment' => ['nullable', 'string', 'max:2000'],
             'worksafe_notifiable' => ['boolean'],
             'acc_claim_number' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        WorkplaceInjury::create(array_merge($validated, [
+        $injury = WorkplaceInjury::create(array_merge($validated, [
             'status' => 'reported',
             'lost_time_days' => 0,
+            // ACC is "lodged" when a claim number is captured at intake.
+            'acc_claim_lodged' => filled($validated['acc_claim_number'] ?? null),
             'created_by' => $request->user()->id,
         ]));
 
         if ($request->boolean('stay')) {
-            return back()->with('success', 'Workplace injury recorded successfully.');
+            return back()->with('success', 'Workplace injury recorded.')->with('created_injury_id', $injury->id);
         }
 
         return redirect()->route('health-safety.injuries.index')
-            ->with('success', 'Workplace injury recorded successfully.');
+            ->with('success', 'Workplace injury recorded.')
+            ->with('created_injury_id', $injury->id);
     }
 
-    /**
-     * Show a workplace injury with RTW plans, modified duties, and capacity assessments.
-     */
-    public function show(WorkplaceInjury $injury): \Inertia\Response
-    {
-        $injury->load(['user:id,name', 'site:id,name']);
-
-        $rtwPlans = $injury->returnToWorkPlans()
-            ->with(['worker:id,name', 'manager:id,name'])
-            ->orderByDesc('created_at')
-            ->get();
-
-        $modifiedDuties = ModifiedDuty::whereIn(
-                'return_to_work_plan_id',
-                $injury->returnToWorkPlans()->pluck('id')
-            )
-            ->with('user:id,name')
-            ->orderByDesc('start_date')
-            ->get();
-
-        $capacityAssessments = $injury->capacityAssessments()
-            ->with('user:id,name')
-            ->orderByDesc('assessment_date')
-            ->get();
-
-        $injuryData = $injury->toArray();
-        $injuryData['rtw_plans'] = $rtwPlans;
-        $injuryData['modified_duties'] = $modifiedDuties;
-        $injuryData['capacity_assessments'] = $capacityAssessments;
-
-        return Inertia::render('health-safety/injuries/show', [
-            'injury' => $injuryData,
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
-        ]);
-    }
-
-    /**
-     * Update a workplace injury (status, lost_time_days, return dates, ACC claim).
-     */
     public function update(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['sometimes', 'string', 'in:reported,under_treatment,return_to_work,recovered,closed'],
+            // Edit-mode content fields (the wizard PUTs these).
+            'user_id' => ['sometimes', 'exists:users,id'],
+            'site_id' => ['sometimes', 'exists:sites,id'],
+            'related_incident_id' => ['sometimes', 'nullable', 'exists:client_incidents,id'],
+            'injury_date' => ['sometimes', 'date'],
+            'injury_type' => ['sometimes', 'string', 'in:'.implode(',', array_keys(self::TYPE_LABELS))],
+            'body_part_affected' => ['sometimes', 'string', 'max:255'],
+            'severity' => ['sometimes', 'string', 'in:minor,moderate,serious,critical'],
+            'description' => ['sometimes', 'string', 'max:5000'],
+            'medical_treatment_type' => ['sometimes', 'string', 'in:'.implode(',', array_keys(self::TREATMENT_LABELS))],
+            'immediate_treatment' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            // Claim / lifecycle-data fields (detail panes). NOTE: status is intentionally
+            // NOT accepted here — all lifecycle moves go through transitionStatus() so the
+            // allowed-transition graph is always enforced.
             'lost_time_days' => ['sometimes', 'integer', 'min:0'],
             'expected_return_date' => ['sometimes', 'nullable', 'date'],
             'actual_return_date' => ['sometimes', 'nullable', 'date'],
@@ -159,14 +479,88 @@ class ReturnToWorkController extends Controller
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
+        $validated['updated_by'] = $request->user()->id;
         $injury->update($validated);
 
-        return redirect()->back()->with('success', 'Injury record updated successfully.');
+        return back()->with('success', 'Injury record updated.');
     }
 
     /**
-     * Create a Return to Work plan for an injury.
+     * Explicit lifecycle transition (Start treatment / Begin RTW / Mark recovered / Close).
+     * Validates the transition is legal and sets derived dates.
      */
+    public function transitionStatus(Request $request, WorkplaceInjury $injury): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:reported,under_treatment,return_to_work,recovered,closed'],
+        ]);
+
+        $from = (string) $injury->status;
+        $to = $validated['status'];
+
+        if ($to === $from) {
+            return back(); // no-op — don't bump updated_by or emit a phantom audit entry
+        }
+
+        if (! in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
+            return back()->with('error', 'That status change is not allowed from "'.str_replace('_', ' ', $from).'".');
+        }
+
+        $changes = ['status' => $to, 'updated_by' => $request->user()->id];
+        if ($to === 'recovered' && ! $injury->actual_return_date) {
+            $changes['actual_return_date'] = now()->toDateString();
+        }
+
+        $injury->update($changes);
+
+        return back()->with('success', 'Injury moved to '.str_replace('_', ' ', $to).'.');
+    }
+
+    /** Export the filtered register to CSV (honours the same scope/tab/refinements as index). */
+    public function export(Request $request): StreamedResponse
+    {
+        $tab = (string) $request->input('tab', 'all');
+        $query = $this->applyRefinements($this->applyTab($this->scopedBase($request), $tab), $request)
+            ->with(['user:id,name', 'site:id,name'])
+            ->orderByDesc('injury_date');
+
+        $filename = 'injuries-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Reference', 'Worker', 'Site', 'Injury date', 'Type', 'Body part', 'Severity', 'Status', 'Lost days', 'ACC lodged', 'ACC number', 'WorkSafe notifiable']);
+            $query->chunk(200, function ($rows) use ($out) {
+                foreach ($rows as $i) {
+                    fputcsv($out, [
+                        $this->reference($i->id),
+                        $i->user?->name,
+                        $i->site?->name,
+                        optional($i->injury_date)->format('Y-m-d'),
+                        self::TYPE_LABELS[$i->injury_type] ?? $i->injury_type,
+                        $i->body_part_affected,
+                        $i->severity,
+                        $i->status,
+                        (int) $i->lost_time_days,
+                        $i->acc_claim_lodged ? 'Yes' : 'No',
+                        $i->acc_claim_number,
+                        $i->worksafe_notifiable ? 'Yes' : 'No',
+                    ]);
+                }
+            });
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /** Detail is modal-first — the full page is retired. Deep-link opens the dialog over the register. */
+    public function show(WorkplaceInjury $injury): RedirectResponse
+    {
+        return redirect()->route('health-safety.injuries.index', ['injury' => $injury->id]);
+    }
+
+    /* ================================================================== */
+    /*  RTW plans / capacity / modified duties (existing signatures) */
+    /* ================================================================== */
+
     public function storeRtwPlan(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
         $validated = $request->validate([
@@ -182,21 +576,20 @@ class ReturnToWorkController extends Controller
             'stages.*.duties_description' => ['nullable', 'string', 'max:1000'],
             'medical_clearance_notes' => ['nullable', 'string', 'max:2000'],
             'medical_clearance_provider' => ['nullable', 'string', 'max:255'],
+            'next_review_date' => ['nullable', 'date'],
             'worker_id' => ['nullable', 'exists:users,id'],
             'manager_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $injury->returnToWorkPlans()->create(array_merge($validated, [
+            'worker_id' => $validated['worker_id'] ?? $injury->user_id,
             'status' => 'active',
             'created_by' => $request->user()->id,
         ]));
 
-        return redirect()->back()->with('success', 'Return to Work plan created successfully.');
+        return back()->with('success', 'Return-to-work plan created.');
     }
 
-    /**
-     * Update a Return to Work plan.
-     */
     public function updateRtwPlan(Request $request, ReturnToWorkPlan $rtwPlan): RedirectResponse
     {
         $validated = $request->validate([
@@ -211,17 +604,18 @@ class ReturnToWorkController extends Controller
             'stages.*.end_date' => ['nullable', 'date'],
             'stages.*.hours_per_week' => ['nullable', 'numeric', 'min:0', 'max:60'],
             'stages.*.duties_description' => ['nullable', 'string', 'max:1000'],
+            'medical_clearance_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'medical_clearance_provider' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'next_review_date' => ['sometimes', 'nullable', 'date'],
             'review_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
+        $validated['updated_by'] = $request->user()->id;
         $rtwPlan->update($validated);
 
-        return redirect()->back()->with('success', 'Return to Work plan updated successfully.');
+        return back()->with('success', 'Return-to-work plan updated.');
     }
 
-    /**
-     * Record a capacity assessment for an injury.
-     */
     public function storeCapacityAssessment(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
         $validated = $request->validate([
@@ -237,15 +631,13 @@ class ReturnToWorkController extends Controller
         ]);
 
         $injury->capacityAssessments()->create(array_merge($validated, [
+            'user_id' => $validated['user_id'] ?? $injury->user_id,
             'created_by' => $request->user()->id,
         ]));
 
-        return redirect()->back()->with('success', 'Capacity assessment recorded successfully.');
+        return back()->with('success', 'Capacity assessment recorded.');
     }
 
-    /**
-     * Add a modified duty record to a RTW plan.
-     */
     public function storeModifiedDuty(Request $request, ReturnToWorkPlan $rtwPlan): RedirectResponse
     {
         $validated = $request->validate([
@@ -259,10 +651,69 @@ class ReturnToWorkController extends Controller
         ]);
 
         $rtwPlan->modifiedDuties()->create(array_merge($validated, [
+            'user_id' => $validated['user_id'] ?? $rtwPlan->worker_id,
             'status' => 'active',
             'created_by' => $request->user()->id,
         ]));
 
-        return redirect()->back()->with('success', 'Modified duty record added successfully.');
+        return back()->with('success', 'Modified duty added.');
+    }
+
+    /* ================================================================== */
+    /*  Attachments (premium document upload — IDOR-safe trio) */
+    /* ================================================================== */
+
+    public function uploadAttachment(Request $request, WorkplaceInjury $injury): RedirectResponse
+    {
+        $validated = $request->validate([
+            // Allowlist the expected evidence formats — never accept scriptable types
+            // (svg/html) since attachments are served same-origin from the public disk.
+            'file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,gif,doc,docx'],
+            'kind' => ['nullable', 'string', 'in:medical_cert,acc_form,rtw_clearance,photo,document'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'alt_text' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $file = $request->file('file');
+        $disk = 'public';
+        $path = $file->store('workplace_injury_attachments', $disk);
+
+        $injury->attachments()->create([
+            'uploaded_by' => $request->user()?->id,
+            'disk' => $disk,
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+            'kind' => $validated['kind'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'alt_text' => $validated['alt_text'] ?? null,
+        ]);
+
+        return back()->with('success', 'Document uploaded.');
+    }
+
+    public function downloadAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment)
+    {
+        abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
+
+        $disk = $attachment->disk ?: 'public';
+        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
+
+        // nosniff so a mislabelled file can't be re-interpreted as executable content.
+        return Storage::disk($disk)->download($attachment->path, $attachment->original_name, ['X-Content-Type-Options' => 'nosniff']);
+    }
+
+    public function destroyAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): RedirectResponse
+    {
+        abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
+
+        $disk = $attachment->disk ?: 'public';
+        if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
+            Storage::disk($disk)->delete($attachment->path);
+        }
+        $attachment->delete();
+
+        return back()->with('success', 'Document removed.');
     }
 }

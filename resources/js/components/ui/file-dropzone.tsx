@@ -138,7 +138,7 @@ export function StagedFileCard({ file, onRemove, children }: { file: File; onRem
     );
 }
 
-type StagedItem = { id: number; file: File; note: string; sensitive: boolean };
+type StagedItem = { id: number; file: File; note: string; sensitive: boolean; category: string };
 
 let stagedUid = 0;
 
@@ -153,6 +153,7 @@ export function AttachmentUploader({
     endpoint,
     noteField = null,
     sensitive = null,
+    categoryField = null,
     accept,
     hint,
 }: {
@@ -161,6 +162,8 @@ export function AttachmentUploader({
     noteField?: string | null;
     /** Optional per-file sensitive toggle: form field + checkbox label. */
     sensitive?: { field: string; label: string } | null;
+    /** Optional per-file category select: form field + label + options. */
+    categoryField?: { field: string; label: string; options: { value: string; label: string }[] } | null;
     accept?: string;
     hint?: string;
 }) {
@@ -170,7 +173,7 @@ export function AttachmentUploader({
 
     const add = (files: File[]) => {
         setError(null);
-        setItems((prev) => [...prev, ...files.map((file) => ({ id: ++stagedUid, file, note: '', sensitive: false }))]);
+        setItems((prev) => [...prev, ...files.map((file) => ({ id: ++stagedUid, file, note: '', sensitive: false, category: '' }))]);
     };
     const patch = (id: number, p: Partial<StagedItem>) => setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...p } : it)));
     const remove = (id: number) => setItems((prev) => prev.filter((it) => it.id !== id));
@@ -192,6 +195,7 @@ export function AttachmentUploader({
             fd.append('file', it.file);
             if (noteField) fd.append(noteField, it.note);
             if (sensitive) fd.append(sensitive.field, it.sensitive ? '1' : '0');
+            if (categoryField && it.category) fd.append(categoryField.field, it.category);
             router.post(endpoint, fd, {
                 preserveScroll: true,
                 preserveState: true,
@@ -216,8 +220,23 @@ export function AttachmentUploader({
                 <div className="flex flex-col gap-2">
                     {items.map((it) => (
                         <StagedFileCard key={it.id} file={it.file} onRemove={() => remove(it.id)}>
-                            {noteField || sensitive ? (
+                            {noteField || sensitive || categoryField ? (
                                 <div className="flex flex-col gap-2">
+                                    {categoryField ? (
+                                        <select
+                                            value={it.category}
+                                            onChange={(e) => patch(it.id, { category: e.target.value })}
+                                            aria-label={categoryField.label}
+                                            className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                                        >
+                                            <option value="">{categoryField.label}…</option>
+                                            {categoryField.options.map((o) => (
+                                                <option key={o.value} value={o.value}>
+                                                    {o.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : null}
                                     {noteField ? (
                                         <Input value={it.note} onChange={(e) => patch(it.id, { note: e.target.value })} placeholder="Note (optional)" className="h-8" />
                                     ) : null}

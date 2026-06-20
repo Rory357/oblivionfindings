@@ -1264,9 +1264,9 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/health-safety/first-aid',
             icon: HeartPulse,
         });
-    if (can?.hazards?.view || can?.safeguarding?.viewAny)
+    if (can?.restraints?.view)
         registers.push({
-            title: 'Restraint Register',
+            title: 'Restraints & Behaviour Support',
             href: '/health-safety/restraints',
             icon: Clipboard,
         });

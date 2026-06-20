@@ -121,18 +121,34 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Phase 5B: Restraint Register ────────────────────────────────────
     Route::prefix('restraints')->name('restraints.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        // View register + detail (detail-as-modal via ?event= / ?plan=) + export + downloads.
+        Route::middleware('permission:restraints.view')->group(function () {
             Route::get('/', [RestraintController::class, 'index'])->name('index');
+            Route::get('/export', [RestraintController::class, 'export'])->name('export');
+            Route::get('/clients/{client}/summary', [RestraintController::class, 'clientSummary'])->name('clients.summary');
+            Route::get('/events/{event}/attachments/{attachment}/download', [RestraintController::class, 'downloadAttachment'])->name('events.attachments.download');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
-            // Restraint Events
+        // Capture — record events, create plans, upload evidence.
+        Route::middleware('permission:restraints.create|restraints.manage')->group(function () {
             Route::post('/events', [RestraintController::class, 'storeEvent'])->name('events.store');
             Route::post('/plans', [RestraintController::class, 'storePlan'])->name('plans.store');
+            Route::post('/events/{event}/attachments', [RestraintController::class, 'storeAttachment'])->name('events.attachments.store');
         });
-        Route::middleware('permission:hazards.manage')->group(function () {
+
+        // Review — event review + plan review sign-off.
+        Route::middleware('permission:restraints.review|restraints.manage')->group(function () {
             Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
+            Route::post('/plans/{plan}/review', [RestraintController::class, 'reviewPlan'])->name('plans.review');
+        });
+
+        // Manage — plan edit + lifecycle + attachment removal.
+        Route::middleware('permission:restraints.manage')->group(function () {
             Route::put('/plans/{plan}', [RestraintController::class, 'updatePlan'])->name('plans.update');
+            Route::post('/plans/{plan}/activate', [RestraintController::class, 'activatePlan'])->name('plans.activate');
+            Route::post('/plans/{plan}/submit-review', [RestraintController::class, 'submitPlanReview'])->name('plans.submit-review');
+            Route::post('/plans/{plan}/archive', [RestraintController::class, 'archivePlan'])->name('plans.archive');
+            Route::delete('/events/{event}/attachments/{attachment}', [RestraintController::class, 'destroyAttachment'])->name('events.attachments.destroy');
         });
     });
 
@@ -296,8 +312,13 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Workplace Injuries & Return to Work ───────────────────────────
     Route::prefix('injuries')->name('injuries.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        // Read is open to HR wellbeing too — staff injury / RTW is an HR-wellbeing
+        // function (fixes the nav-vs-route 403: the sidebar already shows this to
+        // hr.wellbeing.view). Writes stay hazards.manage; the UI is read-only for
+        // non-managers via the can.manage flag.
+        Route::middleware('permission:hazards.view|hr.wellbeing.view')->group(function () {
             Route::get('/', [ReturnToWorkController::class, 'index'])->name('index');
+            Route::get('/export', [ReturnToWorkController::class, 'export'])->name('export');
         });
 
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
@@ -306,6 +327,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         });
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{injury}', [ReturnToWorkController::class, 'update'])->name('update');
+
+            // Explicit lifecycle transition (Start treatment / Begin RTW / Mark recovered / Close)
+            Route::post('/{injury}/status', [ReturnToWorkController::class, 'transitionStatus'])->name('status');
 
             // Return to Work Plans
             Route::post('/{injury}/rtw-plans', [ReturnToWorkController::class, 'storeRtwPlan'])->name('rtw-plans.store');
@@ -316,11 +340,20 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
             // Modified Duties
             Route::post('/rtw-plans/{rtwPlan}/modified-duties', [ReturnToWorkController::class, 'storeModifiedDuty'])->name('modified-duties.store');
+
+            // Evidence (premium document upload)
+            Route::post('/{injury}/attachments', [ReturnToWorkController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{injury}/attachments/{attachment}', [ReturnToWorkController::class, 'destroyAttachment'])->name('attachments.destroy');
         });
 
-        // Show route after /create to avoid wildcard conflict
+        // Evidence download (read)
+        Route::get('/{injury}/attachments/{attachment}/download', [ReturnToWorkController::class, 'downloadAttachment'])
+            ->middleware('permission:hazards.view|hr.wellbeing.view')
+            ->name('attachments.download');
+
+        // Show route after /create + static sub-routes to avoid wildcard conflict
         Route::get('/{injury}', [ReturnToWorkController::class, 'show'])
-            ->middleware('permission:hazards.view')
+            ->middleware('permission:hazards.view|hr.wellbeing.view')
             ->name('show');
     });
 

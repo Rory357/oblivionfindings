@@ -8,6 +8,7 @@ use App\Models\ClientIncidentAttachment;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\IncidentFollowup;
+use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
@@ -15,6 +16,7 @@ use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class IncidentController extends Controller
@@ -51,7 +53,7 @@ class IncidentController extends Controller
                     $query->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id));
                 })
                 ->when($q !== '', function ($query) use ($q) {
-                    $term = '%' . $q . '%';
+                    $term = '%'.$q.'%';
                     $query->where(fn ($sub) => $sub->where('description', 'like', $term)
                         ->orWhere('type', 'like', $term)
                         ->orWhere('title', 'like', $term));
@@ -105,7 +107,7 @@ class IncidentController extends Controller
                     'incident_id' => $f->client_incident_id,
                     'incident_type' => $f->incident?->type,
                     'client_name' => $f->incident?->client
-                        ? trim(($f->incident->client->first_name ?? '') . ' ' . ($f->incident->client->last_name ?? ''))
+                        ? trim(($f->incident->client->first_name ?? '').' '.($f->incident->client->last_name ?? ''))
                         : null,
                     'assigned_to' => $f->assignedTo?->name,
                     'due_at' => $f->due_at,
@@ -293,6 +295,7 @@ class IncidentController extends Controller
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
+                'restraintEvents:id,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
                 'firstAidRecords:id,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
             ])
             ->find($incidentId);
@@ -418,6 +421,16 @@ class IncidentController extends Controller
                 'reference' => $incident->fleetIncident->reference(),
                 'type' => $incident->fleetIncident->incident_type,
             ] : null,
+            // Reciprocal of the restraint→incident link: restraint events recorded
+            // against this incident (RestraintEvent.related_incident_id).
+            'restraint_events' => $incident->restraintEvents->map(fn ($e) => [
+                'id' => $e->id,
+                'reference' => 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
+                'restraint_type' => $e->restraint_type,
+                'severity' => $e->severity,
+                'within_support_plan' => (bool) $e->within_support_plan,
+                'injury_occurred' => (bool) $e->injury_occurred,
+            ])->values()->all(),
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
             'first_aid_records' => $incident->firstAidRecords->map(fn ($r) => [
@@ -558,10 +571,10 @@ class IncidentController extends Controller
             'source' => 'manual',
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
-            'requires_followup' => (bool)($data['requires_followup'] ?? false) || ! empty($data['followups']),
+            'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
-            'title' => $data['type'] . ' incident',
+            'title' => $data['type'].' incident',
             'metadata' => $request->filled('hazard') ? ['hazard' => $data['hazard']] : null,
 
             // Near-miss
@@ -586,10 +599,10 @@ class IncidentController extends Controller
 
         // Auto-escalate abuse/neglect incidents to safeguarding
         if (preg_match('/abuse|neglect/i', $incident->type)) {
-            \App\Models\SafeguardingConcern::create([
-                'subject_type' => \App\Models\Client::class,
+            SafeguardingConcern::create([
+                'subject_type' => Client::class,
                 'subject_id' => $client->id,
-                'subject_name' => $client->first_name . ' ' . $client->last_name,
+                'subject_name' => $client->first_name.' '.$client->last_name,
                 'concern_type' => 'incident_escalation',
                 'severity' => $incident->severity,
                 'description' => $incident->description,
@@ -722,12 +735,12 @@ class IncidentController extends Controller
         ]);
 
         // If reporter is editing, do not allow review fields / portal visibility to be overwritten
-        if ($user && $incident->isEditableByReporter($user) && !$user->canDo('incidents.viewAny')) {
+        if ($user && $incident->isEditableByReporter($user) && ! $user->canDo('incidents.viewAny')) {
             unset($data['review_notes']);
             unset($data['portal_visible']);
         }
 
-        if ($user && !$user->canDo('incidents.portal.manage')) {
+        if ($user && ! $user->canDo('incidents.portal.manage')) {
             unset($data['portal_visible']);
         }
 
@@ -746,7 +759,7 @@ class IncidentController extends Controller
 
         $incident->update([
             ...$data,
-            'title' => ($data['type'] ?? $incident->type) . ' incident',
+            'title' => ($data['type'] ?? $incident->type).' incident',
         ]);
 
         return back()->with('success', 'Incident updated.');
@@ -757,14 +770,14 @@ class IncidentController extends Controller
         $this->authorize('view', $incident);
         abort_unless($request->user()?->canDo('incidents.portal.manage'), 403);
 
-        abort_unless((int)$attachment->incident_id === (int)$incident->id, 404);
+        abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
 
         $data = $request->validate([
             'portal_visible' => ['required', 'boolean'],
         ]);
 
         $attachment->update([
-            'portal_visible' => (bool)$data['portal_visible'],
+            'portal_visible' => (bool) $data['portal_visible'],
         ]);
 
         return back()->with('success', 'Attachment sharing updated.');
@@ -846,7 +859,7 @@ class IncidentController extends Controller
 
         // Notify reporter + assigned workers that the incident has been reviewed.
         $targets = [];
-        if (!empty($incident->reported_by)) {
+        if (! empty($incident->reported_by)) {
             $targets[] = (int) $incident->reported_by;
         }
 
@@ -910,7 +923,7 @@ class IncidentController extends Controller
 
         // Notify reporter + assigned workers that the incident has been closed.
         $targets = [];
-        if (!empty($incident->reported_by)) {
+        if (! empty($incident->reported_by)) {
             $targets[] = (int) $incident->reported_by;
         }
 
@@ -954,7 +967,7 @@ class IncidentController extends Controller
                 ]);
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('IncidentController: failed to resolve linked alert on incident close', [
+            Log::warning('IncidentController: failed to resolve linked alert on incident close', [
                 'incident_id' => $incident->id,
                 'alert_id' => $incident->control_room_alert_id,
                 'error' => $e->getMessage(),
@@ -991,11 +1004,11 @@ class IncidentController extends Controller
 
         // Notify reporter that the incident has been reopened.
         $targets = [];
-        if (!empty($incident->reported_by)) {
+        if (! empty($incident->reported_by)) {
             $targets[] = (int) $incident->reported_by;
         }
 
-        app(\App\Services\NotificationService::class)->notifyCrud(
+        app(NotificationService::class)->notifyCrud(
             $request->user(),
             'reopened',
             'incident',
@@ -1096,11 +1109,11 @@ class IncidentController extends Controller
         // Audit guardrail: attachments are only mutable while the incident is in draft.
         abort_unless($incident->status === 'draft', 403);
 
-        abort_unless((int)$attachment->incident_id === (int)$incident->id, 404);
+        abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
 
         // Attachments may be removed only while incident is editable by reporter (admins/managers can also remove if they can update)
         $user = $request->user();
-        if ($user && !$user->canDo('incidents.viewAny')) {
+        if ($user && ! $user->canDo('incidents.viewAny')) {
             abort_unless($incident->isEditableByReporter($user), 403);
         }
 
@@ -1117,9 +1130,10 @@ class IncidentController extends Controller
     public function downloadAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment)
     {
         $this->authorize('view', $incident);
-        abort_unless((int)$attachment->incident_id === (int)$incident->id, 404);
+        abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
 
         $disk = $attachment->disk ?: 'public';
+
         return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
     }
 }
