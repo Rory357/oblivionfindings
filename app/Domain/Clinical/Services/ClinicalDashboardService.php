@@ -23,6 +23,7 @@ use App\Models\ClientFluidEntry;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
+use App\Models\MedicationPrnEffectiveness;
 use App\Models\RestraintEvent;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -625,6 +626,124 @@ class ClinicalDashboardService
                 'review_due' => $scope()->whereNull('reviewed_at')->count(),
             ],
         ];
+    }
+
+    /**
+     * Cross-module context signals for a client's Trends tab — narrative cards
+     * that connect the vitals/weight picture to behaviour (PRN reliance),
+     * nutrition (fluid intake) and Health & Safety (falls). These are read-only
+     * correlation *hints*, not clinical claims: each links out to the system of
+     * record so a clinician can decide. Every query is client- and window-scoped.
+     *
+     * @return array<int, array{key: string, tone: string, title: string, body: string, metrics: array<int, array{label: string, value: string}>, link: array{href: string, label: string}|null}>
+     */
+    public function getTrendSignals(Client $client, \DateTimeInterface $from, \DateTimeInterface $to): array
+    {
+        $signals = [];
+
+        // ── PRN reliance alongside escalating behaviour ──────────────────────
+        // PRN medication (often psychotropic) reviewed in the same window as
+        // escalated ABC entries can flag reactive management that a proactive PBS
+        // plan should pre-empt. We count PRN effectiveness reviews (created in the
+        // window) against escalated behaviour entries.
+        $prnReviews = MedicationPrnEffectiveness::query()
+            ->where('client_id', $client->id)
+            ->whereBetween('created_at', [$from, $to])
+            ->count();
+
+        $escalatedBehaviour = BehaviourAbcEntry::query()
+            ->where('client_id', $client->id)
+            ->whereBetween('occurred_at', [$from, $to])
+            ->where('escalated', true)
+            ->count();
+
+        if ($prnReviews > 0 && $escalatedBehaviour > 0) {
+            $signals[] = [
+                'key' => 'prn_behaviour',
+                'tone' => 'warn',
+                'title' => 'PRN use alongside escalating behaviour',
+                'body' => "{$prnReviews} PRN review(s) and {$escalatedBehaviour} escalated behaviour entr"
+                    .($escalatedBehaviour === 1 ? 'y' : 'ies')
+                    .' in this window — check the behaviour support plan covers these triggers proactively.',
+                'metrics' => [
+                    ['label' => 'PRN reviews', 'value' => (string) $prnReviews],
+                    ['label' => 'Escalated ABC', 'value' => (string) $escalatedBehaviour],
+                ],
+                'link' => ['href' => "/health-clinical/behaviour?client_id={$client->id}", 'label' => 'Behaviour register'],
+            ];
+        }
+
+        // ── Weight trajectory vs recorded fluid intake ───────────────────────
+        // A meaningful weight decline (≥2% across the window — the MUST screening
+        // threshold of concern) paired with recent fluid intake, prompting a MUST
+        // screen rather than asserting malnutrition.
+        $weights = ClinicalObservation::query()
+            ->forClient($client->id)
+            ->where('observation_type', ObservationType::Weight->value)
+            ->whereBetween('recorded_at', [$from, $to])
+            ->orderBy('recorded_at')
+            ->get(['id', 'recorded_at', 'data']);
+
+        if ($weights->count() >= 2) {
+            $firstWeight = (float) ($weights->first()->data['weight_kg'] ?? 0);
+            $lastWeight = (float) ($weights->last()->data['weight_kg'] ?? 0);
+
+            if ($firstWeight > 0 && $lastWeight > 0) {
+                $deltaKg = round($lastWeight - $firstWeight, 1);
+                $deltaPct = round(($deltaKg / $firstWeight) * 100, 1);
+
+                if ($deltaPct <= -2.0) {
+                    $fluid7d = (int) ClientFluidEntry::query()
+                        ->where('client_id', $client->id)
+                        ->where('direction', 'intake')
+                        ->where('occurred_at', '>=', Carbon::parse($to)->copy()->subDays(7))
+                        ->sum('volume_ml');
+
+                    $signals[] = [
+                        'key' => 'weight_nutrition',
+                        'tone' => 'warn',
+                        'title' => 'Weight trending down',
+                        'body' => "Down {$deltaKg} kg ({$deltaPct}%) across this window. "
+                            ."Recorded fluid intake in the last 7 days: {$fluid7d} ml. Consider a MUST malnutrition screen.",
+                        'metrics' => [
+                            ['label' => 'Weight change', 'value' => "{$deltaKg} kg"],
+                            ['label' => 'Change', 'value' => "{$deltaPct}%"],
+                            ['label' => 'Fluid 7d', 'value' => "{$fluid7d} ml"],
+                        ],
+                        'link' => ['href' => "/health-clinical/assessments?client_id={$client->id}&assessment_type=".ClinicalAssessmentType::MalnutritionMust->value, 'label' => 'Assessments register'],
+                    ];
+                }
+            }
+        }
+
+        // ── Falls → Health & Safety linkage ──────────────────────────────────
+        // Surface falls in the window and how many auto-linked to an H&S event;
+        // repeated falls warrant a FRAT review.
+        $falls = ClinicalEvent::query()
+            ->where('client_id', $client->id)
+            ->where('event_type', ClinicalEventType::Fall->value)
+            ->whereBetween('occurred_at', [$from, $to])
+            ->get(['id', 'linked_hs_event_id']);
+
+        if ($falls->count() > 0) {
+            $fallCount = $falls->count();
+            $linkedFalls = $falls->whereNotNull('linked_hs_event_id')->count();
+
+            $signals[] = [
+                'key' => 'falls_hs',
+                'tone' => $fallCount >= 3 ? 'crit' : 'info',
+                'title' => $fallCount === 1 ? '1 fall recorded' : "{$fallCount} falls recorded",
+                'body' => "{$linkedFalls} of {$fallCount} linked to a Health & Safety event."
+                    .($fallCount >= 2 ? ' Repeated falls warrant a falls-risk (FRAT) review.' : ''),
+                'metrics' => [
+                    ['label' => 'Falls', 'value' => (string) $fallCount],
+                    ['label' => 'H&S-linked', 'value' => (string) $linkedFalls],
+                ],
+                'link' => ['href' => "/health-clinical/events?client_id={$client->id}&event_type=".ClinicalEventType::Fall->value, 'label' => 'Fall events'],
+            ];
+        }
+
+        return $signals;
     }
 
     /**
