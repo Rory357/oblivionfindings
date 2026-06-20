@@ -444,8 +444,11 @@ function ReviewPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function LinkIncidentPane({ d, incidents, onDone }: { d: EventDetail; incidents: IncidentOption[]; onDone: () => void }) {
+    // Radix <Select.Item> rejects an empty-string value at runtime, so the "no link"
+    // choice carries a sentinel that we translate back to null on submit.
+    const NONE = '__none__';
     const form = useForm({
-        related_incident_id: d.related_incident ? String(d.related_incident.id) : '',
+        related_incident_id: d.related_incident ? String(d.related_incident.id) : NONE,
     });
 
     // Only same-client incidents can be linked (the server enforces this too).
@@ -462,13 +465,13 @@ function LinkIncidentPane({ d, incidents, onDone }: { d: EventDetail; incidents:
         });
     }
     const nothingToPick = merged.length === 0;
-    const options = [{ value: '', label: '— No linked incident —' }, ...merged.map((i) => ({ value: String(i.id), label: i.label }))];
+    const options = [{ value: NONE, label: '— No linked incident —' }, ...merged.map((i) => ({ value: String(i.id), label: i.label }))];
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
         // Inertia's useForm().transform() does not support chaining in this version —
         // set the transform, then post on a separate statement (see clients/medical.tsx).
-        form.transform((data) => ({ related_incident_id: data.related_incident_id ? Number(data.related_incident_id) : null }));
+        form.transform((data) => ({ related_incident_id: data.related_incident_id && data.related_incident_id !== NONE ? Number(data.related_incident_id) : null }));
         form.post(`/health-safety/restraints/events/${d.id}/link-incident`, {
             preserveScroll: true,
             onSuccess: (page: Page) => {
