@@ -37,6 +37,12 @@ class PrivacyDashboardController extends Controller
         abort_unless($request->user()?->canDo('privacy.viewRequests'), 403);
 
         $tab = in_array($request->get('tab'), self::TABS, true) ? $request->get('tab') : 'overview';
+        // Per-domain least-privilege: a view-only user lands on the requests
+        // worklist; a domain tab they can't view falls back to overview so the
+        // worklist below never returns records the dedicated page would deny.
+        if (! $this->canViewTab($request, $tab)) {
+            $tab = 'overview';
+        }
         $periodStart = $this->periodStart($request->get('period', 'month'));
 
         return Inertia::render('privacy/dashboard', [
@@ -283,20 +289,38 @@ class PrivacyDashboardController extends Controller
     /** @return array<string, mixed>|null */
     private function detail(Request $request): ?array
     {
+        $user = $request->user();
+
         if ($id = $request->integer('request')) {
             return $this->requestDetail($request, $id);
         }
-        if ($id = $request->integer('breach')) {
+        // Per-domain detail is gated by the domain permission — the same gate
+        // the dedicated breach/hold/DPIA pages enforce — so a view-only user
+        // can't drill into records they otherwise can't see.
+        if (($id = $request->integer('breach')) && $user?->canDo('privacy.reportBreaches')) {
             return $this->breachDetail($request, $id);
         }
-        if ($id = $request->integer('hold')) {
+        if (($id = $request->integer('hold')) && $user?->canDo('privacy.manageLegalHolds')) {
             return $this->holdDetail($request, $id);
         }
-        if ($id = $request->integer('dpia')) {
+        if (($id = $request->integer('dpia')) && $user?->canDo('privacy.conductDPIA')) {
             return $this->dpiaDetail($request, $id);
         }
 
         return null;
+    }
+
+    private function canViewTab(Request $request, string $tab): bool
+    {
+        $perm = match ($tab) {
+            'breaches' => 'privacy.reportBreaches',
+            'legal_holds' => 'privacy.manageLegalHolds',
+            'retention', 'deletion_logs' => 'privacy.manageRetention',
+            'dpia' => 'privacy.conductDPIA',
+            default => 'privacy.viewRequests',
+        };
+
+        return (bool) $request->user()?->canDo($perm);
     }
 
     /** @return array<string, mixed> */

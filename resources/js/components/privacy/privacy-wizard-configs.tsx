@@ -184,7 +184,20 @@ export function getPrivacyWizardConfig(domain: PrivacyWizardDomain): PrivacyWiza
                         headBlurb: 'What this policy is called and which records it governs.',
                         fields: [
                             { type: 'text', name: 'policy_name', label: 'Policy name', required: true, placeholder: 'e.g. Client records' },
-                            { type: 'text', name: 'model_type', label: 'Applies to (record type)', required: true, placeholder: 'e.g. Client' },
+                            // FQCN values — the deletion executor resolves these via class_exists()
+                            // and only anonymises personal fields for these three record types.
+                            {
+                                type: 'tiles',
+                                name: 'model_type',
+                                label: 'Applies to (record type)',
+                                required: true,
+                                cols: 3,
+                                tiles: [
+                                    { key: 'App\\Models\\Client', label: 'Client', description: 'Client profiles', icon: Users },
+                                    { key: 'App\\Models\\ClientNote', label: 'Client note', description: 'Progress & daily notes', icon: ListChecks },
+                                    { key: 'App\\Models\\ClientDocument', label: 'Client document', description: 'Uploaded documents', icon: FileText },
+                                ],
+                            },
                             { type: 'textarea', name: 'description', label: 'Description', placeholder: 'What this policy covers…' },
                         ],
                     },

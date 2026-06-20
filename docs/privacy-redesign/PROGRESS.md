@@ -173,6 +173,26 @@ deletion.execute ← policy_id*, confirm*(accepted). (critical confirm modal)
   `DataSubjectRequestFactory` bug (`status='pending'` invalid → `received`). NZ/IPP sweep clean.
 - [ ] **Step 11 (optional)** — Reminders: request-overdue + breach-OPC-due notifications + scheduled command.
 
+## §3.5 ADVERSARIAL REVIEW (post-build)
+
+Ran a multi-agent review (workflow rate-limited → fell back to self-review + one focused fresh-eyes agent).
+- **CONFIRMED + FIXED — authz least-privilege**: the dashboard `detail()` + per-tab worklist were gated only by
+  `privacy.viewRequests`, so a view-only auditor could drill into breach/hold/DPIA records the dedicated
+  (per-domain-gated) pages deny. Fixed: `canViewTab()` forces a non-viewable tab → overview; `detail()` gates
+  each non-request kind by its domain perm; FE hides tabs without the perm. Test:
+  `test_dashboard_does_not_leak_other_domains_to_view_only_user`.
+- **CONFIRMED + FIXED — retention `model_type`**: the wizard collected free-text "Client" but the deletion
+  executor needs the FQCN `App\Models\Client` (`class_exists()`), so execute-deletion silently no-op'd. Fixed:
+  `model_type` is now a TilePicker of the 3 executor-supported FQCNs (Client/ClientNote/ClientDocument).
+- **FALSE POSITIVES (verified) — 5 "NOT NULL → 500" wizard blockers**: the fresh-eyes agent read only the
+  original `000004` migration and missed the pre-existing `2026_04_22` align migration + Step-1 `100002`.
+  Confirmed against the LIVE DB: `legal_holds.holdable_type/id`, `pia.description/residual_risk_level`,
+  `breach.likely_consequences/measures_taken`, `dsr.request_details` are all `nullable=YES`. No 500s; no fix needed.
+- **Defensive**: added 5 `*_wizard_minimal_payload_succeeds` tests (post `_modal` + only required fields →
+  assert redirect + record created), to catch any future NOT-NULL drift.
+- Independently confirmed clean: action-modal↔lifecycle validation, execute-deletion contract, detail↔dialog
+  keys, tone maps cover all BE enums, worklist rows↔table, hero/tabCount period windows, all routes/links.
+
 ## §4 RISKS / WATCH-OUTS
 - Worktree has NO vendor/node_modules/.env → backend tests load the PARENT app (junctioned). Verify backend
   by merging or running in parent; migrations + frontend build DO use the worktree. (See memory

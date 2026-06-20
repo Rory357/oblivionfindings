@@ -188,14 +188,16 @@ export default function PrivacyDashboard({ tab, tabCounts, hero, filters, sites,
         setCtx({ x: e.clientX, y: e.clientY, tag: 'New', meta: 'Privacy command centre', items });
     };
 
+    // Per-domain least-privilege: only show the tabs the user can view (mirrors
+    // the dedicated pages' permissions). Overview/Requests need only viewRequests.
     const TABS: RosterTabItem[] = [
         { id: 'overview', label: 'Overview', icon: Activity, tone: 'primary', badge: tabCounts.overview || undefined },
         { id: 'requests', label: 'Requests', icon: FileText, tone: 'info', badge: tabCounts.requests || undefined },
-        { id: 'breaches', label: 'Breaches', icon: AlertTriangle, tone: 'critical', badge: tabCounts.breaches || undefined },
-        { id: 'legal_holds', label: 'Legal holds', icon: Scale, tone: 'warning', badge: tabCounts.legal_holds || undefined },
-        { id: 'retention', label: 'Retention', icon: Lock, tone: 'primary', badge: tabCounts.retention || undefined },
-        { id: 'dpia', label: 'DPIA', icon: ShieldCheck, tone: 'success', badge: tabCounts.dpia || undefined },
-        { id: 'deletion_logs', label: 'Deletion logs', icon: Trash2, tone: 'warning', badge: tabCounts.deletion_logs || undefined },
+        ...(can.reportBreaches ? [{ id: 'breaches', label: 'Breaches', icon: AlertTriangle, tone: 'critical', badge: tabCounts.breaches || undefined } as RosterTabItem] : []),
+        ...(can.manageLegalHolds ? [{ id: 'legal_holds', label: 'Legal holds', icon: Scale, tone: 'warning', badge: tabCounts.legal_holds || undefined } as RosterTabItem] : []),
+        ...(can.manageRetention ? [{ id: 'retention', label: 'Retention', icon: Lock, tone: 'primary', badge: tabCounts.retention || undefined } as RosterTabItem] : []),
+        ...(can.conductDPIA ? [{ id: 'dpia', label: 'DPIA', icon: ShieldCheck, tone: 'success', badge: tabCounts.dpia || undefined } as RosterTabItem] : []),
+        ...(can.manageRetention ? [{ id: 'deletion_logs', label: 'Deletion logs', icon: Trash2, tone: 'warning', badge: tabCounts.deletion_logs || undefined } as RosterTabItem] : []),
     ];
 
     return (

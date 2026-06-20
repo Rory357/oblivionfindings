@@ -1708,6 +1708,106 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
+    public function test_dashboard_does_not_leak_other_domains_to_view_only_user(): void
+    {
+        // The auditor holds privacy.viewRequests only — not reportBreaches.
+        $breach = $this->createBreach(['nature_of_breach' => 'Should not leak']);
+
+        // Per-domain detail must not be served to a user who can't view that domain.
+        $this->actingAs($this->auditor)
+            ->get("/privacy/dashboard?breach={$breach->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('detail', null));
+
+        // A domain tab they can't view falls back to the requests overview.
+        $this->actingAs($this->auditor)
+            ->get('/privacy/dashboard?tab=breaches')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('tab', 'overview'));
+    }
+
+    // ══════════════════════════════════════════════════
+    //  Wizard minimal-payload contract — the command-centre modal posts
+    //  `_modal` + ONLY the fields the wizard marks required. These guard
+    //  against a NOT NULL column drifting out of sync with the validation.
+    // ══════════════════════════════════════════════════
+
+    public function test_request_wizard_minimal_payload_succeeds(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/requests', [
+                '_modal' => true,
+                'request_type' => 'access',
+                'subject_name' => 'Aroha Tane',
+                'subject_email' => 'aroha@example.co.nz',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('data_subject_requests', ['subject_email' => 'aroha@example.co.nz']);
+    }
+
+    public function test_breach_wizard_minimal_payload_succeeds(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/breaches', [
+                '_modal' => true,
+                'nature_of_breach' => 'Misdirected email to wrong whānau',
+                'discovered_at' => now()->toDateString(),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('data_breach_logs', ['nature_of_breach' => 'Misdirected email to wrong whānau']);
+    }
+
+    public function test_legal_hold_wizard_minimal_payload_succeeds(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/legal-holds', [
+                '_modal' => true,
+                'hold_type' => 'litigation',
+                'reason' => 'Pending Employment Relations Authority claim.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('legal_holds', ['reason' => 'Pending Employment Relations Authority claim.']);
+    }
+
+    public function test_retention_wizard_minimal_payload_succeeds(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/retention', [
+                '_modal' => true,
+                'model_type' => 'App\\Models\\Client',
+                'policy_name' => 'Client records',
+                'retention_period_years' => 7,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('data_retention_policies', ['policy_name' => 'Client records']);
+    }
+
+    public function test_dpia_wizard_minimal_payload_succeeds(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/pia', [
+                '_modal' => true,
+                'assessment_name' => 'New client portal',
+                'project_or_process' => 'Portal rollout',
+                'assessment_type' => 'new_project',
+                'processing_purpose' => 'Allow whānau to view care information.',
+                'legal_basis' => 'Privacy Act 2020 IPP 1-4',
+                'overall_risk_level' => 'medium',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('privacy_impact_assessments', ['assessment_name' => 'New client portal']);
+    }
+
     // ══════════════════════════════════════════════════
     //  SECTION 16: Compliance Report Generation
     // ══════════════════════════════════════════════════
