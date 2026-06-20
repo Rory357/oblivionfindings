@@ -497,6 +497,14 @@ app(Schedule::class)
     ->dailyAt('06:30')
     ->withoutOverlapping();
 
+// Generate HSWA worker-participation obligations (HSC 3-month cadence, HSR term
+// re-election, HSR training) ahead of their deadlines: daily 06:20
+app(Schedule::class)
+    ->command('participation:sync-obligations')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:20')
+    ->withoutOverlapping();
+
 // Timesheet reconciliation: re-sync draft timesheets and re-evaluate submitted timesheets
 app(Schedule::class)
     ->job(new ReconcileTimesheetsJob)

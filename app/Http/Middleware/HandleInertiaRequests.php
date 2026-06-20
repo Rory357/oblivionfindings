@@ -236,6 +236,10 @@ class HandleInertiaRequests extends Middleware
                 // The Fleet incident report wizard reads this so its success pane
                 // can open the newly-reported incident.
                 'created_fleet_incident_id' => session('created_fleet_incident_id'),
+                // The Worker Participation "schedule meeting" wizard reads this
+                // after creating a NEW committee so it can chain the meeting POST
+                // to /committees/{id}/meetings on the freshly created committee.
+                'created_committee_id' => session('created_committee_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

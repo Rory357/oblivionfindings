@@ -15,6 +15,7 @@ use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\RespiteObligationProvider;
 use App\Services\Sites\Calendar\Providers\VendorReminderProvider;
+use App\Services\Sites\Calendar\Providers\WorkerParticipationObligationProvider;
 use App\Services\Sites\SiteCalendarService;
 use Illuminate\Support\Carbon;
 
@@ -66,6 +67,7 @@ class SiteCalendarAggregator
             new AssetMaintenanceObligationProvider(),
             new EmergencyPlanObligationProvider(),
             new RespiteObligationProvider(),
+            new WorkerParticipationObligationProvider(),
         ];
     }
 

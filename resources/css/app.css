@@ -250,6 +250,7 @@
     --src-damage: oklch(56% 0.15 52);        --src-damage-bg: oklch(96% 0.06 55);      --src-damage-ln: oklch(87% 0.10 55);
     --src-emergency: oklch(48% 0.21 18);     --src-emergency-bg: oklch(95% 0.06 18);   --src-emergency-ln: oklch(86% 0.10 18);
     --src-respite: oklch(50% 0.16 190);      --src-respite-bg: oklch(96% 0.04 190);    --src-respite-ln: oklch(88% 0.07 190);
+    --src-participation: oklch(52% 0.17 340); --src-participation-bg: oklch(96% 0.045 340); --src-participation-ln: oklch(88% 0.07 340);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);     --src-external-bg: oklch(95% 0.012 265);  --src-external-ln: oklch(87% 0.02 265);
