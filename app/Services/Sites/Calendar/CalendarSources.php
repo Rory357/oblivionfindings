@@ -31,6 +31,7 @@ class CalendarSources
             ['key' => 'emergency',  'label' => 'Emergency plan',    'short' => 'Emergency',  'group' => 'auto',   'icon' => 'Siren',         'origin' => 'Emergency plans'],
             ['key' => 'drill',      'label' => 'Emergency drill',   'short' => 'Drill',      'group' => 'auto',   'icon' => 'Flame',         'origin' => 'Emergency drills'],
             ['key' => 'respite',    'label' => 'Respite booking',   'short' => 'Respite',    'group' => 'auto',   'icon' => 'BedDouble',     'origin' => 'Respite'],
+            ['key' => 'participation', 'label' => 'Worker participation', 'short' => 'Participation', 'group' => 'auto', 'icon' => 'Users',     'origin' => 'Worker participation'],
             ['key' => 'external',   'label' => 'External busy',     'short' => 'External',   'group' => 'external', 'icon' => 'Lock',        'origin' => 'External calendar'],
         ];
     }
