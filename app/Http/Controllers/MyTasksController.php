@@ -147,6 +147,11 @@ class MyTasksController extends Controller
             // LoneWorkerSession. The one-tap card POSTs to the existing
             // health-safety.lone-workers.sessions.check-in endpoint.
             'active_lone_worker_session' => $this->getActiveLoneWorkerSession($user),
+            // Read-only "First-aid follow-ups assigned to me" card. Lists open
+            // (uncompleted) FirstAidFollowup rows owned by the signed-in worker
+            // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
+            // row deep-links to the register's record modal (no write here).
+            'first_aid_followups' => $this->getFirstAidFollowups($user),
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
@@ -970,6 +975,47 @@ class MyTasksController extends Controller
             report($e);
 
             return null;
+        }
+    }
+
+    /**
+     * Open first-aid follow-ups assigned to the signed-in worker.
+     *
+     * Read-only digest data for the My Day "First-aid follow-ups assigned to
+     * me" card. Returns uncompleted FirstAidFollowup rows (whose parent record
+     * still exists) ordered by due date, each with a deep-link into the First
+     * Aid Register's record modal. Fail-soft — the home renders without the
+     * card if anything throws.
+     */
+    private function getFirstAidFollowups(User $user): array
+    {
+        try {
+            return \App\Models\FirstAidFollowup::query()
+                ->where('assigned_to_user_id', $user->id)
+                ->whereNull('completed_at')
+                ->whereHas('record')
+                ->with([
+                    'record:id,treated_person_name,site_id,treatment_date,injury_illness_type',
+                    'record.site:id,name',
+                ])
+                ->orderBy('due_at')
+                ->limit(10)
+                ->get()
+                ->map(fn ($f) => [
+                    'id' => $f->id,
+                    'notes' => $f->notes,
+                    'due_at' => $f->due_at?->toIso8601String(),
+                    'is_overdue' => $f->due_at ? $f->due_at->isPast() : false,
+                    'record_id' => $f->first_aid_record_id,
+                    'treated_person_name' => $f->record?->treated_person_name,
+                    'site_name' => $f->record?->site?->name,
+                    'url' => '/health-safety/first-aid?record='.$f->first_aid_record_id,
+                ])
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
         }
     }
 

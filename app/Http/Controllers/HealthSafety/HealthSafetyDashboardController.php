@@ -213,6 +213,10 @@ class HealthSafetyDashboardController extends Controller
                 ];
             }, ['pct' => null, 'committees' => 0], false),
 
+            // First-aid activity (leading care-activity signal, trailing 30 days) — surfaced
+            // on the Leading tab. First-aid-only treatment is NOT recordable / excluded from TRIFR.
+            'first_aid' => rescue(fn () => $this->kpiService->firstAidActivity(null, null, $siteId), ['treatments' => 0, 'ambulance' => 0, 'hospital' => 0], false),
+
             // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
             'procedures' => rescue(function () {
                 $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];

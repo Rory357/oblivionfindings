@@ -212,6 +212,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:25');
 
+// First Aid — follow-ups due/overdue on open records (daily)
+app(Schedule::class)
+    ->command('first-aid:followup-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)

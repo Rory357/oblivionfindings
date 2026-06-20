@@ -115,6 +115,7 @@ export function FirstAidReportDialog({
     sites,
     firstAiders,
     clients,
+    staff,
     incidents,
     onOpenRecord,
 }: {
@@ -123,6 +124,7 @@ export function FirstAidReportDialog({
     sites: Opt[];
     firstAiders: Opt[];
     clients: Opt[];
+    staff: Opt[];
     incidents: IncidentOpt[];
     onOpenRecord?: (id: number) => void;
 }) {
@@ -135,6 +137,7 @@ export function FirstAidReportDialog({
 
     const opt = (xs: Opt[]) => xs.map((x) => ({ value: String(x.id), label: x.name }));
     const isClient = d.treated_person_type === 'client';
+    const isStaff = d.treated_person_type === 'staff';
     const lastIndex = STEPS.length - 1;
     const stepKey = STEPS[stepIndex].key as StepKey;
 
@@ -352,8 +355,9 @@ export function FirstAidReportDialog({
                                 <Segmented
                                     value={d.treated_person_type}
                                     onChange={(v) => {
-                                        // Switching away from client clears the client link; keep the typed name.
+                                        // Switching person type clears the now-irrelevant link; keep the typed name.
                                         if (v !== 'client') set('client_id', '');
+                                        if (v !== 'staff') set('treated_person_id', '');
                                         set('treated_person_type', v);
                                     }}
                                     options={PERSON_TYPES.map((p) => ({ value: p.value, label: p.label }))}
@@ -381,6 +385,20 @@ export function FirstAidReportDialog({
                                     />
                                 </Field>
                             )}
+                            {isStaff ? (
+                                <Field label="Link to staff record" span hint="optional — links to their user profile">
+                                    <SelectInput
+                                        value={d.treated_person_id}
+                                        onChange={(v) => {
+                                            set('treated_person_id', v);
+                                            const u = staff.find((x) => String(x.id) === v);
+                                            if (u) set('treated_person_name', u.name);
+                                        }}
+                                        placeholder="Unlinked — use the name above"
+                                        options={opt(staff)}
+                                    />
+                                </Field>
+                            ) : null}
                             <Field label="First-aider" required span error={fieldError('first_aider_id')} hint="staff flagged is_first_aider">
                                 <SelectInput value={d.first_aider_id} onChange={(v) => set('first_aider_id', v)} placeholder="Select first-aider" options={opt(firstAiders)} />
                             </Field>

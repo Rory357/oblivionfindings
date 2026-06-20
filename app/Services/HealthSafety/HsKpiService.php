@@ -5,6 +5,7 @@ namespace App\Services\HealthSafety;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\BillingEntry;
 use App\Models\ClientIncident;
+use App\Models\FirstAidRecord;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsTrainingRequirement;
 use App\Models\Site;
@@ -13,6 +14,7 @@ use App\Models\WorkplaceInjury;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Health & Safety KPI calculation service (NZ frameworks).
@@ -234,6 +236,31 @@ class HsKpiService
         return SiteHazard::whereIn('status', ['open', 'in_progress'])
             ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
             ->count();
+    }
+
+    /**
+     * First-aid treatments logged in the window — a leading care-activity signal (first-aid-only
+     * treatment is NOT recordable and is excluded from TRIFR). Trailing 30d default; site-scoped
+     * directly via first_aid_records.site_id.
+     *
+     * @return array{treatments:int,ambulance:int,hospital:int}
+     */
+    public function firstAidActivity(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?int $siteId = null): array
+    {
+        [$from, $to] = $this->countWindow($from, $to);
+        if (! Schema::hasTable('first_aid_records')) {
+            return ['treatments' => 0, 'ambulance' => 0, 'hospital' => 0];
+        }
+
+        $base = FirstAidRecord::query()
+            ->whereBetween('treatment_date', [$from, $to])
+            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId));
+
+        return [
+            'treatments' => (clone $base)->count(),
+            'ambulance' => (clone $base)->where('ambulance_called', true)->count(),
+            'hospital' => (clone $base)->where('treatment_outcome', 'sent_to_hospital')->count(),
+        ];
     }
 
     /* ------------------------------------------------------------------ */

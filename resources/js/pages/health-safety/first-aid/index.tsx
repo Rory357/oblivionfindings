@@ -56,6 +56,7 @@ import {
     BarChart3,
     CheckCircle2,
     ClipboardList,
+    Download,
     FileText,
     HeartPulse,
     LayoutList,
@@ -124,6 +125,7 @@ type Props = {
     sites: Opt[];
     firstAiders: Opt[];
     clients: Opt[];
+    staff: Opt[];
     incidents: IncidentOpt[];
     can: { view: boolean; create: boolean; manage: boolean };
     detail: FirstAidDetail | null;
@@ -163,6 +165,7 @@ export default function FirstAidIndex({
     sites,
     firstAiders,
     clients,
+    staff,
     incidents,
     can,
     detail,
@@ -254,11 +257,21 @@ export default function FirstAidIndex({
         setCtx({ x: e.clientX, y: e.clientY, tag: 'FIRST AID', meta: `${r.reference} · ${r.treated_person_name}`, items });
     };
 
+    const exportUrl = () => {
+        const qs = new URLSearchParams();
+        Object.entries(params()).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+        });
+        const s = qs.toString();
+        return `${BASE}/export${s ? `?${s}` : ''}`;
+    };
+
     const openHeroCtx = (e: ReactMouseEvent) => {
         e.preventDefault();
         const items: ShiftCtxItem[] = [];
         if (can.create) items.push({ icon: <Plus className="h-3.5 w-3.5" />, label: 'Record first aid', tone: 'primary', onClick: () => setReportOpen(true) });
         items.push(
+            { icon: <Download className="h-3.5 w-3.5" />, label: 'Export register (CSV)', sub: 'current filters & tab', onClick: () => { window.location.href = exportUrl(); } },
             { icon: <HeartPulse className="h-3.5 w-3.5" />, label: 'Go to H&S events', onClick: () => router.visit('/health-safety/events') },
             { icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Go to analytics', onClick: () => router.visit('/health-safety/analytics') },
         );
@@ -524,6 +537,7 @@ export default function FirstAidIndex({
                     sites={sites}
                     firstAiders={firstAiders}
                     clients={clients}
+                    staff={staff}
                     incidents={incidents}
                     onOpenRecord={(id) => {
                         setReportOpen(false);
