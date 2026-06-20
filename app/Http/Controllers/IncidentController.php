@@ -293,6 +293,7 @@ class IncidentController extends Controller
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
+                'firstAidRecords:id,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
             ])
             ->find($incidentId);
 
@@ -417,6 +418,16 @@ class IncidentController extends Controller
                 'reference' => $incident->fleetIncident->reference(),
                 'type' => $incident->fleetIncident->incident_type,
             ] : null,
+            // First-aid treatments escalated to / linked with this incident — reciprocal
+            // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
+            'first_aid_records' => $incident->firstAidRecords->map(fn ($r) => [
+                'id' => $r->id,
+                'reference' => 'FA-'.str_pad((string) $r->id, 4, '0', STR_PAD_LEFT),
+                'person' => $r->treated_person_name,
+                'injury' => $r->injury_illness_type,
+                'treatment_date' => $r->treatment_date?->toISOString(),
+                'ambulance_called' => (bool) $r->ambulance_called,
+            ])->values(),
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),

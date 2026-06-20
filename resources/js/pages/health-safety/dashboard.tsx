@@ -1,6 +1,6 @@
 import { TabStrip } from '@/components/rostering';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
 import { IncidentTrendCard, LaggingCharts, LeadingCharts, type OpenHazardRow, SiteLeagueCard } from './components/charts';
@@ -203,6 +203,13 @@ export default function HealthSafetyDashboard({
                     onClose={() => setLauncherOpen(false)}
                     onWorkflow={(key) => {
                         setLauncherOpen(false);
+                        // First aid has its own bespoke add-client-style wizard on the register
+                        // page (the single record-first-aid experience) — open it there with all
+                        // its props rather than the generic config-driven HsFormWizard.
+                        if (key === 'first_aid') {
+                            router.visit('/health-safety/first-aid?report=1');
+                            return;
+                        }
                         setActiveWizard(key);
                     }}
                 />

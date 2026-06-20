@@ -61,6 +61,7 @@ import { CareSupportPlanTab } from './tabs/care-support-plan';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
+import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
     AssessmentsTab,
@@ -91,6 +92,7 @@ import {
     Globe,
     GraduationCap,
     Heart,
+    HeartPulse,
     Home,
     ListTodo,
     MessageSquare as MsgIcon,
@@ -534,6 +536,7 @@ type TabKey =
     | 'actions_reviews'
     | 'risk_management'
     | 'incidents_accidents'
+    | 'first_aid'
     | 'service_agreements'
     | 'support_plan'
     | 'assessments'
@@ -833,6 +836,13 @@ export default function ClientShow({
                 icon: AlertTriangle,
                 show: true,
                 count: (pageProps.client_incidents ?? []).length || undefined,
+            },
+            {
+                key: 'first_aid',
+                label: 'First Aid',
+                icon: HeartPulse,
+                show: true,
+                count: (pageProps.first_aid_records ?? []).length || undefined,
             },
             {
                 key: 'calendar',
@@ -3351,6 +3361,12 @@ export default function ClientShow({
                 {tab === 'incidents_accidents' && (
                     <IncidentsTab
                         incidents={(pageProps.client_incidents ?? []) as any[]}
+                    />
+                )}
+
+                {tab === 'first_aid' && (
+                    <FirstAidTab
+                        records={(pageProps.first_aid_records ?? []) as any[]}
                     />
                 )}
 

@@ -60,6 +60,7 @@ export const CLIENT_TAB_GROUPS: ClientTabGroup[] = [
             'medical',
             'mar',
             'incidents_accidents',
+            'first_aid',
             'risk_management',
         ],
     },

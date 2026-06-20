@@ -13,6 +13,7 @@ import {
     Download,
     ExternalLink,
     FileText,
+    HeartPulse,
     LinkIcon,
     ListTodo,
     Paperclip,
@@ -108,6 +109,7 @@ export type IncidentDetail = {
     assignable_staff: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
     fleet_incident?: { id: number; reference: string; type: string } | null;
+    first_aid_records?: Array<{ id: number; reference: string; person: string; injury: string; treatment_date: string | null; ambulance_called: boolean }>;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -845,8 +847,17 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
             {d.fleet_incident ? (
                 <LinkedRow icon={Truck} title="Fleet incident" sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`} href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`} />
             ) : null}
+            {(d.first_aid_records ?? []).map((r) => (
+                <LinkedRow
+                    key={r.id}
+                    icon={HeartPulse}
+                    title="First-aid treatment"
+                    sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
+                    href={`/health-safety/first-aid?record=${r.id}`}
+                />
+            ))}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
+            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length && !(d.first_aid_records ?? []).length ? <p className="text-sm text-muted-foreground">No linked records.</p> : null}
         </div>
     );
 }

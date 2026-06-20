@@ -1,0 +1,54 @@
+# First Aid Register — Gold-Standard Redesign (`/health-safety/first-aid`)
+
+Self-paced `/loop`. Rebuild `/health-safety/first-aid` to the H&S gold standard (near-twin of
+Incidents / Safeguarding / Fleet Incidents / Hazards / Emergency Drills): hero + tabs + hero-footer
+filters + right-click rows + detail-as-modal + add-client-style wizard, **plus** the cross-module
+integration + feature-complete modals the user asked for (premium document upload).
+
+Worktree: `cranky-heyrovsky-b7ad73`. NZ-only, web-only, semantic tokens only. Source design drop:
+`First Aid.zip` (README + FIRST_AID_HANDOVER + FIRST_AID_BACKEND_HANDOVER + prototype HTML).
+
+Deep audit done via 8-agent workflow (`wf_6620764c-7d5`). All findings folded in below.
+
+---
+
+## §0 — LOCKED decisions
+
+1. **Table is `first_aid_records`** (NOT `first_aid_register` despite the migration filename). Model `App\Models\FirstAidRecord`.
+2. **Permissions: reuse `hazards.*`** — `hazards.view` (read) / `hazards.manage|hazards.create` (write). NO dedicated `first_aid.*` (would 403 on prod until reseed; deploys skip seeders). Add the missing `hazards.view` guard to `index()`.
+3. **Enum columns are plain VARCHAR** (not DB enums) → enum reconciliation is a zero-risk **data UPDATE** migration. Canonical sets:
+   - `injury_illness_type`: `cut,burn,bruise,sprain,fracture,fall,head_injury,eye_injury,allergic_reaction,breathing_difficulty,chest_pain,seizure,fainting,nausea,sting,choking,other` (already includes `fall`).
+   - `treatment_outcome` (collapse dupes → 7): `returned_to_activity,sent_home,medical_centre,sent_to_hospital,ongoing_monitoring,refused_treatment,other`. Remap legacy: `returned_to_work→returned_to_activity`, `sent_to_medical→medical_centre`, `hospital→sent_to_hospital`, `ambulance_called→sent_to_hospital` (boolean `ambulance_called` preserved).
+4. **Escalation = user-driven `linkIncident`** (create-or-link a `ClientIncident`, back-fill `related_incident_id`+`incident_reported`) → reuse existing `ClientIncidentObserver→HsEvent` cascade. **NO new `FirstAidObserver`, NO `is_notifiable`/`severity`/`status` columns.** "Reportable" derived at query time from `treatment_outcome IN (sent_to_hospital) OR ambulance_called`.
+5. **Document upload (premium)**: dedicated `first_aid_attachments` table (mirror `emergency_drill_attachments`) + shared `AttachmentUploader` (`@/components/ui/file-dropzone`) in the **detail-dialog Evidence pane**. IDOR guard on download/destroy. 20MB, `accept="image/*,.pdf,.doc,.docx"`.
+6. **Follow-ups**: dedicated `first_aid_followups` table (mirror `fleet_incident_followups`) → "Add follow-up" in detail modal (note + optional assignee + due + complete). `first_aider_notes` stays the at-capture notes field.
+7. **First-aider pool** = `User::whereHas('hrEmployeeProfile', fn($q)=>$q->where('is_first_aider',true))->staff()->orderBy('name')->get(['id','name'])`. (NOT all users — current bug.)
+8. **One create experience**: bespoke `FirstAidReportDialog` (WizardShell + wizard primitives, add-client UX). Used by BOTH the register "Record first aid" button AND the command-centre launcher `first_aid` tile (retire the `firstAidConfig`→`HsFormWizard` path for first_aid).
+9. **Client linkage**: add nullable `client_id` FK → `clients`. Wizard "client" person-type sets it. Enables read-only "First-aid treatments" panel on client profile (`FirstAidTab`).
+10. **Backend template** = `app/Http/Controllers/FleetAssets/IncidentController.php`. Detail-dialog chrome = `WizardShell`. Detail reference = `event-detail-dialog.tsx` + `incident-detail-dialog.tsx`. Wizard reference = `safeguarding/raise-wizard.tsx` + add-client-dialog. Page reference = `health-safety/events/index.tsx` + `drills/index.tsx`.
+11. **Live bug to fix**: current table renders `r.incident_id` (col doesn't exist → always "N"). Use `related_incident_id`/`incident_reported`.
+12. ⚠️ Worktree junction: PHP tests autoload PARENT app/ → backend verified by tsc/build here + (merge→pest in parent). Migrations + frontend DO use worktree. Run migration locally (policy).
+
+---
+
+## Build steps
+
+- [x] **Step 1 — Migrations** (3): `client_id` FK + enum data-normalise; `first_aid_attachments`; `first_aid_followups`. **RAN locally ✓**.
+- [x] **Step 2 — Models**: `FirstAidAttachment`, `FirstAidFollowup`; `FirstAidRecord` += `client()/attachments()/followups()` + `client_id` fillable; `ClientIncident` += `firstAidRecords()`. (No `linkedHsEvent()` — escalation via linkIncident.)
+- [x] **Step 3 — FormRequests**: `StoreFirstAidRecordRequest` + `UpdateFirstAidRecordRequest` (canonical enums, client_id, related_incident_id).
+- [x] **Step 4 — Controller rebuild**: index(hero/tabCounts/can/detail-partial/firstAiders/clients/incidents) + show/update/destroy + linkIncident + add/completeFollowup + upload/download/destroyAttachment + privates. RespondsToInertiaOrJson. +`created_first_aid_id` flash in HandleInertiaRequests. **All PHP lints clean ✓**.
+- [x] **Step 5 — Routes**: show/update/destroy/link-incident/followups/attachments under `hazards.*` gates.
+- [x] **Step 6 — Shared enum module** `first-aid/options.ts` (FE=BE; labels + outcome/injury tones).
+- [x] **Step 7 — `FirstAidReportDialog`** (bespoke WizardShell wizard, add-client UX, 5 steps, client picker→client_id, incident link mode, save-&-add-another, success+open-record, jump-to-failing-step).
+- [x] **Step 8 — `FirstAidDetailDialog`** (WizardShell chrome; sections Overview/Injury/Incident/Follow-ups/Evidence/History; panes Edit/LinkIncident/AddFollowup/Delete; AttachmentUploader; initialSection/Action + re-sync).
+- [x] **Step 9 — Rebuilt `first-aid/index.tsx`** (HeroShell+ribbon+2 clusters+4 NZ badges+filter footer; 5 TabStrip tabs; typed table + ShiftContextMenu + click/keyboard/focus; LaravelPagination; mounts detail+report dialogs; ?record= partial; hero right-click).
+- [x] **Step 10 — Cross-module**: client profile `FirstAidTab` + ClientController prop + `_groups.ts`/`show.tsx` (TabKey/registration/render); incident detail `LinkedSection` first-aid rows + IncidentController eager-load+payload + `ClientIncident::firstAidRecords()`; launcher first_aid → bespoke dialog via `?report=1` (dashboard guarded). All PHP lints clean.
+- [x] **Step 11 — Verify**: PHP lint ✓; **tsc 0 (whole project) ✓**; **eslint 0 ✓**; **vite build green ✓** (3m41s). **Adversarial 4-agent review (`wf_9fcdb421-710`): 14 findings, 3 high/critical, ALL verified real, 0 false-positives — ALL 14 FIXED** (see below). Re-verifying tsc/eslint post-fix.
+  - ⚠️ Worktree scaffolding added this session: junctioned `node_modules`, `vendor`, `resources/js/{routes,actions,wayfinder}` from parent + copied `.env` (the worktree had none). ⚠️[[reference_worktree_vendor]] junction-removal danger before deleting worktree.
+
+## Adversarial review — all 14 findings fixed (2026-06-20)
+**High/critical (3):** (1) client-PII leak — picker pools (`clients`/`incidents`/`firstAiders`) were bare Inertia closures shipped to `hazards.view`-only roles → now gated behind `can.create` (hero badge count still server-side). (2) `linkIncident` 500 (NOT-NULL `client_incidents.client_id`) when escalating a non-client treatment → guarded (only client treatments auto-create; others must link existing) + FE LinkIncidentPane requires an existing incident when no client. (3) report wizard kept stale state on reopen → page now unmounts it on close (`{reportOpen && can.create ? …}`).
+**Medium/low (11):** incident-title leak (same gate); Edit-pane never sent `client_id` → added client picker + BE clears `client_id` when type≠client; follow-ups now audited against the record (show in History); `destroy` uses `back()` (preserves filters); **Mark-reportable contradiction** → unified `linked`=`whereNotNull(related_incident_id)` & shared `applyReportable()` across tab/counts/hero + matching row badge; hero "To hospital" tile → `?treatment_outcome=sent_to_hospital`; dropped dead flashed `record` payloads; **deleted dead `firstAidConfig`** + orphaned PERSON_TYPES/INJURY_TYPES/OUTCOMES/`User` import + dashboard guard (one experience now); **client panel relation key** `first_aider`→`firstAider`; removed 3 unused imports. **+ self-caught pre-review:** `linkIncident` silently dropped non-fillable `site_id`.
+
+## Status log
+- 2026-06-20: Audit complete (8 agents). Plan locked. Foundational kits read first-hand (hs-hero-kit, register-row-kit, wizard/shell, wizard/primitives, add-client-dialog, routes). Starting Step 1.

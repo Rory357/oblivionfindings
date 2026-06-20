@@ -12,7 +12,6 @@ import {
     PersonStanding,
     ShieldCheck,
     Siren,
-    User,
     Users,
 } from 'lucide-react';
 
@@ -35,41 +34,10 @@ const DRILL_TYPES = [
     'other',
 ].map((v) => opt(v));
 
-const PERSON_TYPES = ['staff', 'client', 'visitor', 'contractor'].map((v) => opt(v));
-
-const INJURY_TYPES = [
-    'cut',
-    'burn',
-    'bruise',
-    'sprain',
-    'fracture',
-    'fall',
-    'head_injury',
-    'eye_injury',
-    'allergic_reaction',
-    'breathing_difficulty',
-    'chest_pain',
-    'seizure',
-    'fainting',
-    'nausea',
-    'sting',
-    'choking',
-    'other',
-].map((v) => opt(v));
-
-const OUTCOMES = [
-    'returned_to_activity',
-    'returned_to_work',
-    'sent_home',
-    'medical_centre',
-    'sent_to_medical',
-    'hospital',
-    'sent_to_hospital',
-    'ambulance_called',
-    'ongoing_monitoring',
-    'refused_treatment',
-    'other',
-].map((v) => opt(v));
+// First-aid record vocabulary now lives solely in
+// resources/js/pages/health-safety/first-aid/options.ts — the bespoke FirstAidReportDialog
+// replaced the config-driven first-aid wizard, so PERSON_TYPES/INJURY_TYPES/OUTCOMES were
+// removed here to prevent FE/BE enum drift.
 
 const drillConfig: WizardConfig = {
     key: 'drill',
@@ -105,58 +73,6 @@ const drillConfig: WizardConfig = {
             ],
         },
         { key: 'review', label: 'Review', blurb: 'Confirm & schedule', icon: ClipboardCheck, fields: [] },
-    ],
-};
-
-const firstAidConfig: WizardConfig = {
-    key: 'first_aid',
-    title: 'Record first-aid treatment',
-    description: 'Record a first-aid treatment in the register.',
-    railIcon: HeartPulse,
-    railTitle: 'First aid',
-    railSub: 'First-aid register',
-    endpoint: '/health-safety/first-aid',
-    successTitle: 'First-aid recorded',
-    successBlurb: 'The treatment is in the register.',
-    steps: [
-        {
-            key: 'person',
-            label: 'Person',
-            blurb: 'Who was treated',
-            icon: User,
-            fields: [
-                { key: 'site_id', label: 'Site', type: 'select', source: 'sites', required: true },
-                { key: 'treated_person_name', label: 'Person treated', type: 'text', required: true },
-                { key: 'treated_person_type', label: 'Person type', type: 'segmented', required: true, options: PERSON_TYPES },
-                { key: 'treatment_date', label: 'Treatment date', type: 'date', required: true },
-            ],
-        },
-        {
-            key: 'injury',
-            label: 'Injury & treatment',
-            blurb: 'What happened & what was done',
-            icon: Activity,
-            fields: [
-                { key: 'injury_illness_type', label: 'Injury / illness', type: 'select', required: true, options: INJURY_TYPES },
-                { key: 'body_part', label: 'Body part', type: 'text' },
-                { key: 'injury_illness_description', label: 'Description', type: 'textarea', required: true, placeholder: 'Describe the injury / illness…' },
-                { key: 'treatment_given', label: 'Treatment given', type: 'textarea', required: true, placeholder: 'Describe the treatment…' },
-                { key: 'treatment_outcome', label: 'Outcome', type: 'select', required: true, options: OUTCOMES },
-            ],
-        },
-        {
-            key: 'aider',
-            label: 'First-aider & follow-up',
-            blurb: 'Who treated & next steps',
-            icon: ShieldCheck,
-            fields: [
-                { key: 'first_aider_id', label: 'First-aider', type: 'select', source: 'staff', required: true },
-                { key: 'ambulance_called', label: 'Ambulance called', type: 'toggle' },
-                { key: 'incident_reported', label: 'Incident reported', type: 'toggle' },
-                { key: 'first_aider_notes', label: 'Notes', type: 'textarea' },
-            ],
-        },
-        { key: 'review', label: 'Review', blurb: 'Confirm & file', icon: ClipboardCheck, fields: [] },
     ],
 };
 
@@ -433,7 +349,6 @@ const participationConfig: WizardConfig = {
 
 export const WIZARD_CONFIGS: Record<string, WizardConfig> = {
     drill: drillConfig,
-    first_aid: firstAidConfig,
     restraint: restraintConfig,
     rtw: rtwConfig,
     substance: substanceConfig,
