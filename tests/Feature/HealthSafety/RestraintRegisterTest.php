@@ -306,7 +306,7 @@ class RestraintRegisterTest extends TestCase
 
     public function test_event_attachment_upload_and_remove(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $event = RestraintEvent::factory()->create();
         $officer = $this->officer();
 
@@ -318,7 +318,8 @@ class RestraintRegisterTest extends TestCase
 
         $att = RestraintEventAttachment::where('restraint_event_id', $event->id)->firstOrFail();
         $this->assertSame('body_map', $att->category);
-        Storage::disk('public')->assertExists($att->path);
+        $this->assertSame('private', $att->disk);
+        Storage::disk('private')->assertExists($att->path);
 
         $this->actingAs($officer)
             ->delete('/health-safety/restraints/events/'.$event->id.'/attachments/'.$att->id)

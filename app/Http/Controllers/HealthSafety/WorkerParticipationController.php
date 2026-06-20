@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Services\ComplianceEngineService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\StoreConsultationRequest;
 use App\Http\Requests\HealthSafety\StoreMeetingRequest;
@@ -20,7 +21,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -42,6 +42,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class WorkerParticipationController extends Controller
 {
+    use ServesPrivateAttachments;
+
     private const TABS = ['representatives', 'meetings', 'consultations'];
 
     /** Canonical consultation lifecycle, in order. */
@@ -544,9 +546,13 @@ class WorkerParticipationController extends Controller
     public function downloadMeetingMinutes(HsCommitteeMeeting $meeting): StreamedResponse
     {
         $path = $meeting->minutes_document_path;
-        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Minutes document not found.');
+        abort_unless((bool) $path, 404, 'Minutes document not found.');
 
-        return Storage::disk('private')->download($path, $meeting->minutes_document_name ?? basename($path));
+        return $this->streamPrivateAttachment(
+            'private',
+            $path,
+            $meeting->minutes_document_name ?? basename($path),
+        );
     }
 
     /**
@@ -673,9 +679,13 @@ class WorkerParticipationController extends Controller
             ? [$consultation->document_path, $consultation->document_name]
             : [$consultation->outcome_document_path, $consultation->outcome_document_name];
 
-        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Document not found.');
+        abort_unless((bool) $path, 404, 'Document not found.');
 
-        return Storage::disk('private')->download($path, $name ?? basename($path));
+        return $this->streamPrivateAttachment(
+            'private',
+            $path,
+            $name ?? basename($path),
+        );
     }
 
     /* ================================================================== */

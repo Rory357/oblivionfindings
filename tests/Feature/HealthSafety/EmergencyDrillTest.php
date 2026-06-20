@@ -257,7 +257,7 @@ class EmergencyDrillTest extends TestCase
 
     public function test_upload_and_remove_attachment(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $drill = EmergencyDrill::factory()->create();
 
         $this->actingAs($this->officer())
@@ -269,14 +269,15 @@ class EmergencyDrillTest extends TestCase
 
         $attachment = EmergencyDrillAttachment::firstWhere('emergency_drill_id', $drill->id);
         $this->assertNotNull($attachment);
-        Storage::disk('public')->assertExists($attachment->path);
+        $this->assertSame('private', $attachment->disk);
+        Storage::disk('private')->assertExists($attachment->path);
 
         $this->actingAs($this->officer())
             ->delete("/health-safety/drills/{$drill->id}/attachments/{$attachment->id}")
             ->assertRedirect();
 
         $this->assertSoftDeleted('emergency_drill_attachments', ['id' => $attachment->id]);
-        Storage::disk('public')->assertMissing($attachment->path);
+        Storage::disk('private')->assertMissing($attachment->path);
     }
 
     /* ---- Compliance single source of truth ---- */

@@ -78,9 +78,14 @@ class HazardDetailPresenter
             'status_changed_by' => $hazard->statusChangedBy ? ['id' => $hazard->statusChangedBy->id, 'name' => $hazard->statusChangedBy->name] : null,
             'worksafe_notifiable' => $hazard->isWorksafeNotifiable(),
             'resolution_summary' => $hazard->resolution_summary,
-            'photo_paths' => array_values($hazard->photo_paths ?? []),
-            'document_paths' => self::normaliseFiles($hazard->document_paths ?? []),
-            'resolution_evidence' => self::normaliseFiles($hazard->resolution_evidence ?? []),
+            // Evidence lives on the private disk — emit the authenticated serve URL
+            // (sites.hazards.media.show) per item instead of a raw path. The frontend's
+            // storageUrl() passes these absolute URLs through unchanged.
+            'photo_paths' => collect(array_values($hazard->photo_paths ?? []))
+                ->map(fn ($p, int $i) => route('sites.hazards.media.show', [$hazard->id, 'photo', $i]))
+                ->all(),
+            'document_paths' => self::fileServeUrls($hazard, 'document', self::normaliseFiles($hazard->document_paths ?? [])),
+            'resolution_evidence' => self::fileServeUrls($hazard, 'resolution', self::normaliseFiles($hazard->resolution_evidence ?? [])),
             'actions' => $hazard->actions
                 ->sortByDesc('created_at')
                 ->values()
@@ -131,6 +136,25 @@ class HazardDetailPresenter
                 'size' => $item['size'] ?? null,
             ];
         })->filter(fn ($i) => $i['path'] !== '')->values()->all();
+    }
+
+    /**
+     * Replace each normalised file's raw path with its authenticated serve URL so the
+     * private-disk evidence is reachable only through the hazards.view-gated route. The
+     * index must match SiteHazardController::showMedia (both run normaliseFiles).
+     *
+     * @param  array<int,array{name?:string,path?:string,size?:int|null}>  $files
+     * @return array<int,array{name:string,path:string,size:int|null}>
+     */
+    private static function fileServeUrls(SiteHazard $hazard, string $kind, array $files): array
+    {
+        return collect($files)
+            ->map(fn ($f, int $i) => [
+                'name' => $f['name'] ?? basename((string) ($f['path'] ?? '')),
+                'path' => route('sites.hazards.media.show', [$hazard->id, $kind, $i]),
+                'size' => $f['size'] ?? null,
+            ])
+            ->all();
     }
 
     /**

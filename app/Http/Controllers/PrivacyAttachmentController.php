@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Models\DataBreachLog;
 use App\Models\DataRetentionPolicy;
 use App\Models\DataSubjectRequest;
@@ -12,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Privacy command-centre — polymorphic document/evidence upload.
@@ -24,6 +26,8 @@ use Illuminate\Validation\Rule;
  */
 class PrivacyAttachmentController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /** type key => [model class, view permission, write permission]. */
     private const TYPES = [
         'request' => [DataSubjectRequest::class, 'privacy.viewRequests', 'privacy.processRequests'],
@@ -51,7 +55,7 @@ class PrivacyAttachmentController extends Controller
         $model = $class::findOrFail($validated['attachable_id']);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('privacy_attachments', $disk);
 
         $model->attachments()->create([
@@ -68,7 +72,7 @@ class PrivacyAttachmentController extends Controller
         return back()->with('success', 'Document uploaded.');
     }
 
-    public function download(Request $request, PrivacyAttachment $attachment)
+    public function download(Request $request, PrivacyAttachment $attachment): StreamedResponse
     {
         $type = $this->typeKeyFor($attachment->attachable_type);
         abort_unless($type !== null, 404);
@@ -81,10 +85,13 @@ class PrivacyAttachmentController extends Controller
             abort_unless($request->user()?->canDo($writePerm), 403);
         }
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroy(Request $request, PrivacyAttachment $attachment): RedirectResponse
@@ -95,7 +102,7 @@ class PrivacyAttachmentController extends Controller
         [, , $writePerm] = self::TYPES[$type];
         abort_unless($request->user()?->canDo($writePerm), 403);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

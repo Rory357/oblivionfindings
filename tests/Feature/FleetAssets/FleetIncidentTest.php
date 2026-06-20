@@ -257,7 +257,7 @@ class FleetIncidentTest extends TestCase
 
     public function test_upload_attachment(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $incident = FleetIncident::factory()->create(['asset_id' => $this->vehicle()->id]);
 
         $this->actingAs($this->admin)
@@ -275,7 +275,8 @@ class FleetIncidentTest extends TestCase
             'kind' => 'photo',
         ]);
         $attachment = $incident->attachments()->first();
-        Storage::disk('public')->assertExists($attachment->path);
+        // Controller uploads now persist to the PRIVATE disk.
+        Storage::disk('private')->assertExists($attachment->path);
     }
 
     /* -------------------------------------------------------------- */

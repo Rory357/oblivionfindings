@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\StoreFirstAidRecordRequest;
 use App\Http\Requests\HealthSafety\UpdateFirstAidRecordRequest;
@@ -37,6 +38,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class FirstAidController extends Controller
 {
     use RespondsToInertiaOrJson;
+    use ServesPrivateAttachments;
 
     /** Canonical outcome that, with the ambulance flag, marks a treatment WorkSafe-reportable. */
     private const REPORTABLE_OUTCOME = 'sent_to_hospital';
@@ -308,7 +310,7 @@ class FirstAidController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('first_aid_attachments', $disk);
 
         $record->attachments()->create([
@@ -328,15 +330,18 @@ class FirstAidController extends Controller
         return $this->inertiaOrJson($request, 'Evidence uploaded.');
     }
 
-    public function downloadAttachment(Request $request, FirstAidRecord $record, FirstAidAttachment $attachment)
+    public function downloadAttachment(Request $request, FirstAidRecord $record, FirstAidAttachment $attachment): StreamedResponse
     {
         abort_unless((bool) $request->user()?->canDo('hazards.view'), 403);
         abort_unless((int) $attachment->first_aid_record_id === (int) $record->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroyAttachment(Request $request, FirstAidRecord $record, FirstAidAttachment $attachment): RedirectResponse|JsonResponse
@@ -344,7 +349,7 @@ class FirstAidController extends Controller
         abort_unless($this->userCanManage($request), 403);
         abort_unless((int) $attachment->first_aid_record_id === (int) $record->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

@@ -43,7 +43,7 @@ class PrivacyAttachmentTest extends TestCase
 
     public function test_upload_stores_attachment_against_the_request(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $dsr = $this->dsr();
 
         $this->actingAs($this->admin)
@@ -59,7 +59,8 @@ class PrivacyAttachmentTest extends TestCase
         $this->assertSame(DataSubjectRequest::class, $attachment->attachable_type);
         $this->assertEquals($dsr->id, $attachment->attachable_id);
         $this->assertTrue($attachment->is_sensitive);
-        Storage::disk('public')->assertExists($attachment->path);
+        // Uploads now land on the PRIVATE disk (never world-readable under /storage).
+        Storage::disk('private')->assertExists($attachment->path);
     }
 
     public function test_upload_forbidden_without_domain_write_permission(): void
@@ -109,10 +110,11 @@ class PrivacyAttachmentTest extends TestCase
             ->get("/privacy/attachments/{$attachment->id}/download")
             ->assertForbidden();
 
-        // Write-permission user can download it.
+        // Write-permission user can download it — streamed with hardened headers.
         $this->actingAs($this->admin)
             ->get("/privacy/attachments/{$attachment->id}/download")
-            ->assertOk();
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
     }
 
     public function test_destroy_removes_the_attachment_and_file(): void

@@ -314,7 +314,7 @@ class PpeRegisterTest extends TestCase
 
     public function test_inventory_attachment_upload_download_delete(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $item = PpeInventory::factory()->create();
         $manager = $this->manager();
 
@@ -323,18 +323,25 @@ class PpeRegisterTest extends TestCase
         ])->assertRedirect();
 
         $att = PpeAttachment::where('ppe_inventory_id', $item->id)->firstOrFail();
-        Storage::disk('public')->assertExists($att->path);
+        // Stored on the PRIVATE disk now — never world-readable under /storage.
+        Storage::disk('private')->assertExists($att->path);
+        $this->assertSame('private', $att->disk);
 
-        $this->actingAs($manager)->get('/health-safety/ppe/inventory/'.$item->id.'/attachments/'.$att->id.'/download')->assertOk();
+        // download — streamed from the private disk with the hardened headers
+        // (nosniff + CSP sandbox) from ServesPrivateAttachments.
+        $this->actingAs($manager)->get('/health-safety/ppe/inventory/'.$item->id.'/attachments/'.$att->id.'/download')
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         $this->actingAs($manager)->delete('/health-safety/ppe/inventory/'.$item->id.'/attachments/'.$att->id)->assertRedirect();
         $this->assertSoftDeleted('ppe_attachments', ['id' => $att->id]);
-        Storage::disk('public')->assertMissing($att->path);
+        Storage::disk('private')->assertMissing($att->path);
     }
 
     public function test_attachment_download_guards_ownership(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $a = PpeInventory::factory()->create();
         $b = PpeInventory::factory()->create();
         $manager = $this->manager();

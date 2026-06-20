@@ -23,7 +23,11 @@ class SafeguardingAttachmentTest extends TestCase
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        // Controller uploads now land on the PRIVATE disk, while the manual
+        // attachment() fixtures below build rows pinned to the legacy public disk
+        // (download/destroy respect each row's stored disk) — fake both.
         Storage::fake('public');
+        Storage::fake('private');
     }
 
     private function makeSafeguardingUser(array $permissionKeys, bool $withRole = false): User
@@ -81,7 +85,8 @@ class SafeguardingAttachmentTest extends TestCase
             'notes' => 'Door camera log',
         ]);
         $this->assertSame(1, $concern->attachments()->count());
-        Storage::disk('public')->assertExists($concern->attachments()->first()->path);
+        // Controller uploads now persist to the PRIVATE disk.
+        Storage::disk('private')->assertExists($concern->attachments()->first()->path);
     }
 
     public function test_sensitive_evidence_download_gated_by_view_sensitive(): void
@@ -110,7 +115,8 @@ class SafeguardingAttachmentTest extends TestCase
         $viewer = $this->makeSafeguardingUser(['safeguarding.viewAny']);
         $this->actingAs($viewer)
             ->get("/safeguarding/{$concern->id}/attachments/{$att->id}/download")
-            ->assertOk();
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
     }
 
     public function test_destroy_removes_attachment(): void

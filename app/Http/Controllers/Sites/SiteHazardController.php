@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
@@ -15,11 +16,14 @@ use App\Support\HazardDetailPresenter;
 use App\Support\SiteRecommendedHazards;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SiteHazardController extends Controller
 {
     use ResolvesAllowedSiteTypes;
+    use ServesPrivateAttachments;
 
     private const TABS = ['all', 'open', 'in_progress', 'overdue', 'critical', 'closed'];
 
@@ -625,7 +629,7 @@ class SiteHazardController extends Controller
     {
         $paths = [];
         foreach (array_filter($files) as $file) {
-            $paths[] = $file->store("hazards/{$hazardId}/{$sub}", 'public');
+            $paths[] = $file->store("hazards/{$hazardId}/{$sub}", 'private');
         }
 
         return $paths;
@@ -643,7 +647,7 @@ class SiteHazardController extends Controller
         foreach (array_filter($files) as $file) {
             $out[] = [
                 'name' => $file->getClientOriginalName(),
-                'path' => $file->store("hazards/{$hazardId}/{$sub}", 'public'),
+                'path' => $file->store("hazards/{$hazardId}/{$sub}", 'private'),
                 'size' => $file->getSize(),
             ];
         }
@@ -651,4 +655,35 @@ class SiteHazardController extends Controller
         return $out;
     }
 
+    /**
+     * Stream a hazard photo (photo_paths[index]) or document (document_paths[index])
+     * through this authenticated, hazards.view-gated route — hazard evidence is no
+     * longer reachable at a public /storage/... URL. Hazard media has no per-file disk
+     * column, so the disk is resolved by existence: new uploads live on the private
+     * disk; any legacy file still on the public disk keeps serving until the backfill
+     * relocates it. nosniff + CSP sandbox come from ServesPrivateAttachments.
+     */
+    public function showMedia(SiteHazard $hazard, string $kind, int $index): StreamedResponse
+    {
+        $this->authorize('view', $hazard->site);
+
+        if ($kind === 'photo') {
+            $path = array_values($hazard->photo_paths ?? [])[$index] ?? null;
+            $name = is_string($path) ? basename($path) : null;
+        } else {
+            // 'document' → document_paths; 'resolution' → resolution_evidence. Both are
+            // normalised identically to the presenter so the [index] lines up.
+            $source = $kind === 'resolution' ? $hazard->resolution_evidence : $hazard->document_paths;
+            $doc = HazardDetailPresenter::normaliseFiles($source ?? [])[$index] ?? null;
+            $path = is_array($doc) ? ($doc['path'] ?? null) : null;
+            $name = is_array($doc) ? ($doc['name'] ?? (is_string($path) ? basename($path) : null)) : null;
+        }
+
+        abort_unless(is_string($path) && $path !== '', 404);
+
+        // New uploads are 'private'; legacy evidence may still be on 'public' pre-backfill.
+        $disk = collect(['private', 'public'])->first(fn (string $d) => Storage::disk($d)->exists($path)) ?? 'private';
+
+        return $this->streamPrivateAttachment($disk, $path, $name ?: 'attachment');
+    }
 }

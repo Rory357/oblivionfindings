@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\BehaviourSupportPlan;
 use App\Models\BehaviourSupportPlanReview;
@@ -23,6 +24,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RestraintController extends Controller
 {
+    use ServesPrivateAttachments;
+
     private const RESTRAINT_TYPES = ['physical', 'chemical', 'mechanical', 'seclusion', 'environmental'];
 
     private const SEVERITIES = ['low', 'medium', 'high', 'critical'];
@@ -694,7 +697,7 @@ class RestraintController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('restraint_attachments', $disk);
 
         $event->attachments()->create([
@@ -717,7 +720,7 @@ class RestraintController extends Controller
         abort_unless($this->canManage($request), 403);
         abort_unless((int) $attachment->restraint_event_id === (int) $event->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }
@@ -726,14 +729,18 @@ class RestraintController extends Controller
         return back()->with('success', 'Attachment removed.');
     }
 
-    public function downloadAttachment(Request $request, RestraintEvent $event, RestraintEventAttachment $attachment)
+    public function downloadAttachment(Request $request, RestraintEvent $event, RestraintEventAttachment $attachment): StreamedResponse
     {
         abort_unless($this->canView($request), 403);
         abort_unless((int) $attachment->restraint_event_id === (int) $event->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     /* ================================================================== */

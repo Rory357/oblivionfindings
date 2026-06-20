@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\ActivateHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\StoreHsRiskAssessmentRequest;
@@ -20,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Risk Assessments register (`/health-safety/risk-assessments`) — H&S gold standard.
@@ -28,6 +30,8 @@ use Inertia\Response;
  */
 class HsRiskAssessmentController extends Controller
 {
+    use ServesPrivateAttachments;
+
     public function __construct(private readonly HsRiskAssessmentService $service) {}
 
     /* ====================================================================== */
@@ -237,7 +241,7 @@ class HsRiskAssessmentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('hs_risk_assessment_attachments', $disk);
 
         $assessment->attachments()->create([
@@ -255,21 +259,24 @@ class HsRiskAssessmentController extends Controller
         return back()->with('success', 'Evidence uploaded.');
     }
 
-    public function downloadAttachment(Request $request, HsRiskAssessment $assessment, HsRiskAssessmentAttachment $attachment)
+    public function downloadAttachment(Request $request, HsRiskAssessment $assessment, HsRiskAssessmentAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $attachment->hs_risk_assessment_id === (int) $assessment->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroyAttachment(Request $request, HsRiskAssessment $assessment, HsRiskAssessmentAttachment $attachment): RedirectResponse
     {
         abort_unless((int) $attachment->hs_risk_assessment_id === (int) $assessment->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }
