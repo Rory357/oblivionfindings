@@ -25,10 +25,13 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowUpRight,
     Check,
+    ChevronDown,
+    ChevronUp,
     Clock,
     Filter,
     ListChecks,
     MoreVertical,
+    Paperclip,
     Stethoscope,
     User,
     X,
@@ -50,10 +53,15 @@ type EventRecord = {
     severity: string;
     occurred_at: string;
     description: string;
+    immediate_action_taken: string | null;
+    outcome: string | null;
+    witnesses: string[] | null;
     requires_followup: boolean;
+    followup_notes: string | null;
     followup_completed_at: string | null;
     reviewed_at: string | null;
     status: string;
+    attachments_count?: number;
     client:
         | { id: number; first_name: string; last_name: string; site_id: number | null; site?: { id: number; name: string } | null }
         | null;
@@ -121,6 +129,7 @@ export default function EventRegister({ events, stats, filters, filter_options, 
         date_to: filters.date_to ?? '',
     });
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [expanded, setExpanded] = useState<number | null>(null);
 
     const applyFilters = () => {
         const clean = Object.fromEntries(Object.entries(local).filter(([, v]) => v !== '' && v !== undefined));
@@ -221,6 +230,8 @@ export default function EventRegister({ events, stats, filters, filter_options, 
                 <div className="flex flex-col gap-2.5">
                     {events.data.map((ev) => {
                         const sev = SEV[ev.severity] ?? SEV.low;
+                        const isOpen = expanded === ev.id;
+                        const hasDetail = !!(ev.immediate_action_taken || ev.outcome || (ev.witnesses && ev.witnesses.length) || ev.followup_notes || (ev.attachments_count ?? 0) > 0 || ev.reviewed_at);
                         return (
                             <div
                                 key={ev.id}
@@ -250,10 +261,23 @@ export default function EventRegister({ events, stats, filters, filter_options, 
                                             ) : clientName(ev)}
                                             {' · '}{siteName(ev)}
                                         </p>
-                                        {ev.description ? <p className="mt-1 line-clamp-2 text-[13px] text-foreground">{ev.description}</p> : null}
-                                        <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
+                                        {ev.description ? <p className={cn('mt-1 text-[13px] text-foreground', isOpen ? 'whitespace-pre-wrap' : 'line-clamp-2')}>{ev.description}</p> : null}
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                                             <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{formatNzDate(ev.occurred_at)}</span>
                                             {ev.reporter ? <span>· {ev.reporter.name}</span> : null}
+                                            {(ev.attachments_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{ev.attachments_count}</span> : null}
+                                            {hasDetail ? (
+                                                // eslint-disable-next-line no-restricted-syntax -- inline disclosure toggle, not a shadcn Button
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpanded(isOpen ? null : ev.id)}
+                                                    aria-expanded={isOpen}
+                                                    aria-controls={`event-detail-${ev.id}`}
+                                                    className="ml-auto inline-flex items-center gap-1 font-medium hover:text-foreground"
+                                                >
+                                                    {isOpen ? <>Hide detail <ChevronUp className="h-3.5 w-3.5" /></> : <>View detail <ChevronDown className="h-3.5 w-3.5" /></>}
+                                                </button>
+                                            ) : null}
                                         </div>
                                     </div>
                                     {/* eslint-disable-next-line no-restricted-syntax -- icon-only context-menu trigger, not a shadcn Button */}
@@ -266,6 +290,30 @@ export default function EventRegister({ events, stats, filters, filter_options, 
                                         <MoreVertical className="h-4 w-4" />
                                     </button>
                                 </div>
+
+                                {isOpen ? (
+                                    <div id={`event-detail-${ev.id}`} className="mt-3 grid gap-2.5 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2">
+                                        <DetailField label="Immediate action taken" value={ev.immediate_action_taken} />
+                                        <DetailField label="Outcome" value={ev.outcome} />
+                                        <DetailField label="Witnesses" value={ev.witnesses && ev.witnesses.length ? ev.witnesses.join(', ') : null} />
+                                        {ev.requires_followup ? <DetailField label="Follow-up notes" value={ev.followup_notes} /> : null}
+                                        <div className="sm:col-span-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+                                            {ev.reviewed_at ? <span>Reviewed {formatNzDate(ev.reviewed_at)}{ev.reviewer ? ` · ${ev.reviewer.name}` : ''}</span> : <span>Not yet reviewed</span>}
+                                            {(ev.attachments_count ?? 0) > 0 ? <span>{ev.attachments_count} attachment{ev.attachments_count === 1 ? '' : 's'}</span> : null}
+                                        </div>
+                                        <div className="sm:col-span-2 flex flex-wrap gap-2">
+                                            {can.eventsReview && !ev.reviewed_at ? (
+                                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => review(ev.id)}><Check className="h-3.5 w-3.5" /> Review &amp; sign off</Button>
+                                            ) : null}
+                                            {ev.requires_followup && !ev.followup_completed_at && (can.eventsReview || can.eventsRecord) ? (
+                                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => completeFollowup(ev.id)}><ListChecks className="h-3.5 w-3.5" /> Mark follow-up complete</Button>
+                                            ) : null}
+                                            {can.eventsEscalate ? (
+                                                <Button size="sm" variant="ghost" className="gap-1.5 text-status-critical" onClick={() => escalate(ev.id)}><ArrowUpRight className="h-3.5 w-3.5" /> Escalate</Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         );
                     })}
@@ -287,6 +335,15 @@ export default function EventRegister({ events, stats, filters, filter_options, 
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </HealthClinicalShell>
+    );
+}
+
+function DetailField({ label, value }: { label: string; value: string | null }) {
+    return (
+        <div>
+            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+            <p className="mt-0.5 text-[13px] whitespace-pre-wrap text-foreground">{value || '—'}</p>
+        </div>
     );
 }
 

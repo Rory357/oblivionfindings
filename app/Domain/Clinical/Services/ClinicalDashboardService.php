@@ -651,6 +651,7 @@ class ClinicalDashboardService
                 'reporter:id,name',
                 'reviewer:id,name',
             ])
+            ->withCount('attachments')
             ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
             ->when($filters['event_type'] ?? null, function ($q, $type) {
                 $enum = ClinicalEventType::tryFrom($type);
