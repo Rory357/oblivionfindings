@@ -51,6 +51,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/behaviour', [HealthClinicalDashboardController::class, 'behaviour'])
             ->middleware('permission:clinical.behaviour.viewAny')
             ->name('behaviour.index');
+        Route::get('/care-plans', [HealthClinicalDashboardController::class, 'carePlans'])
+            ->middleware('permission:clinical.dashboard')
+            ->name('care-plans.index');
+        Route::get('/health-monitoring', [HealthClinicalDashboardController::class, 'healthMonitoring'])
+            ->middleware('permission:clinical.monitoring.viewAny')
+            ->name('health-monitoring.index');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');

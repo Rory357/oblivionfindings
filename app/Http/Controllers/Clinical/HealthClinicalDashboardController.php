@@ -195,6 +195,50 @@ class HealthClinicalDashboardController extends Controller
             'stats' => $this->dashboardService->getBehaviourRegisterStats(),
             'filters' => $filters,
             'filter_options' => $this->dashboardService->getBehaviourFilterOptions(),
+            // Read-only Restraint register lens (managed in Health & Safety).
+            'restraint' => $this->dashboardService->getRestraintLens((int) ($auth->organization_id ?? 0)),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+        ]);
+    }
+
+    /**
+     * Read-only Care Plans review/sign-off lens. Surfaces clinical care plans due
+     * for review/sign-off and links out to /operations/care-plans (the system of
+     * record) — no create/edit here.
+     */
+    public function carePlans(Request $request): \Inertia\Response
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clinical.dashboard'), 403);
+
+        $lens = $this->dashboardService->getCarePlanLens((int) ($auth->organization_id ?? 0));
+        $kpis = $this->dashboardService->getKpis();
+
+        return inertia('health-clinical/CarePlans', [
+            'plans' => $lens['plans'],
+            'stats' => $lens['stats'],
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+        ]);
+    }
+
+    /**
+     * Cross-client Health Monitoring rollup (fluid / bowel / seizure / sleep).
+     */
+    public function healthMonitoring(Request $request): \Inertia\Response
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clinical.monitoring.viewAny'), 403);
+
+        $filters = $request->validate(['client_id' => ['nullable', 'integer', 'exists:clients,id']]);
+
+        $kpis = $this->dashboardService->getKpis();
+
+        return inertia('health-clinical/HealthMonitoring', [
+            'rollup' => $this->dashboardService->getMonitoringRollup((int) ($auth->organization_id ?? 0), $filters),
+            'filters' => $filters,
+            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
             'kpis' => $kpis,
             'tab_counts' => $this->dashboardService->getTabCounts($kpis),
         ]);

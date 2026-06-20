@@ -60,9 +60,9 @@ export const HC_TABS: HcTab[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary', group: 'monitor', href: '/health-clinical' },
     { id: 'observations', label: 'Observations', icon: Activity, tone: 'primary', group: 'monitor', href: '/health-clinical/observations' },
     { id: 'clinical_events', label: 'Clinical Events', icon: Stethoscope, tone: 'warning', group: 'monitor', href: '/health-clinical/events' },
-    { id: 'health_monitoring', label: 'Health Monitoring', icon: HeartPulse, tone: 'info', group: 'monitor', href: null },
+    { id: 'health_monitoring', label: 'Health Monitoring', icon: HeartPulse, tone: 'info', group: 'monitor', href: '/health-clinical/health-monitoring' },
     // ── Plan ─────────────────────────────────────────────────────────────
-    { id: 'care_plans', label: 'Care Plans', icon: ClipboardList, tone: 'success', group: 'plan', href: null },
+    { id: 'care_plans', label: 'Care Plans', icon: ClipboardList, tone: 'success', group: 'plan', href: '/health-clinical/care-plans' },
     { id: 'protocols', label: 'Protocols', icon: Workflow, tone: 'primary', group: 'plan', href: '/health-clinical/protocols' },
     { id: 'assessments', label: 'Assessments & Risk', icon: AlertTriangle, tone: 'critical', group: 'plan', href: null },
     // ── Analyse ──────────────────────────────────────────────────────────

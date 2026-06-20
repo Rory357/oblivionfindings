@@ -13,8 +13,14 @@ use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Enums\AlertSeverity;
 use App\Models\BehaviourAbcEntry;
+use App\Models\CarePlan;
 use App\Models\Client;
+use App\Models\ClientBowelEntry;
+use App\Models\ClientFluidEntry;
 use App\Models\ClientMedicalProfile;
+use App\Models\ClientSeizureEntry;
+use App\Models\ClientSleepEntry;
+use App\Models\RestraintEvent;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -421,6 +427,131 @@ class ClinicalDashboardService
             'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
             'functions' => BehaviourFunction::options(),
             'intensities' => collect(BehaviourAbcEntry::INTENSITIES)->map(fn ($i) => ['value' => $i, 'label' => ucfirst($i)])->values(),
+        ];
+    }
+
+    /**
+     * Read-only Care Plans review/sign-off lens (links out to /operations/care-plans).
+     * Org-scoped via CarePlan.organization_id.
+     *
+     * @return array{plans: array<int, array<string, mixed>>, stats: array{active: int, reviews_overdue: int, awaiting_sign_off: int}}
+     */
+    public function getCarePlanLens(int $organizationId): array
+    {
+        $plans = CarePlan::query()
+            ->where('organization_id', $organizationId)
+            ->where('status', 'active')
+            ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
+            ->withCount(['signOffs', 'goals'])
+            ->orderByRaw('next_review_at IS NULL, next_review_at asc')
+            ->limit(50)
+            ->get()
+            ->map(fn (CarePlan $p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'plan_type' => $p->plan_type,
+                'status' => $p->status,
+                'next_review_at' => $p->next_review_at?->toDateString(),
+                'review_overdue' => $p->next_review_at !== null && $p->next_review_at->isPast(),
+                'goals_count' => (int) $p->goals_count,
+                'unsigned' => (int) $p->sign_offs_count === 0,
+                'client' => $p->client ? ['id' => $p->client->id, 'name' => trim("{$p->client->first_name} {$p->client->last_name}")] : null,
+            ]);
+
+        $scope = fn () => CarePlan::query()->where('organization_id', $organizationId)->where('status', 'active');
+
+        return [
+            'plans' => $plans->all(),
+            'stats' => [
+                'active' => $scope()->count(),
+                'reviews_overdue' => $scope()->where('next_review_at', '<', now())->count(),
+                'awaiting_sign_off' => $scope()->doesntHave('signOffs')->count(),
+            ],
+        ];
+    }
+
+    /**
+     * Cross-client Health Monitoring rollup (fluid / bowel / seizure / sleep).
+     * Reads the per-client capture stores directly (decision #3: read both stores,
+     * don't migrate); all four carry organization_id so org-scoping is direct.
+     * NB sleep keys on slept_at, not occurred_at.
+     *
+     * @param  array{client_id?: int|null}  $filters
+     * @return array<string, mixed>
+     */
+    public function getMonitoringRollup(int $organizationId, array $filters = []): array
+    {
+        $clientId = $filters['client_id'] ?? null;
+        $now = Carbon::now();
+        $from = $now->copy()->subDays(30);
+        $sevenDays = $now->copy()->subDays(7);
+
+        $scoped = fn (string $model) => $model::query()
+            ->where('organization_id', $organizationId)
+            ->when($clientId, fn ($q, $id) => $q->where('client_id', $id));
+
+        $clientName = fn ($e) => $e->client ? trim("{$e->client->first_name} {$e->client->last_name}") : 'Unknown';
+
+        return [
+            'stats' => [
+                'fluid_30d' => $scoped(ClientFluidEntry::class)->where('occurred_at', '>=', $from)->count(),
+                'fluid_intake_ml_7d' => (int) $scoped(ClientFluidEntry::class)->where('occurred_at', '>=', $sevenDays)->where('direction', 'intake')->sum('volume_ml'),
+                'bowel_30d' => $scoped(ClientBowelEntry::class)->where('occurred_at', '>=', $from)->count(),
+                'seizures_30d' => $scoped(ClientSeizureEntry::class)->where('occurred_at', '>=', $from)->count(),
+                'seizures_escalated_30d' => $scoped(ClientSeizureEntry::class)->where('occurred_at', '>=', $from)->where('escalated', true)->count(),
+                'sleep_avg_hours_7d' => round((float) $scoped(ClientSleepEntry::class)->where('slept_at', '>=', $sevenDays)->avg('hours_slept'), 1),
+            ],
+            'recent_fluid' => $scoped(ClientFluidEntry::class)->with('client:id,first_name,last_name')->orderByDesc('occurred_at')->limit(12)->get()
+                ->map(fn ($e) => ['id' => $e->id, 'occurred_at' => $e->occurred_at?->toISOString(), 'direction' => $e->direction, 'fluid_type' => $e->fluid_type, 'volume_ml' => $e->volume_ml, 'client_name' => $clientName($e)])->all(),
+            'recent_seizures' => $scoped(ClientSeizureEntry::class)->with('client:id,first_name,last_name')->orderByDesc('occurred_at')->limit(12)->get()
+                ->map(fn ($e) => ['id' => $e->id, 'occurred_at' => $e->occurred_at?->toISOString(), 'duration_seconds' => $e->duration_seconds, 'seizure_type' => $e->seizure_type, 'escalated' => (bool) $e->escalated, 'client_name' => $clientName($e)])->all(),
+            'recent_sleep' => $scoped(ClientSleepEntry::class)->with('client:id,first_name,last_name')->orderByDesc('slept_at')->limit(12)->get()
+                ->map(fn ($e) => ['id' => $e->id, 'slept_at' => $e->slept_at?->toISOString(), 'hours_slept' => $e->hours_slept, 'quality' => $e->quality, 'interruptions' => $e->interruptions, 'client_name' => $clientName($e)])->all(),
+            'recent_bowel' => $scoped(ClientBowelEntry::class)->with('client:id,first_name,last_name')->orderByDesc('occurred_at')->limit(12)->get()
+                ->map(fn ($e) => ['id' => $e->id, 'occurred_at' => $e->occurred_at?->toISOString(), 'bristol_type' => $e->bristol_type, 'client_name' => $clientName($e)])->all(),
+        ];
+    }
+
+    /**
+     * Read-only Restraint register lens (links out to /health-safety/restraints).
+     * RestraintEvent has no organization_id — scope through the client to avoid a
+     * cross-tenant leak.
+     *
+     * @return array{events: array<int, array<string, mixed>>, stats: array{total_30d: int, off_plan: int, with_injury: int, review_due: int}}
+     */
+    public function getRestraintLens(int $organizationId): array
+    {
+        $orgClient = fn ($q) => $q->where('organization_id', $organizationId);
+
+        $events = RestraintEvent::query()
+            ->whereHas('client', $orgClient)
+            ->with(['client:id,first_name,last_name', 'authorisedBy:id,name'])
+            ->orderByDesc('started_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (RestraintEvent $r) => [
+                'id' => $r->id,
+                'started_at' => $r->started_at?->toISOString(),
+                'restraint_type' => $r->restraint_type,
+                'severity' => $r->severity,
+                'duration_minutes' => $r->duration_minutes,
+                'within_support_plan' => (bool) $r->within_support_plan,
+                'injury_occurred' => (bool) $r->injury_occurred,
+                'review_due' => $r->reviewed_at === null,
+                'authorised_by' => $r->authorisedBy?->name,
+                'client' => $r->client ? ['id' => $r->client->id, 'name' => trim("{$r->client->first_name} {$r->client->last_name}")] : null,
+            ]);
+
+        $scope = fn () => RestraintEvent::query()->whereHas('client', $orgClient);
+
+        return [
+            'events' => $events->all(),
+            'stats' => [
+                'total_30d' => $scope()->where('started_at', '>=', now()->subDays(30))->count(),
+                'off_plan' => $scope()->where('within_support_plan', false)->count(),
+                'with_injury' => $scope()->where('injury_occurred', true)->count(),
+                'review_due' => $scope()->whereNull('reviewed_at')->count(),
+            ],
         ];
     }
 
