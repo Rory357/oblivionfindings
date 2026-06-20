@@ -9,10 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AttachmentUploader, formatFileSize } from '@/components/ui/file-dropzone';
 import { Field, InfoCard, StepHead } from '@/components/wizard/primitives';
-import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
+import { ReviewCard, WizardShell, type WizardStep } from '@/components/wizard/shell';
 import {
     FlagBadge,
-    initials,
     titleCase,
     TONE_BG,
     TONE_DOT,

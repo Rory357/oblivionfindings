@@ -24,7 +24,7 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { router, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CalendarClock,
