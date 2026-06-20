@@ -25,7 +25,8 @@ import {
     type RosterTabItem,
 } from '@/components/rostering';
 import { cn } from '@/lib/utils';
-import { Head, router } from '@inertiajs/react';
+import { RecordObservationDialog } from '@/pages/health-clinical/components/record-observation-dialog';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -37,7 +38,7 @@ import {
     Stethoscope,
     type LucideIcon,
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import {
     builtTabsForGroup,
@@ -75,10 +76,13 @@ export type HealthClinicalShellProps = {
     kpis: HealthClinicalKpis;
     /** Per-tab attention badges (sum bubbles up to the owning group pill). */
     tabCounts?: Partial<Record<HcTabId, number>>;
-    /** When provided, the hero shows the matching primary/ghost record button (Step 4). */
-    onRecordObservation?: () => void;
-    onLogEvent?: () => void;
     children: ReactNode;
+};
+
+type ClinicalAbilities = {
+    observationsRecord?: boolean;
+    observationsRecordClinical?: boolean;
+    eventsRecord?: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -226,11 +230,13 @@ export function HealthClinicalShell({
     activeTab,
     kpis,
     tabCounts,
-    onRecordObservation,
-    onLogEvent,
     children,
 }: HealthClinicalShellProps) {
     const activeGroup = groupForTab(activeTab);
+    const page = usePage<{ auth?: { can?: { clinical?: ClinicalAbilities } } }>();
+    const can = page.props.auth?.can?.clinical ?? {};
+    const canRecordObs = !!(can.observationsRecord || can.observationsRecordClinical);
+    const [obsOpen, setObsOpen] = useState(false);
 
     const go = (href: string | null) => {
         if (href) router.visit(href, { preserveScroll: true });
@@ -271,27 +277,15 @@ export function HealthClinicalShell({
                             </div>
                         </div>
 
-                        {onRecordObservation || onLogEvent ? (
+                        {canRecordObs ? (
                             <div className="flex flex-wrap items-center gap-2">
-                                {onRecordObservation ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={onRecordObservation}
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                    >
-                                        <Activity className="mr-1.5 h-4 w-4" /> Record observation
-                                    </Button>
-                                ) : null}
-                                {onLogEvent ? (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={onLogEvent}
-                                        className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
-                                    >
-                                        <Stethoscope className="mr-1.5 h-4 w-4" /> Log clinical event
-                                    </Button>
-                                ) : null}
+                                <Button
+                                    size="sm"
+                                    onClick={() => setObsOpen(true)}
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                >
+                                    <Activity className="mr-1.5 h-4 w-4" /> Record observation
+                                </Button>
                             </div>
                         ) : null}
                     </div>
@@ -375,6 +369,12 @@ export function HealthClinicalShell({
                 {/* ── Active panel ── */}
                 {children}
             </div>
+
+            <RecordObservationDialog
+                open={obsOpen}
+                onClose={() => setObsOpen(false)}
+                canRecordClinical={!!can.observationsRecordClinical}
+            />
         </AppLayout>
     );
 }

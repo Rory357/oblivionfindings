@@ -37,6 +37,7 @@ export function WizardShell({
     onStepClick,
     pct,
     pctLabel = 'Completeness',
+    railExtra,
     footerStart,
     footerEnd,
     success,
@@ -55,6 +56,8 @@ export function WizardShell({
     onStepClick: (index: number) => void;
     pct?: number | null;
     pctLabel?: string;
+    /** Extra rail content pinned below the steps (e.g. a live clinical card). */
+    railExtra?: ReactNode;
     footerStart?: ReactNode;
     footerEnd?: ReactNode;
     /** When set, replaces the whole shell body (rail + steps) — success pane. */
@@ -145,8 +148,12 @@ export function WizardShell({
                                 );
                             })}
 
+                            {railExtra ? (
+                                <div className="mt-auto pt-4">{railExtra}</div>
+                            ) : null}
+
                             {pct != null ? (
-                                <div className="mt-auto pt-4">
+                                <div className={cn('pt-4', railExtra ? '' : 'mt-auto')}>
                                     <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground">
                                         <span>{pctLabel}</span>
                                         <span className="font-bold text-primary">
