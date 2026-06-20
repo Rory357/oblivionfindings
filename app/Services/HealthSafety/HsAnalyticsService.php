@@ -9,6 +9,7 @@ use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsInvestigation;
 use App\Models\SafeWorkProcedure;
+use App\Models\SafetyDataSheet;
 use App\Models\SiteHazard;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
@@ -81,12 +82,26 @@ class HsAnalyticsService
             'scorecard' => $scorecard,
             'period_summary' => $this->periodSummary($siteId, $from, $to),
             'worksafe_notifiable' => $this->worksafeTotals($siteId, $from, $to),
+            'sds_expiring' => $this->sdsExpiringCount($siteId),
             'hours_meta' => [
                 'source' => 'billing_entries',
                 'total_hours' => round($this->kpi->totalHoursWorked(null, null, $siteId), 0),
             ],
             'role_note' => $this->roleNote($lens),
         ];
+    }
+
+    /**
+     * Current Safety Data Sheets due for review within 30 days (incl. overdue),
+     * site-scoped via the substance's storage locations. Single source shared
+     * with the register hero and the dashboard expiring feed.
+     */
+    private function sdsExpiringCount(?int $siteId): int
+    {
+        return SafetyDataSheet::query()
+            ->expiringWithin(30)
+            ->when($siteId, fn ($q) => $q->whereHas('hazardousSubstance.storageLocations', fn ($s) => $s->where('site_id', $siteId)))
+            ->count();
     }
 
     // ── Monthly trend series ────────────────────────────────────────────

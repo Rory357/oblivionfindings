@@ -19,6 +19,7 @@ import {
 } from './components/dashboard-tabs';
 import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
+import { SubstanceWizardDialog } from '@/components/health-safety/substance-wizard-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
@@ -216,7 +217,19 @@ export default function HealthSafetyDashboard({
                 {activeWizard === 'incident' ? (
                     <ReportIncidentDialog open onClose={() => setActiveWizard(null)} clients={clients} sites={sites} />
                 ) : null}
-                {activeWizard && WIZARD_CONFIGS[activeWizard] ? (
+                {/* The Chemical register's add-substance wizard is the single source — the
+                    launcher tile mounts the same modal as the register's "Add substance". */}
+                {activeWizard === 'substance' ? (
+                    <SubstanceWizardDialog
+                        open
+                        onClose={() => setActiveWizard(null)}
+                        onOpenSubstance={(id, opts) => {
+                            setActiveWizard(null);
+                            router.visit(`/health-safety/substances?substance=${id}${opts?.action ? `&action=${opts.action}` : ''}`);
+                        }}
+                    />
+                ) : null}
+                {activeWizard && activeWizard !== 'substance' && WIZARD_CONFIGS[activeWizard] ? (
                     <HsFormWizard
                         key={activeWizard}
                         config={WIZARD_CONFIGS[activeWizard]}

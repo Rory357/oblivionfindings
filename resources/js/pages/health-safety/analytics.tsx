@@ -524,7 +524,7 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
-    const { trends, scorecard, period_summary, worksafe_notifiable, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+    const { trends, scorecard, period_summary, worksafe_notifiable, sds_expiring, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
 
     // Board-report routes are gated on governance.view; hide the launcher + the
     // Governance-tab report packs for register-only roles to avoid a hard 403.
@@ -713,7 +713,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                 <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteScope}</span>
                                 {' · Ngā Paerewa NZS 8134:2021 · HSWA 2015 · ACC'}
                             </p>
-                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={0} drillsOverdue={drillsOverdue} />
+                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={sds_expiring} drillsOverdue={drillsOverdue} />
                         </div>
                     </div>
 

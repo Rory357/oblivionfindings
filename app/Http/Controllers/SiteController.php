@@ -752,6 +752,10 @@ class SiteController extends Controller
             'ra_pickers' => ($user && $user->canDo('hazards.view'))
                 ? RiskAssessmentPresenter::pickers()
                 : ['sites' => [], 'clients' => [], 'events' => []],
+            'chemicalsStored' => array_merge(
+                app(HsModuleSummaryService::class)->chemicalsStoredForSite($site->id),
+                ['can_add' => (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'))],
+            ),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
                 'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),

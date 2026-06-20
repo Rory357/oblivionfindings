@@ -105,6 +105,7 @@ export type AnalyticsProps = {
         drills_total: number;
     };
     worksafe_notifiable: { notified: number; awaiting: number };
+    sds_expiring: number;
     hours_meta: { source: string; total_hours: number };
     role_note: string;
     filters: AnalyticsFilters;

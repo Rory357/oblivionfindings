@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HazardousSubstance extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
@@ -38,6 +39,7 @@ class HazardousSubstance extends Model
         'requires_tracking',
         'is_controlled_substance',
         'status',
+        'status_reason',
         'created_by',
         'updated_by',
     ];
@@ -50,7 +52,7 @@ class HazardousSubstance extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function safetyDataSheets(): HasMany
@@ -68,6 +70,16 @@ class HazardousSubstance extends Model
         return $this->hasMany(SubstanceExposureRecord::class);
     }
 
+    /**
+     * The single current Safety Data Sheet (latest issued, not superseded).
+     */
+    public function currentSds(): HasOne
+    {
+        return $this->hasOne(SafetyDataSheet::class)
+            ->where('status', 'current')
+            ->latest('issue_date');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -79,7 +91,7 @@ class HazardousSubstance extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -95,5 +107,46 @@ class HazardousSubstance extends Model
     public function scopeRequiresTracking($query)
     {
         return $query->where('requires_tracking', true);
+    }
+
+    /** Substances with no current SDS on file. */
+    public function scopeSdsMissing($query)
+    {
+        return $query->whereDoesntHave('safetyDataSheets', fn ($q) => $q->where('status', 'current'));
+    }
+
+    /** Substances whose current SDS is due for review within `$days` (includes overdue). */
+    public function scopeSdsExpiring($query, int $days = SafetyDataSheet::REVIEW_HORIZON_DAYS)
+    {
+        return $query->whereHas('safetyDataSheets', fn ($q) => $q->where('status', 'current')
+            ->whereNotNull('review_date')
+            ->whereDate('review_date', '<=', now()->addDays($days)));
+    }
+
+    /** Substances with a current SDS that is genuinely up to date (not expiring/overdue). */
+    public function scopeSdsCurrent($query, int $days = SafetyDataSheet::REVIEW_HORIZON_DAYS)
+    {
+        return $query->whereHas('safetyDataSheets', fn ($q) => $q->where('status', 'current'))
+            ->whereDoesntHave('safetyDataSheets', fn ($q) => $q->where('status', 'current')
+                ->whereNotNull('review_date')
+                ->whereDate('review_date', '<=', now()->addDays($days)));
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Computed SDS state */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Org-wide SDS posture for this substance, derived from the current sheet:
+     *  missing (no current SDS) · current · expiring (review ≤30d) · expired (review past).
+     * Prefers the eager-loaded `currentSds` relation to avoid N+1.
+     */
+    public function getSdsStateAttribute(): string
+    {
+        $current = $this->relationLoaded('currentSds')
+            ? $this->getRelation('currentSds')
+            : $this->currentSds()->first();
+
+        return $current?->state ?? 'missing';
     }
 }
