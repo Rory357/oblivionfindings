@@ -5,6 +5,7 @@ namespace Tests\Feature\HealthSafety;
 use App\Models\HsAttachment;
 use App\Models\Role;
 use App\Models\SafeWorkProcedure;
+use App\Models\Site;
 use App\Models\SafeWorkProcedureVersion;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -298,5 +299,37 @@ class SafeWorkProcedureTest extends TestCase
             'title' => 'x', 'reference_number' => 'SWP-950', 'category' => 'manual_handling',
         ])->assertForbidden();
         $this->actingAs($auditor)->post("/health-safety/procedures/{$procedure->id}/approve")->assertForbidden();
+    }
+
+    /* ---------------- Cross-module resolution scopes ---------------- */
+
+    public function test_applicable_to_site_scope_includes_site_and_org_wide_approved(): void
+    {
+        $site = Site::factory()->create();
+        $other = Site::factory()->create();
+        $forSite = SafeWorkProcedure::factory()->approved()->create(['applicable_sites' => [$site->id]]);
+        $orgWide = SafeWorkProcedure::factory()->approved()->create(['applicable_sites' => []]);
+        $forOther = SafeWorkProcedure::factory()->approved()->create(['applicable_sites' => [$other->id]]);
+        $draftForSite = SafeWorkProcedure::factory()->draft()->create(['applicable_sites' => [$site->id]]);
+
+        $ids = SafeWorkProcedure::applicableToSite($site->id)->pluck('id');
+
+        $this->assertTrue($ids->contains($forSite->id));
+        $this->assertTrue($ids->contains($orgWide->id));        // empty applicable_sites = org-wide
+        $this->assertFalse($ids->contains($forOther->id));      // a different site
+        $this->assertFalse($ids->contains($draftForSite->id));  // not approved
+    }
+
+    public function test_applicable_to_roles_scope_includes_role_and_org_wide_approved(): void
+    {
+        $forRole = SafeWorkProcedure::factory()->approved()->create(['applicable_roles' => ['support_worker']]);
+        $orgWide = SafeWorkProcedure::factory()->approved()->create(['applicable_roles' => []]);
+        $forOther = SafeWorkProcedure::factory()->approved()->create(['applicable_roles' => ['team_lead']]);
+
+        $ids = SafeWorkProcedure::applicableToRoles(['support_worker'])->pluck('id');
+
+        $this->assertTrue($ids->contains($forRole->id));
+        $this->assertTrue($ids->contains($orgWide->id));
+        $this->assertFalse($ids->contains($forOther->id));
     }
 }
