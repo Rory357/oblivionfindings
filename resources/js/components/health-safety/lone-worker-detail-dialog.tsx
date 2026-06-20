@@ -16,9 +16,9 @@ import {
     TONE_BG,
     TONE_DOT,
 } from '@/pages/health-safety/components/register-row-kit';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -226,6 +226,42 @@ function SessionOverview({ d }: { d: SessionDetail }) {
                         ) : null}
                     </div>
                 </div>
+                {d.tracker ? (
+                    <div className="rounded-xl border border-border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                                    <Radio className="h-3.5 w-3.5 text-primary" /> {d.tracker.name || 'GPS tracker'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {d.tracker.battery_level != null ? `Battery ${d.tracker.battery_level}% · ` : ''}
+                                    Last seen {formatRelative(d.tracker.last_seen_at)}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => router.post(d.tracker!.locate_url, {}, { preserveScroll: true })}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                            >
+                                <Navigation className="h-3 w-3" /> Locate now
+                            </button>
+                        </div>
+                        {d.tracker.panic_active ? (
+                            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-status-critical-bg px-3 py-2">
+                                <span className="flex items-center gap-1.5 text-xs font-semibold text-status-critical">
+                                    <AlertTriangle className="h-3.5 w-3.5" /> Panic / man-down active
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => router.post(d.tracker!.acknowledge_panic_url, {}, { preserveScroll: true })}
+                                    className="rounded-lg bg-status-critical px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-status-critical/90"
+                                >
+                                    Acknowledge
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
                 {d.status === 'emergency' && d.emergency_notes ? (
                     <InfoCard icon={AlertTriangle} tone="crit">
                         {d.emergency_notes}
