@@ -186,11 +186,11 @@ export type Paginator<T> = {
 };
 
 /** Lifecycle action launched from the row menu or the detail Options bar. */
-export type ActionKind = 'checkin' | 'extend' | 'end' | 'emergency' | 'acknowledge' | 'resolve';
+export type ActionKind = 'checkin' | 'extend' | 'end' | 'emergency' | 'delete' | 'acknowledge' | 'resolve';
 
 /** Target for an action modal — a session (lifecycle) or a legacy alert (ack/resolve). */
 export type ActionTarget =
-    | { kind: 'checkin' | 'extend' | 'end' | 'emergency'; session: Session | SessionDetail }
+    | { kind: 'checkin' | 'extend' | 'end' | 'emergency' | 'delete'; session: Session | SessionDetail }
     | { kind: 'acknowledge' | 'resolve'; alert: Alert | AlertDetail };
 
 /* ── Shared display maps (tone + label) ─────────────────────────────── */

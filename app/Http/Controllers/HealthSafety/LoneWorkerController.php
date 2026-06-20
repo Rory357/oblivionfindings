@@ -305,6 +305,26 @@ class LoneWorkerController extends Controller
     }
 
     /**
+     * Soft-delete a completed session — remove an erroneous / test / duplicate entry from
+     * the register. SoftDeletes retains the row (and AuditableChanges logs the removal) so
+     * the safety record is never destroyed and an administrator can restore it. Only
+     * completed sessions are removable: a live (active/overdue) or emergency session must be
+     * ended first, so we never silently drop active monitoring or a critical emergency record.
+     */
+    public function destroy(Request $request, LoneWorkerSession $session): RedirectResponse
+    {
+        if ($session->status !== 'completed') {
+            return back()->with('error', 'Only completed sessions can be removed. End the session first.');
+        }
+
+        $session->update(['updated_by' => $request->user()->id]);
+        $session->delete();
+
+        return redirect()->route('health-safety.lone-workers.index')
+            ->with('success', 'Session removed from the register (retained for audit).');
+    }
+
+    /**
      * Trigger emergency for an active session.
      */
     public function triggerEmergency(Request $request, LoneWorkerSession $session): RedirectResponse

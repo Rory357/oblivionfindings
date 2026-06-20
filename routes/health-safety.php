@@ -390,6 +390,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::post('/sessions', [LoneWorkerController::class, 'startSession'])->name('sessions.store');
             Route::patch('/sessions/{session}', [LoneWorkerController::class, 'updateSession'])->name('sessions.update');
             Route::post('/sessions/{session}/end', [LoneWorkerController::class, 'endSession'])->name('sessions.end');
+            Route::delete('/sessions/{session}', [LoneWorkerController::class, 'destroy'])->name('sessions.destroy');
             Route::post('/sessions/{session}/emergency', [LoneWorkerController::class, 'triggerEmergency'])->name('sessions.emergency');
             // Queclink GPS tracker — Locate-now + acknowledge panic (staff-paired device).
             Route::post('/sessions/{session}/locate', [LoneWorkerController::class, 'locateNow'])->name('sessions.locate');

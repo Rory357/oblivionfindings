@@ -34,6 +34,7 @@ import {
     Navigation,
     Radio,
     RadioTower,
+    Trash2,
     User,
     XCircle,
 } from 'lucide-react';
@@ -116,6 +117,7 @@ function SessionDetailDialog({
         </span>
     );
 
+    const canRemove = can.manage && d.status === 'completed';
     const footerEnd = action ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
             {canAct ? (
@@ -140,6 +142,15 @@ function SessionDetailDialog({
             ) : (
                 <span className="text-xs text-muted-foreground">No lifecycle actions — session {SESSION_LABEL[d.status]?.toLowerCase() ?? d.status}.</span>
             )}
+            {canRemove ? (
+                <button
+                    type="button"
+                    onClick={() => setAction({ kind: 'delete', session: d })}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-status-critical/40 px-3 py-2 text-sm font-medium text-status-critical transition-colors hover:bg-status-critical/10"
+                >
+                    <Trash2 className="h-4 w-4" /> Remove session
+                </button>
+            ) : null}
         </div>
     );
 
@@ -159,7 +170,11 @@ function SessionDetailDialog({
             footerEnd={footerEnd}
         >
             {action ? (
-                <LoneWorkerActionForm target={action} onDone={() => setAction(null)} onCancel={() => setAction(null)} />
+                <LoneWorkerActionForm
+                    target={action}
+                    onDone={() => (action.kind === 'delete' ? onClose() : setAction(null))}
+                    onCancel={() => setAction(null)}
+                />
             ) : section === 'overview' ? (
                 <SessionOverview d={d} />
             ) : section === 'checkins' ? (

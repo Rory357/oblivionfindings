@@ -21,6 +21,7 @@ import {
     CheckCircle2,
     Clock,
     Phone,
+    Trash2,
     X,
     XCircle,
 } from 'lucide-react';
@@ -55,6 +56,7 @@ const META: Record<ActionTarget['kind'], Meta> = {
     checkin: { title: 'Record check-in', blurb: "Log the worker's status and time-stamp the check-in.", icon: CheckCircle2, cta: 'Submit check-in', ctaIcon: Check, tone: 'primary' },
     extend: { title: 'Extend / edit session', blurb: 'Push out the expected end or adjust the check-in interval.', icon: Clock, cta: 'Save changes', ctaIcon: Check, tone: 'primary' },
     end: { title: 'End session', blurb: 'Stop monitoring this session.', icon: XCircle, cta: 'End session', ctaIcon: XCircle, tone: 'primary' },
+    delete: { title: 'Remove session', blurb: 'Remove a completed session from the register.', icon: Trash2, cta: 'Remove session', ctaIcon: Trash2, tone: 'critical' },
     emergency: { title: 'Trigger emergency', blurb: 'Raise an emergency and notify contacts now.', icon: AlertTriangle, cta: 'Confirm emergency', ctaIcon: Phone, tone: 'critical' },
     acknowledge: { title: 'Acknowledge alert', blurb: 'Mark that someone is responding — a convenience action.', icon: Bell, cta: 'Acknowledge', ctaIcon: Check, tone: 'primary' },
     resolve: { title: 'Resolve alert', blurb: 'Close out the alert — a convenience action.', icon: Check, cta: 'Resolve alert', ctaIcon: Check, tone: 'critical' },
@@ -117,6 +119,8 @@ export function LoneWorkerActionForm({
                 form.post(`${base}/end`, { preserveScroll: true, onSuccess: finish });
             } else if (target.kind === 'emergency') {
                 form.post(`${base}/emergency`, { preserveScroll: true, onSuccess: finish });
+            } else if (target.kind === 'delete') {
+                form.delete(base, { preserveScroll: true, onSuccess: finish });
             }
             return;
         }
@@ -185,6 +189,12 @@ export function LoneWorkerActionForm({
                 {target.kind === 'end' && (
                     <InfoCard icon={XCircle} tone="warn">
                         End monitoring for this session? The worker will no longer be tracked and overdue alerts stop.
+                    </InfoCard>
+                )}
+
+                {target.kind === 'delete' && (
+                    <InfoCard icon={Trash2} tone="crit">
+                        Remove this completed session from the register? It is soft-deleted — the record is retained for audit and an administrator can restore it. Use this for test, duplicate, or erroneous entries.
                     </InfoCard>
                 )}
 
