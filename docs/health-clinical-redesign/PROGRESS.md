@@ -226,20 +226,23 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] Tests: new `HealthClinicalModuleRecordingTest` (5/16) proves module store → canonical Domain table + timeline + witnesses (B3) + HS auto-link + client_id validation + permission gating. **Regression: 256 clinical tests / 1007 assertions green; all changed PHP lints clean.**
 - **Ships:** module-level recording stops writing the phantom schema; one canonical write path. Commit: `f2ceea69` (rolls into next commit).
 
-### 🔧 Step 2 — Hero + two-tier tab shell (FE; wraps existing pages) — **IN PROGRESS**
+### ✅ Step 2 — Hero + two-tier tab shell (FE; wraps existing pages) — **DONE + VERIFIED**
 - [x] Tab registry `resources/js/pages/health-clinical/lib/tab-groups.ts` (`HC_TABS`/`HC_GROUPS` Monitor/Plan/Analyse + `groupForTab`/`builtTabsForGroup`/`groupsWithBuiltTabs`). `href: null` = not-built (NOT rendered — no stubs; tabs flip on as steps land).
 - [x] Shared shell `resources/js/pages/health-clinical/components/health-clinical-shell.tsx` — hero on `hs-hero-kit` (medallion/status pill/2 clusters/bespoke `ClinicalChips` row mirroring only the CHIP token maps) + two-tier `GroupPills` over `TabStrip`; tab nav = Inertia visit (keeps `/health-clinical/events` a real route for governance). Record buttons + period control are prop-gated (appear in Steps 3/4 — no dead controls now).
 - [x] Refactored Overview `index.tsx` through the shell (kept component name `health-clinical/index`; dropped old PageHero + KPI grid). **tsc green (0 errors).** Commit: `08bfc1a8`.
-- [x] Wrapped `observations`/`Events`/`Protocols` register pages through the shell (each keeps its filters/table/pager + a `RegisterStatStrip` of its own stats; Protocols' "New Protocol" moved to a register toolbar). Added `kpis` + `tab_counts` to all 3 controllers via new `ClinicalDashboardService::getTabCounts()` (Observations badge = overdue schedules, Clinical Events badge = unreviewed; reuses the kpis snapshot). **tsc + eslint clean.** Commit: `__STEP2B_SHA__`.
+- [x] Wrapped `observations`/`Events`/`Protocols` register pages through the shell (each keeps its filters/table/pager + a `RegisterStatStrip` of its own stats; Protocols' "New Protocol" moved to a register toolbar). Added `kpis` + `tab_counts` to all 3 controllers via new `ClinicalDashboardService::getTabCounts()` (Observations badge = overdue schedules, Clinical Events badge = unreviewed; reuses the kpis snapshot). **tsc + eslint clean.** Commit: `d50f064b`.
 - [x] Tests: existing `HealthClinicalTest` (dashboard `health-clinical/index` + 3 register renders) green with the additive props.
 - **Decision:** registers are SEPARATE routes rendering the shared shell (not one mega-page) — preserves the governance deep-link contract + heterogeneous panels; tab click = Inertia visit.
 - **Deferred to later steps (no stubs now):** Trends tab (currently per-client → needs a module route, Step 8), Health Monitoring (Step 7), Care Plans (Step 7), Assessments (Step 8), Behaviour (Step 7); hero record buttons + period control (Steps 3–4).
 
-### ☐ Step 3 — NEWS2 + structured vitals (backend + wizard hook)
-- [ ] Migration (additive): `news2_score`/`news2_band` + `on_oxygen`/`consciousness` on `clinical_observations`; reconcile `respiration_rate→respiratory_rate` + `o2_saturation→spo2`. Add `Acvpu` enum.
-- [ ] `News2Scorer` + extend `validateDataForType`/`validateVitals`; compute-on-write; `clinical_deterioration` emit via `ClinicalSignalService` on band ≥ Medium; add `Health & Clinical` notification group.
-- [ ] Extend `getKpis()` with `clients_on_watch` (B7 partial).
-- [ ] Tests: scorer thresholds (incl. SpO₂ Scale-2/on-oxygen), band persistence, escalation emit. **Dependency:** Step 1. **Ships:** watchlist + register NEWS2 pill + Trends NEWS2 unblocked.
+### ✅ Step 3 — NEWS2 + structured vitals — **DONE + VERIFIED**
+- [x] Migration (additive): `news2_score` (tinyint) + `news2_band` (string) + index on `clinical_observations`. **Per decision #2: KEPT existing data keys** (`respiration_rate`/`o2_saturation`); added `consciousness` (ACVPU) + `on_oxygen` + `spo2_scale` as NEW vitals data keys — **no rename, no historical backfill.**
+- [x] `News2Scorer` — full RCP NEWS2 (resp rate, SpO₂ **Scale 1 + Scale 2**, air/oxygen, systolic, pulse, ACVPU, temp) + single-parameter red-flag → band. Enums `Acvpu`, `News2Band` (+advice/isOnWatch); `News2Result` DTO (score/band/redFlag/breakdown).
+- [x] `validateVitals` extended (consciousness/on_oxygen/spo2_scale, optional); **compute-on-write** in `ClinicalObservationService::record()` (vitals only) → persists score+band; **deterioration emit** via new `ClinicalSignalService::emitForDeterioration()` (reuses existing `TYPE_DETERIORATION`) when band ≥ Medium.
+- [x] `getKpis()` → `clients_on_watch`; new `getDeteriorationWatch()` (latest-per-client, score sparkline) → Overview **deterioration-watch card** (avatar/sparkline bars/band pill/→client profile). Hero "On watch" tile + deterioration chip now light up with real data.
+- [x] Tests: `News2ScorerTest` 11/34 (normal, red-flag, Medium/High thresholds, both SpO₂ scales, on-oxygen, ACVPU, incomplete→null); `News2ObservationTest` 7 (persistence, non-vitals/incomplete→no score, emit decision Med/High vs Low, watchlist latest-only); `ClinicalObservationServiceTest` 22 still green (constructor change safe). **tsc + eslint + php-lint clean.** Commit: `__STEP3_SHA__`.
+- **Deferred (no stubs):** notification_events.php "Health & Clinical" group + My Day fanout → Step 8; register NEWS2 score-pill column → Step 6 (§9 register polish); hero period control → Step 4.
+- **Ships:** deterioration watch (count + card + chip) live; NEWS2 stored for the wizard's live score (Step 4) + Trends (Step 8).
 
 ### ☐ Step 4 — Record wizards (3, one lifted component, §8)
 - [ ] Build Observation/Event/ABC on `WizardShell` + primitives + gating logic; optional-client prop; live clinical card rail; live NEWS2 (Step 3); type-aware measurements; `is_flagged`/`recorded_at`/`protocol_schedule_id` seeding.

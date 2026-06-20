@@ -3,6 +3,7 @@
 namespace App\Domain\Clinical\Services;
 
 use App\Domain\Clinical\Enums\ClinicalEventType;
+use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalEvent;
@@ -31,6 +32,7 @@ class ClinicalDashboardService
      *     events_30d: int,
      *     events_high_severity_30d: int,
      *     compliance_rate_30d: float,
+     *     clients_on_watch: int,
      * }
      */
     public function getKpis(): array
@@ -39,6 +41,7 @@ class ClinicalDashboardService
 
         return [
             'protocols_active' => ClinicalProtocol::active()->count(),
+            'clients_on_watch' => $this->clientsOnWatchCount(),
             'observations_today' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->startOfDay())->count(),
             'observations_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
             'schedules_due' => ClinicalProtocolSchedule::pending()->count(),
@@ -72,6 +75,70 @@ class ClinicalDashboardService
                 ->where('occurred_at', '>=', $now->copy()->subDays(30))
                 ->count(),
         ];
+    }
+
+    /**
+     * Deterioration watch: clients whose MOST RECENT vitals observation (last 7
+     * days) carries a NEWS2 band of Medium or High. Latest-per-client is resolved
+     * in PHP over the bounded recent-vitals set.
+     */
+    private function clientsOnWatchCount(): int
+    {
+        return $this->latestVitalsPerClient()
+            ->filter(fn ($rows) => $rows->first()->news2_band instanceof News2Band
+                && $rows->first()->news2_band->isOnWatch())
+            ->count();
+    }
+
+    /**
+     * The deterioration watch list for the Overview: each on-watch client with
+     * their latest NEWS2 score + band and a short score sparkline. Sorted worst
+     * first.
+     *
+     * @return array<int, array{client_id: int, client_name: string, site: ?string, news2_score: int, news2_band: string, band_label: string, recorded_at: string, sparkline: array<int, int>}>
+     */
+    public function getDeteriorationWatch(int $limit = 10): array
+    {
+        return $this->latestVitalsPerClient()
+            ->filter(fn ($rows) => $rows->first()->news2_band instanceof News2Band
+                && $rows->first()->news2_band->isOnWatch())
+            ->map(function ($rows) {
+                $latest = $rows->first();
+
+                return [
+                    'client_id' => $latest->client_id,
+                    'client_name' => $latest->client
+                        ? trim("{$latest->client->first_name} {$latest->client->last_name}")
+                        : 'Unknown',
+                    'site' => $latest->client?->site?->name,
+                    'news2_score' => $latest->news2_score,
+                    'news2_band' => $latest->news2_band->value,
+                    'band_label' => $latest->news2_band->label(),
+                    'recorded_at' => $latest->recorded_at->toISOString(),
+                    // Oldest → newest for the sparkline.
+                    'sparkline' => $rows->take(8)->reverse()->pluck('news2_score')->map(fn ($v) => (int) $v)->values()->all(),
+                ];
+            })
+            ->sortByDesc('news2_score')
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Recent vitals (with a NEWS2 band), grouped by client and ordered newest
+     * first within each group — the shared basis for the watch count + list.
+     */
+    private function latestVitalsPerClient(): \Illuminate\Support\Collection
+    {
+        return ClinicalObservation::query()
+            ->where('observation_type', ObservationType::Vitals->value)
+            ->whereNotNull('news2_band')
+            ->where('recorded_at', '>=', Carbon::now()->subDays(7))
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name'])
+            ->orderByDesc('recorded_at')
+            ->get(['id', 'client_id', 'news2_score', 'news2_band', 'recorded_at'])
+            ->groupBy('client_id');
     }
 
     /**

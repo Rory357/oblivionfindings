@@ -2,7 +2,9 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Enums\AlertSeverity;
 use App\Models\ControlRoom\SignalSource;
 use App\Services\ControlRoom\SignalProcessingService;
@@ -57,6 +59,43 @@ class ClinicalSignalService
             ],
             $event->site_id,
             "clinical_event_{$event->id}",
+        );
+    }
+
+    /**
+     * Emit a deterioration signal from a NEWS2 vitals observation.
+     *
+     * Called when the computed band is Medium or High; the band drives the
+     * Control Room severity hint. The deterioration watchlist itself reads the
+     * stored news2_band column, so this is the escalation/notification path.
+     */
+    public function emitForDeterioration(ClinicalObservation $observation, News2Result $result): void
+    {
+        $severity = match ($result->band) {
+            News2Band::High => AlertSeverity::HIGH,
+            News2Band::Medium => AlertSeverity::MEDIUM,
+            default => AlertSeverity::LOW,
+        };
+
+        $observation->loadMissing('client');
+        $clientName = $observation->client?->first_name
+            ? trim($observation->client->first_name . ' ' . ($observation->client->last_name ?? ''))
+            : 'Client #' . $observation->client_id;
+
+        $this->emit(
+            self::TYPE_DETERIORATION,
+            $observation->client_id,
+            $severity,
+            "NEWS2 {$result->score} ({$result->band->label()}) — possible deterioration for {$clientName}",
+            [
+                'clinical_observation_id' => $observation->id,
+                'news2_score' => $result->score,
+                'news2_band' => $result->band->value,
+                'site_id' => $observation->site_id,
+                'recorded_at' => $observation->recorded_at,
+            ],
+            $observation->site_id,
+            "deterioration_{$observation->id}",
         );
     }
 

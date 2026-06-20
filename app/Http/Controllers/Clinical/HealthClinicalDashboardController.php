@@ -36,6 +36,7 @@ class HealthClinicalDashboardController extends Controller
         return inertia('health-clinical/index', [
             'kpis' => $kpis,
             'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'deterioration_watch' => $this->dashboardService->getDeteriorationWatch(),
             'overdue_items' => $this->dashboardService->getOverdueItems(),
             'recent_events' => $this->dashboardService->getRecentEvents(),
             'recent_observations' => $this->dashboardService->getRecentObservations(),

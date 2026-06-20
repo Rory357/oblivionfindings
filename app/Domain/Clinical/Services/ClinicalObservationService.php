@@ -2,6 +2,7 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\Acvpu;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Events\ObservationRecorded;
 use App\Domain\Clinical\Models\ClinicalObservation;
@@ -18,6 +19,11 @@ use Illuminate\Validation\ValidationException;
 class ClinicalObservationService
 {
     public const TIMELINE_TYPE_OBSERVATION = 'clinical_observation';
+
+    public function __construct(
+        protected News2Scorer $news2Scorer,
+        protected ClinicalSignalService $signalService,
+    ) {}
 
     /**
      * Record a clinical observation.
@@ -42,6 +48,12 @@ class ClinicalObservationService
 
         $input['data'] = $this->validateDataForType($type, $input['data']);
 
+        // NEWS2 is computed on write for vitals so registers/trends/the watchlist
+        // can read the stored score + band without recomputation.
+        $news2 = $type === ObservationType::Vitals
+            ? $this->news2Scorer->score($input['data'])
+            : null;
+
         $observation = ClinicalObservation::create([
             'client_id' => $client->id,
             'shift_id' => $shift?->id,
@@ -50,6 +62,8 @@ class ClinicalObservationService
             'observation_type' => $type,
             'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
             'data' => $input['data'],
+            'news2_score' => $news2?->score,
+            'news2_band' => $news2?->band,
             'notes' => $input['notes'] ?? null,
             'protocol_schedule_id' => $input['protocol_schedule_id'] ?? null,
         ]);
@@ -62,6 +76,11 @@ class ClinicalObservationService
                 $recorder->id,
                 $observation->id,
             );
+        }
+
+        // Deterioration escalation — Medium/High NEWS2 raises a clinical signal.
+        if ($news2 && $news2->band->isOnWatch()) {
+            $this->signalService->emitForDeterioration($observation, $news2);
         }
 
         ObservationRecorded::dispatch($observation);
@@ -180,6 +199,29 @@ class ClinicalObservationService
         $this->numericField($data, $errors, 'temperature', 30, 45, required: false);
         $this->numericField($data, $errors, 'respiration_rate', 4, 60, required: false);
         $this->numericField($data, $errors, 'o2_saturation', 50, 100, required: false);
+
+        // NEWS2 inputs (optional — present when a full early-warning set is recorded).
+        if ($this->hasValue($data, 'consciousness')) {
+            $level = (string) $data['consciousness'];
+            if (Acvpu::tryFrom($level) === null) {
+                $errors['data.consciousness'] = 'Choose a valid level of consciousness (ACVPU).';
+            } else {
+                $data['consciousness'] = $level;
+            }
+        }
+
+        if (array_key_exists('on_oxygen', $data) && $data['on_oxygen'] !== null && $data['on_oxygen'] !== '') {
+            $data['on_oxygen'] = filter_var($data['on_oxygen'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($this->hasValue($data, 'spo2_scale')) {
+            $scale = (int) $data['spo2_scale'];
+            if (! in_array($scale, [1, 2], true)) {
+                $errors['data.spo2_scale'] = 'SpO₂ scale must be 1 or 2.';
+            } else {
+                $data['spo2_scale'] = $scale;
+            }
+        }
     }
 
     /**

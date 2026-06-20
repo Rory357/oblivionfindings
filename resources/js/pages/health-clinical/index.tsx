@@ -4,10 +4,13 @@ import {
     HealthClinicalShell,
     type HealthClinicalKpis,
 } from '@/pages/health-clinical/components/health-clinical-shell';
+import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ChevronRight,
     ClipboardList,
+    HeartPulse,
     Stethoscope,
 } from 'lucide-react';
 
@@ -43,13 +46,106 @@ type RecentObservation = {
     recorded_at: string;
 };
 
+type WatchItem = {
+    client_id: number;
+    client_name: string;
+    site: string | null;
+    news2_score: number;
+    news2_band: string;
+    band_label: string;
+    recorded_at: string;
+    sparkline: number[];
+};
+
 type Props = {
     kpis: HealthClinicalKpis & { protocols_active: number };
     tab_counts?: Record<string, number>;
+    deterioration_watch: WatchItem[];
     overdue_items: OverdueItem[];
     recent_events: RecentEvent[];
     recent_observations: RecentObservation[];
 };
+
+const BAND_TONE: Record<string, { pill: string; bar: string }> = {
+    low: { pill: 'bg-status-success-bg text-status-success', bar: 'bg-status-success' },
+    low_medium: { pill: 'bg-primary/10 text-primary', bar: 'bg-primary' },
+    medium: { pill: 'bg-status-warning-bg text-status-warning', bar: 'bg-status-warning' },
+    high: { pill: 'bg-status-critical-bg text-status-critical', bar: 'bg-status-critical' },
+};
+
+function initials(name: string): string {
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+}
+
+function DeteriorationWatchCard({ items }: { items: WatchItem[] }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <HeartPulse className="h-4 w-4 text-primary" />
+                    Deterioration watch · NEWS2
+                    {items.length > 0 ? (
+                        <Badge variant="outline" className="ml-auto text-xs text-status-warning">
+                            {items.length} on watch
+                        </Badge>
+                    ) : null}
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {items.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                        All clients stable — no NEWS2 escalations in the last 7 days.
+                    </p>
+                ) : (
+                    <div className="divide-y">
+                        {items.map((item) => {
+                            const tone = BAND_TONE[item.news2_band] ?? BAND_TONE.low;
+                            const peak = Math.max(...item.sparkline, 6);
+                            return (
+                                <Link
+                                    key={item.client_id}
+                                    href={`/operations/clients/${item.client_id}`}
+                                    className="flex items-center gap-3 py-2.5 transition-colors hover:bg-muted/30"
+                                >
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                        {initials(item.client_name)}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">{item.client_name}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {item.site ?? 'No site'}
+                                        </p>
+                                    </div>
+                                    <div className="flex h-7 items-end gap-0.5" aria-hidden="true">
+                                        {item.sparkline.map((s, i) => (
+                                            <div
+                                                key={i}
+                                                className={cn('w-1.5 rounded-sm', tone.bar)}
+                                                style={{ height: `${Math.max(12, (s / peak) * 100)}%` }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="flex w-[120px] items-center justify-end gap-2">
+                                        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', tone.pill)}>
+                                            {item.band_label}
+                                        </span>
+                                        <span className="text-lg font-bold tabular-nums">{item.news2_score}</span>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 function formatTimeAgo(iso: string): string {
     const diffH = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
@@ -70,12 +166,15 @@ const severityColor: Record<string, string> = {
 export default function HealthClinicalOverview({
     kpis,
     tab_counts,
+    deterioration_watch,
     overdue_items,
     recent_events,
     recent_observations,
 }: Props) {
     return (
         <HealthClinicalShell activeTab="overview" kpis={kpis} tabCounts={tab_counts}>
+            <DeteriorationWatchCard items={deterioration_watch} />
+
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Overdue Observations */}
                 <Card>
