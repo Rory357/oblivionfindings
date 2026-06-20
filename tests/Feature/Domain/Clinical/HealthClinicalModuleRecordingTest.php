@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
+use App\Domain\Clinical\Models\ClinicalAttachment;
 use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Models\Client;
 use App\Models\HsEvent;
 use App\Models\Role;
@@ -10,6 +12,8 @@ use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -149,5 +153,59 @@ class HealthClinicalModuleRecordingTest extends TestCase
                 'data' => ['weight_kg' => 80],
             ])
             ->assertForbidden();
+    }
+
+    public function test_observation_flag_on_entry_is_persisted(): void
+    {
+        $user = $this->createUserWithRole('coordinator');
+
+        $this->actingAs($user)
+            ->from('/health-clinical')
+            ->post('/health-clinical/observations', [
+                'client_id' => $this->client->id,
+                'observation_type' => 'weight',
+                'data' => ['weight_kg' => 62.1],
+                'is_flagged' => true,
+                'flagged_reason' => 'Sudden 4kg loss — escalate to RN.',
+            ])
+            ->assertRedirect('/health-clinical');
+
+        $obs = ClinicalObservation::where('client_id', $this->client->id)->firstOrFail();
+        $this->assertTrue($obs->is_flagged);
+        $this->assertSame('Sudden 4kg loss — escalate to RN.', $obs->flagged_reason);
+        $this->assertSame($user->id, $obs->flagged_by);
+    }
+
+    public function test_module_event_store_saves_staged_attachments(): void
+    {
+        Storage::fake('public');
+        $user = $this->createUserWithRole('coordinator');
+
+        $this->actingAs($user)
+            ->from('/health-clinical')
+            ->post('/health-clinical/events', [
+                'client_id' => $this->client->id,
+                'event_type' => 'skin_integrity',
+                'severity' => 'medium',
+                'occurred_at' => now()->toDateTimeString(),
+                'description' => 'Stage 2 pressure injury to the sacrum.',
+                'attachments' => [
+                    UploadedFile::fake()->image('wound.jpg'),
+                    UploadedFile::fake()->create('chart.pdf', 40, 'application/pdf'),
+                ],
+            ])
+            ->assertRedirect('/health-clinical');
+
+        $event = ClinicalEvent::where('client_id', $this->client->id)->firstOrFail();
+        $this->assertSame(2, $event->attachments()->count());
+        $this->assertDatabaseHas('clinical_attachments', [
+            'attachable_type' => ClinicalEvent::class,
+            'attachable_id' => $event->id,
+            'uploaded_by' => $user->id,
+            'original_name' => 'wound.jpg',
+        ]);
+
+        $attachment = ClinicalAttachment::where('attachable_id', $event->id)->where('original_name', 'wound.jpg')->firstOrFail();
+        Storage::disk('public')->assertExists($attachment->path);
     }
 }

@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -176,8 +177,70 @@ class HealthClinicalDashboardController extends Controller
 
         $validated = $this->validateClinicalEventInput($request, $user);
 
-        $this->eventService->record($client, $user, $validated);
+        $event = $this->eventService->record($client, $user, $validated);
+        $this->saveClinicalAttachments($request, $event);
 
         return back()->with('success', 'Clinical event recorded successfully.');
+    }
+
+    /**
+     * Debounced client search backing the record-wizard pickers (name / preferred
+     * name / NHI). NHI search matters for nurses. JSON.
+     */
+    public function clientSearch(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user && (
+            $user->canDo('clinical.observations.viewAny')
+            || $user->canDo('clinical.observations.viewAssigned')
+            || $user->canDo('clinical.observations.record')
+            || $user->canDo('clinical.observations.recordClinical')
+        ), 403);
+
+        $q = trim((string) $request->input('q', ''));
+
+        $clients = Client::query()
+            ->when($q !== '', fn ($query) => $query->where(function ($sub) use ($q) {
+                $sub->where('first_name', 'like', "%{$q}%")
+                    ->orWhere('last_name', 'like', "%{$q}%")
+                    ->orWhere('preferred_name', 'like', "%{$q}%");
+
+                // nhi_number is encrypted at rest — match the full NHI via its hash.
+                if (Client::validateNhi($q)) {
+                    $sub->orWhere('nhi_hash', Client::nhiHash($q));
+                }
+            }))
+            ->with('site:id,name')
+            ->orderBy('first_name')
+            ->limit(20)
+            ->get(['id', 'first_name', 'last_name', 'preferred_name', 'nhi_number', 'site_id'])
+            ->map(fn (Client $c) => [
+                'id' => $c->id,
+                'name' => trim("{$c->first_name} {$c->last_name}"),
+                'preferred_name' => $c->preferred_name,
+                'nhi' => $c->nhi_number,
+                'site' => $c->site?->name,
+            ]);
+
+        return response()->json(['clients' => $clients]);
+    }
+
+    /**
+     * The live clinical card (allergies, baseline vitals + NEWS2, active protocols)
+     * shown in a record wizard's rail once a client is chosen. JSON.
+     */
+    public function clinicalCard(Request $request, Client $client): JsonResponse
+    {
+        $this->authorize('view', $client);
+
+        $user = $request->user();
+        abort_unless($user && (
+            $user->canDo('clinical.observations.viewAny')
+            || $user->canDo('clinical.observations.viewAssigned')
+            || $user->canDo('clinical.observations.record')
+            || $user->canDo('clinical.observations.recordClinical')
+        ), 403);
+
+        return response()->json($this->dashboardService->getClinicalCard($client));
     }
 }

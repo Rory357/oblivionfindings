@@ -89,6 +89,7 @@ class ClientClinicalController extends Controller
         $validated = $this->validateClinicalEventInput($request, $user);
 
         $event = $this->eventService->record($client, $user, $validated);
+        $this->saveClinicalAttachments($request, $event);
 
         if ($request->wantsJson()) {
             return response()->json([

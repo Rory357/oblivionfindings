@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Clinical\Concerns;
 
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Services\ClinicalAttachmentService;
 use App\Enums\AlertSeverity;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -39,6 +41,9 @@ trait RecordsClinicalRecords
             'notes' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date'],
             'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
+            // Flag-on-entry → pushes the record to the RN sign-off queue.
+            'is_flagged' => ['nullable', 'boolean'],
+            'flagged_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $type = ObservationType::from($validated['observation_type']);
@@ -77,6 +82,25 @@ trait RecordsClinicalRecords
             'witnesses.*' => ['string', 'max:255'],
             'requires_followup' => ['nullable', 'boolean'],
             'followup_notes' => ['nullable', 'string', 'max:2000'],
+            // Evidence staged in the wizard (created with the record).
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
+    }
+
+    /**
+     * Persist the `attachments[]` files a record wizard staged onto the freshly
+     * created record (event / ABC entry). Returns the number saved.
+     */
+    protected function saveClinicalAttachments(Request $request, Model $attachable): int
+    {
+        $files = $request->file('attachments');
+
+        if (! $files) {
+            return 0;
+        }
+
+        return app(ClinicalAttachmentService::class)
+            ->attachMany($attachable, is_array($files) ? $files : [$files], $request->user());
     }
 }

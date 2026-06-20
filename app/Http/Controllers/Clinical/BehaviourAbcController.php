@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Clinical;
 
 use App\Domain\Clinical\Enums\BehaviourFunction;
+use App\Domain\Clinical\Services\ClinicalAttachmentService;
 use App\Http\Controllers\Controller;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
@@ -47,6 +48,11 @@ class BehaviourAbcController extends Controller
         $validated = $this->validatePayload($request, $client, isUpdate: false);
 
         $entry = $this->service->record($client, $request->user(), $validated);
+
+        if ($request->hasFile('attachments')) {
+            app(ClinicalAttachmentService::class)
+                ->attachMany($entry, $request->file('attachments'), $request->user());
+        }
 
         if ($request->wantsJson()) {
             return response()->json($this->transform($entry->fresh('recorder'), detail: true), 201);
@@ -135,6 +141,9 @@ class BehaviourAbcController extends Controller
                 'nullable',
                 Rule::exists('care_plans', 'id')->where('client_id', $client->id),
             ],
+            // Evidence staged in the Record ABC wizard (esp. when harm occurred).
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
     }
 

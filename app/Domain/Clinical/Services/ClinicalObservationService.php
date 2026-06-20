@@ -65,6 +65,9 @@ class ClinicalObservationService
             'news2_score' => $news2?->score,
             'news2_band' => $news2?->band,
             'notes' => $input['notes'] ?? null,
+            'is_flagged' => $isFlagged = (bool) ($input['is_flagged'] ?? false),
+            'flagged_reason' => $isFlagged ? ($input['flagged_reason'] ?? null) : null,
+            'flagged_by' => $isFlagged ? $recorder->id : null,
             'protocol_schedule_id' => $input['protocol_schedule_id'] ?? null,
         ]);
 

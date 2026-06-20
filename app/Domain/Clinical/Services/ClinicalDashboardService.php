@@ -11,6 +11,8 @@ use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Enums\AlertSeverity;
+use App\Models\Client;
+use App\Models\ClientMedicalProfile;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -123,6 +125,63 @@ class ClinicalDashboardService
             ->take($limit)
             ->values()
             ->all();
+    }
+
+    /**
+     * The live clinical card shown in a record wizard's rail once a client is
+     * picked: allergies, the latest vitals baseline (+ its NEWS2), and the
+     * client's active observation protocols. (Resus/ACP status has no data source
+     * yet — deferred rather than fabricated.)
+     *
+     * @return array{allergies: array, disabilities: array, blood_type: ?string, baseline_vitals: ?array, active_protocols: array}
+     */
+    public function getClinicalCard(Client $client): array
+    {
+        $profile = ClientMedicalProfile::where('client_id', $client->id)->first();
+
+        $latestVitals = ClinicalObservation::query()
+            ->forClient($client->id)
+            ->where('observation_type', ObservationType::Vitals->value)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        return [
+            'allergies' => $profile?->allergies ?? [],
+            'disabilities' => $profile?->disabilities ?? [],
+            'blood_type' => $profile?->blood_type,
+            'baseline_vitals' => $latestVitals ? [
+                'recorded_at' => $latestVitals->recorded_at->toISOString(),
+                'summary' => $this->summariseVitals($latestVitals->data ?? []),
+                'news2_score' => $latestVitals->news2_score,
+                'news2_band' => $latestVitals->news2_band?->value,
+                'news2_band_label' => $latestVitals->news2_band?->label(),
+            ] : null,
+            'active_protocols' => ClinicalProtocol::query()
+                ->where('client_id', $client->id)
+                ->where('is_active', true)
+                ->orderBy('observation_type')
+                ->get(['id', 'name', 'observation_type'])
+                ->map(fn (ClinicalProtocol $p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'type' => $p->observation_type->label(),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function summariseVitals(array $data): string
+    {
+        return implode(' · ', array_filter([
+            isset($data['systolic'], $data['diastolic']) ? "BP {$data['systolic']}/{$data['diastolic']}" : null,
+            isset($data['pulse']) ? "HR {$data['pulse']}" : null,
+            isset($data['temperature']) ? "Temp {$data['temperature']}°C" : null,
+            isset($data['o2_saturation']) ? "SpO₂ {$data['o2_saturation']}%" : null,
+        ]));
     }
 
     /**

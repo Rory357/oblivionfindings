@@ -57,6 +57,11 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/protocols/{protocol}/toggle-active', [HealthClinicalProtocolController::class, 'toggleActive'])
             ->middleware('permission:clinical.protocols.manage')
             ->name('protocols.toggle-active');
+        // Record-wizard support (debounced client search + the live clinical card).
+        Route::get('/clients/search', [HealthClinicalDashboardController::class, 'clientSearch'])
+            ->name('clients.search');
+        Route::get('/clients/{client}/clinical-card', [HealthClinicalDashboardController::class, 'clinicalCard'])
+            ->name('clients.clinical-card');
         Route::get('/clients/{client}/trends', [HealthClinicalClientTrendsController::class, 'show'])
             ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
             ->name('clients.trends');
