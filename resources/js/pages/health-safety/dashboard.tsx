@@ -77,6 +77,7 @@ type Props = {
     site_league: Array<{ id: number; name: string; incidents: number; hazards: number }>;
     open_hazards_list: OpenHazardRow[];
     worker_participation: { pct: number | null; committees: number };
+    procedures: { approved: number; review_due: number; coverage_gap_categories: number };
     worklists: WorklistsPayload;
 };
 
@@ -97,6 +98,7 @@ export default function HealthSafetyDashboard({
     site_league,
     open_hazards_list = [],
     worker_participation = { pct: null, committees: 0 },
+    procedures = { approved: 0, review_due: 0, coverage_gap_categories: 0 },
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
@@ -127,6 +129,7 @@ export default function HealthSafetyDashboard({
                     openSafeguarding={kpis.open_safeguarding ?? 0}
                     fleetUnresolved={kpis.fleet_unresolved ?? 0}
                     fleetIncidents30d={kpis.fleet_incidents_30d ?? 0}
+                    procedures={procedures}
                     onReport={() => setLauncherOpen(true)}
                     orgName={org_name}
                 />

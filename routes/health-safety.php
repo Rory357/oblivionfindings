@@ -108,27 +108,40 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Phase 5C: Safe Work Procedures ──────────────────────────────────
     Route::prefix('procedures')->name('procedures.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/', [SafeWorkProcedureController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
+        Route::middleware('permission:procedures.create|procedures.manage')->group(function () {
             Route::get('/create', [SafeWorkProcedureController::class, 'create'])->name('create');
             Route::post('/', [SafeWorkProcedureController::class, 'store'])->name('store');
-        });
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/{procedure}/edit', [SafeWorkProcedureController::class, 'edit'])->name('edit');
             Route::put('/{procedure}', [SafeWorkProcedureController::class, 'update'])->name('update');
             Route::post('/{procedure}/submit-for-review', [SafeWorkProcedureController::class, 'submitForReview'])->name('submit-for-review');
         });
-        Route::middleware('permission:hazards.manage')->group(function () {
+
+        Route::middleware('permission:procedures.manage')->group(function () {
+            Route::post('/{procedure}/request-changes', [SafeWorkProcedureController::class, 'requestChanges'])->name('request-changes');
+            Route::post('/{procedure}/record-review', [SafeWorkProcedureController::class, 'recordReview'])->name('record-review');
+            Route::post('/{procedure}/archive', [SafeWorkProcedureController::class, 'archive'])->name('archive');
+            Route::post('/{procedure}/restore', [SafeWorkProcedureController::class, 'restore'])->name('restore');
+
+            // Controlled-document library (premium upload — reuses polymorphic HsAttachment)
+            Route::post('/{procedure}/attachments', [SafeWorkProcedureController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{procedure}/attachments/{attachment}', [SafeWorkProcedureController::class, 'destroyAttachment'])->name('attachments.destroy');
+        });
+
+        Route::middleware('permission:procedures.approve')->group(function () {
             Route::post('/{procedure}/approve', [SafeWorkProcedureController::class, 'approve'])->name('approve');
         });
 
-        // Show route after /create and /edit to avoid wildcard conflict
-        Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])
-            ->middleware('permission:hazards.view')
-            ->name('show');
+        // View-gated reads — download lets register-only roles read the master document.
+        Route::middleware('permission:procedures.view')->group(function () {
+            Route::get('/{procedure}/attachments/{attachment}/download', [SafeWorkProcedureController::class, 'downloadAttachment'])->name('attachments.download');
+
+            // Show route LAST to avoid the /{procedure} wildcard swallowing /create etc.
+            Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])->name('show');
+        });
     });
 
     // ── Worker Participation ──────────────────────────────────────────

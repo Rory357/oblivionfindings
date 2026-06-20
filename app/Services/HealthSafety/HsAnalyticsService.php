@@ -8,6 +8,7 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsInvestigation;
+use App\Models\SafeWorkProcedure;
 use App\Models\SiteHazard;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
@@ -717,6 +718,7 @@ class HsAnalyticsService
             ['key' => 'worker_engagement', 'label' => 'Worker participation', 'value' => $latest['worker_engagement'] ?? null, 'suffix' => '%', ...$d('worker_engagement', false)],
             ['key' => 'open_hazards', 'label' => 'Open hazards', 'value' => $lead['open_hazards'], 'suffix' => '', ...$d('hazards_open', true)],
             ['key' => 'worker_consultation', 'label' => 'Consultation completion', 'value' => $latest['worker_consultation'] ?? null, 'suffix' => '%', ...$d('worker_consultation', false)],
+            ['key' => 'procedure_review_pct', 'label' => 'Procedure review compliance', 'value' => $this->procedureReviewPct(), 'suffix' => '%', 'delta' => null, 'dir' => 'flat'],
         ];
 
         $lagging = [
@@ -729,6 +731,25 @@ class HsAnalyticsService
         ];
 
         return ['leading' => $leading, 'lagging' => $lagging];
+    }
+
+    /**
+     * % of approved Safe Work Procedures still within their review date (or with no
+     * date set) — a leading control-of-documents indicator. Org-wide (procedures are
+     * policy-level, not site-scoped). Null when there are no approved procedures.
+     */
+    private function procedureReviewPct(): ?int
+    {
+        $approved = SafeWorkProcedure::query()->where('status', 'approved')->count();
+        if ($approved === 0) {
+            return null;
+        }
+
+        $inWindow = SafeWorkProcedure::query()->where('status', 'approved')
+            ->where(fn ($q) => $q->whereNull('review_date')->orWhere('review_date', '>=', Carbon::today()))
+            ->count();
+
+        return (int) round($inWindow / $approved * 100);
     }
 
     // ── Period summary + role note ──────────────────────────────────────
