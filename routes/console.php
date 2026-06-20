@@ -206,6 +206,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:20');
 
+// Injuries & RTW monitoring — return-to-work reviews + capacity reassessments due (daily)
+app(Schedule::class)
+    ->command('injuries:review-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:25');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)

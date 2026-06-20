@@ -76,6 +76,11 @@ class WorkplaceInjury extends Model
         return $this->hasMany(WorkCapacityAssessment::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(WorkplaceInjuryAttachment::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -89,11 +94,6 @@ class WorkplaceInjury extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
-
-    public function scopeActive($query)
-    {
-        return $query->where('status', 'active');
-    }
 
     public function scopeForWorker($query, int $userId)
     {

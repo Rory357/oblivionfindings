@@ -191,6 +191,16 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->hasMany(FirstAidRecord::class, 'related_incident_id');
     }
 
+    /**
+     * Staff workplace injuries that arose from this incident (e.g. a worker injured
+     * during a client fall/transfer or behavioural escalation). Reverse of
+     * WorkplaceInjury::relatedIncident(). Injuries & RTW redesign — cross-module seam 1.
+     */
+    public function workplaceInjuries(): HasMany
+    {
+        return $this->hasMany(WorkplaceInjury::class, 'related_incident_id');
+    }
+
     public function followups(): HasMany
     {
         return $this->hasMany(IncidentFollowup::class, 'client_incident_id');
