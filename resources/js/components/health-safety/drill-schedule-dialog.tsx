@@ -23,7 +23,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { SCHEDULE_TYPE_KEYS, typeMeta, type StaffOption } from '@/pages/health-safety/drills/shared';
+import { SCHEDULE_TYPE_KEYS, localToUtcIso, typeMeta, type StaffOption } from '@/pages/health-safety/drills/shared';
 
 const STEPS: WizardStep[] = [
     { key: 'type', label: 'Site & type', blurb: 'Where & what kind', icon: MapPin },
@@ -87,7 +87,7 @@ export function DrillScheduleDialog({
         e?.preventDefault();
         form.transform((data) => ({
             ...data,
-            scheduled_at: data.date && data.time ? `${data.date}T${data.time}` : data.date,
+            scheduled_at: data.date && data.time ? localToUtcIso(`${data.date}T${data.time}`) : data.date,
         }));
         form.post('/health-safety/drills', {
             preserveScroll: true,

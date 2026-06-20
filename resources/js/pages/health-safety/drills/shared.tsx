@@ -315,6 +315,17 @@ export function fmtEvacTime(seconds: number | null | undefined): string {
     return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 }
 
+/**
+ * Convert a naive datetime-local value ("YYYY-MM-DDTHH:mm", interpreted in the
+ * browser's local tz) to a UTC ISO instant for the server. Without this the server
+ * stores the naive string as UTC, so an NZ-entered 9:30am displays back as 9:30pm.
+ */
+export function localToUtcIso(local: string | null | undefined): string {
+    if (!local) return '';
+    const d = new Date(local);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
+
 export function formatFileSize(bytes: number | null | undefined): string {
     if (bytes == null) return '';
     if (bytes < 1024) return `${bytes} B`;
