@@ -10,9 +10,11 @@ use App\Models\PpeType;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\PpeComplianceDueNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -391,5 +393,26 @@ class PpeRegisterTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('ppe_allocations', ['id' => $alloc->id, 'acknowledged' => false]);
+    }
+
+    /* ───────────── Compliance reminders (B6) ───────────── */
+
+    public function test_compliance_reminders_notify_worker_and_manager(): void
+    {
+        Notification::fake();
+
+        $worker = User::factory()->create();
+        // Unacknowledged allocation older than the grace window → worker digest.
+        PpeAllocation::factory()->create([
+            'user_id' => $worker->id, 'acknowledged' => false, 'returned_at' => null, 'allocated_at' => now()->subDays(3),
+        ]);
+        // Inspection-overdue item → manager digest to hazards.manage holders.
+        PpeInventory::factory()->inspectionDue()->create(['status' => 'available']);
+        $manager = $this->manager();
+
+        $this->artisan('ppe:compliance-reminders')->assertSuccessful();
+
+        Notification::assertSentTo($worker, PpeComplianceDueNotification::class, fn ($n) => $n->audience === 'worker');
+        Notification::assertSentTo($manager, PpeComplianceDueNotification::class, fn ($n) => $n->audience === 'manager');
     }
 }

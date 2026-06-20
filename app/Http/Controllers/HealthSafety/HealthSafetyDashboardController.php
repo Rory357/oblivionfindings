@@ -108,6 +108,19 @@ class HealthSafetyDashboardController extends Controller
             'fleet_unresolved' => $fleetUnresolved,
             'staff_compliance_pct' => (int) round($this->kpiService->trainingAuditCompliancePct() ?? 0),
             'days_since_lti' => $this->kpiService->daysSinceLostTimeInjury($siteId),
+            // PPE compliance (cross-module B2) — site-scoped when a site filter is active.
+            'ppe_inspections_overdue' => \App\Models\PpeInventory::query()
+                ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+                ->whereNotIn('status', ['condemned', 'disposed'])
+                ->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<', $now->toDateString())->count(),
+            'ppe_expiring' => \App\Models\PpeInventory::query()
+                ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+                ->whereNotIn('status', ['condemned', 'disposed'])
+                ->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', $now->copy()->addDays(60)->toDateString())->count(),
+            'ppe_unacknowledged' => \App\Models\PpeAllocation::query()
+                ->whereNull('returned_at')->where('acknowledged', false)
+                ->when($siteId, fn ($q) => $q->whereHas('ppeInventory', fn ($iq) => $iq->where('site_id', $siteId)))
+                ->count(),
         ];
 
         // -- Incident Trends (12 months) --

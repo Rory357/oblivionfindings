@@ -779,11 +779,15 @@ class SiteController extends Controller
             'firstAidOpenFollowupCount' => ($user && $user->canDo('hazards.view'))
                 ? FirstAidRecord::where('site_id', $site->id)->whereHas('followups', fn ($q) => $q->whereNull('completed_at'))->count()
                 : 0,
+            // PPE & Equipment stored at this site (read-only inline panel; the
+            // register at /health-safety/ppe stays the single write surface).
+            'ppeSummary' => ($user && $user->canDo('hazards.view')) ? $this->buildPpeSummary($site) : null,
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
                 'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),
                 'manage_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.manage')),
                 'view_hs_first_aid' => (bool) ($user && $user->canDo('hazards.view')),
+                'view_hs_ppe' => (bool) ($user && $user->canDo('hazards.view')),
             ],
             'fleet' => Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
@@ -804,6 +808,43 @@ class SiteController extends Controller
                 'assigned_asset_ids' => $g->assignedAssets->pluck('id')->values(),
             ])->values(),
         ]);
+    }
+
+    /**
+     * Read-only PPE & Equipment summary for the site profile — stock counts +
+     * a short stored-items list. The /health-safety/ppe register is the single
+     * write surface; this panel deep-links there filtered by site.
+     */
+    private function buildPpeSummary(Site $site): array
+    {
+        $in30 = now()->addDays(30)->toDateString();
+        $in60 = now()->addDays(60)->toDateString();
+        $base = fn () => \App\Models\PpeInventory::query()->where('site_id', $site->id);
+
+        return [
+            'counts' => [
+                'total' => $base()->whereNotIn('status', ['condemned', 'disposed'])->count(),
+                'available' => $base()->where('status', 'available')->count(),
+                'allocated' => $base()->where('status', 'allocated')->count(),
+                'inspections_due' => $base()->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<=', $in30)->count(),
+                'expiring' => $base()->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', $in60)->count(),
+                'condemned' => $base()->where('status', 'condemned')->count(),
+            ],
+            'items' => $base()->with('ppeType:id,name,category')
+                ->whereNotIn('status', ['disposed'])
+                ->orderByDesc('created_at')->limit(8)->get()
+                ->map(fn (\App\Models\PpeInventory $i) => [
+                    'id' => $i->id,
+                    'type_name' => $i->ppeType?->name,
+                    'category' => $i->ppeType?->category,
+                    'serial_number' => $i->serial_number,
+                    'condition' => $i->condition,
+                    'status' => $i->status,
+                    'next_inspection_due' => optional($i->next_inspection_due)->toDateString(),
+                    'expiry_date' => optional($i->expiry_date)->toDateString(),
+                ])->values(),
+            'register_url' => '/health-safety/ppe?site_id='.$site->id,
+        ];
     }
 
     private function buildInspectionsSummary(Site $site): array

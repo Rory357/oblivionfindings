@@ -73,6 +73,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
 
+// PPE compliance reminders: worker unacknowledged/fit-test digests + H&S lead
+// overdue-inspection/expiring/condemned digests — every day 08:15 NZ.
+app(Schedule::class)
+    ->command('ppe:compliance-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:15');
+
 // Controlled-drug balance checks not done in ≥7 days → dashboard alert: 07:30 NZ
 app(Schedule::class)
     ->command('emar:escalate-overdue-cd-checks')
