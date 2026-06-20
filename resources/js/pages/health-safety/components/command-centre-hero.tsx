@@ -20,7 +20,6 @@ import {
     Plus,
     ShieldCheck,
     TrendingDown,
-    Truck,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -69,10 +68,22 @@ const LENS_ITEMS: HeroSegItem[] = [
 
 const GOV_REPORTS = [
     { label: 'Board summary', href: '/health-safety/reports/board-summary' },
-    { label: 'WorkSafe register', href: '/health-safety/reports/worksafe-register' },
-    { label: 'Investigation outcomes', href: '/health-safety/reports/investigation-outcomes' },
-    { label: 'Corrective-action traceability', href: '/health-safety/reports/corrective-action-traceability' },
-    { label: 'Risk-assessment register', href: '/health-safety/reports/risk-assessment-register' },
+    {
+        label: 'WorkSafe register',
+        href: '/health-safety/reports/worksafe-register',
+    },
+    {
+        label: 'Investigation outcomes',
+        href: '/health-safety/reports/investigation-outcomes',
+    },
+    {
+        label: 'Corrective-action traceability',
+        href: '/health-safety/reports/corrective-action-traceability',
+    },
+    {
+        label: 'Risk-assessment register',
+        href: '/health-safety/reports/risk-assessment-register',
+    },
 ];
 
 function toISODate(d: Date): string {
@@ -116,13 +127,18 @@ export function CommandCentreHero({
     openSafeguarding: number;
     fleetUnresolved: number;
     fleetIncidents30d: number;
-    procedures: { approved: number; review_due: number; coverage_gap_categories: number };
+    procedures: {
+        approved: number;
+        review_due: number;
+        coverage_gap_categories: number;
+    };
     onReport?: () => void;
     orgName?: string | null;
 }) {
     // The board-summary export targets governance.view-gated report routes; hide
     // it for register-only roles so they don't hit a 403 from the command centre.
-    const canViewBoardReports = usePage<SharedData>().props.auth.can?.governance?.view ?? false;
+    const canViewBoardReports =
+        usePage<SharedData>().props.auth.can?.governance?.view ?? false;
 
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
@@ -130,11 +146,18 @@ export function CommandCentreHero({
     const lagging = leadingLagging.lagging;
     const leading = leadingLagging.leading;
 
-    const notifiableAwaiting = notifiableEvents.filter((n) => n.status === 'pending').length;
+    const notifiableAwaiting = notifiableEvents.filter(
+        (n) => n.status === 'pending',
+    ).length;
     const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
     const drillsDue = expiring.filter((e) => e.type === 'drill').length;
+    const ppeDue = expiring.filter(
+        (e) => e.type === 'ppe_inspection' || e.type === 'ppe_expiry',
+    ).length;
 
-    const go = (params: Partial<HeroFilters> & { from?: string; to?: string }) => {
+    const go = (
+        params: Partial<HeroFilters> & { from?: string; to?: string },
+    ) => {
         const merged: Record<string, string | number> = {
             from: filters.from,
             to: filters.to,
@@ -155,7 +178,8 @@ export function CommandCentreHero({
         return 'custom';
     })();
 
-    const activeSite = filters.site != null ? sites.find((s) => s.id === filters.site) : null;
+    const activeSite =
+        filters.site != null ? sites.find((s) => s.id === filters.site) : null;
     const siteLabel = activeSite ? activeSite.name : 'All sites';
 
     const periodItems: HeroSegItem[] = [
@@ -170,14 +194,30 @@ export function CommandCentreHero({
                     <div className="flex items-end gap-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             From
-                            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                            <input
+                                type="date"
+                                value={customFrom}
+                                max={customTo}
+                                onChange={(e) => setCustomFrom(e.target.value)}
+                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             To
-                            <input type="date" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground" />
+                            <input
+                                type="date"
+                                value={customTo}
+                                min={customFrom}
+                                onChange={(e) => setCustomTo(e.target.value)}
+                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                            />
                         </label>
                     </div>
-                    <Button size="sm" className="w-full" onClick={() => go({ from: customFrom, to: customTo })}>
+                    <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => go({ from: customFrom, to: customTo })}
+                    >
                         Apply range
                     </Button>
                 </>
@@ -189,7 +229,14 @@ export function CommandCentreHero({
         <>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 {/* Period range control */}
-                <HeroSegmented variant="pill" label="Period" ariaLabel="Period range" items={periodItems} value={activePeriod} onChange={(k) => go(presetRange(k))} />
+                <HeroSegmented
+                    variant="pill"
+                    label="Period"
+                    ariaLabel="Period range"
+                    items={periodItems}
+                    value={activePeriod}
+                    onChange={(k) => go(presetRange(k))}
+                />
 
                 {/* Site filter + role lens */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -201,18 +248,40 @@ export function CommandCentreHero({
                         value={filters.site}
                         onChange={(v) => go({ site: v ?? undefined })}
                     />
-                    <HeroSegmented variant="segmented" label="Lens" ariaLabel="Role lens" items={LENS_ITEMS} value={filters.lens} onChange={(k) => go({ lens: k })} />
+                    <HeroSegmented
+                        variant="segmented"
+                        label="Lens"
+                        ariaLabel="Role lens"
+                        items={LENS_ITEMS}
+                        value={filters.lens}
+                        onChange={(k) => go({ lens: k })}
+                    />
                 </div>
             </div>
 
             {/* "This week" summary strip */}
             <HeroSummaryStrip label="This week">
-                <HeroSummaryMetric tone="warning">{lagging.incidents} incidents</HeroSummaryMetric>
-                <HeroSummaryMetric tone="critical">{notifiableAwaiting} WorkSafe-notifiable</HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">{leading.open_hazards} hazards open</HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">{drillsDue} drills due</HeroSummaryMetric>
-                <HeroSummaryMetric tone={activeAlerts > 0 ? 'critical' : 'success'}>
-                    {activeAlerts > 0 ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}` : 'lone-workers all checked in'}
+                <HeroSummaryMetric tone="warning">
+                    {lagging.incidents} incidents
+                </HeroSummaryMetric>
+                <HeroSummaryMetric tone="critical">
+                    {notifiableAwaiting} WorkSafe-notifiable
+                </HeroSummaryMetric>
+                <HeroSummaryMetric tone="warning">
+                    {leading.open_hazards} hazards open
+                </HeroSummaryMetric>
+                <HeroSummaryMetric tone="warning">
+                    {drillsDue} drills due
+                </HeroSummaryMetric>
+                <HeroSummaryMetric tone={ppeDue > 0 ? 'warning' : 'success'}>
+                    {ppeDue > 0 ? `${ppeDue} PPE due` : 'PPE all current'}
+                </HeroSummaryMetric>
+                <HeroSummaryMetric
+                    tone={activeAlerts > 0 ? 'critical' : 'success'}
+                >
+                    {activeAlerts > 0
+                        ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}`
+                        : 'lone-workers all checked in'}
                 </HeroSummaryMetric>
             </HeroSummaryStrip>
         </>
@@ -274,9 +343,13 @@ export function CommandCentreHero({
             <div className="flex items-start gap-4 md:gap-5">
                 <HeroMedallion icon={ShieldCheck} />
                 <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">Health &amp; Safety command centre</h1>
+                    <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
+                        Health &amp; Safety command centre
+                    </h1>
                     <p className="mt-1 text-sm text-primary-foreground/75">
-                        <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteLabel}</span>
+                        <span className="underline decoration-primary-foreground/40 underline-offset-4">
+                            {siteLabel}
+                        </span>
                         {orgName ? ` · ${orgName}` : ''}
                         {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
                     </p>
@@ -291,33 +364,133 @@ export function CommandCentreHero({
             {/* Stat clusters */}
             <div className="grid gap-3 lg:grid-cols-2">
                 <HeroCluster title="Lagging · outcomes" icon={TrendingDown}>
-                    <HeroClusterTile href="/incidents" label="Incidents" value={fmt(lagging.incidents)} caption="this period" tone={lagging.incidents > 0 ? 'warning' : 'success'} />
-                    <HeroClusterTile href="/health-safety/injuries" label="LTIFR" value={fmt(lagging.ltifr)} caption="per M hrs" tone="neutral" />
-                    <HeroClusterTile href="/health-safety/injuries" label="TRIFR" value={fmt(lagging.trifr)} caption="per M hrs" tone="neutral" />
-                    <HeroClusterTile href="/health-safety/injuries" label="Days LTI-free" value={fmt(lagging.days_since_lti)} caption="since last LTI" tone={(lagging.days_since_lti ?? 0) >= 30 ? 'success' : 'warning'} />
+                    <HeroClusterTile
+                        href="/incidents"
+                        label="Incidents"
+                        value={fmt(lagging.incidents)}
+                        caption="this period"
+                        tone={lagging.incidents > 0 ? 'warning' : 'success'}
+                    />
+                    <HeroClusterTile
+                        href="/health-safety/injuries"
+                        label="LTIFR"
+                        value={fmt(lagging.ltifr)}
+                        caption="per M hrs"
+                        tone="neutral"
+                    />
+                    <HeroClusterTile
+                        href="/health-safety/injuries"
+                        label="TRIFR"
+                        value={fmt(lagging.trifr)}
+                        caption="per M hrs"
+                        tone="neutral"
+                    />
+                    <HeroClusterTile
+                        href="/health-safety/injuries"
+                        label="Days LTI-free"
+                        value={fmt(lagging.days_since_lti)}
+                        caption="since last LTI"
+                        tone={
+                            (lagging.days_since_lti ?? 0) >= 30
+                                ? 'success'
+                                : 'warning'
+                        }
+                    />
                 </HeroCluster>
 
                 <HeroCluster title="Leading · proactive" icon={Clock}>
-                    <HeroClusterTile href="/incidents?type=near_miss" label="Near-miss" value={fmt(leading.near_miss_ratio, '×')} caption=": incident" tone={(leading.near_miss_ratio ?? 0) >= 3 ? 'success' : 'warning'} />
-                    <HeroClusterTile href="/health-safety/corrective-actions" label="Actions on time" value={fmt(leading.actions_on_time_pct, '%')} caption="30-day" tone={(leading.actions_on_time_pct ?? 0) >= 90 ? 'success' : 'warning'} />
-                    <HeroClusterTile href="/health-safety/worker-participation" label="Train / audit" value={fmt(leading.training_pct, '%')} caption="compliance" tone={(leading.training_pct ?? 0) >= 90 ? 'success' : 'warning'} />
-                    <HeroClusterTile href="/compliance/hazards" label="Open hazards" value={fmt(leading.open_hazards)} caption="open now" tone={leading.open_hazards > 0 ? 'warning' : 'success'} />
+                    <HeroClusterTile
+                        href="/incidents?type=near_miss"
+                        label="Near-miss"
+                        value={fmt(leading.near_miss_ratio, '×')}
+                        caption=": incident"
+                        tone={
+                            (leading.near_miss_ratio ?? 0) >= 3
+                                ? 'success'
+                                : 'warning'
+                        }
+                    />
+                    <HeroClusterTile
+                        href="/health-safety/corrective-actions"
+                        label="Actions on time"
+                        value={fmt(leading.actions_on_time_pct, '%')}
+                        caption="30-day"
+                        tone={
+                            (leading.actions_on_time_pct ?? 0) >= 90
+                                ? 'success'
+                                : 'warning'
+                        }
+                    />
+                    <HeroClusterTile
+                        href="/health-safety/worker-participation"
+                        label="Train / audit"
+                        value={fmt(leading.training_pct, '%')}
+                        caption="compliance"
+                        tone={
+                            (leading.training_pct ?? 0) >= 90
+                                ? 'success'
+                                : 'warning'
+                        }
+                    />
+                    <HeroClusterTile
+                        href="/compliance/hazards"
+                        label="Open hazards"
+                        value={fmt(leading.open_hazards)}
+                        caption="open now"
+                        tone={leading.open_hazards > 0 ? 'warning' : 'success'}
+                    />
                 </HeroCluster>
             </div>
 
             {/* Cross-module · related safety workflows reachable from the hub */}
             <HeroCluster title="Across the safety system" icon={ShieldCheck}>
-                <HeroClusterTile href="/safeguarding" label="Safeguarding" value={fmt(openSafeguarding)} caption="open concerns" tone={openSafeguarding > 0 ? 'warning' : 'success'} />
-                <HeroClusterTile href="/fleet-assets/incidents" label="Fleet incidents" value={fmt(fleetUnresolved)} caption="unresolved" tone={fleetUnresolved > 0 ? 'warning' : 'success'} />
-                <HeroClusterTile href="/fleet-assets/incidents" label="Fleet · 30d" value={fmt(fleetIncidents30d)} caption="reported this period" tone={fleetIncidents30d > 0 ? 'warning' : 'success'} />
+                <HeroClusterTile
+                    href="/safeguarding"
+                    label="Safeguarding"
+                    value={fmt(openSafeguarding)}
+                    caption="open concerns"
+                    tone={openSafeguarding > 0 ? 'warning' : 'success'}
+                />
+                <HeroClusterTile
+                    href="/fleet-assets/incidents"
+                    label="Fleet incidents"
+                    value={fmt(fleetUnresolved)}
+                    caption="unresolved"
+                    tone={fleetUnresolved > 0 ? 'warning' : 'success'}
+                />
+                <HeroClusterTile
+                    href="/fleet-assets/incidents"
+                    label="Fleet · 30d"
+                    value={fmt(fleetIncidents30d)}
+                    caption="reported this period"
+                    tone={fleetIncidents30d > 0 ? 'warning' : 'success'}
+                />
                 <HeroClusterTile
                     href="/health-safety/procedures"
                     label="Procedures"
                     value={fmt(procedures.approved)}
-                    caption={procedures.review_due > 0 ? `${procedures.review_due} review due` : procedures.coverage_gap_categories > 0 ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}` : 'all in review window'}
-                    tone={procedures.coverage_gap_categories > 0 ? 'critical' : procedures.review_due > 0 ? 'warning' : 'success'}
+                    caption={
+                        procedures.review_due > 0
+                            ? `${procedures.review_due} review due`
+                            : procedures.coverage_gap_categories > 0
+                              ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}`
+                              : 'all in review window'
+                    }
+                    tone={
+                        procedures.coverage_gap_categories > 0
+                            ? 'critical'
+                            : procedures.review_due > 0
+                              ? 'warning'
+                              : 'success'
+                    }
                 />
-                <HeroClusterTile href="/health-safety/analytics" label="Analytics" value="View" caption="trends & root cause" tone="neutral" />
+                <HeroClusterTile
+                    href="/health-safety/analytics"
+                    label="Analytics"
+                    value="View"
+                    caption="trends & root cause"
+                    tone="neutral"
+                />
             </HeroCluster>
         </HeroShell>
     );

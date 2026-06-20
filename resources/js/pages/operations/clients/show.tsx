@@ -61,6 +61,7 @@ import { CareSupportPlanTab } from './tabs/care-support-plan';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
+import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
@@ -3201,6 +3202,7 @@ export default function ClientShow({
                                 Record observation
                             </Button>
                         </div>
+                        <ClientClinicalRecordLaunchers client={client} />
                         <HealthMonitoringTab
                             clientId={client.id}
                             data={healthMonitoring}

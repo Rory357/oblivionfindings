@@ -284,6 +284,12 @@ class HealthClinicalDashboardController extends Controller
             ? $this->observationService->buildTrendSets($client, $from, $to, includeNews2: true)
             : null;
 
+        // Cross-module context signals (PRN↔behaviour, weight↔nutrition, falls→H&S)
+        // for the selected client over the same window.
+        $trendSignals = $client
+            ? $this->dashboardService->getTrendSignals($client, $from, $to)
+            : [];
+
         $kpis = $this->dashboardService->getKpis();
 
         // Assigned-only users only see their own clients in the picker (no roster leak).
@@ -304,6 +310,7 @@ class HealthClinicalDashboardController extends Controller
                 'date_to' => $to->toDateString(),
             ],
             'trend_sets' => $trendSets,
+            'trend_signals' => $trendSignals,
             'kpis' => $kpis,
             'tab_counts' => $this->dashboardService->getTabCounts($kpis),
         ]);

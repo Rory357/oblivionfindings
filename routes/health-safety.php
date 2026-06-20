@@ -401,24 +401,49 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── PPE Management (Phase 3) ──────────────────────────────────────
     Route::prefix('ppe')->name('ppe.')->group(function () {
 
+        // Worker self-acknowledgement from My Day (auth-only — support workers have no
+        // hazards.* perms). Authorisation is ownership, enforced inside acknowledgeOwn().
+        // Must sit OUTSIDE the hazards.manage group or worker self-ack would 403.
+        Route::post('/allocations/{allocation}/acknowledge-own', [PpeController::class, 'acknowledgeOwn'])->name('allocations.acknowledge-own');
+
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [PpeController::class, 'index'])->name('index');
+            Route::get('/export', [PpeController::class, 'export'])->name('export');
+
+            // Evidence downloads (read)
+            Route::get('/inventory/{inventory}/attachments/{attachment}/download', [PpeController::class, 'downloadInventoryAttachment'])->name('inventory.attachments.download');
+            Route::get('/allocations/{allocation}/attachments/{attachment}/download', [PpeController::class, 'downloadAllocationAttachment'])->name('allocations.attachments.download');
+            Route::get('/inspections/{inspection}/attachments/{attachment}/download', [PpeController::class, 'downloadInspectionAttachment'])->name('inspections.attachments.download');
         });
 
         Route::middleware('permission:hazards.manage')->group(function () {
             // PPE Types
             Route::post('/types', [PpeController::class, 'storeType'])->name('types.store');
+            Route::put('/types/{type}', [PpeController::class, 'updateType'])->name('types.update');
+            Route::patch('/types/{type}/activate', [PpeController::class, 'activateType'])->name('types.activate');
+            Route::patch('/types/{type}/deactivate', [PpeController::class, 'deactivateType'])->name('types.deactivate');
 
             // PPE Inventory
             Route::post('/inventory', [PpeController::class, 'storeInventory'])->name('inventory.store');
             Route::put('/inventory/{inventory}', [PpeController::class, 'updateInventory'])->name('inventory.update');
+            Route::post('/inventory/{inventory}/condemn', [PpeController::class, 'condemn'])->name('inventory.condemn');
+            Route::post('/inventory/{inventory}/dispose', [PpeController::class, 'dispose'])->name('inventory.dispose');
 
             // Allocations
             Route::post('/inventory/{inventory}/allocate', [PpeController::class, 'allocate'])->name('inventory.allocate');
+            Route::post('/allocations/{allocation}/acknowledge', [PpeController::class, 'acknowledge'])->name('allocations.acknowledge');
             Route::post('/allocations/{allocation}/return', [PpeController::class, 'returnPpe'])->name('allocations.return');
 
             // Inspections
             Route::post('/inventory/{inventory}/inspections', [PpeController::class, 'storeInspection'])->name('inventory.inspections.store');
+
+            // Evidence (premium document upload) — uploads + deletes
+            Route::post('/inventory/{inventory}/attachments', [PpeController::class, 'uploadInventoryAttachment'])->name('inventory.attachments.store');
+            Route::delete('/inventory/{inventory}/attachments/{attachment}', [PpeController::class, 'destroyInventoryAttachment'])->name('inventory.attachments.destroy');
+            Route::post('/allocations/{allocation}/attachments', [PpeController::class, 'uploadAllocationAttachment'])->name('allocations.attachments.store');
+            Route::delete('/allocations/{allocation}/attachments/{attachment}', [PpeController::class, 'destroyAllocationAttachment'])->name('allocations.attachments.destroy');
+            Route::post('/inspections/{inspection}/attachments', [PpeController::class, 'uploadInspectionAttachment'])->name('inspections.attachments.store');
+            Route::delete('/inspections/{inspection}/attachments/{attachment}', [PpeController::class, 'destroyInspectionAttachment'])->name('inspections.attachments.destroy');
         });
     });
 });

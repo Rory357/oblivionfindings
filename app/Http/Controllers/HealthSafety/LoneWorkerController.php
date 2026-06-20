@@ -472,7 +472,9 @@ class LoneWorkerController extends Controller
 
         $list = $shifts->map(function (Shift $shift) use ($siteCounts, $gpsByShift) {
             $isSolo = $shift->site_id && ($siteCounts[$shift->site_id] ?? 0) === 1;
-            $isLone = (bool) $shift->is_on_call || $isSolo;
+            // Explicit roster flag is authoritative; fall back to the heuristic
+            // (on-call, or solo cover at the site) for shifts not yet flagged.
+            $isLone = (bool) $shift->is_lone_worker || (bool) $shift->is_on_call || $isSolo;
             $ping = $gpsByShift->get($shift->id)?->first();
 
             return [

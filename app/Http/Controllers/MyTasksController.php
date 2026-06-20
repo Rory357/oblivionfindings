@@ -13,6 +13,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
 use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
+use App\Models\PpeAllocation;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
@@ -152,6 +153,11 @@ class MyTasksController extends Controller
             // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
             // row deep-links to the register's record modal (no write here).
             'first_aid_followups' => $this->getFirstAidFollowups($user),
+            // Worker-facing "My PPE" card — the worker's own active allocations that
+            // still need acknowledgement or an RPE fit-test. Empty unless action is
+            // needed. One-tap acknowledge POSTs to ppe.allocations.acknowledge-own
+            // (auth-only + ownership), so support workers (no hazards.* perms) can use it.
+            'my_ppe' => $this->getMyPpe($user),
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
@@ -1011,6 +1017,51 @@ class MyTasksController extends Controller
                     'site_name' => $f->record?->site?->name,
                     'url' => '/health-safety/first-aid?record='.$f->first_aid_record_id,
                 ])
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * The signed-in worker's own active PPE allocations that still need attention —
+     * unacknowledged, or an RPE item missing a fit-test (AS/NZS 1715). Empty when
+     * nothing is outstanding so the card hides. Read-only over the worker's own rows.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function getMyPpe(User $user): array
+    {
+        try {
+            return PpeAllocation::query()
+                ->where('user_id', $user->id)
+                ->whereNull('returned_at')
+                ->where(function ($q) {
+                    $q->where('acknowledged', false)
+                        ->orWhere(fn ($r) => $r->where('fit_test_completed', false)
+                            ->whereHas('ppeInventory.ppeType', fn ($t) => $t->where('category', 'respiratory')));
+                })
+                ->with(['ppeInventory.ppeType:id,name,category', 'ppeInventory.site:id,name'])
+                ->latest('allocated_at')
+                ->get()
+                ->map(function (PpeAllocation $a) {
+                    $item = $a->ppeInventory;
+                    $isRpe = $item?->ppeType?->category === 'respiratory';
+
+                    return [
+                        'id' => $a->id,
+                        'type_name' => $item?->ppeType?->name ?? 'PPE',
+                        'category' => $item?->ppeType?->category,
+                        'serial_number' => $item?->serial_number,
+                        'site' => $item?->site?->name,
+                        'allocated_at' => optional($a->allocated_at)->toIso8601String(),
+                        'acknowledged' => (bool) $a->acknowledged,
+                        'fit_test_required' => $isRpe,
+                        'fit_test_completed' => (bool) $a->fit_test_completed,
+                    ];
+                })
                 ->all();
         } catch (\Throwable $e) {
             report($e);
