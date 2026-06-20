@@ -5,6 +5,7 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
@@ -32,14 +33,16 @@ class HealthClinicalCrossOrgAuthorizationTest extends TestCase
     use RefreshDatabase;
 
     protected User $clinicalUserOrgA;
+
     protected Client $clientOrgA;
+
     protected Client $clientOrgB;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $coordinatorRole = Role::where('name', 'coordinator')->firstOrFail();
 
