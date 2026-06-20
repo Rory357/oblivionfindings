@@ -25,12 +25,14 @@ import {
     type RosterTabItem,
 } from '@/components/rostering';
 import { cn } from '@/lib/utils';
+import { RecordAbcDialog } from '@/pages/health-clinical/components/record-abc-dialog';
 import { RecordEventDialog } from '@/pages/health-clinical/components/record-event-dialog';
 import { RecordObservationDialog } from '@/pages/health-clinical/components/record-observation-dialog';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    Brain,
     CheckCircle2,
     Eye,
     HeartPulse,
@@ -240,6 +242,7 @@ export function HealthClinicalShell({
     const canRecordEvent = !!can.eventsRecord;
     const [obsOpen, setObsOpen] = useState(false);
     const [eventOpen, setEventOpen] = useState(false);
+    const [abcOpen, setAbcOpen] = useState(false);
 
     const go = (href: string | null) => {
         if (href) router.visit(href, { preserveScroll: true });
@@ -299,6 +302,16 @@ export function HealthClinicalShell({
                                         className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
                                     >
                                         <Stethoscope className="mr-1.5 h-4 w-4" /> Log clinical event
+                                    </Button>
+                                ) : null}
+                                {canRecordEvent ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setAbcOpen(true)}
+                                        className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                                    >
+                                        <Brain className="mr-1.5 h-4 w-4" /> Record ABC
                                     </Button>
                                 ) : null}
                             </div>
@@ -391,6 +404,7 @@ export function HealthClinicalShell({
                 canRecordClinical={!!can.observationsRecordClinical}
             />
             <RecordEventDialog open={eventOpen} onClose={() => setEventOpen(false)} />
+            <RecordAbcDialog open={abcOpen} onClose={() => setAbcOpen(false)} />
         </AppLayout>
     );
 }
