@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Models\HsAttachment;
+use App\Models\ProcedureAcknowledgement;
 use App\Models\Role;
 use App\Models\SafeWorkProcedure;
 use App\Models\SafeWorkProcedureVersion;
@@ -60,39 +61,18 @@ class SafeWorkProcedureController extends Controller
 
     public function index(Request $request): \Inertia\Response
     {
-        $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'all';
+        $filters = $this->resolveFilters($request);
 
-        $q = trim((string) $request->input('q'));
-        $filters = [
-            'q' => $q !== '' ? $q : null,
-            'tab' => $tab,
-            'category' => in_array($request->input('category'), self::PROCEDURE_CATEGORIES, true) ? $request->input('category') : null,
-            'status' => in_array($request->input('status'), self::STATUSES, true) ? $request->input('status') : null,
-            'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
-            'review_state' => in_array($request->input('review_state'), self::REVIEW_STATES, true) ? $request->input('review_state') : null,
-        ];
-
-        $procedures = SafeWorkProcedure::query()
+        $procedures = $this->buildQuery($filters)
             ->with(['approvedBy:id,name', 'owner:id,name'])
             ->withCount('attachments')
-            ->when($tab === 'review_due', fn ($query) => $query->where('status', 'approved')->where(fn ($w) => $this->applyReviewDue($w)))
-            ->when(in_array($tab, self::STATUSES, true), fn ($query) => $query->where('status', $tab))
-            ->when($filters['category'], fn ($query) => $query->where('category', $filters['category']))
-            ->when($filters['status'], fn ($query) => $query->where('status', $filters['status']))
-            ->when($filters['site_id'], fn ($query) => $query->whereJsonContains('applicable_sites', $filters['site_id']))
-            ->when($filters['review_state'], fn ($query) => $this->applyReviewState($query, $filters['review_state']))
-            ->when($filters['q'], fn ($query) => $query->where(function ($sub) use ($filters) {
-                $sub->where('title', 'like', "%{$filters['q']}%")
-                    ->orWhere('reference_number', 'like', "%{$filters['q']}%");
-            }))
-            ->orderBy('title')
             ->paginate(25)
             ->withQueryString()
             ->through(fn (SafeWorkProcedure $p) => $this->mapRow($p));
 
         return Inertia::render('health-safety/procedures/index', array_merge([
             'procedures' => $procedures,
-            'tab' => $tab,
+            'tab' => $filters['tab'],
             'tabCounts' => $this->tabCounts(),
             'hero' => $this->heroBlock(),
             'filters' => $filters,
@@ -121,6 +101,36 @@ class SafeWorkProcedureController extends Controller
     {
         // Modal-first: the permalink opens the detail-as-modal on the register.
         return redirect()->route('health-safety.procedures.index', ['procedure' => $procedure->id]);
+    }
+
+    /** CSV export of the register, honouring the current tab + filters. */
+    public function export(Request $request): StreamedResponse
+    {
+        $procedures = $this->buildQuery($this->resolveFilters($request))
+            ->with(['approvedBy:id,name', 'owner:id,name'])
+            ->get();
+
+        $filename = 'safe-work-procedures-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($procedures) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Reference', 'Title', 'Category', 'Status', 'Version', 'Owner', 'Approved by', 'Next review', 'Sites', 'Roles']);
+            foreach ($procedures as $p) {
+                fputcsv($out, [
+                    $p->reference_number,
+                    $p->title,
+                    $this->categoryLabel((string) $p->category),
+                    ucfirst(str_replace('_', ' ', (string) $p->status)),
+                    'v'.$p->current_version,
+                    $p->owner?->name ?? '',
+                    $p->approvedBy?->name ?? '',
+                    $p->review_date?->toDateString() ?? '',
+                    is_array($p->applicable_sites) ? count($p->applicable_sites) : 0,
+                    is_array($p->applicable_roles) ? count($p->applicable_roles) : 0,
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /* ================================================================== */
@@ -272,6 +282,17 @@ class SafeWorkProcedureController extends Controller
         return back()->with('success', 'Procedure restored from the archive.');
     }
 
+    /** Record that the current worker has read & understood the procedure (version-stamped). */
+    public function acknowledge(Request $request, SafeWorkProcedure $procedure): RedirectResponse
+    {
+        ProcedureAcknowledgement::updateOrCreate(
+            ['safe_work_procedure_id' => $procedure->id, 'user_id' => $request->user()->id],
+            ['version_acknowledged' => $procedure->current_version, 'acknowledged_at' => now()],
+        );
+
+        return back()->with('success', 'Procedure acknowledged.');
+    }
+
     /* ================================================================== */
     /*  Controlled-document library (premium upload — polymorphic HsAttachment) */
     /* ================================================================== */
@@ -421,6 +442,10 @@ class SafeWorkProcedureController extends Controller
                 'created_at' => $a->created_at?->toISOString(),
                 'url' => "/health-safety/procedures/{$p->id}/attachments/{$a->id}/download",
             ])->values(),
+            'acknowledged' => $user
+                ? (int) $p->acknowledgements()->where('user_id', $user->id)->value('version_acknowledged') === (int) $p->current_version
+                : false,
+            'acknowledged_count' => $p->acknowledgements()->count(),
             'form' => $this->mapProcedureForForm($p),
             'can' => $this->canBlock($user),
         ];
@@ -490,6 +515,41 @@ class SafeWorkProcedureController extends Controller
     /* ================================================================== */
     /*  Query scopes / options                                            */
     /* ================================================================== */
+
+    /** Whitelisted filter set, shared by index() + export(). */
+    private function resolveFilters(Request $request): array
+    {
+        $tab = in_array($request->input('tab'), self::TABS, true) ? $request->input('tab') : 'all';
+        $q = trim((string) $request->input('q'));
+
+        return [
+            'q' => $q !== '' ? $q : null,
+            'tab' => $tab,
+            'category' => in_array($request->input('category'), self::PROCEDURE_CATEGORIES, true) ? $request->input('category') : null,
+            'status' => in_array($request->input('status'), self::STATUSES, true) ? $request->input('status') : null,
+            'site_id' => $request->filled('site_id') ? (int) $request->input('site_id') : null,
+            'review_state' => in_array($request->input('review_state'), self::REVIEW_STATES, true) ? $request->input('review_state') : null,
+        ];
+    }
+
+    /** Build the filtered register query (no pagination/eager-loads), shared by index() + export(). */
+    private function buildQuery(array $filters): \Illuminate\Database\Eloquent\Builder
+    {
+        $tab = $filters['tab'];
+
+        return SafeWorkProcedure::query()
+            ->when($tab === 'review_due', fn ($query) => $query->where('status', 'approved')->where(fn ($w) => $this->applyReviewDue($w)))
+            ->when(in_array($tab, self::STATUSES, true), fn ($query) => $query->where('status', $tab))
+            ->when($filters['category'], fn ($query) => $query->where('category', $filters['category']))
+            ->when($filters['status'], fn ($query) => $query->where('status', $filters['status']))
+            ->when($filters['site_id'], fn ($query) => $query->whereJsonContains('applicable_sites', $filters['site_id']))
+            ->when($filters['review_state'], fn ($query) => $this->applyReviewState($query, $filters['review_state']))
+            ->when($filters['q'], fn ($query) => $query->where(function ($sub) use ($filters) {
+                $sub->where('title', 'like', "%{$filters['q']}%")
+                    ->orWhere('reference_number', 'like', "%{$filters['q']}%");
+            }))
+            ->orderBy('title');
+    }
 
     /** Approved review-due predicate (overdue OR due within 30 days). Single source of truth. */
     private function applyReviewDue($query): void

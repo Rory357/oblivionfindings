@@ -171,14 +171,18 @@ class MyHrController extends Controller
             ->limit(5)
             ->get(['id', 'title', 'priority', 'published_at']);
 
-        // Safe Work Procedures applicable to my role(s) — read-only, deep-links to
-        // the procedures register's detail modal. Role-matched + org-wide (approved).
+        // Safe Work Procedures applicable to my role(s) — deep-link to the register's
+        // detail modal, with a version-stamped "Acknowledge" affordance. Role-matched
+        // + org-wide (approved).
         $roleKeys = $user->roles()->pluck('name')->all();
+        $ackedVersions = \App\Models\ProcedureAcknowledgement::query()
+            ->where('user_id', $user->id)
+            ->pluck('version_acknowledged', 'safe_work_procedure_id');
         $safeWorkProcedures = $user->canDo('procedures.view')
             ? SafeWorkProcedure::query()->applicableToRoles($roleKeys)
                 ->orderBy('title')
                 ->limit(25)
-                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date', 'current_version'])
                 ->map(fn (SafeWorkProcedure $p) => [
                     'id' => $p->id,
                     'reference_number' => $p->reference_number,
@@ -186,6 +190,7 @@ class MyHrController extends Controller
                     'category' => $p->category,
                     'status' => $p->status,
                     'review_date' => $p->review_date?->toDateString(),
+                    'acknowledged' => (int) ($ackedVersions[$p->id] ?? 0) === (int) $p->current_version,
                 ])->values()
             : collect();
 

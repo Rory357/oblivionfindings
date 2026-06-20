@@ -557,9 +557,27 @@ class ClientController extends Controller
             }
         }
 
+        // Safe Work Procedures governing care at this client's home (site-scoped +
+        // org-wide, approved), read-only — deep-links to the procedures register.
+        $homeProcedures = ($siteId && $request->user()?->canDo('procedures.view'))
+            ? \App\Models\SafeWorkProcedure::query()->applicableToSite($siteId)
+                ->orderBy('title')
+                ->limit(15)
+                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                ->map(fn ($p) => [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number,
+                    'title' => $p->title,
+                    'category' => $p->category,
+                    'status' => $p->status,
+                    'review_date' => $p->review_date?->toDateString(),
+                ])->values()
+            : collect();
+
         return inertia('operations/clients/show', [
             'homeHazards' => $homeHazards,
             'homeHazardDetail' => $homeHazardDetail,
+            'homeProcedures' => $homeProcedures,
             'homeName' => $client->site?->name,
             'homeSiteId' => $siteId,
             'client' => [

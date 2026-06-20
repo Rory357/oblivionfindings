@@ -162,6 +162,7 @@ export type HazardDetail = {
     hazard_type: string;
     hazard_label: string;
     custom_hazard_type: string | null;
+    related_procedures?: import('@/components/health-safety/applicable-procedures-panel').ApplicableProcedure[];
     severity: string;
     likelihood: string;
     risk_rating: string;

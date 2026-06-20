@@ -687,6 +687,9 @@ class RbacSeeder extends Seeder
             'timesheets.viewAssigned', 'timesheets.create', 'timesheets.update', 'timesheets.submit',
             'incidents.viewAssigned', 'incidents.create', 'incidents.update', 'incidents.submit',
             'incidents.followups.complete', 'risks.viewAssigned',
+            // Frontline workers read the safe work procedures applicable to their role
+            // (surfaced on /hr/my) and acknowledge them; no create/manage.
+            'procedures.view',
             // Workers need to browse the sites they're rostered at from /my-day's
             // global links and resident popovers (sites.viewAny gates /sites,
             // /sites/{id}, and the site-scoped care + house ledger reads).

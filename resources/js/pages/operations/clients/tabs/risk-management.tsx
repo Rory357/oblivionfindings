@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { HazardDetailDialog } from '@/components/health-safety/hazard-detail-dialog';
 import { RISK, RiskChip, StatusChip, fmtDueShort, type HazardDetail } from '@/components/health-safety/hazard-kit';
 import { ShiftContextMenu, type ShiftCtxState } from '@/components/rostering';
@@ -66,6 +67,8 @@ type RiskManagementTabProps = {
     homeHazardDetail?: HazardDetail | null;
     homeName?: string | null;
     homeSiteId?: number | null;
+    /** Read-only safe work procedures governing care at the client's home. */
+    homeProcedures?: ApplicableProcedure[];
 };
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
@@ -134,6 +137,7 @@ export function RiskManagementTab({
     homeHazardDetail = null,
     homeName = null,
     homeSiteId = null,
+    homeProcedures = [],
 }: RiskManagementTabProps) {
     const list = useMemo(() => risks ?? [], [risks]);
 
@@ -260,6 +264,14 @@ export function RiskManagementTab({
                     </div>
                 </div>
             </div>
+
+            {/* Safe work procedures governing care at this home (read-only) */}
+            {homeProcedures.length > 0 ? (
+                <ApplicableProceduresPanel
+                    procedures={homeProcedures}
+                    subtitle={homeName ? `Procedures governing care at ${homeName} (and organisation-wide)` : 'Procedures governing care at this home'}
+                />
+            ) : null}
 
             {/* Site / environmental hazards (read-only — managed in the register) */}
             {homeName ? (

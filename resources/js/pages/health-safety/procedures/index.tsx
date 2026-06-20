@@ -5,6 +5,7 @@
  * → ShiftContextMenu; create/edit → the Add-client-style modal wizard. NZ-only, web-only. */
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
 import {
     ProcedureDetailDialog,
@@ -38,9 +39,11 @@ import {
     AlertTriangle,
     Archive,
     ArchiveRestore,
+    BarChart3,
     CalendarCheck,
     CheckCircle2,
     Clock,
+    Download,
     ExternalLink,
     Eye,
     FilePlus2,
@@ -180,6 +183,29 @@ export default function ProceduresIndex({ procedures, tab, tabCounts, hero, filt
     const activeReview = filters.review_state ?? 'all';
     const onReview = (key: string) => go({ review_state: key === 'all' ? null : key });
 
+    const exportUrl = () => {
+        const params = new URLSearchParams();
+        if (filters.tab && filters.tab !== 'all') params.set('tab', filters.tab);
+        if (filters.q) params.set('q', filters.q);
+        if (filters.category) params.set('category', filters.category);
+        if (filters.site_id) params.set('site_id', String(filters.site_id));
+        if (filters.review_state) params.set('review_state', filters.review_state);
+        const qs = params.toString();
+        return `${URL}/export${qs ? `?${qs}` : ''}`;
+    };
+
+    // Hero right-click → library quick actions (mirrors the Library reports popover).
+    const openHeroCtx = (e: ReactMouseEvent) => {
+        e.preventDefault();
+        const items: ShiftCtxItem[] = [];
+        if (can.create) items.push({ icon: <Plus className="h-3.5 w-3.5" />, label: 'New procedure', tone: 'primary', onClick: () => setWizard({ mode: 'create' }) });
+        items.push(
+            { icon: <Download className="h-3.5 w-3.5" />, label: 'Export register (CSV)', onClick: () => { window.location.href = exportUrl(); } },
+            { icon: <CalendarCheck className="h-3.5 w-3.5" />, label: 'Review-due list', onClick: () => setTab('review_due') },
+        );
+        setCtx({ x: e.clientX, y: e.clientY, tag: 'LIBRARY', meta: `${tabCounts.all ?? 0} procedures`, items });
+    };
+
     const openRowCtx = (e: ReactMouseEvent, p: ProcedureRow) => {
         e.preventDefault();
         const st = statusMeta(p.status);
@@ -259,7 +285,7 @@ export default function ProceduresIndex({ procedures, tab, tabCounts, hero, filt
                 >
                     <WorkflowRibbon current="document" />
 
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4" onContextMenu={openHeroCtx}>
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={FileText} />
                             <div className="flex flex-col gap-1.5">
@@ -272,11 +298,30 @@ export default function ProceduresIndex({ procedures, tab, tabCounts, hero, filt
                             </div>
                         </div>
 
-                        {can.create ? (
-                            <Button size="sm" onClick={() => setWizard({ mode: 'create' })} className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
-                                <Plus className="mr-1.5 h-4 w-4" /> New procedure
-                            </Button>
-                        ) : null}
+                        <div className="flex items-center gap-2">
+                            {can.create ? (
+                                <Button size="sm" onClick={() => setWizard({ mode: 'create' })} className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                    <Plus className="mr-1.5 h-4 w-4" /> New procedure
+                                </Button>
+                            ) : null}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button size="sm" className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                        <BarChart3 className="mr-1.5 h-4 w-4" /> Library reports
+                                        <span aria-hidden className="ml-1">▾</span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-60 p-1.5">
+                                    <a href={exportUrl()} className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted">
+                                        <Download className="h-4 w-4 shrink-0 text-primary" /> Export register (CSV)
+                                    </a>
+                                    {/* eslint-disable-next-line no-restricted-syntax -- popover menu item, not a form control */}
+                                    <button type="button" onClick={() => setTab('review_due')} className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted">
+                                        <CalendarCheck className="h-4 w-4 shrink-0 text-primary" /> Review-due list
+                                    </button>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-2">

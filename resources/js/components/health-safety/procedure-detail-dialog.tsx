@@ -113,6 +113,8 @@ export type ProcedureDetail = {
         created_at: string | null;
         url: string;
     }[];
+    acknowledged: boolean;
+    acknowledged_count: number;
     form: ProcedureFormData;
     can: { view: boolean; create: boolean; manage: boolean; approve: boolean };
 };
@@ -396,6 +398,34 @@ function OverviewSection({ detail }: { detail: ProcedureDetail }) {
                     Review cadence: every {detail.review_frequency_months} month{detail.review_frequency_months === 1 ? '' : 's'}.
                 </p>
             ) : null}
+            {detail.status === 'approved' ? <AcknowledgeBar detail={detail} /> : null}
+        </div>
+    );
+}
+
+/** "I have read & understood" — version-stamped acknowledgement for in-force procedures. */
+function AcknowledgeBar({ detail }: { detail: ProcedureDetail }) {
+    const acknowledge = () =>
+        router.post(`${PROCEDURES_URL}/${detail.id}/acknowledge`, {}, { preserveScroll: true, preserveState: true });
+
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">
+                    Acknowledged by <span className="font-semibold text-foreground">{detail.acknowledged_count}</span>{' '}
+                    {detail.acknowledged_count === 1 ? 'person' : 'people'}
+                </span>
+            </div>
+            {detail.acknowledged ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-status-success-bg px-3 py-1.5 text-xs font-semibold text-status-success">
+                    <Check className="h-3.5 w-3.5" /> You've acknowledged v{detail.version}
+                </span>
+            ) : (
+                <Button type="button" size="sm" onClick={acknowledge}>
+                    <Check className="mr-1.5 h-4 w-4" /> I've read &amp; understood this
+                </Button>
+            )}
         </div>
     );
 }

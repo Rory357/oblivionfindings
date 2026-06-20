@@ -157,6 +157,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/', [SafeWorkProcedureController::class, 'index'])->name('index');
+            // Static export before the {procedure} wildcard so it isn't swallowed.
+            Route::get('/export', [SafeWorkProcedureController::class, 'export'])->name('export');
         });
 
         Route::middleware('permission:procedures.create|procedures.manage')->group(function () {
@@ -185,6 +187,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // View-gated reads — download lets register-only roles read the master document.
         Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/{procedure}/attachments/{attachment}/download', [SafeWorkProcedureController::class, 'downloadAttachment'])->name('attachments.download');
+
+            // Any viewer can acknowledge they've read & understood the procedure.
+            Route::post('/{procedure}/acknowledge', [SafeWorkProcedureController::class, 'acknowledge'])->name('acknowledge');
 
             // Show route LAST to avoid the /{procedure} wildcard swallowing /create etc.
             Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])->name('show');
