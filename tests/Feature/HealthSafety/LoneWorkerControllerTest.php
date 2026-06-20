@@ -360,4 +360,34 @@ class LoneWorkerControllerTest extends TestCase
 
         return [$shift, $attendance];
     }
+
+    public function test_is_lone_worker_flag_marks_a_shift_as_lone(): void
+    {
+        // Two in-progress shifts at the SAME site (so neither is "solo cover")
+        // and neither on-call — isolating the explicit flag as the only reason a
+        // shift is treated as lone.
+        $site = Site::factory()->create();
+        $client = Client::factory()->create();
+        $mk = fn (bool $flagged) => Shift::create([
+            'user_id' => User::factory()->create()->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
+            'is_on_call' => false,
+            'is_lone_worker' => $flagged,
+            'created_by' => $this->admin->id,
+        ]);
+        $mk(true);   // flagged → lone
+        $mk(false);  // co-worker at same site → not solo, not on-call, not flagged → not lone
+
+        $this->actingAs($this->admin)
+            ->get('/health-safety/lone-workers')
+            ->assertOk()
+            ->assertInertia(fn (Assert $p) => $p
+                ->has('options.shifts', 2)
+                ->where('hero.lone_shifts_unmonitored', 1));
+    }
 }

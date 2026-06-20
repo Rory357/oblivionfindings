@@ -869,6 +869,7 @@ class ShiftController extends Controller
             'shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
             'is_sleepover' => ['nullable', 'boolean'],
             'is_on_call' => ['nullable', 'boolean'],
+            'is_lone_worker' => ['nullable', 'boolean'],
             'expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
@@ -1225,6 +1226,7 @@ class ShiftController extends Controller
             'shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
             'is_sleepover' => ['nullable', 'boolean'],
             'is_on_call' => ['nullable', 'boolean'],
+            'is_lone_worker' => ['nullable', 'boolean'],
             'expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
@@ -1849,6 +1851,7 @@ class ShiftController extends Controller
         $data['shift_type'] = $data['shift_type'] ?? 'standard';
         $data['is_sleepover'] = (bool) ($data['is_sleepover'] ?? false);
         $data['is_on_call'] = (bool) ($data['is_on_call'] ?? false);
+        $data['is_lone_worker'] = (bool) ($data['is_lone_worker'] ?? false);
 
         if ($data['shift_type'] === 'sleepover') {
             $data['is_sleepover'] = true;
