@@ -456,6 +456,12 @@ class RbacSeeder extends Seeder
             ['key' => 'restraints.manage', 'description' => 'Manage restraint events & behaviour support plan lifecycle', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.review', 'description' => 'Review restraint events & sign off plan reviews', 'group' => 'restraints', 'module' => 'Compliance'],
 
+            // Safe Work Procedures (controlled SWMS document library)
+            ['key' => 'procedures.view', 'description' => 'View safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
+            ['key' => 'procedures.create', 'description' => 'Create safe work procedures (draft)', 'group' => 'procedures', 'module' => 'Compliance'],
+            ['key' => 'procedures.manage', 'description' => 'Edit, submit, archive, review & attach documents to safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
+            ['key' => 'procedures.approve', 'description' => 'Approve safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
+
             // Checklists
             ['key' => 'checklists.view', 'description' => 'View checklists', 'group' => 'checklists', 'module' => 'Compliance'],
             ['key' => 'checklists.run', 'description' => 'Run/complete checklist', 'group' => 'checklists', 'module' => 'Compliance'],
@@ -591,6 +597,7 @@ class RbacSeeder extends Seeder
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
+            'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.request',
             'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
@@ -654,6 +661,7 @@ class RbacSeeder extends Seeder
             'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view',
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update', 'safeguarding.investigate',
+            'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'consents.viewAny', 'consents.record', 'consents.withdraw', 'consents.request',
             'siteHardware.view', 'controlRoom.alerts.view',
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
@@ -755,7 +763,7 @@ class RbacSeeder extends Seeder
             'respite.tasks.view', 'respite.handovers.view', 'respite.communications.view',
             'respite.daily-notes.view', 'respite.risk-plans.view', 'family_portal.viewAny',
             'assets.telemetry.view', 'assets.alerts.view',
-            'safeguarding.viewAny', 'consents.viewAny',
+            'safeguarding.viewAny', 'consents.viewAny', 'procedures.view',
             'staff.vetting.view',
             'privacy.viewRequests', 'hr.employees.viewAny', 'hr.compliance.view',
             'hr.training.view', 'hr.vetting.view', 'hr.performance.view',
@@ -773,6 +781,7 @@ class RbacSeeder extends Seeder
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
+            'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',
             'siteHardware.view', 'controlRoom.alerts.view',
@@ -798,6 +807,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($healthSafetyOfficer, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
+            'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
         ]);
@@ -806,6 +816,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($maintenanceCoordinator, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'hazards.view',
+            'procedures.view',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'assets.view_register', 'assets.manage_register',
             'vendors.view', 'vendors.manage', 'credentials.view', 'credentials.reveal',

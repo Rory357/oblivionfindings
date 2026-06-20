@@ -191,6 +191,12 @@ class ClientIncident extends Model implements EmitsToTimeline
         return $this->hasMany(RestraintEvent::class, 'related_incident_id');
     }
 
+    /** First-aid treatments escalated to / linked with this incident. */
+    public function firstAidRecords(): HasMany
+    {
+        return $this->hasMany(FirstAidRecord::class, 'related_incident_id');
+    }
+
     public function followups(): HasMany
     {
         return $this->hasMany(IncidentFollowup::class, 'client_incident_id');

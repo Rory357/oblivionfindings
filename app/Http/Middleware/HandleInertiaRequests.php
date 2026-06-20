@@ -236,10 +236,20 @@ class HandleInertiaRequests extends Middleware
                 // The Fleet incident report wizard reads this so its success pane
                 // can open the newly-reported incident.
                 'created_fleet_incident_id' => session('created_fleet_incident_id'),
+                // The First Aid report wizard reads this so its success pane can
+                // open the newly-recorded treatment on the register.
+                'created_first_aid_id' => session('created_first_aid_id'),
                 // The Worker Participation "schedule meeting" wizard reads this
                 // after creating a NEW committee so it can chain the meeting POST
                 // to /committees/{id}/meetings on the freshly created committee.
                 'created_committee_id' => session('created_committee_id'),
+                // The Safe Work Procedure wizard reads this after a successful
+                // create so its success pane can open the new procedure.
+                'created_procedure_id' => session('created_procedure_id'),
+                // The Risk Assessment wizard reads this after a successful create/
+                // supersede so it can upload staged evidence to the new draft and
+                // its success pane can open it.
+                'created_risk_assessment_id' => session('created_risk_assessment_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
@@ -276,7 +286,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v2';
+    protected const PERMISSIONS_CACHE_VERSION = 'v3';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -446,6 +456,7 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('hazards.create'),
                 'assign' => $user->canDo('hazards.assign'),
                 'close' => $user->canDo('hazards.close'),
+                'manage' => $user->canDo('hazards.manage'),
                 'manageTypes' => $user->canDo('hazards.manage_types'),
             ],
 
@@ -454,6 +465,13 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('restraints.create'),
                 'manage' => $user->canDo('restraints.manage'),
                 'review' => $user->canDo('restraints.review'),
+            ],
+
+            'procedures' => [
+                'view' => $user->canDo('procedures.view'),
+                'create' => $user->canDo('procedures.create'),
+                'manage' => $user->canDo('procedures.manage'),
+                'approve' => $user->canDo('procedures.approve'),
             ],
 
             'checklists' => [

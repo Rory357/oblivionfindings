@@ -14,6 +14,7 @@ import {
     ExternalLink,
     FileText,
     Hand,
+    HeartPulse,
     LinkIcon,
     ListTodo,
     Paperclip,
@@ -110,6 +111,7 @@ export type IncidentDetail = {
     safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
     fleet_incident?: { id: number; reference: string; type: string } | null;
     restraint_events?: Array<{ id: number; reference: string; restraint_type: string; severity: string; within_support_plan: boolean; injury_occurred: boolean }>;
+    first_aid_records?: Array<{ id: number; reference: string; person: string; injury: string; treatment_date: string | null; ambulance_called: boolean }>;
 };
 
 type SectionKey = 'overview' | 'timeline' | 'photos' | 'followups' | 'investigation' | 'linked';
@@ -849,15 +851,24 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
             ) : null}
             {(d.restraint_events ?? []).map((r) => (
                 <LinkedRow
-                    key={r.id}
+                    key={`re-${r.id}`}
                     icon={Hand}
                     title="Restraint event"
                     sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
                     href={`/health-safety/restraints?event=${r.id}`}
                 />
             ))}
+            {(d.first_aid_records ?? []).map((r) => (
+                <LinkedRow
+                    key={`fa-${r.id}`}
+                    icon={HeartPulse}
+                    title="First-aid treatment"
+                    sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
+                    href={`/health-safety/first-aid?record=${r.id}`}
+                />
+            ))}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length ? (
+            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length && !(d.first_aid_records ?? []).length ? (
                 <p className="text-sm text-muted-foreground">No linked records.</p>
             ) : null}
         </div>

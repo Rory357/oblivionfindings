@@ -331,12 +331,45 @@ class WorkerParticipationController extends Controller
             'terms_of_reference' => ['nullable', 'string', 'max:5000'],
             'members' => ['required', 'array', 'min:1'],
             'members.*' => ['integer', 'exists:users,id'],
+            // Optional inline first meeting — lets the schedule-meeting wizard
+            // stand up a brand-new committee AND its first meeting in ONE atomic
+            // request, instead of a fragile two-POST chain across an Inertia
+            // redirect (which could orphan the committee).
+            'schedule_meeting' => ['sometimes', 'boolean'],
+            'scheduled_at' => ['required_if:schedule_meeting,true', 'date'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'agenda_items' => ['nullable', 'array'],
+            'agenda_items.*' => ['string', 'max:255'],
+            'attendees' => ['nullable', 'array'],
+            'attendees.*' => ['integer', 'exists:users,id'],
         ]);
 
-        $committee = HsCommittee::create(array_merge($validated, [
+        $committee = HsCommittee::create([
+            'name' => $validated['name'],
+            'site_id' => $validated['site_id'],
+            'meeting_frequency' => $validated['meeting_frequency'],
+            'established_at' => $validated['established_at'],
+            'terms_of_reference' => $validated['terms_of_reference'] ?? null,
+            'members' => $validated['members'],
             'status' => 'active',
             'created_by' => $request->user()->id,
-        ]));
+        ]);
+
+        if ($request->boolean('schedule_meeting')) {
+            $meeting = $committee->meetings()->create([
+                'scheduled_at' => $validated['scheduled_at'],
+                'location' => $validated['location'] ?? null,
+                'agenda_items' => $validated['agenda_items'] ?? [],
+                'status' => 'scheduled',
+                'created_by' => $request->user()->id,
+            ]);
+
+            $attendeeIds = $this->cleanIds($validated['attendees'] ?? $committee->members ?? []);
+            $meeting->attendeeUsers()->sync($attendeeIds);
+            $this->notifyMeeting($meeting, $attendeeIds, $committee, notifyWorkers: true);
+
+            return back()->with('success', 'Committee created and first meeting scheduled.');
+        }
 
         return back()->with('success', 'Committee created successfully.')->with('created_committee_id', $committee->id);
     }
@@ -564,6 +597,16 @@ class WorkerParticipationController extends Controller
             'workers_consulted' => ['nullable', 'array'],
             'workers_consulted.*' => ['integer', 'exists:users,id'],
         ]);
+
+        // The lifecycle is monotonic — never regress the stage (e.g. recording
+        // late feedback on an already-actioned consultation keeps the later
+        // stage); content fields still save. Defense-in-depth — the front-end
+        // already computes a non-regressing target.
+        $current = array_search($consultation->status, self::CONSULT_STAGES, true);
+        $target = array_search($validated['status'], self::CONSULT_STAGES, true);
+        if ($current !== false && $target !== false && $target < $current) {
+            $validated['status'] = $consultation->status;
+        }
 
         $consultation->update($validated);
 

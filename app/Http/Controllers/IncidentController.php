@@ -296,6 +296,7 @@ class IncidentController extends Controller
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
                 'restraintEvents:id,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
+                'firstAidRecords:id,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
             ])
             ->find($incidentId);
 
@@ -430,6 +431,16 @@ class IncidentController extends Controller
                 'within_support_plan' => (bool) $e->within_support_plan,
                 'injury_occurred' => (bool) $e->injury_occurred,
             ])->values()->all(),
+            // First-aid treatments escalated to / linked with this incident — reciprocal
+            // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
+            'first_aid_records' => $incident->firstAidRecords->map(fn ($r) => [
+                'id' => $r->id,
+                'reference' => 'FA-'.str_pad((string) $r->id, 4, '0', STR_PAD_LEFT),
+                'person' => $r->treated_person_name,
+                'injury' => $r->injury_illness_type,
+                'treatment_date' => $r->treatment_date?->toISOString(),
+                'ambulance_called' => (bool) $r->ambulance_called,
+            ])->values(),
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),

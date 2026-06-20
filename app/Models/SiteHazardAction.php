@@ -15,15 +15,19 @@ class SiteHazardAction extends Model
     protected $fillable = [
         'tenant_id',
         'hazard_id',
+        'reference_number',
         'action_description',
+        'action_type',
         'status',
         'assigned_to_user_id',
+        'due_date',
         'completed_at',
         'completed_by_user_id',
         'completion_notes',
     ];
 
     protected $casts = [
+        'due_date' => 'date',
         'completed_at' => 'datetime',
     ];
 
