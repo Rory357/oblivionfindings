@@ -210,7 +210,7 @@ class SafeWorkProcedureController extends Controller
         ]);
 
         if (! empty($validated['note'])) {
-            $this->snapshotVersion($procedure->fresh(), $procedure->current_version, 'Approved: '.$validated['note'], $request->user()->id);
+            $this->snapshotNewVersion($procedure, 'Approved: '.$validated['note'], $request->user()->id);
         }
 
         return back()->with('success', 'Procedure approved.');
@@ -225,7 +225,7 @@ class SafeWorkProcedureController extends Controller
         $procedure->update(['status' => 'draft', 'updated_by' => $request->user()->id]);
 
         if (! empty($validated['note'])) {
-            $this->snapshotVersion($procedure->fresh(), $procedure->current_version, 'Returned to draft: '.$validated['note'], $request->user()->id);
+            $this->snapshotNewVersion($procedure, 'Returned to draft: '.$validated['note'], $request->user()->id);
         }
 
         return back()->with('success', 'Returned to draft for changes.');
@@ -240,9 +240,8 @@ class SafeWorkProcedureController extends Controller
 
         $procedure->update(['review_date' => $validated['review_date'], 'updated_by' => $request->user()->id]);
 
-        $this->snapshotVersion(
-            $procedure->fresh(),
-            $procedure->current_version,
+        $this->snapshotNewVersion(
+            $procedure,
             'Review recorded'.(! empty($validated['note']) ? ': '.$validated['note'] : ''),
             $request->user()->id,
         );
@@ -768,6 +767,18 @@ class SafeWorkProcedureController extends Controller
             'change_summary' => $summary,
             'changed_by' => $userId,
         ]);
+    }
+
+    /**
+     * Record a controlled-document lifecycle revision (review / approval / return-to-
+     * draft note): bump current_version and snapshot at the NEW number. A version row
+     * for the current number already exists (store/update/seed wrote it), so reusing
+     * it would violate the unique (procedure, version) index — bump first.
+     */
+    private function snapshotNewVersion(SafeWorkProcedure $procedure, string $summary, int $userId): void
+    {
+        $procedure->update(['current_version' => $procedure->current_version + 1]);
+        $this->snapshotVersion($procedure->fresh(), $procedure->current_version, $summary, $userId);
     }
 
     private function mapProcedureForForm(SafeWorkProcedure $procedure): array
