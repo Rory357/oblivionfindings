@@ -219,6 +219,36 @@ class WorkerParticipationTest extends TestCase
             ->assertSessionHas('created_committee_id', HsCommittee::where('name', 'New build committee')->value('id'));
     }
 
+    public function test_store_committee_schedules_its_first_meeting_atomically(): void
+    {
+        Notification::fake();
+        $site = Site::factory()->create();
+        $member = User::factory()->create();
+
+        // The schedule-meeting wizard's "new committee" path posts the committee
+        // AND its first meeting in one request, so the meeting can never be
+        // dropped/orphaned by a fragile two-POST chain across a redirect.
+        $this->actingAs($this->officer())
+            ->post('/health-safety/worker-participation/committees', [
+                'name' => 'Atomic Committee',
+                'site_id' => $site->id,
+                'meeting_frequency' => 'quarterly',
+                'established_at' => now()->toDateString(),
+                'members' => [$member->id],
+                'schedule_meeting' => true,
+                'scheduled_at' => now()->addWeek()->toDateTimeString(),
+                'location' => 'Staff room',
+                'attendees' => [$member->id],
+            ])
+            ->assertRedirect();
+
+        $committee = HsCommittee::where('name', 'Atomic Committee')->firstOrFail();
+        $meeting = HsCommitteeMeeting::where('hs_committee_id', $committee->id)->firstOrFail();
+        $this->assertSame('scheduled', $meeting->status);
+        $this->assertTrue($meeting->attendeeUsers()->where('users.id', $member->id)->exists());
+        Notification::assertSentTo($member, CommitteeMeetingScheduled::class);
+    }
+
     /* ---- meetings: pivot attendees + notifications ------------------- */
 
     public function test_schedule_meeting_syncs_pivot_and_notifies_attendees(): void
