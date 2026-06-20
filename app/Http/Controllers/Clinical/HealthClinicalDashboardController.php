@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Clinical;
 
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
@@ -242,5 +243,35 @@ class HealthClinicalDashboardController extends Controller
         ), 403);
 
         return response()->json($this->dashboardService->getClinicalCard($client));
+    }
+
+    /**
+     * Review & sign off a clinical event. Permission gated by route middleware.
+     */
+    public function reviewEvent(Request $request, ClinicalEvent $event): RedirectResponse
+    {
+        $this->eventService->review($event, $request->user());
+
+        return back()->with('success', 'Clinical event reviewed and signed off.');
+    }
+
+    /**
+     * Mark a clinical event's follow-up complete.
+     */
+    public function completeEventFollowup(Request $request, ClinicalEvent $event): RedirectResponse
+    {
+        $this->eventService->completeFollowup($event, $request->user());
+
+        return back()->with('success', 'Follow-up marked complete.');
+    }
+
+    /**
+     * Escalate a clinical event to on-call clinical leadership.
+     */
+    public function escalateEvent(Request $request, ClinicalEvent $event): RedirectResponse
+    {
+        $this->eventService->escalate($event, $request->user());
+
+        return back()->with('success', 'Clinical event escalated to on-call leadership.');
     }
 }

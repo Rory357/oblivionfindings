@@ -39,6 +39,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/events', [HealthClinicalDashboardController::class, 'storeEvent'])
             ->middleware('permission:clinical.events.record')
             ->name('events.store');
+        Route::patch('/events/{event}/review', [HealthClinicalDashboardController::class, 'reviewEvent'])
+            ->middleware('permission:clinical.events.review')
+            ->name('events.review');
+        Route::patch('/events/{event}/follow-up/complete', [HealthClinicalDashboardController::class, 'completeEventFollowup'])
+            ->middleware('permission:clinical.events.review|clinical.events.record')
+            ->name('events.followup.complete');
+        Route::post('/events/{event}/escalate', [HealthClinicalDashboardController::class, 'escalateEvent'])
+            ->middleware('permission:clinical.events.escalate')
+            ->name('events.escalate');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');

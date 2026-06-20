@@ -435,6 +435,8 @@ class HandleInertiaRequests extends Middleware
                 'eventsView' => $user->canDo('clinical.events.view'),
                 'eventsViewAssigned' => $user->canDo('clinical.events.viewAssigned'),
                 'eventsRecord' => $user->canDo('clinical.events.record'),
+                'eventsReview' => $user->canDo('clinical.events.review'),
+                'eventsEscalate' => $user->canDo('clinical.events.escalate'),
             ],
 
             'hazards' => [

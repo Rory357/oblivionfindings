@@ -6,6 +6,7 @@ use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Enums\AlertSeverity;
+use App\Models\User;
 use App\Models\ControlRoom\SignalSource;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Facades\Log;
@@ -59,6 +60,32 @@ class ClinicalSignalService
             ],
             $event->site_id,
             "clinical_event_{$event->id}",
+        );
+    }
+
+    /**
+     * Emit a forced high-priority Control Room signal when a clinician escalates
+     * an event (regardless of its original severity). A distinct idempotency key
+     * lets an already-emitted event still raise a fresh escalation alert.
+     */
+    public function emitForEscalation(ClinicalEvent $event, User $escalatedBy): void
+    {
+        $event->loadMissing('client');
+
+        $this->emit(
+            $this->resolveSignalType($event),
+            $event->client_id,
+            AlertSeverity::HIGH,
+            'Escalated: ' . $this->buildMessage($event),
+            [
+                'clinical_event_id' => $event->id,
+                'event_type' => $event->event_type->value,
+                'escalated_by' => $escalatedBy->id,
+                'site_id' => $event->site_id,
+                'occurred_at' => $event->occurred_at,
+            ],
+            $event->site_id,
+            "escalation_{$event->id}",
         );
     }
 
