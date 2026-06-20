@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { TabsContent } from '@/components/ui/tabs';
+import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/datetime';
@@ -2341,6 +2342,14 @@ export default function SiteShow({
                                 </Card>
                             );
                         })()}
+                        {((page.props.safeWorkProcedures ?? []) as ApplicableProcedure[]).length > 0 ? (
+                            <div className="mt-4">
+                                <ApplicableProceduresPanel
+                                    procedures={(page.props.safeWorkProcedures ?? []) as ApplicableProcedure[]}
+                                    subtitle={`Procedures that apply at ${site.name} (and organisation-wide)`}
+                                />
+                            </div>
+                        ) : null}
                     </TabsContent>
 
                     {/* Fleet Tab */}

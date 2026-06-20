@@ -31,6 +31,7 @@ use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
+use App\Models\SafeWorkProcedure;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -170,9 +171,28 @@ class MyHrController extends Controller
             ->limit(5)
             ->get(['id', 'title', 'priority', 'published_at']);
 
+        // Safe Work Procedures applicable to my role(s) — read-only, deep-links to
+        // the procedures register's detail modal. Role-matched + org-wide (approved).
+        $roleKeys = $user->roles()->pluck('name')->all();
+        $safeWorkProcedures = $user->canDo('procedures.view')
+            ? SafeWorkProcedure::query()->applicableToRoles($roleKeys)
+                ->orderBy('title')
+                ->limit(25)
+                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                ->map(fn (SafeWorkProcedure $p) => [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number,
+                    'title' => $p->title,
+                    'category' => $p->category,
+                    'status' => $p->status,
+                    'review_date' => $p->review_date?->toDateString(),
+                ])->values()
+            : collect();
+
         return Inertia::render('hr/my/index', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
             'overview' => $this->myHrOverviewProps($user, $tenantId),
+            'safeWorkProcedures' => $safeWorkProcedures,
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,
