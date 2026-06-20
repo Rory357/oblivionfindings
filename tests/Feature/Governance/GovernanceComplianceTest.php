@@ -3,7 +3,6 @@
 namespace Tests\Feature\Governance;
 
 use App\Domain\Governance\Models\ComplianceEvidence;
-use App\Domain\Governance\Models\ComplianceObligation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -12,8 +11,8 @@ use Tests\TestCase;
 
 class GovernanceComplianceTest extends TestCase
 {
-    use RefreshDatabase;
     use GovernanceTestHelpers;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -108,5 +107,49 @@ class GovernanceComplianceTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('Governance/Compliance/Calendar')
         );
+    }
+
+    public function test_modal_create_persists_priority_requirements_and_frequency(): void
+    {
+        $admin = $this->createAdminUser();
+
+        // The /compliance command-centre wizard posts the extra fields with _modal:true.
+        $response = $this->actingAs($admin)->post('/governance/compliance', [
+            'framework' => 'hswa',
+            'title' => 'Quarterly H&S committee review',
+            'description' => 'Workplace H&S committee meets and minutes are filed',
+            'requirements' => 'Signed minutes uploaded as evidence each quarter',
+            'frequency' => 'quarterly',
+            'priority' => 'high',
+            'due_date' => now()->addDays(20)->toDateString(),
+            'owner_id' => $admin->id,
+            '_modal' => true,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('compliance_obligations', [
+            'framework' => 'hswa',
+            'obligation_title' => 'Quarterly H&S committee review',
+            'requirements' => 'Signed minutes uploaded as evidence each quarter',
+            'frequency' => 'quarterly',
+            'priority' => 'high',
+            'owner_id' => $admin->id,
+        ]);
+    }
+
+    public function test_command_centre_exposes_wizard_reference_data_to_managers(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->actingAs($admin)
+            ->get('/compliance')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can.manage', true)
+                ->has('owners')
+                ->has('obligations')
+                ->has('relatedIncidents')
+                ->has('frameworks')
+            );
     }
 }

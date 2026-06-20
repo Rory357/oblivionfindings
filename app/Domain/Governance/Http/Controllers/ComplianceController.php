@@ -4,8 +4,10 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Http\Requests\StoreComplianceObligationRequest;
 use App\Domain\Governance\Models\ComplianceObligation;
+use App\Domain\Governance\Models\NotifiableIncident;
 use App\Domain\Governance\Services\ComplianceEngineService;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -70,22 +72,30 @@ class ComplianceController extends Controller
 
         $validated = $request->validated();
 
-        $owner = $validated['owner_id'] ? \App\Models\User::find($validated['owner_id']) : null;
+        $owner = $validated['owner_id'] ? User::find($validated['owner_id']) : null;
         $dueDate = $validated['due_date'] ? Carbon::parse($validated['due_date']) : null;
 
         $obligation = $this->complianceService->createObligation(
             $validated['framework'],
             $validated['title'],
             $validated['description'],
-            'annual', // default frequency
+            $validated['frequency'] ?? 'annual',
             $owner ?? auth()->user(),
             $dueDate,
             $validated['obligation_reference'] ?? null,
-            $validated['reminder_days'] ?? null
+            $validated['reminder_days'] ?? null,
+            $validated['priority'] ?? 'medium',
+            $validated['requirements'] ?? null
         );
 
         // Schedule reminders
         $this->complianceService->scheduleReminders($obligation);
+
+        // Modal callers (e.g. the /compliance command centre wizard) stay on the page
+        // and show a success pane — preserve their context instead of redirecting to show.
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'Compliance obligation created.');
+        }
 
         return redirect()->route('governance.compliance.show', $obligation)
             ->with('success', 'Compliance obligation created.');
@@ -201,14 +211,19 @@ class ComplianceController extends Controller
             'related_incident_id' => 'nullable|integer',
         ]);
 
-        $incident = \App\Domain\Governance\Models\NotifiableIncident::create([
+        $incident = NotifiableIncident::create([
             ...$validated,
             'status' => 'pending',
             'submitted_by' => auth()->id(),
         ]);
 
-        return redirect()->route('governance.compliance.index')
-            ->with('success', 'Notifiable incident recorded. Ensure timely notification to '.$validated['notification_authority'].'.');
+        $message = 'Notifiable incident recorded. Ensure timely notification to '.$validated['notification_authority'].'.';
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', $message);
+        }
+
+        return redirect()->route('governance.compliance.index')->with('success', $message);
     }
 
     protected function getFrameworks(): array
