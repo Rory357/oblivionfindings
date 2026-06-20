@@ -186,6 +186,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         });
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{substance}', [HazardousSubstanceController::class, 'update'])->name('update');
+            Route::patch('/{substance}/status', [HazardousSubstanceController::class, 'updateStatus'])
+                ->whereNumber('substance')->name('status');
         });
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
 

@@ -699,6 +699,10 @@ class SiteController extends Controller
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
             'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            'chemicalsStored' => array_merge(
+                app(HsModuleSummaryService::class)->chemicalsStoredForSite($site->id),
+                ['can_add' => (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'))],
+            ),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],

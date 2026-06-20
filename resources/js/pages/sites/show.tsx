@@ -33,6 +33,7 @@ import { TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/datetime';
+import { SiteChemicalsPanel, type SiteChemicalsData } from '@/components/health-safety/site-chemicals-panel';
 import { formatCurrency } from '@/lib/fleet-utils';
 import type { ChecklistsData } from '@/components/checklists/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -641,6 +642,7 @@ type Props = {
     checklistsData?: ChecklistsData;
     inspectionsSummary?: InspectionsSummary;
     drillsSummary?: DrillsSummary;
+    chemicalsStored?: SiteChemicalsData;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -934,6 +936,7 @@ export default function SiteShow({
     checklistsData,
     inspectionsSummary = emptyInspectionsSummary,
     drillsSummary = emptyDrillsSummary,
+    chemicalsStored = { rows: [], summary: { count: 0, controlled: 0, sds_to_action: 0, segregation_gaps: 0 }, substances: [], can_add: false },
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -2259,7 +2262,7 @@ export default function SiteShow({
                     </TabsContent>
 
                     {/* Hazards Tab */}
-                    <TabsContent value="hazards">
+                    <TabsContent value="hazards" className="space-y-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Hazards Register</CardTitle>
@@ -2292,6 +2295,9 @@ export default function SiteShow({
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Chemicals stored at this site (read-mostly; managed from the Chemical register) */}
+                        <SiteChemicalsPanel data={chemicalsStored} siteId={site.id} siteName={site.name} />
                     </TabsContent>
 
                     {/* Fleet Tab */}
