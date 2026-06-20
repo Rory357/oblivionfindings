@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class DataBreachLog extends Model
 {
@@ -54,5 +55,13 @@ class DataBreachLog extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Evidence documents (screenshots, incident reports, NotifyUs receipts).
+     */
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(PrivacyAttachment::class, 'attachable')->latest();
     }
 }
