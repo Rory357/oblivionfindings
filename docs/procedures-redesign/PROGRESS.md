@@ -85,10 +85,19 @@ Worktree: `.claude/worktrees/cool-shirley-187cb8` · branch `claude/cool-shirley
 - [x] **Step 7 — Seeder + factory:** `seedSafeWorkProcedures()` (9 NZ procedures across statuses/review
       states/versions) + factory fixed (valid lifecycle states + categories). Seeder ran clean.
 - [x] **Step 8 — Tests + verify:** `SafeWorkProcedureTest` **16 passing / 106 assertions** (payload/tabs/
-      detail/filters/lifecycle/attachment IDOR/gating). tsc 0 · eslint 0 errors. _(prod build + browser-test
-      fix pending in Step 9.)_
-- [ ] **Step 9 (FINAL) — Prod `npm run build` + (optional) deferred cross-module + merge + deploy +
-      Chrome-verify** on .com.
+      detail/filters/lifecycle/attachment IDOR/gating). Full `tests/Feature/HealthSafety` **298 passing /
+      1169 assertions** (zero regressions from shared-file edits). tsc 0 · eslint 0 errors · prod
+      `npm run build` clean (4m 2s, procedures chunk in manifest) · Dusk create-page test retargeted.
+- [x] **Cross-module scopes** — `SafeWorkProcedure::scopeApplicableToSite/ToRoles` added (commit `6c2b5e07`)
+      so the deferred Site/HR/Client panels are a trivial, conflict-free follow-up.
+- [ ] **Step 9 (FINAL) — merge → deploy → Chrome-verify on .com.** ⚠️ Live production deploy — gated on the
+      user's go-ahead. On merge: re-run `*PermissionsSeeder --force` on the server (`procedures.*` seeded, not
+      migrated). ⚠️ shared-file edits (additive) may conflict with concurrent loops — resolve keeping both.
+
+## FINAL STATE (2026-06-20)
+Core redesign **DONE + committed + fully verified** on branch `claude/cool-shirley-187cb8`
+(commits `b2979d33` + `6c2b5e07`). Ready to merge. Deferred (scope-ready, documented): Site profile /
+`/hr/my` + HR staff profile (separate HR brief) / Client risk-tab read-only panels; hazards↔SiteHazard pivot.
 
 ---
 
