@@ -75,15 +75,28 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/risk-assessment-register', [HsGovernanceReportController::class, 'riskAssessmentRegister'])->name('risk-assessment-register');
     });
 
-    // ── Phase 5A: First Aid Register ────────────────────────────────────
+    // ── Phase 5A: First Aid Register (gold-standard rebuild) ────────────
     Route::prefix('first-aid')->name('first-aid.')->group(function () {
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [FirstAidController::class, 'index'])->name('index');
+            // Static sub-routes before the {record} wildcard so they aren't swallowed.
+            Route::get('/{record}/attachments/{attachment}/download', [FirstAidController::class, 'downloadAttachment'])->name('attachments.download');
+            Route::get('/{record}', [FirstAidController::class, 'show'])->name('show');
         });
 
         Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::post('/', [FirstAidController::class, 'store'])->name('store');
+            Route::put('/{record}', [FirstAidController::class, 'update'])->name('update');
+            Route::post('/{record}/link-incident', [FirstAidController::class, 'linkIncident'])->name('link-incident');
+            Route::post('/{record}/followups', [FirstAidController::class, 'addFollowup'])->name('followups.add');
+            Route::patch('/{record}/followups/{followup}/complete', [FirstAidController::class, 'completeFollowup'])->name('followups.complete');
+            Route::post('/{record}/attachments', [FirstAidController::class, 'uploadAttachment'])->name('attachments.upload');
+            Route::delete('/{record}/attachments/{attachment}', [FirstAidController::class, 'destroyAttachment'])->name('attachments.destroy');
+        });
+
+        Route::middleware('permission:hazards.manage')->group(function () {
+            Route::delete('/{record}', [FirstAidController::class, 'destroy'])->name('destroy');
         });
     });
 

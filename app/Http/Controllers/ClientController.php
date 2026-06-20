@@ -1003,6 +1003,16 @@ class ClientController extends Controller
                 ->limit(5)
                 ->get(),
 
+            // First-aid treatments recorded for this client (read-only panel; gated on the
+            // first_aid_records.client_id FK added by the gold-standard rebuild).
+            'first_aid_records' => \Illuminate\Support\Facades\Schema::hasTable('first_aid_records')
+                ? \App\Models\FirstAidRecord::where('client_id', $client->id)
+                    ->with(['site:id,name', 'firstAider:id,name'])
+                    ->orderByDesc('treatment_date')
+                    ->limit(10)
+                    ->get()
+                : [],
+
             'care_plans_summary' => [
                 // The "current" plan: the active plan if one exists, otherwise the
                 // latest draft (so a freshly-created draft is visible + editable in-tab).
