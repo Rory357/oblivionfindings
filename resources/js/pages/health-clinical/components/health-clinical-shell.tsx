@@ -25,6 +25,7 @@ import {
     type RosterTabItem,
 } from '@/components/rostering';
 import { cn } from '@/lib/utils';
+import { RecordEventDialog } from '@/pages/health-clinical/components/record-event-dialog';
 import { RecordObservationDialog } from '@/pages/health-clinical/components/record-observation-dialog';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -236,7 +237,9 @@ export function HealthClinicalShell({
     const page = usePage<{ auth?: { can?: { clinical?: ClinicalAbilities } } }>();
     const can = page.props.auth?.can?.clinical ?? {};
     const canRecordObs = !!(can.observationsRecord || can.observationsRecordClinical);
+    const canRecordEvent = !!can.eventsRecord;
     const [obsOpen, setObsOpen] = useState(false);
+    const [eventOpen, setEventOpen] = useState(false);
 
     const go = (href: string | null) => {
         if (href) router.visit(href, { preserveScroll: true });
@@ -277,15 +280,27 @@ export function HealthClinicalShell({
                             </div>
                         </div>
 
-                        {canRecordObs ? (
+                        {canRecordObs || canRecordEvent ? (
                             <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={() => setObsOpen(true)}
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                >
-                                    <Activity className="mr-1.5 h-4 w-4" /> Record observation
-                                </Button>
+                                {canRecordObs ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setObsOpen(true)}
+                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    >
+                                        <Activity className="mr-1.5 h-4 w-4" /> Record observation
+                                    </Button>
+                                ) : null}
+                                {canRecordEvent ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setEventOpen(true)}
+                                        className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                                    >
+                                        <Stethoscope className="mr-1.5 h-4 w-4" /> Log clinical event
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : null}
                     </div>
@@ -375,6 +390,7 @@ export function HealthClinicalShell({
                 onClose={() => setObsOpen(false)}
                 canRecordClinical={!!can.observationsRecordClinical}
             />
+            <RecordEventDialog open={eventOpen} onClose={() => setEventOpen(false)} />
         </AppLayout>
     );
 }
