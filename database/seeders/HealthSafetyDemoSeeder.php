@@ -97,7 +97,128 @@ class HealthSafetyDemoSeeder extends Seeder
             $this->command->info('Governance backbone already seeded, skipping.');
         }
 
+        // ── 8. Lone Worker Safety (sessions + check-ins + legacy alerts) ──
+        if (! DB::table('lone_worker_sessions')->where('activity_description', 'like', '%' . self::DEMO_MARKER . '%')->exists()) {
+            $this->command->info('Seeding Lone Worker sessions...');
+            $this->seedLoneWorkers($userIds, $siteIds, $clientIds, $now);
+        } else {
+            $this->command->info('Lone Worker sessions already seeded, skipping.');
+        }
+
         $this->command->info('Health & Safety demo data seeded successfully.');
+    }
+
+    /* ==================================================================
+     *  Lone Worker Safety — live monitoring register demo data
+     * ================================================================*/
+    private function seedLoneWorkers(array $userIds, array $siteIds, array $clientIds, Carbon $now): void
+    {
+        // NZ field locations (Bay of Plenty / Waikato) for the last-known-location map.
+        $coords = [
+            ['Tauranga community visit', -37.6878, 176.1651],
+            ['Hamilton home support', -37.7870, 175.2793],
+            ['Rotorua site lock-up', -38.1368, 176.2497],
+            ['Mount Maunganui welfare check', -37.6406, 176.1849],
+        ];
+
+        $mk = function (string $status, int $startedMinsAgo, int $expectedMins, ?int $lastCheckinMinsAgo, int $interval, array $coord, ?Carbon $endedAt = null, ?Carbon $emergencyAt = null) use ($userIds, $siteIds, $clientIds, $now): array {
+            $started = $now->copy()->subMinutes($startedMinsAgo);
+
+            return [
+                'user_id' => $userIds[array_rand($userIds)],
+                'site_id' => $siteIds[array_rand($siteIds)],
+                'client_id' => (! empty($clientIds) && rand(0, 1) === 1) ? $clientIds[array_rand($clientIds)] : null,
+                'shift_id' => null,
+                'started_at' => $started,
+                'expected_end_at' => $started->copy()->addMinutes($expectedMins),
+                'ended_at' => $endedAt,
+                'location' => $coord[0],
+                'location_lat' => $coord[1],
+                'location_lng' => $coord[2],
+                'activity_description' => $coord[0] . ' ' . self::DEMO_MARKER,
+                'check_in_interval_minutes' => $interval,
+                'last_check_in_at' => $lastCheckinMinsAgo !== null ? $now->copy()->subMinutes($lastCheckinMinsAgo) : $started,
+                'status' => $status,
+                'emergency_triggered_at' => $emergencyAt,
+                'emergency_notes' => $emergencyAt ? ('No response to welfare call ' . self::DEMO_MARKER) : null,
+                'created_by' => $userIds[array_rand($userIds)],
+                'updated_by' => $userIds[array_rand($userIds)],
+                'created_at' => $started,
+                'updated_at' => $now,
+            ];
+        };
+
+        $rows = [
+            $mk('active', 95, 240, 12, 30, $coords[0]),
+            $mk('active', 50, 180, 8, 60, $coords[1]),
+            $mk('overdue', 200, 180, 75, 30, $coords[2]),
+            $mk('emergency', 40, 180, 35, 30, $coords[3], null, $now->copy()->subMinutes(9)),
+            $mk('completed', 1500, 240, 1260, 60, $coords[0], $now->copy()->subMinutes(1260)),
+            $mk('completed', 1600, 240, 1380, 60, $coords[1], $now->copy()->subMinutes(1370)),
+        ];
+
+        foreach ($rows as $row) {
+            $sessionId = DB::table('lone_worker_sessions')->insertGetId($row);
+
+            $checkIns = [[
+                'lone_worker_session_id' => $sessionId,
+                'checked_in_at' => $row['started_at'],
+                'location_lat' => $row['location_lat'],
+                'location_lng' => $row['location_lng'],
+                'status' => 'ok',
+                'notes' => 'Arrived on site ' . self::DEMO_MARKER,
+                'created_at' => $row['started_at'],
+                'updated_at' => $row['started_at'],
+            ]];
+
+            if (in_array($row['status'], ['active', 'completed'], true)) {
+                $mid = $row['started_at']->copy()->addMinutes(30);
+                $checkIns[] = [
+                    'lone_worker_session_id' => $sessionId,
+                    'checked_in_at' => $mid,
+                    'location_lat' => $row['location_lat'],
+                    'location_lng' => $row['location_lng'],
+                    'status' => 'ok',
+                    'notes' => null,
+                    'created_at' => $mid,
+                    'updated_at' => $mid,
+                ];
+            }
+            if ($row['status'] === 'emergency') {
+                $checkIns[] = [
+                    'lone_worker_session_id' => $sessionId,
+                    'checked_in_at' => $row['emergency_triggered_at'],
+                    'location_lat' => $row['location_lat'],
+                    'location_lng' => $row['location_lng'],
+                    'status' => 'emergency',
+                    'notes' => 'Emergency raised ' . self::DEMO_MARKER,
+                    'created_at' => $row['emergency_triggered_at'],
+                    'updated_at' => $row['emergency_triggered_at'],
+                ];
+            }
+            DB::table('lone_worker_check_ins')->insert($checkIns);
+
+            if ($row['status'] === 'overdue') {
+                DB::table('lone_worker_alerts')->insert([
+                    'lone_worker_session_id' => $sessionId,
+                    'alert_type' => 'overdue_check_in',
+                    'triggered_at' => $now->copy()->subMinutes(45),
+                    'status' => 'active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+            if ($row['status'] === 'emergency') {
+                DB::table('lone_worker_alerts')->insert([
+                    'lone_worker_session_id' => $sessionId,
+                    'alert_type' => 'emergency',
+                    'triggered_at' => $row['emergency_triggered_at'],
+                    'status' => 'active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
     }
 
     /* ==================================================================

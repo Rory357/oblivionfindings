@@ -161,6 +161,10 @@ export function HeroCluster({ title, icon: Icon, children }: { title: string; ic
 
 type BadgeTone = 'success' | 'warning' | 'critical';
 
+/** A single compliance chip. Pages with a bespoke compliance story (e.g. Lone Workers)
+ *  pass an `items` array of these to override the canonical module row below. */
+export type HeroComplianceBadge = { icon: LucideIcon; tone: BadgeTone; label: string };
+
 const CHIP_CLASS: Record<BadgeTone, string> = {
     success: 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
     warning: 'border-status-warning/50 bg-status-warning/25 text-primary-foreground',
@@ -175,15 +179,19 @@ const CHIP_ICON: Record<BadgeTone, string> = {
 /** The five canonical NZ compliance chips — one tone map, one label set, fed by counts/booleans
  *  (never pre-formatted strings) so both H&S heroes read identically. */
 export function HeroComplianceBadges({
-    worksafeAwaiting,
-    sdsExpiring,
+    items,
+    worksafeAwaiting = 0,
+    sdsExpiring = 0,
     drillsDue = 0,
     drillsOverdue = 0,
     ngaPaerewaCertified = true,
     firstAidOk = true,
 }: {
-    worksafeAwaiting: number;
-    sdsExpiring: number;
+    /** Optional override — render this exact chip set instead of the canonical module
+     *  row. Lets a page tell its own compliance story while keeping identical chip chrome. */
+    items?: HeroComplianceBadge[];
+    worksafeAwaiting?: number;
+    sdsExpiring?: number;
     /** Drills due-soon → warning. */
     drillsDue?: number;
     /** Drills past their cadence → critical; outranks `drillsDue`. */
@@ -201,7 +209,7 @@ export function HeroComplianceBadges({
               ? `Fire · ${drillsDue} drill${drillsDue === 1 ? '' : 's'} due`
               : 'Fire · Drills current';
 
-    const badges: { icon: LucideIcon; tone: BadgeTone; label: string }[] = [
+    const badges: HeroComplianceBadge[] = items ?? [
         {
             icon: worksafeAwaiting > 0 ? AlertTriangle : CheckCircle2,
             tone: worksafeAwaiting > 0 ? 'warning' : 'success',
