@@ -286,8 +286,17 @@ class HealthClinicalDashboardController extends Controller
 
         $kpis = $this->dashboardService->getKpis();
 
+        // Assigned-only users only see their own clients in the picker (no roster leak).
+        $clients = Client::query()
+            ->when(
+                ! $auth->canDo('clinical.observations.viewAny'),
+                fn ($query) => $query->whereHas('supportWorkers', fn ($q) => $q->whereKey($auth->id)),
+            )
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+
         return inertia('health-clinical/Trends', [
-            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'clients' => $clients,
             'selected_client' => $client?->only(['id', 'first_name', 'last_name']),
             'filters' => [
                 'client_id' => $validated['client_id'] ?? null,
@@ -500,6 +509,12 @@ class HealthClinicalDashboardController extends Controller
         $q = trim((string) $request->input('q', ''));
 
         $clients = Client::query()
+            // Assigned-only users may only search/pick clients they can view — never leak
+            // other clients' names/NHI through the wizard picker.
+            ->when(
+                ! $user->canDo('clinical.observations.viewAny'),
+                fn ($query) => $query->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id)),
+            )
             ->when($q !== '', fn ($query) => $query->where(function ($sub) use ($q) {
                 $sub->where('first_name', 'like', "%{$q}%")
                     ->orWhere('last_name', 'like', "%{$q}%")

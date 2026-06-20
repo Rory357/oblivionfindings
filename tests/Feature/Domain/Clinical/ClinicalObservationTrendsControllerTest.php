@@ -168,6 +168,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         $assigned = $this->createUserWithRole('support_worker');
         $unassigned = $this->createUserWithRole('support_worker');
         $client = Client::factory()->create();
+        Client::factory()->create(); // another client this worker is NOT assigned to
         $client->supportWorkers()->attach($assigned->id);
 
         ClinicalObservation::factory()->weight()->create([
@@ -182,7 +183,10 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/Trends')
                 ->where('selected_client.id', $client->id)
-                ->where('trend_sets.weight.points.0.weight_kg', 70.5));
+                ->where('trend_sets.weight.points.0.weight_kg', 70.5)
+                // Picker is scoped to the worker's caseload — the other client is excluded.
+                ->has('clients', 1)
+                ->where('clients.0.id', $client->id));
 
         // Unassigned worker swapping in another client's id → 403, no PHI leaked.
         $this->actingAs($unassigned)

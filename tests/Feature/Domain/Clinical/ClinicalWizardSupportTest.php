@@ -65,6 +65,28 @@ class ClinicalWizardSupportTest extends TestCase
             ->assertJsonPath('clients.0.nhi', 'ZAC5961');
     }
 
+    public function test_client_search_scopes_to_assigned_clients_for_assigned_only_users(): void
+    {
+        // A viewAssigned-only support worker must not discover other clients' names/NHI
+        // through the wizard picker — only their own caseload.
+        $worker = $this->createUserWithRole('support_worker');
+        $mine = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata']);
+        Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Solomon']);
+        $mine->supportWorkers()->attach($worker->id);
+
+        $this->actingAs($worker)
+            ->getJson('/health-clinical/clients/search?q=aroha')
+            ->assertOk()
+            ->assertJsonCount(1, 'clients')
+            ->assertJsonPath('clients.0.id', $mine->id);
+
+        // A viewAny holder (coordinator) still sees both matches.
+        $this->actingAs($this->user)
+            ->getJson('/health-clinical/clients/search?q=aroha')
+            ->assertOk()
+            ->assertJsonCount(2, 'clients');
+    }
+
     public function test_clinical_card_returns_allergies_baseline_and_protocols(): void
     {
         $client = Client::factory()->create();
