@@ -13,6 +13,7 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsRepresentative;
 use App\Models\Site;
+use App\Models\StaffCredential;
 use App\Models\User;
 use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use Illuminate\Http\RedirectResponse;
@@ -45,6 +46,9 @@ class WorkerParticipationController extends Controller
 
     /** Canonical consultation lifecycle, in order. */
     private const CONSULT_STAGES = ['open', 'feedback_received', 'actioned', 'closed'];
+
+    /** StaffCredential.type used to track a trained HSR (NZQA US 29315). */
+    private const HSR_CREDENTIAL_TYPE = 'HSR Initial Training (NZQA US 29315)';
 
     public function __construct(
         private readonly ComplianceEngineService $compliance,
@@ -249,7 +253,9 @@ class WorkerParticipationController extends Controller
             'created_by' => $request->user()->id,
         ]));
 
-        $this->syncRepresentativeObligations($rep->fresh('user'), $request->user());
+        $fresh = $rep->fresh('user');
+        $this->syncRepresentativeObligations($fresh, $request->user());
+        $this->syncTrainedHsrCredential($fresh);
 
         return back()->with('success', 'H&S representative added successfully.');
     }
@@ -260,12 +266,15 @@ class WorkerParticipationController extends Controller
             'status' => ['sometimes', 'string', 'in:active,inactive,resigned'],
             'work_group' => ['sometimes', 'nullable', 'string', 'max:120'],
             'training_days_completed' => ['sometimes', 'integer', 'min:0', 'max:30'],
+            'initial_training_completed_at' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'term_expires_at' => ['sometimes', 'nullable', 'date', 'before_or_equal:'.now()->addYears(3)->toDateString()],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
         $representative->update($validated);
-        $this->syncRepresentativeObligations($representative->fresh('user'), $request->user());
+        $fresh = $representative->fresh('user');
+        $this->syncRepresentativeObligations($fresh, $request->user());
+        $this->syncTrainedHsrCredential($fresh);
 
         return back()->with('success', 'Representative updated successfully.');
     }
@@ -308,6 +317,32 @@ class WorkerParticipationController extends Controller
             );
             $this->compliance->scheduleReminders($ob);
         }
+    }
+
+    /**
+     * Surface a trained HSR (completed NZQA Unit Standard 29315) as a tracked HR
+     * credential on the rep's staff record — visible on /staff/{id}/credentials and
+     * read by the HR compliance evaluator's `credential` check. Reuses the existing
+     * staff_credentials table (no parallel credential system) and is idempotent on
+     * [user_id, type], so re-saving the rep never duplicates. Closes the
+     * cross-module gap where "trained HSR" (a precondition for issuing PINs /
+     * directing cease-unsafe-work) was not a tracked credential.
+     */
+    private function syncTrainedHsrCredential(HsRepresentative $rep): void
+    {
+        if (! $rep->initial_training_completed_at || ! $rep->user_id) {
+            return;
+        }
+
+        StaffCredential::updateOrCreate(
+            ['user_id' => $rep->user_id, 'type' => self::HSR_CREDENTIAL_TYPE],
+            [
+                'issuer' => 'NZQA',
+                'reference' => 'US 29315',
+                'issued_at' => $rep->initial_training_completed_at,
+                'notes' => 'Auto-recorded from the H&S Representative register (initial HSR training).',
+            ]
+        );
     }
 
     private function obligationExists(string $code): bool

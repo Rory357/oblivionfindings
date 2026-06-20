@@ -63,6 +63,7 @@ type RepForm = {
     elected_at: string;
     term_expires_at: string;
     training_days_completed: number;
+    initial_training_completed_at: string;
     notes: string;
 };
 
@@ -74,6 +75,7 @@ const EMPTY: RepForm = {
     elected_at: '',
     term_expires_at: '',
     training_days_completed: 0,
+    initial_training_completed_at: '',
     notes: '',
 };
 
@@ -93,6 +95,7 @@ const STEP_OF: Record<string, number> = {
     elected_at: 1,
     term_expires_at: 1,
     training_days_completed: 1,
+    initial_training_completed_at: 1,
     notes: 1,
 };
 
@@ -392,9 +395,18 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                                 }
                             />
                         </Field>
+                        <Field label="Initial training completed" hint="NZQA US 29315 — optional" error={err('initial_training_completed_at')}>
+                            <Input
+                                type="date"
+                                max={new Date().toISOString().slice(0, 10)}
+                                value={data.initial_training_completed_at}
+                                onChange={(e) => setData('initial_training_completed_at', e.target.value)}
+                            />
+                        </Field>
                         <InfoCard icon={GraduationCap}>
                             HSWA entitles each rep to 2 days&rsquo; paid training per year; NZQA US 29315 must be completed
-                            before a rep can issue PINs or direct an unsafe-work cease.
+                            before a rep can issue PINs or direct an unsafe-work cease. Recording the completion date adds a
+                            tracked credential to the rep&rsquo;s HR record.
                         </InfoCard>
                         <Field label="Notes" hint="optional" span error={err('notes')}>
                             <Textarea
@@ -452,6 +464,10 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                             <ReviewRow
                                 label="Training days"
                                 value={`${data.training_days_completed} ${data.training_days_completed === 1 ? 'day' : 'days'}`}
+                            />
+                            <ReviewRow
+                                label="Initial training (US 29315)"
+                                value={data.initial_training_completed_at ? fmtDate(data.initial_training_completed_at) : undefined}
                             />
                         </ReviewCard>
                         {data.notes ? (
