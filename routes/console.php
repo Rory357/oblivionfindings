@@ -218,6 +218,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:30');
 
+// Health & Clinical — deterioration watch + overdue observations digest (daily)
+app(Schedule::class)
+    ->command('clinical:deterioration-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:35');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)

@@ -14,8 +14,9 @@ import {
     type HealthClinicalKpis,
 } from '@/pages/health-clinical/components/health-clinical-shell';
 import { TrendChartsGrid, type TrendSetsMap } from '@/pages/health-clinical/components/trend-charts';
+import { cn } from '@/lib/utils';
 import { Link, router } from '@inertiajs/react';
-import { ArrowUpRight, Filter, LineChart, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, Filter, LineChart, Link2, type LucideIcon, Pill, Scale, ShieldAlert, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 type ClientRef = { id: number; first_name: string; last_name: string };
@@ -26,18 +27,91 @@ type Filters = {
     date_to: string;
 };
 
+type TrendSignal = {
+    key: string;
+    tone: 'warn' | 'info' | 'crit';
+    title: string;
+    body: string;
+    metrics: { label: string; value: string }[];
+    link: { href: string; label: string } | null;
+};
+
 type Props = {
     clients: ClientRef[];
     selected_client: ClientRef | null;
     filters: Filters;
     trend_sets: TrendSetsMap | null;
+    trend_signals?: TrendSignal[];
     kpis: HealthClinicalKpis;
     tab_counts?: Record<string, number>;
 };
 
 const NONE_SENTINEL = '__none__';
 
-export default function Trends({ clients, selected_client, filters, trend_sets, kpis, tab_counts }: Props) {
+const SIGNAL_ICON: Record<string, LucideIcon> = {
+    prn_behaviour: Pill,
+    weight_nutrition: Scale,
+    falls_hs: ShieldAlert,
+};
+
+const SIGNAL_TONE: Record<TrendSignal['tone'], { wrap: string; chip: string; icon: string }> = {
+    crit: {
+        wrap: 'border-status-critical/40 bg-status-critical-bg',
+        chip: 'bg-status-critical/10 text-status-critical',
+        icon: 'text-status-critical',
+    },
+    warn: {
+        wrap: 'border-status-warning/40 bg-status-warning-bg',
+        chip: 'bg-status-warning/10 text-status-warning',
+        icon: 'text-status-warning',
+    },
+    info: {
+        wrap: 'border-status-info/40 bg-status-info-bg',
+        chip: 'bg-status-info/10 text-status-info',
+        icon: 'text-status-info',
+    },
+};
+
+function SignalCard({ signal }: { signal: TrendSignal }) {
+    const Icon = SIGNAL_ICON[signal.key] ?? TrendingUp;
+    const tone = SIGNAL_TONE[signal.tone] ?? SIGNAL_TONE.info;
+
+    return (
+        <div className={cn('flex flex-col gap-3 rounded-xl border p-4', tone.wrap)}>
+            <div className="flex items-start gap-3">
+                <span className={cn('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', tone.chip)}>
+                    <Icon className={cn('h-4 w-4', tone.icon)} />
+                </span>
+                <div className="min-w-0">
+                    <h3 className="text-sm font-semibold">{signal.title}</h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{signal.body}</p>
+                </div>
+            </div>
+            {signal.metrics.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                    {signal.metrics.map((m) => (
+                        <span
+                            key={m.label}
+                            className="inline-flex items-baseline gap-1.5 rounded-md bg-background/60 px-2 py-1 text-xs"
+                        >
+                            <span className="font-semibold tabular-nums">{m.value}</span>
+                            <span className="text-muted-foreground">{m.label}</span>
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+            {signal.link ? (
+                <Link href={signal.link.href} className="self-start">
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                        <Link2 className="h-3.5 w-3.5" /> {signal.link.label}
+                    </Button>
+                </Link>
+            ) : null}
+        </div>
+    );
+}
+
+export default function Trends({ clients, selected_client, filters, trend_sets, trend_signals, kpis, tab_counts }: Props) {
     const [local, setLocal] = useState<{ client_id: string; date_from: string; date_to: string }>({
         client_id: filters.client_id ? String(filters.client_id) : '',
         date_from: filters.date_from,
@@ -147,6 +221,13 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                             {clientName} · {filters.date_from} to {filters.date_to}
                         </h2>
                     </div>
+                    {trend_signals && trend_signals.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {trend_signals.map((signal) => (
+                                <SignalCard key={signal.key} signal={signal} />
+                            ))}
+                        </div>
+                    ) : null}
                     <TrendChartsGrid trendSets={trend_sets} />
                 </div>
             )}
