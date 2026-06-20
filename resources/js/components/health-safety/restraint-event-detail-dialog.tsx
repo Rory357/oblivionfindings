@@ -24,6 +24,7 @@ import {
     titleCase,
     typeMeta,
     type EventDetail,
+    type IncidentOption,
 } from '@/pages/health-safety/restraints/shared';
 import type { Page } from '@inertiajs/core';
 import { Link, router, useForm } from '@inertiajs/react';
@@ -39,6 +40,7 @@ import {
     HeartPulse,
     Link2,
     Paperclip,
+    Plus,
     ShieldAlert,
     ShieldCheck,
     Trash2,
@@ -55,6 +57,7 @@ export function RestraintEventDetailDialog({
     detail,
     open,
     onClose,
+    incidents = [],
     initialSection = 'overview',
     initialAction = null,
     onOpenPlan,
@@ -62,6 +65,7 @@ export function RestraintEventDetailDialog({
     detail: EventDetail;
     open: boolean;
     onClose: () => void;
+    incidents?: IncidentOption[];
     initialSection?: RestraintSectionKey;
     initialAction?: RestraintEventActionKey | null;
     onOpenPlan?: (id: number) => void;
@@ -69,10 +73,12 @@ export function RestraintEventDetailDialog({
     const d = detail;
     const [section, setSection] = useState<RestraintSectionKey>(initialSection);
     const [reviewing, setReviewing] = useState(initialAction === 'review');
+    const [linking, setLinking] = useState(false);
 
     useEffect(() => {
         setSection(initialSection);
         setReviewing(initialAction === 'review');
+        setLinking(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on incoming prop-value changes
     }, [initialSection, initialAction, d.id]);
 
@@ -80,6 +86,15 @@ export function RestraintEventDetailDialog({
     const sev = severityMeta(d.severity);
     const reviewed = !!d.reviewed_at;
 
+    // Rail design (consistent with drill-detail-dialog.tsx, the gold-standard sibling):
+    // the rail lists exactly these five *read-only* governance views, and each blurb is
+    // live-computed from the record (file count, injury flag, reviewed state) so the rail
+    // doubles as an at-a-glance status. Workflows that *change* the record — Review,
+    // Link incident — deliberately replace the body as a pane (the Add-Client idiom) and
+    // are launched from the footer / a section button rather than added as rail entries:
+    // they are actions, not sections. This keeps the rail stable and avoids the read/write
+    // mixing that the Review section (status) vs. Review pane (edit form) split exists to
+    // prevent. Accept-as-built — do not collapse the section/pane pairs into one.
     const SECTIONS: { key: RestraintSectionKey; label: string; blurb: string; icon: ComponentType<{ className?: string }> }[] = [
         { key: 'overview', label: 'Overview', blurb: 'The episode & links', icon: ShieldAlert },
         { key: 'response', label: 'Response', blurb: 'Trigger, de-escalation', icon: Activity },
@@ -112,7 +127,7 @@ export function RestraintEventDetailDialog({
         </div>
     );
 
-    const footerEnd = reviewing ? null : (
+    const footerEnd = reviewing || linking ? null : (
         <div className="flex flex-wrap items-center gap-2">
             {d.client ? (
                 <Link href={`/operations/clients/${d.client.id}`} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
@@ -145,9 +160,11 @@ export function RestraintEventDetailDialog({
         >
             {reviewing ? (
                 <ReviewPane d={d} onDone={() => setReviewing(false)} />
+            ) : linking ? (
+                <LinkIncidentPane d={d} incidents={incidents} onDone={() => setLinking(false)} />
             ) : (
                 <>
-                    {section === 'overview' ? <OverviewSection d={d} onOpenPlan={onOpenPlan} /> : null}
+                    {section === 'overview' ? <OverviewSection d={d} onOpenPlan={onOpenPlan} canReview={d.can.review} onLink={() => setLinking(true)} /> : null}
                     {section === 'response' ? <ResponseSection d={d} /> : null}
                     {section === 'injury' ? <InjurySection d={d} /> : null}
                     {section === 'evidence' ? <EvidenceSection d={d} /> : null}
@@ -162,7 +179,7 @@ export function RestraintEventDetailDialog({
 /*  Sections                                                           */
 /* ------------------------------------------------------------------ */
 
-function OverviewSection({ d, onOpenPlan }: { d: EventDetail; onOpenPlan?: (id: number) => void }) {
+function OverviewSection({ d, onOpenPlan, canReview, onLink }: { d: EventDetail; onOpenPlan?: (id: number) => void; canReview: boolean; onLink: () => void }) {
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -209,18 +226,44 @@ function OverviewSection({ d, onOpenPlan }: { d: EventDetail; onOpenPlan?: (id: 
             )}
 
             {d.related_incident ? (
-                <Link href={`/incidents?incident=${d.related_incident.id}`} className="block">
-                    <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/70 p-3 transition-colors hover:border-primary/40 hover:bg-card">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
-                            <Link2 className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold">Linked incident · {d.related_incident.reference}</div>
-                            <div className="text-xs text-muted-foreground">{d.related_incident.type ? titleCase(d.related_incident.type) : 'Incident'} — open in Incidents</div>
+                <div className="flex flex-col gap-2">
+                    <Link href={`/incidents?incident=${d.related_incident.id}`} className="block">
+                        <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/70 p-3 transition-colors hover:border-primary/40 hover:bg-card">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                                <Link2 className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-semibold">Linked incident · {d.related_incident.reference}</div>
+                                <div className="text-xs text-muted-foreground">{d.related_incident.type ? titleCase(d.related_incident.type) : 'Incident'} — open in Incidents</div>
+                            </div>
+                            <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
                         </div>
-                        <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                    {canReview ? (
+                        <button
+                            type="button"
+                            onClick={onLink}
+                            className="self-start text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        >
+                            Change or remove linked incident
+                        </button>
+                    ) : null}
+                </div>
+            ) : canReview ? (
+                <button
+                    type="button"
+                    onClick={onLink}
+                    className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-card/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-card"
+                >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                        <Link2 className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">Link an incident</div>
+                        <div className="text-xs text-muted-foreground">Cross-reference this restraint episode with a reported incident</div>
                     </div>
-                </Link>
+                    <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
             ) : null}
         </div>
     );
@@ -390,6 +433,71 @@ function ReviewPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </Button>
                 <Button type="submit" disabled={form.processing}>
                     Save review
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Link-incident pane (Add-Client idiom)                             */
+/* ------------------------------------------------------------------ */
+
+function LinkIncidentPane({ d, incidents, onDone }: { d: EventDetail; incidents: IncidentOption[]; onDone: () => void }) {
+    const form = useForm({
+        related_incident_id: d.related_incident ? String(d.related_incident.id) : '',
+    });
+
+    // Only same-client incidents can be linked (the server enforces this too).
+    const clientIncidents = incidents.filter((i) => i.client_id === d.client?.id);
+    // Keep the currently-linked incident selectable even if it has aged out of
+    // the recent-incidents picker list.
+    const merged = [...clientIncidents];
+    if (d.related_incident && !merged.some((i) => i.id === d.related_incident!.id)) {
+        merged.unshift({
+            id: d.related_incident.id,
+            client_id: d.client?.id ?? null,
+            reference: d.related_incident.reference,
+            label: `${d.related_incident.reference}${d.related_incident.type ? ` · ${titleCase(d.related_incident.type)}` : ''}`,
+        });
+    }
+    const nothingToPick = merged.length === 0;
+    const options = [{ value: '', label: '— No linked incident —' }, ...merged.map((i) => ({ value: String(i.id), label: i.label }))];
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        // Inertia's useForm().transform() does not support chaining in this version —
+        // set the transform, then post on a separate statement (see clients/medical.tsx).
+        form.transform((data) => ({ related_incident_id: data.related_incident_id ? Number(data.related_incident_id) : null }));
+        form.post(`/health-safety/restraints/events/${d.id}/link-incident`, {
+            preserveScroll: true,
+            onSuccess: (page: Page) => {
+                if (!(page.props as { flash?: { error?: string } }).flash?.error) onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead icon={Link2} title="Link an incident" blurb="Connect this restraint episode to the incident it relates to." />
+            <InfoCard icon={Link2} tone="info">
+                Cross-referencing the restraint event with its incident record gives reviewers the full picture. Only incidents for {d.client?.name ?? 'this client'} are shown; you can change or remove the link at any time.
+            </InfoCard>
+            <Field label="Related incident" error={form.errors.related_incident_id}>
+                {nothingToPick ? (
+                    <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                        No incidents recorded for {d.client?.name ?? 'this client'} yet. Raise an incident first, then link it here.
+                    </p>
+                ) : (
+                    <SelectInput value={form.data.related_incident_id} onChange={(v) => form.setData('related_incident_id', v)} placeholder="Select an incident" options={options} />
+                )}
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={form.processing || nothingToPick}>
+                    Save link
                 </Button>
             </div>
         </form>

@@ -91,6 +91,27 @@ export type AnalyticsProps = {
         by_outcome: { outcome: string; count: number }[];
     };
     hazard_data: RiskCount[];
+    /**
+     * Restraint & behaviour-support breakdowns (Ngā Paerewa least-restrictive practice).
+     * Optional — additive, built by RestraintKpiService and merged in by the controller.
+     */
+    restraint_analytics?: {
+        summary: {
+            events_in_period: number;
+            out_of_plan: number;
+            with_injury: number;
+            critical: number;
+            unreviewed: number;
+            active_plans: number;
+            plans_review_due: number;
+            clients_no_active_bsp: number;
+        };
+        breakdowns: {
+            by_type: { label: string; count: number }[];
+            by_severity: { label: string; count: number }[];
+            by_plan_status: { label: string; count: number }[];
+        };
+    };
     site_comparison: SiteRow[];
     trends: TrendPoint[];
     hero_stats: {

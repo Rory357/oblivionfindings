@@ -121,6 +121,7 @@ export function RestraintEventWizard({
     plans,
     prescope,
     onOpenEvent,
+    endpoint = '/health-safety/restraints/events',
 }: {
     open: boolean;
     onClose: () => void;
@@ -131,6 +132,12 @@ export function RestraintEventWizard({
     plans: PlanPickerOption[];
     prescope?: Prescope;
     onOpenEvent?: (id: number) => void;
+    /**
+     * Where the wizard posts. Defaults to the H&S restraints endpoint; the respite
+     * workspace points it at `/respite/stays/{stay}/restraints` so the respite-side
+     * RespiteEvent + server-side stay/site derivation are preserved.
+     */
+    endpoint?: string;
 }) {
     const page = usePage().props as { flash?: { error?: string }; detail?: { id?: number } | null };
     const [stepIndex, setStepIndex] = useState(0);
@@ -264,7 +271,7 @@ export function RestraintEventWizard({
             injury_details: d.injury_occurred ? d.injury_details : null,
             stay: prescope?.stay_id ? true : undefined,
         }));
-        form.post('/health-safety/restraints/events', {
+        form.post(endpoint, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {

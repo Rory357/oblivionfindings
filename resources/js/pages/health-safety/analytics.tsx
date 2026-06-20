@@ -525,7 +525,7 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
-    const { trends, scorecard, period_summary, worksafe_notifiable, sds_expiring, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+    const { trends, scorecard, period_summary, worksafe_notifiable, sds_expiring, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison, restraint_analytics } = props;
 
     // Board-report routes are gated on governance.view; hide the launcher + the
     // Governance-tab report packs for register-only roles to avoid a hard 403.
@@ -767,25 +767,28 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                 {tab === 'trends' ? <TrendsTab trends={trends} /> : null}
 
                 {tab === 'breakdowns' ? (
-                    <BreakdownsTab
-                        incidentTypeItems={incidentTypeItems}
-                        severitySegments={severitySegments}
-                        rootCause={root_cause_data}
-                        injuryTypeItems={injuryTypeItems}
-                        bodyPartItems={bodyPartItems}
-                        riskSegments={riskSegments}
-                        firstAidTypeItems={firstAidTypeItems}
-                        firstAidOutcomeItems={firstAidOutcomeItems}
-                        onDrill={openDrill}
-                        onCtx={openCtx}
-                        onFirstAid={goFirstAid}
-                        incidentTypeTarget={incidentTypeTarget}
-                        severityTarget={severityTarget}
-                        causeTarget={causeTarget}
-                        injuryTypeTarget={injuryTypeTarget}
-                        bodyPartTarget={bodyPartTarget}
-                        riskTarget={riskTarget}
-                    />
+                    <div className="grid gap-4">
+                        <BreakdownsTab
+                            incidentTypeItems={incidentTypeItems}
+                            severitySegments={severitySegments}
+                            rootCause={root_cause_data}
+                            injuryTypeItems={injuryTypeItems}
+                            bodyPartItems={bodyPartItems}
+                            riskSegments={riskSegments}
+                            firstAidTypeItems={firstAidTypeItems}
+                            firstAidOutcomeItems={firstAidOutcomeItems}
+                            onDrill={openDrill}
+                            onCtx={openCtx}
+                            onFirstAid={goFirstAid}
+                            incidentTypeTarget={incidentTypeTarget}
+                            severityTarget={severityTarget}
+                            causeTarget={causeTarget}
+                            injuryTypeTarget={injuryTypeTarget}
+                            bodyPartTarget={bodyPartTarget}
+                            riskTarget={riskTarget}
+                        />
+                        <RestraintBreakdowns data={restraint_analytics} />
+                    </div>
                 ) : null}
 
                 {tab === 'sites' ? (
@@ -1052,6 +1055,96 @@ function BreakdownsTab({
             </ChartCard>
         </div>
     );
+}
+
+/**
+ * Restraint & behaviour-support breakdowns (Ngā Paerewa NZS 8134:2021 least-restrictive
+ * practice). Additive analytics section — restraint events by type/severity and BSPs by
+ * status, with a governance summary strip. Rows deep-link into the restraints register.
+ */
+function RestraintBreakdowns({ data }: { data: AnalyticsProps['restraint_analytics'] }) {
+    if (!data) return null;
+    const s = data.summary;
+    const toItems = (rows: { label: string; count: number }[], colour: (label: string, i: number) => string): BreakdownItem[] =>
+        rows.map((r, i) => ({ key: r.label || 'unspecified', label: titleCaseLabel(r.label), value: r.count, color: colour(r.label, i) }));
+
+    const typeItems = toItems(data.breakdowns.by_type, (_l, i) => [TOKEN.primary, TOKEN.c2, TOKEN.c3, TOKEN.c4, TOKEN.c5][i % 5]);
+    const severityItems = toItems(data.breakdowns.by_severity, (l) => severityFill(l));
+    const planStatusItems = toItems(data.breakdowns.by_plan_status, (l) => planStatusFill(l));
+
+    const stats: { label: string; value: number; tone: 'neutral' | 'warning' | 'critical'; href: string }[] = [
+        { label: 'Events (period)', value: s.events_in_period, tone: 'neutral', href: '/health-safety/restraints?lens=events&tab=30d' },
+        { label: 'Out of plan', value: s.out_of_plan, tone: 'critical', href: '/health-safety/restraints?lens=events&tab=out_of_plan' },
+        { label: 'With injury', value: s.with_injury, tone: 'critical', href: '/health-safety/restraints?lens=events&tab=injury' },
+        { label: 'Unreviewed', value: s.unreviewed, tone: 'warning', href: '/health-safety/restraints?lens=events&tab=unreviewed' },
+        { label: 'Active BSPs', value: s.active_plans, tone: 'neutral', href: '/health-safety/restraints?lens=plans&tab=active' },
+        { label: 'Plans review due', value: s.plans_review_due, tone: 'warning', href: '/health-safety/restraints?lens=plans&tab=review_due' },
+    ];
+    const statValueClass = (tone: 'neutral' | 'warning' | 'critical', value: number) =>
+        `mt-0.5 text-xl font-bold tabular-nums ${value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground'}`;
+
+    return (
+        <div className="grid gap-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-bold text-foreground">Restraint &amp; behaviour support</h3>
+                    <p className="text-xs text-muted-foreground">Least-restrictive practice — Ngā Paerewa NZS 8134:2021. Click a tile to open the register.</p>
+                </div>
+                <Link href="/health-safety/restraints" className="shrink-0 text-xs font-medium text-primary hover:underline">
+                    Open register →
+                </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {stats.map((st) => (
+                    <Link
+                        key={st.label}
+                        href={st.href}
+                        className="flex flex-col rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                        <span className="text-[11px] font-medium text-muted-foreground">{st.label}</span>
+                        <span className={statValueClass(st.tone, st.value)}>{st.value}</span>
+                    </Link>
+                ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+                <ChartCard title="Restraints by type" subtitle="Restrictive practice used" aria="Restraint events by type" table={{ caption: 'Restraint events by type', columns: ['Type', 'Count'], rows: typeItems.map((s) => [s.label, s.value]) }}>
+                    {typeItems.length ? <HorizontalBars data={typeItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+                <ChartCard title="Restraints by severity" subtitle="Distribution this period" aria="Restraint events by severity" table={{ caption: 'Restraint events by severity', columns: ['Severity', 'Count'], rows: severityItems.map((s) => [s.label, s.value]) }}>
+                    {severityItems.length ? <HorizontalBars data={severityItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+                <ChartCard title="Behaviour support plans" subtitle="By lifecycle status" aria="Behaviour support plans by status" table={{ caption: 'Behaviour support plans by status', columns: ['Status', 'Count'], rows: planStatusItems.map((s) => [s.label, s.value]) }}>
+                    {planStatusItems.length ? <HorizontalBars data={planStatusItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+            </div>
+        </div>
+    );
+}
+
+function EmptyBreakdown() {
+    return <p className="flex h-[120px] items-center justify-center text-xs text-muted-foreground">No data for this period.</p>;
+}
+
+function titleCaseLabel(s: string): string {
+    if (!s) return 'Unspecified';
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function planStatusFill(status: string): string {
+    switch (status) {
+        case 'active':
+            return TOKEN.success;
+        case 'under_review':
+            return TOKEN.warning;
+        case 'draft':
+            return TOKEN.info;
+        case 'archived':
+            return TOKEN.c5;
+        default:
+            return TOKEN.primary;
+    }
 }
 
 function GovernanceTab({ scorecard, trends, reportUrl, exportUrl, canViewReports }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void; canViewReports: boolean }) {

@@ -23,19 +23,12 @@ import {
     LogIn,
     LogOut,
     MessageSquareWarning,
-    ShieldAlert,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { RespiteStayRow } from '../types';
 
 function nowInput() {
     const date = new Date();
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return date.toISOString().slice(0, 16);
-}
-
-function oneHourAgoInput() {
-    const date = new Date(Date.now() - 60 * 60 * 1000);
     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
     return date.toISOString().slice(0, 16);
 }
@@ -296,172 +289,6 @@ export function MedicationReconciliationModal({
                             <Button onClick={submit} disabled={processing}>
                                 <ClipboardCheck className="h-4 w-4" />
                                 Save med-rec
-                            </Button>
-                        </div>
-                    </>
-                ) : null}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export function RestraintModal({
-    stay,
-    onClose,
-}: {
-    stay: RespiteStayRow | null;
-    onClose: () => void;
-}) {
-    const [processing, setProcessing] = useState(false);
-    const [startedAt, setStartedAt] = useState(oneHourAgoInput());
-    const [endedAt, setEndedAt] = useState(nowInput());
-    const [type, setType] = useState('physical');
-    const [severity, setSeverity] = useState('medium');
-    const [trigger, setTrigger] = useState('');
-    const [deEscalation, setDeEscalation] = useState('');
-    const [description, setDescription] = useState('');
-    const [withinPlan, setWithinPlan] = useState(true);
-    const [deviationReason, setDeviationReason] = useState('');
-
-    useEffect(() => {
-        if (!stay) return;
-        setProcessing(false);
-        setStartedAt(oneHourAgoInput());
-        setEndedAt(nowInput());
-        setType('physical');
-        setSeverity('medium');
-        setTrigger('');
-        setDeEscalation('');
-        setDescription('');
-        setWithinPlan(true);
-        setDeviationReason('');
-    }, [stay]);
-
-    const canSubmit = !!stay && trigger.trim() && deEscalation.trim() && description.trim();
-
-    const submit = () => {
-        if (!stay || !canSubmit) return;
-        setProcessing(true);
-        router.post(
-            `/respite/stays/${stay.id}/restraints`,
-            {
-                started_at: startedAt,
-                ended_at: endedAt || null,
-                restraint_type: type,
-                severity,
-                trigger_description: trigger,
-                de_escalation_attempted: deEscalation,
-                restraint_description: description,
-                within_support_plan: withinPlan,
-                deviation_reason: withinPlan ? null : deviationReason,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => onClose(),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
-
-    return (
-        <Dialog open={stay != null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-xl">
-                {stay ? (
-                    <>
-                        <div>
-                            <DialogTitle className="text-left text-lg">
-                                Record restraint
-                            </DialogTitle>
-                            <DialogDescription className="text-left">
-                                Log a restraint event against {stay.client}'s respite stay.
-                            </DialogDescription>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <InputField
-                                label="Started"
-                                type="datetime-local"
-                                value={startedAt}
-                                setValue={setStartedAt}
-                            />
-                            <InputField
-                                label="Ended"
-                                type="datetime-local"
-                                value={endedAt}
-                                setValue={setEndedAt}
-                            />
-                            <SelectField
-                                label="Type"
-                                value={type}
-                                setValue={setType}
-                                options={[
-                                    ['physical', 'Physical'],
-                                    ['mechanical', 'Mechanical'],
-                                    ['chemical', 'Chemical'],
-                                    ['seclusion', 'Seclusion'],
-                                    ['environmental', 'Environmental'],
-                                ]}
-                            />
-                            <SelectField
-                                label="Severity"
-                                value={severity}
-                                setValue={setSeverity}
-                                options={[
-                                    ['low', 'Low'],
-                                    ['medium', 'Medium'],
-                                    ['high', 'High'],
-                                    ['critical', 'Critical'],
-                                ]}
-                            />
-                            <TextareaField
-                                label="Trigger"
-                                value={trigger}
-                                setValue={setTrigger}
-                            />
-                            <TextareaField
-                                label="De-escalation attempted"
-                                value={deEscalation}
-                                setValue={setDeEscalation}
-                            />
-                            <TextareaField
-                                label="Restraint description"
-                                value={description}
-                                setValue={setDescription}
-                            />
-                            <div className="grid gap-2">
-                                <label className="mt-6 flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        checked={withinPlan}
-                                        onChange={(event) =>
-                                            setWithinPlan(event.target.checked)
-                                        }
-                                    />
-                                    Within behaviour support plan
-                                </label>
-                                {!withinPlan ? (
-                                    <Textarea
-                                        value={deviationReason}
-                                        onChange={(event) =>
-                                            setDeviationReason(
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="Deviation reason"
-                                        rows={3}
-                                    />
-                                ) : null}
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={onClose}>
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={submit}
-                                disabled={processing || !canSubmit}
-                            >
-                                <ShieldAlert className="h-4 w-4" />
-                                Save restraint
                             </Button>
                         </div>
                     </>

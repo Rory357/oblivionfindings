@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -505,6 +506,45 @@ class RestraintController extends Controller
         $event->update($validated);
 
         return back()->with('success', 'Restraint event reviewed.');
+    }
+
+    /**
+     * Link (or unlink) an existing incident to a recorded restraint event.
+     *
+     * Kept deliberately separate from updateEvent(): the capture handover scopes
+     * related_incident_id to create-time only, so post-hoc linking is its own
+     * review-gated verb rather than a field the review form can silently change.
+     * Mirrors the First Aid linkIncident pattern.
+     */
+    public function linkIncident(Request $request, RestraintEvent $event): RedirectResponse
+    {
+        abort_unless($this->canReview($request), 403);
+
+        $validated = $request->validate([
+            'related_incident_id' => 'nullable|exists:client_incidents,id',
+        ]);
+
+        // Data integrity: a restraint event can only point at an incident raised
+        // for the same client. Without this guard a reviewer could cross-link
+        // two unrelated people's records.
+        if (! empty($validated['related_incident_id'])) {
+            $incident = ClientIncident::find($validated['related_incident_id']);
+            if ($incident && (int) $incident->client_id !== (int) $event->client_id) {
+                throw ValidationException::withMessages([
+                    'related_incident_id' => 'The incident must belong to the same client as the restraint event.',
+                ]);
+            }
+        }
+
+        $event->update([
+            'related_incident_id' => $validated['related_incident_id'] ?: null,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        return back()->with(
+            'success',
+            $validated['related_incident_id'] ? 'Incident linked to restraint event.' : 'Incident link removed.'
+        );
     }
 
     /* ================================================================== */

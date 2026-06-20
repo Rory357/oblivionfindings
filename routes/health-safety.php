@@ -137,9 +137,10 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::post('/events/{event}/attachments', [RestraintController::class, 'storeAttachment'])->name('events.attachments.store');
         });
 
-        // Review — event review + plan review sign-off.
+        // Review — event review + plan review sign-off + post-hoc incident link.
         Route::middleware('permission:restraints.review|restraints.manage')->group(function () {
             Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
+            Route::post('/events/{event}/link-incident', [RestraintController::class, 'linkIncident'])->name('events.link-incident');
             Route::post('/plans/{plan}/review', [RestraintController::class, 'reviewPlan'])->name('plans.review');
         });
 
