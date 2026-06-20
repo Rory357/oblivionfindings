@@ -437,6 +437,8 @@ class HandleInertiaRequests extends Middleware
                 'eventsRecord' => $user->canDo('clinical.events.record'),
                 'eventsReview' => $user->canDo('clinical.events.review'),
                 'eventsEscalate' => $user->canDo('clinical.events.escalate'),
+                'assessmentsViewAny' => $user->canDo('clinical.assessments.viewAny'),
+                'assessmentsRecord' => $user->canDo('clinical.assessments.record'),
             ],
 
             'hazards' => [

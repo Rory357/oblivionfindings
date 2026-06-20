@@ -272,7 +272,7 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] **7c Health Monitoring** — DONE. `getMonitoringRollup($orgId, $filters)` aggregates the four per-client stores (`ClientFluid/Bowel/Seizure/SleepEntry`) — **all carry `organization_id`** so org-scoping is direct (no client join needed); sleep keys on `slept_at`, seizure `escalated` precomputed (decision #3: read both stores, don't migrate). `GET /health-clinical/health-monitoring` (perm `clinical.monitoring.viewAny`, NEW — both seeders). `HealthMonitoring.tsx`: info banner + client filter + 4 stat cards (fluid/bowel/seizures+escalated/sleep-avg) + recent-entry lists. `health_monitoring` tab flipped on → **Monitor group complete**. Test `HealthClinicalMonitoringTest` (2). (Per decision #4 existing capture perms unchanged; only the read rollup is gated.)
 - **Dependency:** Steps 2, 5. **Ships:** Behaviour/Health-Monitoring/Care-Plans/Restraint tabs. **Commit (7b+7c): `8df1150d`.** 7 of 9 tabs live + restraint sub-view (Trends + Assessments → Step 8).
 
-### ◐ Step 8 — Trends module tab (8a ✅) + Assessments & Risk + cross-module signals (8b, deferred)
+### ◐ Step 8 — Trends module tab (8a ✅) + Assessments & Risk (8b ✅) + cross-module signals (8c, deferred)
 
 #### ✅ Step 8a — Trends module tab (the 9th tab goes live)
 - [x] **Backend trend-building extracted** to `ClinicalObservationService::buildTrendSets($client, $from, $to, includeNews2)` — the single implementation now shared by the per-client page (`HealthClinicalClientTrendsController`, no NEWS2) and the module tab (NEWS2 on). `getTrends` carries `news2_score`/`news2_band` columns.
@@ -280,11 +280,19 @@ Grouped into 8 independently shippable/testable steps. **NZ / web-only / need-to
 - [x] **Shared `components/trend-charts.tsx`** (`TrendChartCard` + `TrendChartsGrid`) consumed by BOTH `ClientTrends.tsx` (refactored — inline chart code removed) and the new `Trends.tsx` module panel (on `HealthClinicalShell activeTab="trends"`). **De-hardcoded** the hex line colours (`#059669`/`#dc2626`/`#2563eb`/`#0f766e`/`#f59e0b`/`#0891b2`) → `--status-success`/`--status-critical`/`--status-info`/`--primary`/`--status-warning` tokens.
 - [x] tsc 0 + eslint 0 on the 3 touched files; `ClinicalObservationTrendsControllerTest` +1 method (`module_trends_tab_renders_and_scopes_by_client`, asserts NEWS2 series + client scope + 403) → **2 passed / 98 assertions**. **9 of 9 tabs now render.**
 
-#### ☐ Step 8b — Assessments & Risk + cross-module Trends signals (B8, §4) — DEFERRED (new table + scorers)
-- [ ] `clinical_risk_assessments` migration + FRAT/Waterlow-Braden/MUST/IDDSI scorers + index/store/detail; Assessments tab (banner until live).
+#### ✅ Step 8b — Assessments & Risk register (the only net-new register; the design's "banner-until-later" is now overridden — built feature-complete per user)
+- [x] **Transparent, reference-test-pinned scorers** in `app/Domain/Clinical/Services/Assessments/`: `FratScorer` (Peninsula Health FRAT 5–20), `BradenScorer` (Braden 6–23, **inverted** — lower = worse), `MustScorer` (BAPEN MUST 0–6, derives BMI from height/weight), `IddsiClassifier` (level capture, not a score) + `ClinicalAssessmentResult` value object + `ClinicalAssessmentScorer` interface + `ClinicalAssessmentScorerRegistry`. Each returns a **full component breakdown** (never a black box); the band normalises high-is-worse vs low-is-worse onto `ClinicalRiskBand` (minimal/low/medium/high/very_high). **19 unit tests / 60 assertions** pin every band cut-point to published reference values.
+- [x] **Schema + persistence:** `clinical_risk_assessments` migration (org-scoped via `organization_id`; evidence via the existing polymorphic `clinical_attachments` morph — **no new attachments table**) + `ClinicalRiskAssessment` model + `ClinicalAssessmentService::record()` (computes via registry, stores inputs+result+tool version+review-due).
+- [x] **Permissions:** new `clinical.assessments.{viewAny,record}` seeded in BOTH `RbacSeeder` (prod) + `ClinicalPermissionsSeeder` (test) on `'Health & Clinical'` module; granted to team_lead/clinical_lead/coordinator/provider_manager. Shared `auth.can.clinical.assessments{ViewAny,Record}` added to `HandleInertiaRequests`.
+- [x] **Register + store:** `GET/POST /health-clinical/assessments` on `HealthClinicalDashboardController` (per-tool input validation) + dashboard service `getAssessmentsRegister/Stats/FilterOptions` + `assessments` tab-count (review-due). Tab href flipped on.
+- [x] **Frontend:** `Assessments.tsx` register (filters, stat strip, expandable transparent breakdown cards, pagination) + **`RecordAssessmentDialog`** — the premium 4-step WizardShell modal (Add-Client parity: ClientPicker → tool TilePicker → per-tool form → notes+**premium staged upload** → review with **live computed score** via `lib/assessment-scoring.ts` TS port). Gated by `assessmentsRecord`.
+- [x] tsc 0 + eslint 0; `HealthClinicalAssessmentsTest` (store MUST/FRAT + validation + register render + 403) → **5 passed / 33 assertions**. **All 9 tabs now feature-complete.**
+
+#### ☐ Step 8c — cross-module Trends signals + fanout (B8 §4) — DEFERRED (depends on cross-module joins)
 - [ ] Trends cross-module signal cards: PRN↔behaviour join, weight↔nutrition, H&S fall; My Day/notification fanout for watchlist + overdue.
 - [ ] Governance deep-link regression test (§4).
-- [ ] Final: tsc 0 + eslint + pint-clean new files + change-scoped `artisan test`; merge → deploy → run `RbacSeeder --force` → Chrome-verify on .com (all 9 tabs/hero/wizards/ctx menus/lenses, 0 app console errors). **Dependency:** all prior. **Ships:** module complete.
+- [ ] §8 client-profile wizard entry points (RecordAssessmentDialog already accepts a locked `client` prop).
+- [ ] Final: merge → deploy → run `RbacSeeder --force` (new `clinical.assessments.*` + earlier `clinical.{events.escalate,behaviour.viewAny,monitoring.viewAny}`) → run dev-DB migrations (news2 cols + clinical_attachments + clinical_risk_assessments) → Chrome-verify on .com (all 9 tabs/hero/wizards/ctx menus/lenses, 0 app console errors).
 
 ---
 

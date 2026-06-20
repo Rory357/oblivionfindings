@@ -2,7 +2,9 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\ClinicalAssessmentType;
 use App\Domain\Clinical\Enums\ClinicalEventType;
+use App\Domain\Clinical\Enums\ClinicalRiskBand;
 use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Enums\ProtocolFrequency;
@@ -10,6 +12,7 @@ use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
+use App\Domain\Clinical\Models\ClinicalRiskAssessment;
 use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Enums\AlertSeverity;
 use App\Models\BehaviourAbcEntry;
@@ -84,6 +87,8 @@ class ClinicalDashboardService
             'clinical_events' => ClinicalEvent::whereNull('reviewed_at')
                 ->where('occurred_at', '>=', $now->copy()->subDays(30))
                 ->count(),
+            // Assessments due for review (review date reached).
+            'assessments' => ClinicalRiskAssessment::reviewDue()->count(),
         ];
     }
 
@@ -427,6 +432,73 @@ class ClinicalDashboardService
             'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
             'functions' => BehaviourFunction::options(),
             'intensities' => collect(BehaviourAbcEntry::INTENSITIES)->map(fn ($i) => ['value' => $i, 'label' => ucfirst($i)])->values(),
+        ];
+    }
+
+    /**
+     * Cross-client clinical risk-assessments register (FRAT / Braden / MUST /
+     * IDDSI). Org-scoped via organization_id; the controller serialises rows.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function getAssessmentsRegister(int $organizationId, array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        return ClinicalRiskAssessment::query()
+            ->where('organization_id', $organizationId)
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'assessor:id,name'])
+            ->withCount('attachments')
+            ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+            ->when($filters['assessment_type'] ?? null, fn ($q, $t) => $q->where('assessment_type', $t))
+            ->when($filters['risk_band'] ?? null, fn ($q, $b) => $q->where('risk_band', $b))
+            ->when($filters['review_due'] ?? null, fn ($q) => $q->reviewDue())
+            ->orderByDesc('assessed_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Stat cards for the Assessments tab.
+     *
+     * @return array{total: int, high_risk: int, review_due: int, by_type: array<string, int>}
+     */
+    public function getAssessmentsRegisterStats(int $organizationId): array
+    {
+        $scope = fn () => ClinicalRiskAssessment::query()->where('organization_id', $organizationId);
+
+        return [
+            'total' => $scope()->count(),
+            'high_risk' => $scope()->whereIn('risk_band', [ClinicalRiskBand::High->value, ClinicalRiskBand::VeryHigh->value])->count(),
+            'review_due' => $scope()->reviewDue()->count(),
+            'by_type' => $scope()
+                ->selectRaw('assessment_type, COUNT(*) as count')
+                ->groupBy('assessment_type')
+                ->pluck('count', 'assessment_type')
+                ->toArray(),
+        ];
+    }
+
+    /**
+     * Filter options + tool catalogue for the Assessments tab.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAssessmentsFilterOptions(): array
+    {
+        return [
+            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'types' => array_map(fn (ClinicalAssessmentType $t) => [
+                'value' => $t->value,
+                'label' => $t->label(),
+                'short' => $t->shortLabel(),
+                'domain' => $t->domain(),
+                'scored' => $t->isScored(),
+                'tool_version' => $t->toolVersion(),
+            ], ClinicalAssessmentType::cases()),
+            'bands' => array_map(fn (ClinicalRiskBand $b) => [
+                'value' => $b->value,
+                'label' => $b->label(),
+                'tone' => $b->tone(),
+            ], ClinicalRiskBand::cases()),
         ];
     }
 

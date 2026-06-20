@@ -60,6 +60,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/trends', [HealthClinicalDashboardController::class, 'trends'])
             ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
             ->name('trends.index');
+        Route::get('/assessments', [HealthClinicalDashboardController::class, 'assessments'])
+            ->middleware('permission:clinical.assessments.viewAny')
+            ->name('assessments.index');
+        Route::post('/assessments', [HealthClinicalDashboardController::class, 'storeAssessment'])
+            ->middleware('permission:clinical.assessments.record')
+            ->name('assessments.store');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');

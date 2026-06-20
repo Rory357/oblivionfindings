@@ -40,6 +40,10 @@ class ClinicalPermissionsSeeder extends Seeder
             ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Create, edit, and deactivate clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
+            // Assessments & Risk (FRAT / Braden / MUST / IDDSI)
+            ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
             // Module access
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
@@ -90,6 +94,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
@@ -105,6 +111,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',
@@ -124,6 +132,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',
@@ -143,6 +153,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',

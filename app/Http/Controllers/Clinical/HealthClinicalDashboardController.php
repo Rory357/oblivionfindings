@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Clinical;
 
 use App\Domain\Clinical\Enums\BehaviourFunction;
+use App\Domain\Clinical\Enums\ClinicalAssessmentType;
 use App\Domain\Clinical\Enums\ClinicalEventType;
+use App\Domain\Clinical\Enums\ClinicalRiskBand;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Models\ClinicalRiskAssessment;
+use App\Domain\Clinical\Services\ClinicalAssessmentService;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
@@ -30,6 +34,7 @@ class HealthClinicalDashboardController extends Controller
         private readonly ClinicalDashboardService $dashboardService,
         private readonly ClinicalObservationService $observationService,
         private readonly ClinicalEventService $eventService,
+        private readonly ClinicalAssessmentService $assessmentService,
     ) {}
 
     public function index(Request $request): \Inertia\Response
@@ -328,6 +333,145 @@ class HealthClinicalDashboardController extends Controller
         $this->saveClinicalAttachments($request, $event);
 
         return back()->with('success', 'Clinical event recorded successfully.');
+    }
+
+    /**
+     * Cross-client Assessments & Risk register (FRAT / Braden / MUST / IDDSI).
+     * Org-scoped; serialised here with the band tone + review status.
+     */
+    public function assessments(Request $request): \Inertia\Response
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clinical.assessments.viewAny'), 403);
+
+        $filters = $request->validate([
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'assessment_type' => ['nullable', Rule::in(array_column(ClinicalAssessmentType::cases(), 'value'))],
+            'risk_band' => ['nullable', Rule::in(array_column(ClinicalRiskBand::cases(), 'value'))],
+            'review_due' => ['nullable', 'boolean'],
+        ]);
+
+        $orgId = (int) ($auth->organization_id ?? 0);
+
+        $records = $this->dashboardService->getAssessmentsRegister($orgId, $filters)
+            ->through(fn (ClinicalRiskAssessment $a) => [
+                'id' => $a->id,
+                'assessment_type' => $a->assessment_type->value,
+                'type_label' => $a->assessment_type->label(),
+                'type_short' => $a->assessment_type->shortLabel(),
+                'domain' => $a->assessment_type->domain(),
+                'assessed_at' => $a->assessed_at?->toISOString(),
+                'total_score' => $a->total_score,
+                'risk_band' => $a->risk_band?->value,
+                'band_label' => $a->risk_band?->label(),
+                'band_tone' => $a->risk_band?->tone(),
+                'summary' => $a->summary,
+                'advice' => $a->advice,
+                'breakdown' => $a->breakdown,
+                'meta' => $a->meta,
+                'tool_version' => $a->tool_version,
+                'notes' => $a->notes,
+                'review_due_at' => $a->review_due_at?->toDateString(),
+                'review_due' => $a->review_due_at !== null && $a->review_due_at->isPast(),
+                'needs_action' => $a->needsAction(),
+                'attachments_count' => (int) ($a->attachments_count ?? 0),
+                'assessor' => $a->assessor ? ['id' => $a->assessor->id, 'name' => $a->assessor->name] : null,
+                'client' => $a->client ? [
+                    'id' => $a->client->id,
+                    'first_name' => $a->client->first_name,
+                    'last_name' => $a->client->last_name,
+                    'site' => $a->client->site?->name,
+                ] : null,
+            ]);
+
+        $kpis = $this->dashboardService->getKpis();
+
+        return inertia('health-clinical/Assessments', [
+            'records' => $records,
+            'stats' => $this->dashboardService->getAssessmentsRegisterStats($orgId),
+            'filters' => $filters,
+            'filter_options' => $this->dashboardService->getAssessmentsFilterOptions(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+        ]);
+    }
+
+    /**
+     * Record a clinical risk assessment from the module. The wizard supplies
+     * `client_id` + `assessment_type` + the type-specific `inputs`; the scorer
+     * computes the transparent total + band inside ClinicalAssessmentService.
+     */
+    public function storeAssessment(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('clinical.assessments.record'), 403);
+
+        $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'assessment_type' => ['required', Rule::in(array_column(ClinicalAssessmentType::cases(), 'value'))],
+        ]);
+
+        $type = ClinicalAssessmentType::from((string) $request->string('assessment_type'));
+        $client = Client::findOrFail($request->integer('client_id'));
+        $this->authorize('view', $client);
+
+        $validated = $request->validate(array_merge([
+            'assessed_at' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'inputs' => ['required', 'array'],
+            // Evidence staged in the wizard (created with the record).
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
+        ], $this->assessmentInputRules($type)));
+
+        $assessment = $this->assessmentService->record(
+            $client,
+            $user,
+            $type,
+            $validated['inputs'],
+            $validated['notes'] ?? null,
+            isset($validated['assessed_at']) ? Carbon::parse($validated['assessed_at']) : null,
+        );
+        $this->saveClinicalAttachments($request, $assessment);
+
+        return back()->with('success', $type->shortLabel().' assessment recorded successfully.');
+    }
+
+    /**
+     * Per-tool input validation rules (the scorer tolerates gaps, but the
+     * register should not store half-complete scored assessments).
+     *
+     * @return array<string, mixed>
+     */
+    private function assessmentInputRules(ClinicalAssessmentType $type): array
+    {
+        return match ($type) {
+            ClinicalAssessmentType::MalnutritionMust => [
+                'inputs.bmi' => ['nullable', 'numeric', 'min:5', 'max:120'],
+                'inputs.height_cm' => ['nullable', 'numeric', 'min:30', 'max:260'],
+                'inputs.weight_kg' => ['nullable', 'numeric', 'min:1', 'max:500'],
+                'inputs.weight_loss_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+                'inputs.acute_disease_effect' => ['nullable', 'boolean'],
+            ],
+            ClinicalAssessmentType::FallsFrat => [
+                'inputs.recent_falls' => ['required', 'in:none_12mo,one_plus_3_12mo,one_plus_3mo,one_plus_3mo_resident'],
+                'inputs.medications' => ['required', 'in:none,one,two,more_than_two'],
+                'inputs.psychological' => ['required', 'in:none,mild,moderate,severe'],
+                'inputs.cognitive' => ['required', 'in:intact,mild,moderate,severe'],
+            ],
+            ClinicalAssessmentType::PressureBraden => [
+                'inputs.sensory_perception' => ['required', 'integer', 'min:1', 'max:4'],
+                'inputs.moisture' => ['required', 'integer', 'min:1', 'max:4'],
+                'inputs.activity' => ['required', 'integer', 'min:1', 'max:4'],
+                'inputs.mobility' => ['required', 'integer', 'min:1', 'max:4'],
+                'inputs.nutrition' => ['required', 'integer', 'min:1', 'max:4'],
+                'inputs.friction_shear' => ['required', 'integer', 'min:1', 'max:3'],
+            ],
+            ClinicalAssessmentType::DysphagiaIddsi => [
+                'inputs.drink_level' => ['nullable', 'integer', 'min:0', 'max:4'],
+                'inputs.food_level' => ['nullable', 'integer', 'min:3', 'max:7'],
+            ],
+        };
     }
 
     /**

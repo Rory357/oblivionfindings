@@ -278,6 +278,8 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.monitoring.viewAny', 'description' => 'View the cross-client health-monitoring rollup', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Manage clinical protocols', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Incidents
@@ -665,6 +667,7 @@ class RbacSeeder extends Seeder
             'clinical.events.viewAny', 'clinical.events.review', 'clinical.events.escalate',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard',
         ]);
@@ -835,6 +838,7 @@ class RbacSeeder extends Seeder
             'clinical.events.viewAny', 'clinical.events.review', 'clinical.events.escalate',
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard',
             'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
