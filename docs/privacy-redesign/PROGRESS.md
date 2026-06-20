@@ -129,10 +129,16 @@ deletion.execute ← policy_id*, confirm*(accepted). (critical confirm modal)
   (+20 working days via `PublicHolidayCalendar`) wired into `DataSubjectRequest::boot()` (replaced
   GDPR-style +30 calendar days); `DataRetentionPolicy::scopeActive`; `Client::dataSubjectRequests()`.
   Migrations RAN green on shared DB; all files php-lint clean; schema verified.
-- [ ] **Step 2** — Rebuild `PrivacyDashboardController@index` (hero/tabCounts/worklist per-tab paginated/
-  detail per ?request|?breach|?hold|?dpia|?retention|?deletion/can/filters/sites/staff/clients/?new
-  passthrough). Extend `requests.store` (+client_id). Fix schema-mismatch validations. Report controller:
-  `opc_notifications` (was ico_), build real `reports.export` (CSV/JSON).
+- [x] **Step 2** — Rebuilt `PrivacyDashboardController@index`. ✅ DONE. Emits hero (live + attention +
+  badges), tabCounts (7), per-tab paginated worklist (request/breach/hold/retention/dpia/deletion, shaped
+  rows + active-first ordering), detail per `?request|?breach|?hold|?dpia` (full fields + attachments
+  [need-to-know locked shell] + lifecycle timeline), can map, filters (q/period/site_id), sites/staff/
+  clients, `?new` passthrough. `requests.store` now accepts `client_id`/`received_at`/`verification_method`
+  (links the subject so export works). Report controller: `ico_notifications`→`opc_notifications`,
+  high-risk includes very_high, inline perm checks, real streamed-CSV `export` (opc_register/sla/retention/
+  full) replacing the "coming soon" stub. compliance.tsx prop renamed. All php-lint clean.
+  NOTE: deletion "Execute" is policy-scoped (`deletion.execute` takes policy_id) — lives on Retention, not
+  a fake per-log "scheduled" state; deletion-logs tab is read-only AnonymizationLog history.
 - [ ] **Step 3** — `PrivacyAttachmentController` (store/download/destroy, allow-list + perm gating) +
   routes; serialize `attachments[]` into detail payloads (Safeguarding shape, sensitive→locked shell).
 - [ ] **Step 4** — `resources/js/pages/privacy/privacy-shared.ts` (tone maps, pill/dot helpers, NZ/IPP

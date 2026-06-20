@@ -90,6 +90,11 @@ class DataSubjectRequestController extends Controller
             'request_details' => 'nullable|string',
             'specific_data_requested' => 'nullable|array',
             'assigned_to_user_id' => 'nullable|exists:users,id',
+            // Link the request to the client it is about so the export actually
+            // assembles their record (IPP 6) rather than the "no linked record" stub.
+            'client_id' => 'nullable|exists:clients,id',
+            'received_at' => 'nullable|date',
+            'verification_method' => 'nullable|string|max:255',
         ]);
 
         $validated['created_by'] = auth()->id();
