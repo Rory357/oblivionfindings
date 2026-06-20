@@ -236,10 +236,23 @@ class HandleInertiaRequests extends Middleware
                 // The Fleet incident report wizard reads this so its success pane
                 // can open the newly-reported incident.
                 'created_fleet_incident_id' => session('created_fleet_incident_id'),
+                // The First Aid report wizard reads this so its success pane can
+                // open the newly-recorded treatment on the register.
+                'created_first_aid_id' => session('created_first_aid_id'),
                 // The Worker Participation "schedule meeting" wizard reads this
                 // after creating a NEW committee so it can chain the meeting POST
                 // to /committees/{id}/meetings on the freshly created committee.
                 'created_committee_id' => session('created_committee_id'),
+                // The Safe Work Procedure wizard reads this after a successful
+                // create so its success pane can open the new procedure.
+                'created_procedure_id' => session('created_procedure_id'),
+                // The Risk Assessment wizard reads this after a successful create/
+                // supersede so it can upload staged evidence to the new draft and
+                // its success pane can open it.
+                'created_risk_assessment_id' => session('created_risk_assessment_id'),
+                // The Injury record wizard reads this so its success pane can open
+                // the newly-recorded injury straight on its RTW section.
+                'created_injury_id' => session('created_injury_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
@@ -276,7 +289,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v2';
+    protected const PERMISSIONS_CACHE_VERSION = 'v3';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -432,13 +445,21 @@ class HandleInertiaRequests extends Middleware
 
             'clinical' => [
                 'dashboard' => $user->canDo('clinical.dashboard'),
-                'observationsView' => $user->canDo('clinical.observations.view'),
+                'observationsViewAny' => $user->canDo('clinical.observations.viewAny'),
                 'observationsViewAssigned' => $user->canDo('clinical.observations.viewAssigned'),
                 'observationsRecord' => $user->canDo('clinical.observations.record'),
                 'observationsRecordClinical' => $user->canDo('clinical.observations.recordClinical'),
-                'eventsView' => $user->canDo('clinical.events.view'),
+                'eventsViewAny' => $user->canDo('clinical.events.viewAny'),
                 'eventsViewAssigned' => $user->canDo('clinical.events.viewAssigned'),
                 'eventsRecord' => $user->canDo('clinical.events.record'),
+                'eventsReview' => $user->canDo('clinical.events.review'),
+                'eventsEscalate' => $user->canDo('clinical.events.escalate'),
+                'behaviourViewAny' => $user->canDo('clinical.behaviour.viewAny'),
+                'monitoringViewAny' => $user->canDo('clinical.monitoring.viewAny'),
+                'protocolsViewAny' => $user->canDo('clinical.protocols.viewAny'),
+                'protocolsManage' => $user->canDo('clinical.protocols.manage'),
+                'assessmentsViewAny' => $user->canDo('clinical.assessments.viewAny'),
+                'assessmentsRecord' => $user->canDo('clinical.assessments.record'),
             ],
 
             'hazards' => [
@@ -446,7 +467,22 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('hazards.create'),
                 'assign' => $user->canDo('hazards.assign'),
                 'close' => $user->canDo('hazards.close'),
+                'manage' => $user->canDo('hazards.manage'),
                 'manageTypes' => $user->canDo('hazards.manage_types'),
+            ],
+
+            'restraints' => [
+                'view' => $user->canDo('restraints.view'),
+                'create' => $user->canDo('restraints.create'),
+                'manage' => $user->canDo('restraints.manage'),
+                'review' => $user->canDo('restraints.review'),
+            ],
+
+            'procedures' => [
+                'view' => $user->canDo('procedures.view'),
+                'create' => $user->canDo('procedures.create'),
+                'manage' => $user->canDo('procedures.manage'),
+                'approve' => $user->canDo('procedures.approve'),
             ],
 
             'checklists' => [

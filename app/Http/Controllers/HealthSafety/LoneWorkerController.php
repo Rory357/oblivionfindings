@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -12,6 +14,7 @@ use App\Models\ShiftGpsLog;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\Queclink\LocateNowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -133,7 +136,18 @@ class LoneWorkerController extends Controller
             'hero' => $this->heroBlock($shiftData['unmonitored_lone']),
             'filters' => $filters,
             'options' => [
-                'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+                'sites' => Site::select('id', 'name', 'address_line_1', 'suburb', 'city', 'postcode', 'latitude', 'longitude')
+                    ->where('is_active', true)->orderBy('name')->get()
+                    ->map(fn ($s) => [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        // Composed one-line address so the wizard can prefill the location
+                        // field when a site is chosen ("selectable from site").
+                        'address' => collect([$s->address_line_1, $s->suburb, $s->city, $s->postcode])
+                            ->filter()->implode(', ') ?: null,
+                        'latitude' => $s->latitude,
+                        'longitude' => $s->longitude,
+                    ]),
                 'staff' => User::select('id', 'name')->orderBy('name')->get(),
                 'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->get()
                     ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)]),
@@ -291,6 +305,26 @@ class LoneWorkerController extends Controller
     }
 
     /**
+     * Soft-delete a completed session — remove an erroneous / test / duplicate entry from
+     * the register. SoftDeletes retains the row (and AuditableChanges logs the removal) so
+     * the safety record is never destroyed and an administrator can restore it. Only
+     * completed sessions are removable: a live (active/overdue) or emergency session must be
+     * ended first, so we never silently drop active monitoring or a critical emergency record.
+     */
+    public function destroy(Request $request, LoneWorkerSession $session): RedirectResponse
+    {
+        if ($session->status !== 'completed') {
+            return back()->with('error', 'Only completed sessions can be removed. End the session first.');
+        }
+
+        $session->update(['updated_by' => $request->user()->id]);
+        $session->delete();
+
+        return redirect()->route('health-safety.lone-workers.index')
+            ->with('success', 'Session removed from the register (retained for audit).');
+    }
+
+    /**
      * Trigger emergency for an active session.
      */
     public function triggerEmergency(Request $request, LoneWorkerSession $session): RedirectResponse
@@ -351,6 +385,51 @@ class LoneWorkerController extends Controller
 
         return redirect()->back()
             ->with('success', 'Alert resolved. Ensure the corresponding Control Room alert is also resolved.');
+    }
+
+    /**
+     * Queue a "Locate now" request to the worker's paired GPS tracker. Async — the
+     * tracker reports its fix on its next connection (reuses LocateNowService).
+     */
+    public function locateNow(Request $request, LoneWorkerSession $session, LocateNowService $locateNow): RedirectResponse
+    {
+        $device = $this->workerTrackerDevice((int) $session->user_id);
+
+        if (! $device) {
+            return back()->with('error', 'This worker does not have a paired GPS tracker.');
+        }
+
+        $locateNow->queueForDevice($device, $request->user());
+
+        return back()->with('success', 'Locate now queued — the tracker will report on its next connection.');
+    }
+
+    /**
+     * Acknowledge a tracker panic: clear the device panic flag and ack the open
+     * Control Room lone-worker alerts for this session.
+     */
+    public function acknowledgePanic(Request $request, LoneWorkerSession $session): RedirectResponse
+    {
+        $device = $this->workerTrackerDevice((int) $session->user_id);
+
+        if ($device) {
+            $meta = $device->meta ?? [];
+            $meta['panic_active'] = false;
+            $meta['panic_acknowledged_at'] = now()->toISOString();
+            $meta['panic_acknowledged_by'] = $request->user()->id;
+            $device->forceFill(['meta' => $meta])->save();
+        }
+
+        ControlRoomAlert::where('source', 'lone_worker')
+            ->where('context->normalized_data->lone_worker_session_id', $session->id)
+            ->whereIn('status', ['open', 'triaging'])
+            ->update([
+                'status' => 'ack',
+                'acknowledged_at' => now(),
+                'acknowledged_by_user_id' => $request->user()->id,
+            ]);
+
+        return back()->with('success', 'Panic acknowledged.');
     }
 
     /* ───────────────────────────── Payload builders ───────────────────────────── */
@@ -435,8 +514,9 @@ class LoneWorkerController extends Controller
      * In-progress rostered shifts available to monitor (for the wizard "from a
      * shift" mode) + how many "lone" ones are not yet monitored (hero KPI).
      *
-     * "Lone" is derived (no Shift.is_lone_worker flag yet): on-call shifts, or a
-     * worker who is the only person currently on shift at their site (solo cover).
+     * "Lone" prefers the explicit Shift.is_lone_worker roster flag; for shifts not
+     * yet flagged it falls back to the heuristic (on-call, or solo cover — the
+     * worker is the only person currently on shift at their site).
      */
     private function monitorableShifts(): array
     {
@@ -461,7 +541,9 @@ class LoneWorkerController extends Controller
 
         $list = $shifts->map(function (Shift $shift) use ($siteCounts, $gpsByShift) {
             $isSolo = $shift->site_id && ($siteCounts[$shift->site_id] ?? 0) === 1;
-            $isLone = (bool) $shift->is_on_call || $isSolo;
+            // Explicit roster flag is authoritative; fall back to the heuristic
+            // (on-call, or solo cover at the site) for shifts not yet flagged.
+            $isLone = (bool) $shift->is_lone_worker || (bool) $shift->is_on_call || $isSolo;
             $ping = $gpsByShift->get($shift->id)?->first();
 
             return [
@@ -574,7 +656,55 @@ class LoneWorkerController extends Controller
             'is_on_call' => (bool) $s->shift->is_on_call,
         ] : null;
 
+        // Paired GPS tracker (staff/lone-worker Queclink device), if any — last-known
+        // location + Locate-now / acknowledge-panic actions for the detail card.
+        $device = $s->user_id ? $this->workerTrackerDevice((int) $s->user_id) : null;
+        $data['tracker'] = $device ? $this->buildWorkerTrackerPayload($device, (int) $s->id) : null;
+
         return $data;
+    }
+
+    /**
+     * The GPS tracker actively assigned to a staff member (lone worker), if any.
+     * Resolves via the canonical TARGET_STAFF DeviceAssignment (per-user, tenant-safe).
+     */
+    private function workerTrackerDevice(int $userId): ?Device
+    {
+        $assignment = DeviceAssignment::query()
+            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+            ->where('assignable_id', $userId)
+            ->whereNull('released_at')
+            ->latest('id')
+            ->first();
+
+        if (! $assignment) {
+            return null;
+        }
+
+        return Device::query()
+            ->where('id', $assignment->device_id)
+            ->where('domain', 'tracking')
+            ->first();
+    }
+
+    /**
+     * Lean tracker payload for the session detail "Last-known location" card.
+     */
+    private function buildWorkerTrackerPayload(Device $device, int $sessionId): array
+    {
+        $meta = $device->meta ?? [];
+
+        return [
+            'name' => $device->name,
+            'imei' => $device->imei,
+            'latitude' => $device->latitude,
+            'longitude' => $device->longitude,
+            'last_seen_at' => $device->last_seen_at,
+            'battery_level' => $device->battery_level,
+            'panic_active' => (bool) ($meta['panic_active'] ?? false),
+            'locate_url' => route('health-safety.lone-workers.sessions.locate', $sessionId),
+            'acknowledge_panic_url' => route('health-safety.lone-workers.sessions.acknowledge-panic', $sessionId),
+        ];
     }
 
     /**

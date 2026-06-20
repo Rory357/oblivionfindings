@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Privacy\Services\PrivacyRecipients;
 use App\Models\DataBreachLog;
 use App\Models\User;
+use App\Notifications\Privacy\PrivacyBreachNotifiedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,13 +63,11 @@ class DataBreachController extends Controller
     /**
      * Show the form for creating a new breach record.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
 
-        return Inertia::render('privacy/breaches/create', [
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-        ]);
+        return redirect('/privacy/dashboard?new=breach');
     }
 
     /**
@@ -99,9 +100,15 @@ class DataBreachController extends Controller
 
         $breach = DataBreachLog::create($validated);
 
+        $message = 'Data breach recorded with reference: ' . $breach->breach_reference;
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', $message);
+        }
+
         return redirect()
             ->route('privacy.breaches.show', $breach)
-            ->with('success', 'Data breach recorded with reference: ' . $breach->breach_reference);
+            ->with('success', $message);
     }
 
     /**
@@ -163,7 +170,9 @@ class DataBreachController extends Controller
 
         $breach->update($attributes);
 
-        return back()->with('success', 'OPC notification recorded.');
+        $this->notifyPrivacyTeam($breach, 'opc', $request->authority_reference);
+
+        return back()->with('success', 'OPC notification recorded and the privacy team notified.');
     }
 
     /**
@@ -188,7 +197,30 @@ class DataBreachController extends Controller
 
         $breach->update($attributes);
 
-        return back()->with('success', 'Subject notification recorded.');
+        $this->notifyPrivacyTeam($breach, 'subjects', $request->notification_method);
+
+        return back()->with('success', 'Subject notification recorded and the privacy team notified.');
+    }
+
+    /**
+     * Send a real notification (bell + email) to the privacy team — officers who
+     * can report breaches, plus the breach's discoverer/creator — recording that
+     * the breach was reported to the OPC or to affected individuals.
+     */
+    private function notifyPrivacyTeam(DataBreachLog $breach, string $channel, ?string $detail): void
+    {
+        // push() (not merge()) so the nullable discoverer/creator are appended
+        // without Eloquent's key-based merge calling getKey() on a null; filter()
+        // then drops the nulls and unique() de-duplicates against the officers.
+        $recipients = PrivacyRecipients::withPermission('privacy.reportBreaches')
+            ->push($breach->discoveredBy, $breach->creator)
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        if ($recipients->isNotEmpty()) {
+            Notification::send($recipients, new PrivacyBreachNotifiedNotification($breach, $channel, $detail));
+        }
     }
 
     /**

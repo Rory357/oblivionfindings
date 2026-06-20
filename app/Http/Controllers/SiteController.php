@@ -9,6 +9,9 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\CredentialType;
+use App\Models\FirstAidRecord;
+use App\Models\HsRiskAssessment;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
@@ -17,6 +20,9 @@ use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SafeWorkProcedure;
+use App\Models\SiteHazard;
+use App\Support\HazardDetailPresenter;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
@@ -699,8 +705,89 @@ class SiteController extends Controller
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
             'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            'siteHazards' => SiteHazard::where('site_id', $site->id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->with('assignedTo:id,name')
+                ->orderByDesc('created_at')
+                ->limit(6)
+                ->get()
+                ->map(fn (SiteHazard $h) => [
+                    'id' => $h->id,
+                    'reference_number' => $h->reference_number,
+                    'hazard_label' => HazardDetailPresenter::hazardLabel($h),
+                    'description' => $h->description,
+                    'risk_rating' => $h->risk_rating,
+                    'severity' => $h->severity,
+                    'status' => $h->status,
+                    'due_date' => $h->due_date?->toDateString(),
+                    'overdue' => $h->isOverdue(),
+                    'unassigned' => ! $h->assigned_to_user_id,
+                ])->values(),
+            'siteHazardsOpenCount' => SiteHazard::where('site_id', $site->id)->open()->count(),
+            // Safe Work Procedures that apply to this site (or org-wide), read-only.
+            'safeWorkProcedures' => ($user && $user->canDo('procedures.view'))
+                ? SafeWorkProcedure::query()->applicableToSite($site->id)
+                    ->orderBy('title')
+                    ->limit(15)
+                    ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                    ->map(fn (SafeWorkProcedure $p) => [
+                        'id' => $p->id,
+                        'reference_number' => $p->reference_number,
+                        'title' => $p->title,
+                        'category' => $p->category,
+                        'status' => $p->status,
+                        'review_date' => $p->review_date?->toDateString(),
+                    ])->values()
+                : collect(),
+            // Formal H&S risk assessments attached to this site (full inline register tab).
+            'riskAssessments' => ($user && $user->canDo('hazards.view'))
+                ? HsRiskAssessment::forAssessable(Site::class, $site->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
+                    ->withCount('attachments')
+                    ->orderByDesc('created_at')
+                    ->limit(100)
+                    ->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
+                    ->values()
+                : [],
+            'ra_pickers' => ($user && $user->canDo('hazards.view'))
+                ? RiskAssessmentPresenter::pickers()
+                : ['sites' => [], 'clients' => [], 'events' => []],
+            'chemicalsStored' => array_merge(
+                app(HsModuleSummaryService::class)->chemicalsStoredForSite($site->id),
+                ['can_add' => (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'))],
+            ),
+            // First aid records logged at this site (read-only inline panel).
+            'firstAidRecords' => ($user && $user->canDo('hazards.view'))
+                ? FirstAidRecord::query()->where('site_id', $site->id)->with(['firstAider:id,name'])
+                    ->withCount(['attachments', 'followups as open_followups_count' => fn ($q) => $q->whereNull('completed_at')])
+                    ->orderByDesc('treatment_date')->limit(8)->get()
+                    ->map(fn (FirstAidRecord $r) => [
+                        'id' => $r->id,
+                        'treatment_date' => $r->treatment_date?->toISOString(),
+                        'treated_person_name' => $r->treated_person_name,
+                        'treated_person_type' => $r->treated_person_type,
+                        'injury_illness_type' => $r->injury_illness_type,
+                        'treatment_outcome' => $r->treatment_outcome,
+                        'ambulance_called' => (bool) $r->ambulance_called,
+                        'incident_reported' => (bool) $r->incident_reported,
+                        'first_aider_name' => $r->firstAider?->name,
+                        'related_incident_id' => $r->related_incident_id,
+                        'open_followups_count' => (int) ($r->open_followups_count ?? 0),
+                    ])->values()
+                : [],
+            'firstAidOpenFollowupCount' => ($user && $user->canDo('hazards.view'))
+                ? FirstAidRecord::where('site_id', $site->id)->whereHas('followups', fn ($q) => $q->whereNull('completed_at'))->count()
+                : 0,
+            // PPE & Equipment stored at this site (read-only inline panel; the
+            // register at /health-safety/ppe stays the single write surface).
+            'ppeSummary' => ($user && $user->canDo('hazards.view')) ? $this->buildPpeSummary($site) : null,
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
+                'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),
+                'manage_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.manage')),
+                'view_hs_first_aid' => (bool) ($user && $user->canDo('hazards.view')),
+                'view_hs_ppe' => (bool) ($user && $user->canDo('hazards.view')),
             ],
             'fleet' => Inertia::optional(fn () => $this->buildSiteFleetData($site)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
@@ -721,6 +808,43 @@ class SiteController extends Controller
                 'assigned_asset_ids' => $g->assignedAssets->pluck('id')->values(),
             ])->values(),
         ]);
+    }
+
+    /**
+     * Read-only PPE & Equipment summary for the site profile — stock counts +
+     * a short stored-items list. The /health-safety/ppe register is the single
+     * write surface; this panel deep-links there filtered by site.
+     */
+    private function buildPpeSummary(Site $site): array
+    {
+        $in30 = now()->addDays(30)->toDateString();
+        $in60 = now()->addDays(60)->toDateString();
+        $base = fn () => \App\Models\PpeInventory::query()->where('site_id', $site->id);
+
+        return [
+            'counts' => [
+                'total' => $base()->whereNotIn('status', ['condemned', 'disposed'])->count(),
+                'available' => $base()->where('status', 'available')->count(),
+                'allocated' => $base()->where('status', 'allocated')->count(),
+                'inspections_due' => $base()->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<=', $in30)->count(),
+                'expiring' => $base()->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', $in60)->count(),
+                'condemned' => $base()->where('status', 'condemned')->count(),
+            ],
+            'items' => $base()->with('ppeType:id,name,category')
+                ->whereNotIn('status', ['disposed'])
+                ->orderByDesc('created_at')->limit(8)->get()
+                ->map(fn (\App\Models\PpeInventory $i) => [
+                    'id' => $i->id,
+                    'type_name' => $i->ppeType?->name,
+                    'category' => $i->ppeType?->category,
+                    'serial_number' => $i->serial_number,
+                    'condition' => $i->condition,
+                    'status' => $i->status,
+                    'next_inspection_due' => optional($i->next_inspection_due)->toDateString(),
+                    'expiry_date' => optional($i->expiry_date)->toDateString(),
+                ])->values(),
+            'register_url' => '/health-safety/ppe?site_id='.$site->id,
+        ];
     }
 
     private function buildInspectionsSummary(Site $site): array

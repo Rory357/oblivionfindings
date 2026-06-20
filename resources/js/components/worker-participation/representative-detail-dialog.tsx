@@ -297,8 +297,9 @@ function EditPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
 
 /** Record training days — single number input + HSWA / NZQA info. */
 function TrainingPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
-    const form = useForm<{ training_days_completed: string }>({
+    const form = useForm<{ training_days_completed: string; initial_training_completed_at: string }>({
         training_days_completed: String(d.training_days_completed ?? 0),
+        initial_training_completed_at: d.initial_training_completed_at ? d.initial_training_completed_at.slice(0, 10) : '',
     });
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -330,9 +331,18 @@ function TrainingPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
                         onChange={(e) => form.setData('training_days_completed', e.target.value)}
                     />
                 </Field>
+                <Field label="Initial training completed" hint="NZQA US 29315 — optional" error={form.errors.initial_training_completed_at}>
+                    <Input
+                        type="date"
+                        max={new Date().toISOString().slice(0, 10)}
+                        value={form.data.initial_training_completed_at}
+                        onChange={(e) => form.setData('initial_training_completed_at', e.target.value)}
+                    />
+                </Field>
                 <InfoCard icon={GraduationCap} tone="info">
                     Under HSWA 2015 an elected H&amp;S representative is entitled to <b>two days&apos; paid training each year</b>. Approved
-                    training maps to <b>NZQA Unit Standard 29315</b> (HSR training).
+                    training maps to <b>NZQA Unit Standard 29315</b> (HSR training). Recording the completion date adds a tracked
+                    credential to the rep&apos;s HR record.
                 </InfoCard>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={onDone}>

@@ -2,6 +2,7 @@ import { PhotoUploadButton } from '@/components/hr';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     TabsRoot as Tabs,
@@ -303,6 +304,7 @@ interface Props {
     cases: HrCase[];
     assetAssignments: AssetAssignment[];
     policyAttestations: PolicyAttestation[];
+    safeWorkProcedures?: ApplicableProcedure[];
     can: { manage: boolean; viewSensitive: boolean };
 }
 
@@ -569,6 +571,7 @@ export default function EmployeeShow({
     cases = [],
     assetAssignments = [],
     policyAttestations = [],
+    safeWorkProcedures = [],
     can,
 }: Props) {
     const breadcrumbs = [
@@ -1866,6 +1869,15 @@ export default function EmployeeShow({
                                     </Link>
                                 </div>
                             )}
+
+                            {/* Safe Work Procedures applicable to this employee's role(s) */}
+                            {safeWorkProcedures.length > 0 ? (
+                                <ApplicableProceduresPanel
+                                    procedures={safeWorkProcedures}
+                                    subtitle={`Applicable to ${p.user.name.split(' ')[0]}'s role(s) — acknowledgement status`}
+                                    ackReadonly
+                                />
+                            ) : null}
 
                             {/* Summary Stats */}
                             {(() => {

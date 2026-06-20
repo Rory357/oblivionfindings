@@ -30,15 +30,42 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/observations', [HealthClinicalDashboardController::class, 'observations'])
             ->middleware('permission:clinical.observations.viewAny')
             ->name('observations.index');
-        Route::post('/observations', [HealthClinicalController::class, 'storeObservation'])
+        Route::post('/observations', [HealthClinicalDashboardController::class, 'storeObservation'])
             ->middleware('permission:clinical.observations.record')
             ->name('observations.store');
         Route::get('/events', [HealthClinicalDashboardController::class, 'events'])
             ->middleware('permission:clinical.events.viewAny')
             ->name('events.index');
-        Route::post('/events', [HealthClinicalController::class, 'storeEvent'])
+        Route::post('/events', [HealthClinicalDashboardController::class, 'storeEvent'])
             ->middleware('permission:clinical.events.record')
             ->name('events.store');
+        Route::patch('/events/{event}/review', [HealthClinicalDashboardController::class, 'reviewEvent'])
+            ->middleware('permission:clinical.events.review')
+            ->name('events.review');
+        Route::patch('/events/{event}/follow-up/complete', [HealthClinicalDashboardController::class, 'completeEventFollowup'])
+            ->middleware('permission:clinical.events.review|clinical.events.record')
+            ->name('events.followup.complete');
+        Route::post('/events/{event}/escalate', [HealthClinicalDashboardController::class, 'escalateEvent'])
+            ->middleware('permission:clinical.events.escalate')
+            ->name('events.escalate');
+        Route::get('/behaviour', [HealthClinicalDashboardController::class, 'behaviour'])
+            ->middleware('permission:clinical.behaviour.viewAny')
+            ->name('behaviour.index');
+        Route::get('/care-plans', [HealthClinicalDashboardController::class, 'carePlans'])
+            ->middleware('permission:clinical.dashboard')
+            ->name('care-plans.index');
+        Route::get('/health-monitoring', [HealthClinicalDashboardController::class, 'healthMonitoring'])
+            ->middleware('permission:clinical.monitoring.viewAny')
+            ->name('health-monitoring.index');
+        Route::get('/trends', [HealthClinicalDashboardController::class, 'trends'])
+            ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
+            ->name('trends.index');
+        Route::get('/assessments', [HealthClinicalDashboardController::class, 'assessments'])
+            ->middleware('permission:clinical.assessments.viewAny')
+            ->name('assessments.index');
+        Route::post('/assessments', [HealthClinicalDashboardController::class, 'storeAssessment'])
+            ->middleware('permission:clinical.assessments.record')
+            ->name('assessments.store');
         Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
             ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');
@@ -57,6 +84,11 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/protocols/{protocol}/toggle-active', [HealthClinicalProtocolController::class, 'toggleActive'])
             ->middleware('permission:clinical.protocols.manage')
             ->name('protocols.toggle-active');
+        // Record-wizard support (debounced client search + the live clinical card).
+        Route::get('/clients/search', [HealthClinicalDashboardController::class, 'clientSearch'])
+            ->name('clients.search');
+        Route::get('/clients/{client}/clinical-card', [HealthClinicalDashboardController::class, 'clinicalCard'])
+            ->name('clients.clinical-card');
         Route::get('/clients/{client}/trends', [HealthClinicalClientTrendsController::class, 'show'])
             ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
             ->name('clients.trends');

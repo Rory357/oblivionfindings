@@ -9,10 +9,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { Head, Link, router } from '@inertiajs/react';
-import { ClipboardList, Filter, FilePlus2, X } from 'lucide-react';
+import {
+    HealthClinicalShell,
+    RegisterStatStrip,
+    type HealthClinicalKpis,
+} from '@/pages/health-clinical/components/health-clinical-shell';
+import { Link, router } from '@inertiajs/react';
+import { Filter, FilePlus2, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -78,6 +81,8 @@ type Props = {
     filters: Filters;
     filter_options: FilterOptions;
     can_manage: boolean;
+    kpis: HealthClinicalKpis;
+    tab_counts?: Record<string, number>;
 };
 
 const ALL_SENTINEL = '__all__';
@@ -126,6 +131,8 @@ export default function Protocols({
     filters,
     filter_options,
     can_manage,
+    kpis,
+    tab_counts,
 }: Props) {
     const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
@@ -170,45 +177,28 @@ export default function Protocols({
     };
 
     return (
-        <AppLayout>
-            <Head title="Protocol Management — Health & Clinical" />
-
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={ClipboardList}
-                        title="Protocol Management"
-                        description="Manage observation protocols and monitor basic adherence across clients."
+        <HealthClinicalShell activeTab="protocols" kpis={kpis} tabCounts={tab_counts}>
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1">
+                    <RegisterStatStrip
                         stats={[
                             { label: 'Active', value: stats.active_protocols },
-                            { label: 'Due', value: stats.schedules_due },
-                            { label: 'Overdue', value: stats.schedules_overdue },
-                            { label: 'Compliance (30d)', value: `${stats.compliance_rate_30d}%` },
+                            { label: 'Due', value: stats.schedules_due, tone: stats.schedules_due > 0 ? 'warning' : 'default' },
+                            { label: 'Overdue', value: stats.schedules_overdue, tone: stats.schedules_overdue > 0 ? 'critical' : 'default' },
+                            { label: 'Compliance 30d', value: `${stats.compliance_rate_30d}%`, tone: stats.compliance_rate_30d >= 90 ? 'success' : 'warning' },
                         ]}
-                        actions={
-                            <>
-                                {can_manage ? (
-                                    <Link href="/health-clinical/protocols/create">
-                                        <Button size="sm" className="gap-2">
-                                            <FilePlus2 className="h-4 w-4" />
-                                            New Protocol
-                                        </Button>
-                                    </Link>
-                                ) : null}
-                                <Link href="/health-clinical">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        Dashboard
-                                    </Button>
-                                </Link>
-                            </>
-                        }
                     />
-                }
-            >
+                </div>
+                {can_manage ? (
+                    <Link href="/health-clinical/protocols/create">
+                        <Button size="sm" className="gap-2">
+                            <FilePlus2 className="h-4 w-4" />
+                            New Protocol
+                        </Button>
+                    </Link>
+                ) : null}
+            </div>
+
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -464,7 +454,6 @@ export default function Protocols({
                         ) : null}
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+        </HealthClinicalShell>
     );
 }

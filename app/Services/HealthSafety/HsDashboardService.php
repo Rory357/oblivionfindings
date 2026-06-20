@@ -10,6 +10,7 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\HsTrainingRequirement;
+use App\Models\PpeInventory;
 use App\Models\SafetyDataSheet;
 use App\Models\Site;
 use App\Models\SiteHazard;
@@ -270,7 +271,7 @@ class HsDashboardService
             ->orderBy('review_due_at')
             ->limit($limit)
             ->get() as $ra) {
-            $items[] = $this->expiringItem('risk_assessment', 'Risk assessment review', $ra->title ?: $ra->reference_number, $ra->review_due_at, '/health-safety/risk-assessments');
+            $items[] = $this->expiringItem('risk_assessment', 'Risk assessment review', $ra->title ?: $ra->reference_number, $ra->review_due_at, '/health-safety/risk-assessments?assessment='.$ra->id);
         }
 
         foreach (SafetyDataSheet::query()
@@ -295,6 +296,33 @@ class HsDashboardService
             ->get() as $drill) {
             $label = trim(ucfirst((string) $drill->drill_type).' drill — '.($drill->site?->name ?? ''), ' —');
             $items[] = $this->expiringItem('drill', 'Emergency drill', $label, $drill->scheduled_at, '/health-safety/drills', $drill->site?->name);
+        }
+
+        // PPE inspections due + items expiring (site-scoped; one register = /health-safety/ppe).
+        foreach (PpeInventory::query()
+            ->whereNotIn('status', ['condemned', 'disposed'])
+            ->whereNotNull('next_inspection_due')
+            ->whereDate('next_inspection_due', '<=', $horizon)
+            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+            ->with(['ppeType:id,name', 'site:id,name'])
+            ->orderBy('next_inspection_due')
+            ->limit($limit)
+            ->get() as $ppe) {
+            $label = trim(($ppe->ppeType?->name ?? 'PPE item').' · '.($ppe->serial_number ?? ''), ' ·');
+            $items[] = $this->expiringItem('ppe_inspection', 'PPE inspection', $label, $ppe->next_inspection_due, '/health-safety/ppe', $ppe->site?->name);
+        }
+
+        foreach (PpeInventory::query()
+            ->whereNotIn('status', ['condemned', 'disposed'])
+            ->whereNotNull('expiry_date')
+            ->whereDate('expiry_date', '<=', $horizon)
+            ->when($siteId, fn (Builder $q) => $q->where('site_id', $siteId))
+            ->with(['ppeType:id,name', 'site:id,name'])
+            ->orderBy('expiry_date')
+            ->limit($limit)
+            ->get() as $ppe) {
+            $label = trim(($ppe->ppeType?->name ?? 'PPE item').' · '.($ppe->serial_number ?? ''), ' ·');
+            $items[] = $this->expiringItem('ppe_expiry', 'PPE expiry', $label, $ppe->expiry_date, '/health-safety/ppe', $ppe->site?->name);
         }
 
         usort($items, fn ($a, $b) => strcmp((string) $a['due_date'], (string) $b['due_date']));

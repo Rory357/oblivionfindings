@@ -2,6 +2,7 @@
 
 namespace App\Domain\Clinical\Models;
 
+use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
@@ -33,6 +34,8 @@ class ClinicalObservation extends Model
         'observation_type',
         'recorded_at',
         'data',
+        'news2_score',
+        'news2_band',
         'notes',
         'protocol_schedule_id',
         'is_flagged',
@@ -49,6 +52,8 @@ class ClinicalObservation extends Model
         'observation_type' => ObservationType::class,
         'recorded_at' => 'datetime',
         'data' => 'array',
+        'news2_score' => 'integer',
+        'news2_band' => News2Band::class,
         'is_flagged' => 'boolean',
         'correction_approved_at' => 'datetime',
     ];

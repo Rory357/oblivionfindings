@@ -228,11 +228,6 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [processing, setProcessing] = useState(false);
     const [done, setDone] = useState(false);
-    // Remember a committee we already created so a retry after a chained-meeting
-    // validation failure does not POST /committees a second time.
-    const [createdCommitteeId, setCreatedCommitteeId] = useState<number | null>(
-        null,
-    );
 
     const cur = STEPS[stepIndex];
     const stepKey = cur.key as StepKey;
@@ -278,7 +273,6 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
         setStepIndex(0);
         setDone(false);
         setProcessing(false);
-        setCreatedCommitteeId(null);
     };
 
     /** Completeness % across the fields that matter for a meeting. */
@@ -345,15 +339,9 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
             return;
         }
 
-        // New committee that we already created on a previous attempt (the
-        // meeting POST failed validation) → reuse its id, don't create a duplicate.
-        if (createdCommitteeId != null) {
-            postMeeting(createdCommitteeId);
-            return;
-        }
-
-        // New committee → create it first, then chain the meeting against the
-        // freshly-flashed committee id.
+        // New committee + its first meeting in ONE atomic request (storeCommittee
+        // accepts schedule_meeting) — avoids a fragile two-POST chain across an
+        // Inertia redirect that could create the committee but drop the meeting.
         router.post(
             `${WP_BASE}/committees`,
             {
@@ -362,34 +350,19 @@ export function ScheduleMeetingWizard({ open, committees, sites, staff, onClose 
                 meeting_frequency: data.new_frequency,
                 established_at: data.new_established_at,
                 members: data.new_member_ids,
+                schedule_meeting: true,
+                scheduled_at: data.scheduled_at,
+                location: data.location || null,
+                agenda_items: data.agenda_items.map((a) => a.trim()).filter(Boolean),
+                attendees: data.attendee_ids,
             },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: (pg) => {
-                    const flash = (pg.props as {
-                        flash?: { created_committee_id?: number; error?: string };
-                    }).flash;
-                    if (flash?.error) {
-                        setProcessing(false);
-                        return;
-                    }
-                    if (flash?.created_committee_id == null) {
-                        // The committee was created but its id never reached the
-                        // flash — surface it rather than silently dropping the
-                        // meeting (and leaving an orphaned committee behind).
-                        setErrors({
-                            new_name:
-                                'The committee was created but its reference was not returned, so the meeting could not be scheduled. Open the committee and add the meeting from there.',
-                        });
-                        goToStep('committee');
-                        setProcessing(false);
-                        return;
-                    }
-                    // Remember the id so a later meeting-validation retry reuses
-                    // this committee instead of creating a duplicate.
-                    setCreatedCommitteeId(flash.created_committee_id);
-                    postMeeting(flash.created_committee_id);
+                    const flash = (pg.props as { flash?: { error?: string } }).flash;
+                    if (!flash?.error) setDone(true);
+                    setProcessing(false);
                 },
                 onError: (errs: Record<string, string>) => {
                     setErrors(errs);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
+use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedicationAlert;
@@ -152,7 +153,49 @@ class RespiteWorkspaceController extends Controller
                 ->values(),
             'fundingSources' => RespiteFundingSource::options(),
             'clientProfileOptions' => $this->clientProfileOptions(),
+            // Lookup data for the shared RestraintEventWizard launched from a live
+            // stay (E2). Client is prescoped from the stay row, so no clients list.
+            'restraintPickers' => $this->restraintPickers(),
         ]);
+    }
+
+    /**
+     * Picker lookups for the shared RestraintEventWizard when launched from a
+     * respite stay. Shapes mirror RestraintController's index() pickers (sites /
+     * staff / incidents / plans) so the same component renders identically; the
+     * RE-/BSP-/INC- reference formats are the canonical ones from that controller.
+     */
+    private function restraintPickers(): array
+    {
+        return [
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'staff' => User::query()->orderBy('name')->get(['id', 'name']),
+            'incidents' => ClientIncident::query()
+                ->select('id', 'client_id', 'type', 'occurred_at')
+                ->orderByDesc('occurred_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (ClientIncident $i) => [
+                    'id' => $i->id,
+                    'client_id' => $i->client_id,
+                    'reference' => 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT),
+                    'label' => 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT).' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
+                ])
+                ->all(),
+            'plans' => BehaviourSupportPlan::query()
+                ->where('status', '!=', 'archived')
+                ->orderByDesc('created_at')
+                ->get(['id', 'client_id', 'title', 'status', 'restrictive_practice_type'])
+                ->map(fn (BehaviourSupportPlan $p) => [
+                    'id' => $p->id,
+                    'client_id' => $p->client_id,
+                    'title' => $p->title,
+                    'status' => $p->status,
+                    'reference' => 'BSP-'.str_pad((string) $p->id, 3, '0', STR_PAD_LEFT),
+                    'restrictive_practice_type' => $p->restrictive_practice_type,
+                ])
+                ->all(),
+        ];
     }
 
     private function clientProfileOptions(): array
@@ -711,6 +754,9 @@ class RespiteWorkspaceController extends Controller
             'status' => $s->status,
             'live' => in_array($s->status, ['active', 'extended'], true),
             'site' => $s->booking?->location?->name ?? $client?->site?->name,
+            // Mirrors RespiteStayController::recordRestraint site derivation so
+            // the restraint wizard prescopes the correct site (server re-derives too).
+            'siteId' => $s->booking?->location_id ?: $client?->site_id,
             'actualStart' => optional($s->actual_start)->toIso8601String(),
             'actualEnd' => optional($s->actual_end)->toIso8601String(),
             'plannedEnd' => optional($s->booking?->end_at)->toIso8601String(),

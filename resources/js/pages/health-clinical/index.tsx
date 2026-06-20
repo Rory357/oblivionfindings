@@ -1,30 +1,18 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero } from '@/components/page';
-import { Head, Link } from '@inertiajs/react';
 import {
-    Activity,
+    HealthClinicalShell,
+    type HealthClinicalKpis,
+} from '@/pages/health-clinical/components/health-clinical-shell';
+import { cn } from '@/lib/utils';
+import { Link } from '@inertiajs/react';
+import {
     AlertTriangle,
-    CheckCircle2,
+    ChevronRight,
     ClipboardList,
-    Clock,
-    Heart,
-    ShieldAlert,
+    HeartPulse,
     Stethoscope,
 } from 'lucide-react';
-
-type KpiData = {
-    protocols_active: number;
-    observations_today: number;
-    observations_7d: number;
-    schedules_due: number;
-    schedules_overdue: number;
-    events_30d: number;
-    events_high_severity_30d: number;
-    compliance_rate_30d: number;
-};
 
 type OverdueItem = {
     id: number;
@@ -58,59 +46,109 @@ type RecentObservation = {
     recorded_at: string;
 };
 
+type WatchItem = {
+    client_id: number;
+    client_name: string;
+    site: string | null;
+    news2_score: number;
+    news2_band: string;
+    band_label: string;
+    recorded_at: string;
+    sparkline: number[];
+};
+
 type Props = {
-    kpis: KpiData;
+    kpis: HealthClinicalKpis & { protocols_active: number };
+    tab_counts?: Record<string, number>;
+    deterioration_watch: WatchItem[];
     overdue_items: OverdueItem[];
     recent_events: RecentEvent[];
     recent_observations: RecentObservation[];
 };
 
-function KpiCard({
-    icon: Icon,
-    label,
-    value,
-    subtext,
-    variant = 'default',
-}: {
-    icon: typeof Heart;
-    label: string;
-    value: string | number;
-    subtext?: string;
-    variant?: 'default' | 'warning' | 'danger' | 'success';
-}) {
-    const colorMap = {
-        default: 'from-muted to-muted text-muted-foreground',
-        warning: 'from-status-warning-bg to-status-warning-bg text-status-warning',
-        danger: 'from-status-critical-bg to-status-critical-bg text-status-critical',
-        success: 'from-status-success-bg to-status-success-bg text-status-success',
-    };
-    const iconColorMap = {
-        default: 'text-muted-foreground',
-        warning: 'text-status-warning',
-        danger: 'text-status-critical',
-        success: 'text-status-success',
-    };
+const BAND_TONE: Record<string, { pill: string; bar: string }> = {
+    low: { pill: 'bg-status-success-bg text-status-success', bar: 'bg-status-success' },
+    low_medium: { pill: 'bg-primary/10 text-primary', bar: 'bg-primary' },
+    medium: { pill: 'bg-status-warning-bg text-status-warning', bar: 'bg-status-warning' },
+    high: { pill: 'bg-status-critical-bg text-status-critical', bar: 'bg-status-critical' },
+};
 
+function initials(name: string): string {
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+}
+
+function DeteriorationWatchCard({ items }: { items: WatchItem[] }) {
     return (
-        <div
-            className={`rounded-xl border bg-gradient-to-br p-4 ${colorMap[variant]}`}
-        >
-            <div className="flex items-center gap-2">
-                <Icon className={`h-4 w-4 ${iconColorMap[variant]}`} />
-                <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
-                    {label}
-                </p>
-            </div>
-            <p className="mt-1 text-2xl font-bold">{value}</p>
-            {subtext && <p className="mt-0.5 text-xs opacity-60">{subtext}</p>}
-        </div>
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <HeartPulse className="h-4 w-4 text-primary" />
+                    Deterioration watch · NEWS2
+                    {items.length > 0 ? (
+                        <Badge variant="outline" className="ml-auto text-xs text-status-warning">
+                            {items.length} on watch
+                        </Badge>
+                    ) : null}
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {items.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                        All clients stable — no NEWS2 escalations in the last 7 days.
+                    </p>
+                ) : (
+                    <div className="divide-y">
+                        {items.map((item) => {
+                            const tone = BAND_TONE[item.news2_band] ?? BAND_TONE.low;
+                            const peak = Math.max(...item.sparkline, 6);
+                            return (
+                                <Link
+                                    key={item.client_id}
+                                    href={`/operations/clients/${item.client_id}`}
+                                    className="flex items-center gap-3 py-2.5 transition-colors hover:bg-muted/30"
+                                >
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                        {initials(item.client_name)}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">{item.client_name}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {item.site ?? 'No site'}
+                                        </p>
+                                    </div>
+                                    <div className="flex h-7 items-end gap-0.5" aria-hidden="true">
+                                        {item.sparkline.map((s, i) => (
+                                            <div
+                                                key={i}
+                                                className={cn('w-1.5 rounded-sm', tone.bar)}
+                                                style={{ height: `${Math.max(12, (s / peak) * 100)}%` }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="flex w-[120px] items-center justify-end gap-2">
+                                        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', tone.pill)}>
+                                            {item.band_label}
+                                        </span>
+                                        <span className="text-lg font-bold tabular-nums">{item.news2_score}</span>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 
 function formatTimeAgo(iso: string): string {
-    const diffH = Math.floor(
-        (Date.now() - new Date(iso).getTime()) / 3600000,
-    );
+    const diffH = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
     if (diffH < 1) return 'just now';
     if (diffH < 24) return `${diffH}h ago`;
     const days = Math.floor(diffH / 24);
@@ -125,252 +163,60 @@ const severityColor: Record<string, string> = {
     low: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function HealthClinicalDashboard({
+export default function HealthClinicalOverview({
     kpis,
+    tab_counts,
+    deterioration_watch,
     overdue_items,
     recent_events,
     recent_observations,
 }: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Clinical', href: '/health-clinical' }]}>
-            <Head title="Health & Clinical" />
+        <HealthClinicalShell activeTab="overview" kpis={kpis} tabCounts={tab_counts}>
+            <DeteriorationWatchCard items={deterioration_watch} />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Hero Header */}
-                <PageHero
-                    title="Health & Clinical"
-                    description="Clinical observation compliance and event oversight"
-                    icon={<Heart className="h-7 w-7 text-white" />}
-                    stats={[
-                        { label: 'Observations (7d)', value: kpis.observations_7d },
-                        { label: 'Compliance', value: `${kpis.compliance_rate_30d}%` },
-                        { label: 'Overdue', value: kpis.schedules_overdue },
-                        { label: 'Events (30d)', value: kpis.events_30d },
-                    ]}
-                    actions={
-                        <Link href="/health-clinical/observations">
-                            <Button size="sm" className="gap-1.5">
-                                <ClipboardList className="h-4 w-4" />
-                                Observation Register
-                            </Button>
-                        </Link>
-                    }
-                />
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <KpiCard
-                        icon={Activity}
-                        label="Observations (7d)"
-                        value={kpis.observations_7d}
-                        subtext={`${kpis.observations_today} today`}
-                    />
-                    <KpiCard
-                        icon={CheckCircle2}
-                        label="Compliance (30d)"
-                        value={`${kpis.compliance_rate_30d}%`}
-                        variant={
-                            kpis.compliance_rate_30d >= 90
-                                ? 'success'
-                                : kpis.compliance_rate_30d >= 70
-                                  ? 'warning'
-                                  : 'danger'
-                        }
-                    />
-                    <KpiCard
-                        icon={Clock}
-                        label="Overdue"
-                        value={kpis.schedules_overdue}
-                        subtext={`${kpis.schedules_due} total due`}
-                        variant={
-                            kpis.schedules_overdue > 0 ? 'danger' : 'default'
-                        }
-                    />
-                    <KpiCard
-                        icon={ShieldAlert}
-                        label="Events (30d)"
-                        value={kpis.events_30d}
-                        subtext={
-                            kpis.events_high_severity_30d > 0
-                                ? `${kpis.events_high_severity_30d} high severity`
-                                : undefined
-                        }
-                        variant={
-                            kpis.events_high_severity_30d > 0
-                                ? 'warning'
-                                : 'default'
-                        }
-                    />
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Overdue Observations */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-4 w-4 text-status-critical" />
-                                Overdue Observations
-                                {overdue_items.length > 0 && (
-                                    <Badge
-                                        variant="destructive"
-                                        className="ml-auto text-xs"
-                                    >
-                                        {overdue_items.length}
-                                    </Badge>
-                                )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {overdue_items.length === 0 ? (
-                                <p className="py-4 text-center text-sm text-muted-foreground">
-                                    No overdue observations. All protocols on
-                                    track.
-                                </p>
-                            ) : (
-                                <div className="divide-y">
-                                    {overdue_items.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className="flex items-center justify-between py-2"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px]"
-                                                    >
-                                                        {
-                                                            item.observation_type_label
-                                                        }
-                                                    </Badge>
-                                                    <span className="text-xs font-medium text-status-critical">
-                                                        {item.hours_overdue}h
-                                                        overdue
-                                                    </span>
-                                                </div>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    <Link
-                                                        href={`/operations/clients/${item.client_id}?tab=observations`}
-                                                        className="hover:underline"
-                                                    >
-                                                        {item.client_name}
-                                                    </Link>
-                                                    {' \u2014 '}
-                                                    {item.protocol_name}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Recent Clinical Events */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Stethoscope className="h-4 w-4 text-status-warning" />
-                                Recent Clinical Events
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {recent_events.length === 0 ? (
-                                <p className="py-4 text-center text-sm text-muted-foreground">
-                                    No clinical events in the last 30 days.
-                                </p>
-                            ) : (
-                                <div className="divide-y">
-                                    {recent_events.map((event) => (
-                                        <div
-                                            key={event.id}
-                                            className="flex items-center justify-between py-2"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium">
-                                                        {
-                                                            event.event_type_label
-                                                        }
-                                                    </span>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`text-[10px] ${severityColor[event.severity] ?? ''}`}
-                                                    >
-                                                        {event.severity}
-                                                    </Badge>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px]"
-                                                    >
-                                                        {event.status}
-                                                    </Badge>
-                                                </div>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    <Link
-                                                        href={`/operations/clients/${event.client_id}?tab=observations`}
-                                                        className="hover:underline"
-                                                    >
-                                                        {event.client_name}
-                                                    </Link>
-                                                    {event.reporter_name
-                                                        ? ` \u2014 ${event.reporter_name}`
-                                                        : ''}
-                                                </p>
-                                            </div>
-                                            <span className="ml-3 shrink-0 text-xs text-muted-foreground">
-                                                {formatTimeAgo(
-                                                    event.occurred_at,
-                                                )}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Recent Observations */}
+            <div className="grid gap-6 lg:grid-cols-2">
+                {/* Overdue Observations */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <ClipboardList className="h-4 w-4 text-primary" />
-                            Recent Observations
+                            <AlertTriangle className="h-4 w-4 text-status-critical" />
+                            Overdue Observations
+                            {overdue_items.length > 0 && (
+                                <Badge variant="destructive" className="ml-auto text-xs">
+                                    {overdue_items.length}
+                                </Badge>
+                            )}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {recent_observations.length === 0 ? (
+                        {overdue_items.length === 0 ? (
                             <p className="py-4 text-center text-sm text-muted-foreground">
-                                No observations recorded yet.
+                                No overdue observations. All protocols on track.
                             </p>
                         ) : (
                             <div className="divide-y">
-                                {recent_observations.map((obs) => (
-                                    <div
-                                        key={obs.id}
-                                        className="flex items-center justify-between py-2"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                {obs.observation_type_label}
-                                            </Badge>
-                                            <span className="text-sm">
-                                                {obs.client_name}
-                                            </span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-xs text-muted-foreground">
-                                                {formatTimeAgo(obs.recorded_at)}
-                                            </span>
-                                            {obs.recorder_name && (
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    {obs.recorder_name}
-                                                </p>
-                                            )}
+                                {overdue_items.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between py-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    {item.observation_type_label}
+                                                </Badge>
+                                                <span className="text-xs font-medium text-status-critical">
+                                                    {item.hours_overdue}h overdue
+                                                </span>
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                <Link
+                                                    href={`/operations/clients/${item.client_id}?tab=observations`}
+                                                    className="hover:underline"
+                                                >
+                                                    {item.client_name}
+                                                </Link>
+                                                {' — '}
+                                                {item.protocol_name}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -379,12 +225,98 @@ export default function HealthClinicalDashboard({
                     </CardContent>
                 </Card>
 
-                {/* Active Protocols count */}
-                <p className="text-xs text-muted-foreground">
-                    {kpis.protocols_active} active protocol
-                    {kpis.protocols_active !== 1 ? 's' : ''} across all clients.
-                </p>
+                {/* Recent Clinical Events */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Stethoscope className="h-4 w-4 text-status-warning" />
+                            Recent Clinical Events
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {recent_events.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                No clinical events in the last 30 days.
+                            </p>
+                        ) : (
+                            <div className="divide-y">
+                                {recent_events.map((event) => (
+                                    <div key={event.id} className="flex items-center justify-between py-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">{event.event_type_label}</span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`text-[10px] ${severityColor[event.severity] ?? ''}`}
+                                                >
+                                                    {event.severity}
+                                                </Badge>
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    {event.status}
+                                                </Badge>
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                <Link
+                                                    href={`/operations/clients/${event.client_id}?tab=observations`}
+                                                    className="hover:underline"
+                                                >
+                                                    {event.client_name}
+                                                </Link>
+                                                {event.reporter_name ? ` — ${event.reporter_name}` : ''}
+                                            </p>
+                                        </div>
+                                        <span className="ml-3 shrink-0 text-xs text-muted-foreground">
+                                            {formatTimeAgo(event.occurred_at)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
-        </AppLayout>
+
+            {/* Recent Observations */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                        <ClipboardList className="h-4 w-4 text-primary" />
+                        Recent Observations
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {recent_observations.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-muted-foreground">
+                            No observations recorded yet.
+                        </p>
+                    ) : (
+                        <div className="divide-y">
+                            {recent_observations.map((obs) => (
+                                <div key={obs.id} className="flex items-center justify-between py-2">
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className="text-[10px]">
+                                            {obs.observation_type_label}
+                                        </Badge>
+                                        <span className="text-sm">{obs.client_name}</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatTimeAgo(obs.recorded_at)}
+                                        </span>
+                                        {obs.recorder_name && (
+                                            <p className="text-[10px] text-muted-foreground">{obs.recorder_name}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <p className="text-xs text-muted-foreground">
+                {kpis.protocols_active} active protocol{kpis.protocols_active !== 1 ? 's' : ''} across all clients.
+            </p>
+        </HealthClinicalShell>
     );
 }

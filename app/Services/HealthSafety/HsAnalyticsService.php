@@ -4,10 +4,13 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
+use App\Models\FirstAidRecord;
 use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsInvestigation;
+use App\Models\SafeWorkProcedure;
+use App\Models\SafetyDataSheet;
 use App\Models\SiteHazard;
 use App\Models\Site;
 use App\Models\StaffTrainingRecord;
@@ -15,6 +18,7 @@ use App\Models\WorkplaceInjury;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Builds the Health & Safety Analytics payload — trend / root-cause /
@@ -73,6 +77,10 @@ class HsAnalyticsService
                 'by_type' => $this->injuriesByType($siteId, $from, $to),
                 'by_body_part' => $this->injuriesByBodyPart($siteId, $from, $to),
             ],
+            'first_aid_data' => [
+                'by_type' => $this->firstAidByType($siteId, $from, $to),
+                'by_outcome' => $this->firstAidByOutcome($siteId, $from, $to),
+            ],
             'hazard_data' => $this->hazardsByRisk($siteId),
             'site_comparison' => $this->siteComparison($from, $to),
             'trends' => $trends,
@@ -80,12 +88,26 @@ class HsAnalyticsService
             'scorecard' => $scorecard,
             'period_summary' => $this->periodSummary($siteId, $from, $to),
             'worksafe_notifiable' => $this->worksafeTotals($siteId, $from, $to),
+            'sds_expiring' => $this->sdsExpiringCount($siteId),
             'hours_meta' => [
                 'source' => 'billing_entries',
                 'total_hours' => round($this->kpi->totalHoursWorked(null, null, $siteId), 0),
             ],
             'role_note' => $this->roleNote($lens),
         ];
+    }
+
+    /**
+     * Current Safety Data Sheets due for review within 30 days (incl. overdue),
+     * site-scoped via the substance's storage locations. Single source shared
+     * with the register hero and the dashboard expiring feed.
+     */
+    private function sdsExpiringCount(?int $siteId): int
+    {
+        return SafetyDataSheet::query()
+            ->expiringWithin(30)
+            ->when($siteId, fn ($q) => $q->whereHas('hazardousSubstance.storageLocations', fn ($s) => $s->where('site_id', $siteId)))
+            ->count();
     }
 
     // ── Monthly trend series ────────────────────────────────────────────
@@ -166,6 +188,56 @@ class HsAnalyticsService
             ->orderByDesc('count')
             ->get()
             ->map(fn ($r) => ['body_part' => (string) $r->body_part, 'count' => (int) $r->count])
+            ->all();
+    }
+
+    // ── First aid (leading care-activity signal; excluded from TRIFR) ────
+
+    /**
+     * First-aid treatments by injury/illness type over the window, site-scoped via
+     * first_aid_records.site_id. Mirrors {@see injuriesByType()}.
+     *
+     * @return array<int,array{type:string,count:int}>
+     */
+    private function firstAidByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        if (! Schema::hasTable('first_aid_records')) {
+            return [];
+        }
+
+        return FirstAidRecord::query()
+            ->whereBetween('treatment_date', [$from, $to])
+            ->whereNotNull('injury_illness_type')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->selectRaw('injury_illness_type as type, COUNT(*) as count')
+            ->groupBy('injury_illness_type')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => ['type' => (string) $r->type, 'count' => (int) $r->count])
+            ->all();
+    }
+
+    /**
+     * First-aid treatments by treatment outcome over the window, site-scoped via
+     * first_aid_records.site_id. Mirrors {@see injuriesByType()}.
+     *
+     * @return array<int,array{outcome:string,count:int}>
+     */
+    private function firstAidByOutcome(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        if (! Schema::hasTable('first_aid_records')) {
+            return [];
+        }
+
+        return FirstAidRecord::query()
+            ->whereBetween('treatment_date', [$from, $to])
+            ->whereNotNull('treatment_outcome')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->selectRaw('treatment_outcome as outcome, COUNT(*) as count')
+            ->groupBy('treatment_outcome')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => ['outcome' => (string) $r->outcome, 'count' => (int) $r->count])
             ->all();
     }
 
@@ -717,6 +789,7 @@ class HsAnalyticsService
             ['key' => 'worker_engagement', 'label' => 'Worker participation', 'value' => $latest['worker_engagement'] ?? null, 'suffix' => '%', ...$d('worker_engagement', false)],
             ['key' => 'open_hazards', 'label' => 'Open hazards', 'value' => $lead['open_hazards'], 'suffix' => '', ...$d('hazards_open', true)],
             ['key' => 'worker_consultation', 'label' => 'Consultation completion', 'value' => $latest['worker_consultation'] ?? null, 'suffix' => '%', ...$d('worker_consultation', false)],
+            ['key' => 'procedure_review_pct', 'label' => 'Procedure review compliance', 'value' => $this->procedureReviewPct(), 'suffix' => '%', 'delta' => null, 'dir' => 'flat'],
         ];
 
         $lagging = [
@@ -729,6 +802,25 @@ class HsAnalyticsService
         ];
 
         return ['leading' => $leading, 'lagging' => $lagging];
+    }
+
+    /**
+     * % of approved Safe Work Procedures still within their review date (or with no
+     * date set) — a leading control-of-documents indicator. Org-wide (procedures are
+     * policy-level, not site-scoped). Null when there are no approved procedures.
+     */
+    private function procedureReviewPct(): ?int
+    {
+        $approved = SafeWorkProcedure::query()->where('status', 'approved')->count();
+        if ($approved === 0) {
+            return null;
+        }
+
+        $inWindow = SafeWorkProcedure::query()->where('status', 'approved')
+            ->where(fn ($q) => $q->whereNull('review_date')->orWhere('review_date', '>=', Carbon::today()))
+            ->count();
+
+        return (int) round($inWindow / $approved * 100);
     }
 
     // ── Period summary + role note ──────────────────────────────────────

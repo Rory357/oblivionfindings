@@ -41,6 +41,7 @@ use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
+use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
@@ -71,6 +72,13 @@ app(Schedule::class)
     ->command('followups:remind-overdue')
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
+
+// PPE compliance reminders: worker unacknowledged/fit-test digests + H&S lead
+// overdue-inspection/expiring/condemned digests — every day 08:15 NZ.
+app(Schedule::class)
+    ->command('ppe:compliance-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:15');
 
 // Controlled-drug balance checks not done in ≥7 days → dashboard alert: 07:30 NZ
 app(Schedule::class)
@@ -206,11 +214,36 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:20');
 
+// Injuries & RTW monitoring — return-to-work reviews + capacity reassessments due (daily)
+app(Schedule::class)
+    ->command('injuries:review-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:25');
+
+// First Aid — follow-ups due/overdue on open records (daily)
+app(Schedule::class)
+    ->command('first-aid:followup-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
+// Health & Clinical — deterioration watch + overdue observations digest (daily)
+app(Schedule::class)
+    ->command('clinical:deterioration-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:35');
+
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)
     ->job(new HazardOverdueJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
+
+// Privacy deadlines — access/correction requests overdue or due soon + notifiable
+// breaches still awaiting OPC notification (daily)
+app(Schedule::class)
+    ->job(new PrivacyDeadlineRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:25');
 
 // HR Module Scheduled Jobs
 

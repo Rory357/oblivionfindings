@@ -6,6 +6,7 @@ use App\Http\Controllers\DataRetentionPolicyController;
 use App\Http\Controllers\DataSubjectRequestController;
 use App\Http\Controllers\DPIAController;
 use App\Http\Controllers\LegalHoldController;
+use App\Http\Controllers\PrivacyAttachmentController;
 use App\Http\Controllers\PrivacyDashboardController;
 use App\Http\Controllers\PrivacyReportController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,16 @@ use Illuminate\Support\Facades\Route;
  */
 
 Route::middleware(['auth'])->group(function () {
+    // Privacy document / evidence attachments (polymorphic across all privacy
+    // domains). Per-type view/write permissions are enforced inside the
+    // controller against an allow-list, so no single permission middleware fits.
+    Route::post('/privacy/attachments', [PrivacyAttachmentController::class, 'store'])
+        ->name('privacy.attachments.store');
+    Route::get('/privacy/attachments/{attachment}/download', [PrivacyAttachmentController::class, 'download'])
+        ->name('privacy.attachments.download');
+    Route::delete('/privacy/attachments/{attachment}', [PrivacyAttachmentController::class, 'destroy'])
+        ->name('privacy.attachments.destroy');
+
     // Privacy Requests (Privacy Act 2020 IPP 6/7)
     // Create routes must come before wildcard routes
     Route::middleware('permission:privacy.processRequests')->group(function () {

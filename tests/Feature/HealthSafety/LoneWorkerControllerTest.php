@@ -177,6 +177,52 @@ class LoneWorkerControllerTest extends TestCase
         $this->assertNotNull($session->ended_at);
     }
 
+    public function test_destroy_soft_deletes_completed_session_and_drops_it_from_the_register(): void
+    {
+        $session = $this->makeSession(['status' => 'completed', 'ended_at' => now()->subMinutes(5)]);
+
+        $this->actingAs($this->admin)
+            ->from('/health-safety/lone-workers')
+            ->delete("/health-safety/lone-workers/sessions/{$session->id}")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        // Soft-delete retains the row for audit (not a hard delete) ...
+        $this->assertSoftDeleted($session);
+        $this->assertNotNull(LoneWorkerSession::withTrashed()->find($session->id));
+
+        // ... and the removed session no longer appears in the register.
+        $this->actingAs($this->admin)
+            ->get('/health-safety/lone-workers?period=all')
+            ->assertInertia(fn (Assert $p) => $p->has('sessions.data', 0));
+    }
+
+    public function test_destroy_rejected_for_a_live_session(): void
+    {
+        $session = $this->makeSession(['status' => 'active']);
+
+        $this->actingAs($this->admin)
+            ->from('/health-safety/lone-workers')
+            ->delete("/health-safety/lone-workers/sessions/{$session->id}")
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertNotSoftDeleted($session);
+    }
+
+    public function test_destroy_requires_manage_permission(): void
+    {
+        $worker = $this->supportWorker();
+        $session = $this->makeSession(['status' => 'completed', 'ended_at' => now()->subMinutes(5)]);
+
+        $this->actingAs($worker)
+            ->from('/health-safety/lone-workers')
+            ->delete("/health-safety/lone-workers/sessions/{$session->id}")
+            ->assertForbidden();
+
+        $this->assertNotSoftDeleted($session);
+    }
+
     public function test_session_detail_hydrates_check_ins(): void
     {
         $session = $this->makeSession();
@@ -359,5 +405,35 @@ class LoneWorkerControllerTest extends TestCase
         ]);
 
         return [$shift, $attendance];
+    }
+
+    public function test_is_lone_worker_flag_marks_a_shift_as_lone(): void
+    {
+        // Two in-progress shifts at the SAME site (so neither is "solo cover")
+        // and neither on-call — isolating the explicit flag as the only reason a
+        // shift is treated as lone.
+        $site = Site::factory()->create();
+        $client = Client::factory()->create();
+        $mk = fn (bool $flagged) => Shift::create([
+            'user_id' => User::factory()->create()->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
+            'is_on_call' => false,
+            'is_lone_worker' => $flagged,
+            'created_by' => $this->admin->id,
+        ]);
+        $mk(true);   // flagged → lone
+        $mk(false);  // co-worker at same site → not solo, not on-call, not flagged → not lone
+
+        $this->actingAs($this->admin)
+            ->get('/health-safety/lone-workers')
+            ->assertOk()
+            ->assertInertia(fn (Assert $p) => $p
+                ->has('options.shifts', 2)
+                ->where('hero.lone_shifts_unmonitored', 1));
     }
 }

@@ -87,6 +87,19 @@ export type LinkedShift = {
     is_on_call: boolean;
 };
 
+/** A GPS tracker (Queclink) actively paired to the worker, for the detail location card. */
+export type WorkerTracker = {
+    name: string | null;
+    imei: string | null;
+    latitude: string | number | null;
+    longitude: string | number | null;
+    last_seen_at: string | null;
+    battery_level: number | null;
+    panic_active: boolean;
+    locate_url: string;
+    acknowledge_panic_url: string;
+};
+
 export type SessionDetail = Session & {
     _type: 'session';
     emergency_triggered_at: string | null;
@@ -94,6 +107,7 @@ export type SessionDetail = Session & {
     check_ins: CheckIn[];
     alerts: SessionAlertRef[];
     shift: LinkedShift | null;
+    tracker: WorkerTracker | null;
 };
 
 export type AlertDetail = Alert & {
@@ -119,8 +133,17 @@ export type ShiftOption = {
     is_lone: boolean;
 };
 
+export type SiteOption = {
+    id: number;
+    name: string;
+    /** Composed one-line address from the Site record — prefills the wizard location. */
+    address: string | null;
+    latitude: string | number | null;
+    longitude: string | number | null;
+};
+
 export type Options = {
-    sites: Entity[];
+    sites: SiteOption[];
     staff: Entity[];
     clients: Entity[];
     shifts: ShiftOption[];
@@ -163,11 +186,11 @@ export type Paginator<T> = {
 };
 
 /** Lifecycle action launched from the row menu or the detail Options bar. */
-export type ActionKind = 'checkin' | 'extend' | 'end' | 'emergency' | 'acknowledge' | 'resolve';
+export type ActionKind = 'checkin' | 'extend' | 'end' | 'emergency' | 'delete' | 'acknowledge' | 'resolve';
 
 /** Target for an action modal — a session (lifecycle) or a legacy alert (ack/resolve). */
 export type ActionTarget =
-    | { kind: 'checkin' | 'extend' | 'end' | 'emergency'; session: Session | SessionDetail }
+    | { kind: 'checkin' | 'extend' | 'end' | 'emergency' | 'delete'; session: Session | SessionDetail }
     | { kind: 'acknowledge' | 'resolve'; alert: Alert | AlertDetail };
 
 /* ── Shared display maps (tone + label) ─────────────────────────────── */

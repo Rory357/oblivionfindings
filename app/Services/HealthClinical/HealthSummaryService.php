@@ -15,12 +15,6 @@ use App\Models\ClientMedicalProfile;
  */
 class HealthSummaryService
 {
-    public function __construct(
-        private readonly ClinicalObservationService $observationService,
-        private readonly ClinicalEventService $eventService,
-        private readonly ProtocolService $protocolService,
-    ) {}
-
     public function forClient(int $clientId): array
     {
         $profile = ClientMedicalProfile::where('client_id', $clientId)->first();

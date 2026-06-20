@@ -25,6 +25,7 @@ class SubstanceExposureRecord extends Model
         'symptoms',
         'first_aid_given',
         'medical_attention_sought',
+        'medical_treatment',
         'medical_outcome',
         'incident_reported',
         'related_incident_id',

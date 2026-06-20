@@ -20,6 +20,7 @@ use App\Domain\Governance\Models\NotifiableIncident;
 use App\Services\HealthSafety\HsAnalyticsService;
 use App\Services\HealthSafety\HsDashboardService;
 use App\Services\HealthSafety\HsKpiService;
+use App\Services\HealthSafety\RestraintKpiService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,7 @@ class HealthSafetyDashboardController extends Controller
         private readonly HsDashboardService $dashboardService,
         private readonly HsAnalyticsService $analyticsService,
         private readonly HsKpiService $kpiService,
+        private readonly RestraintKpiService $restraintKpiService,
     ) {}
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
@@ -108,6 +110,19 @@ class HealthSafetyDashboardController extends Controller
             'fleet_unresolved' => $fleetUnresolved,
             'staff_compliance_pct' => (int) round($this->kpiService->trainingAuditCompliancePct() ?? 0),
             'days_since_lti' => $this->kpiService->daysSinceLostTimeInjury($siteId),
+            // PPE compliance (cross-module B2) — site-scoped when a site filter is active.
+            'ppe_inspections_overdue' => \App\Models\PpeInventory::query()
+                ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+                ->whereNotIn('status', ['condemned', 'disposed'])
+                ->whereNotNull('next_inspection_due')->whereDate('next_inspection_due', '<', $now->toDateString())->count(),
+            'ppe_expiring' => \App\Models\PpeInventory::query()
+                ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+                ->whereNotIn('status', ['condemned', 'disposed'])
+                ->whereNotNull('expiry_date')->whereDate('expiry_date', '<=', $now->copy()->addDays(60)->toDateString())->count(),
+            'ppe_unacknowledged' => \App\Models\PpeAllocation::query()
+                ->whereNull('returned_at')->where('acknowledged', false)
+                ->when($siteId, fn ($q) => $q->whereHas('ppeInventory', fn ($iq) => $iq->where('site_id', $siteId)))
+                ->count(),
         ];
 
         // -- Incident Trends (12 months) --
@@ -212,6 +227,37 @@ class HealthSafetyDashboardController extends Controller
                     'committees' => HsCommittee::count(),
                 ];
             }, ['pct' => null, 'committees' => 0], false),
+
+            // First-aid activity (leading care-activity signal, trailing 30 days) — surfaced
+            // on the Leading tab. First-aid-only treatment is NOT recordable / excluded from TRIFR.
+            'first_aid' => rescue(fn () => $this->kpiService->firstAidActivity(null, null, $siteId), ['treatments' => 0, 'ambulance' => 0, 'hospital' => 0], false),
+
+            // Safe Work Procedures hub card — approved count + review-due + high-risk coverage gaps.
+            'procedures' => rescue(function () {
+                $highRisk = ['manual_handling', 'challenging_behaviour', 'lone_working', 'medication'];
+                $covered = \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                    ->whereIn('category', $highRisk)->distinct()->pluck('category')->all();
+
+                return [
+                    'approved' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')->count(),
+                    'review_due' => \App\Models\SafeWorkProcedure::query()->where('status', 'approved')
+                        ->whereNotNull('review_date')->where('review_date', '<=', now()->addDays(30))->count(),
+                    'coverage_gap_categories' => count(array_diff($highRisk, $covered)),
+                ];
+            }, ['approved' => 0, 'review_due' => 0, 'coverage_gap_categories' => 0], false),
+
+            // Restraint & behaviour-support governance (Ngā Paerewa least-restrictive practice) —
+            // lagging signals + unreviewed queue. Surfaced on the Lagging tab. See RestraintKpiService.
+            'restraints' => rescue(fn () => [
+                'summary' => $this->restraintKpiService->summary($siteId, $from, $to),
+                'unreviewed' => $this->restraintKpiService->unreviewedWorklist($siteId),
+            ], [
+                'summary' => [
+                    'events_in_period' => 0, 'out_of_plan' => 0, 'with_injury' => 0, 'critical' => 0,
+                    'unreviewed' => 0, 'active_plans' => 0, 'plans_review_due' => 0, 'clients_no_active_bsp' => 0,
+                ],
+                'unreviewed' => [],
+            ], false),
         ]);
     }
 
@@ -247,6 +293,19 @@ class HealthSafetyDashboardController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+
+            // Restraint & behaviour-support breakdowns (Ngā Paerewa) — additive analytics
+            // section, site/period scoped. See RestraintKpiService.
+            'restraint_analytics' => rescue(fn () => [
+                'summary' => $this->restraintKpiService->summary($siteId, $from, $to),
+                'breakdowns' => $this->restraintKpiService->breakdowns($siteId, $from, $to),
+            ], [
+                'summary' => [
+                    'events_in_period' => 0, 'out_of_plan' => 0, 'with_injury' => 0, 'critical' => 0,
+                    'unreviewed' => 0, 'active_plans' => 0, 'plans_review_due' => 0, 'clients_no_active_bsp' => 0,
+                ],
+                'breakdowns' => ['by_type' => [], 'by_severity' => [], 'by_plan_status' => []],
+            ], false),
         ]));
     }
 

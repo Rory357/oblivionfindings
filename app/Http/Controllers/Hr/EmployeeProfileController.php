@@ -675,11 +675,42 @@ class EmployeeProfileController extends Controller
             'cases' => $cases,
             'assetAssignments' => $assetAssignments,
             'policyAttestations' => $policyAttestations,
+            'safeWorkProcedures' => $this->employeeProcedures($user, $profile),
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
                 'viewSensitive' => $user->canDo('hr.employees.viewRestricted'),
             ],
         ]);
+    }
+
+    /**
+     * Safe Work Procedures applicable to this employee's role(s), with the employee's
+     * own acknowledgement status (read-only compliance view for the manager).
+     */
+    private function employeeProcedures($viewer, HrEmployeeProfile $profile): \Illuminate\Support\Collection
+    {
+        if (! $viewer?->canDo('procedures.view')) {
+            return collect();
+        }
+
+        $roleKeys = $profile->user?->roles()->pluck('name')->all() ?? [];
+        $acked = \App\Models\ProcedureAcknowledgement::query()
+            ->where('user_id', $profile->user_id)
+            ->pluck('version_acknowledged', 'safe_work_procedure_id');
+
+        return \App\Models\SafeWorkProcedure::query()->applicableToRoles($roleKeys)
+            ->orderBy('title')
+            ->limit(25)
+            ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date', 'current_version'])
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'reference_number' => $p->reference_number,
+                'title' => $p->title,
+                'category' => $p->category,
+                'status' => $p->status,
+                'review_date' => $p->review_date?->toDateString(),
+                'acknowledged' => (int) ($acked[$p->id] ?? 0) === (int) $p->current_version,
+            ])->values();
     }
 
     /* ------------------------------------------------------------------ */

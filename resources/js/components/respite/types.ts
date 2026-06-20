@@ -4,6 +4,8 @@
  */
 
 import type { ClientWizardForm } from '@/components/clients/add-client-dialog';
+import type { PlanPickerOption } from '@/components/health-safety/restraint-event-wizard';
+import type { IncidentOption, SiteOption, StaffOption } from '@/pages/health-safety/restraints/shared';
 
 export type Urgency = 'planned' | 'urgent' | 'crisis';
 
@@ -180,6 +182,7 @@ export interface RespiteStayRow {
     status: string;
     live: boolean;
     site: string | null;
+    siteId: number | null;
     actualStart: string | null;
     actualEnd: string | null;
     plannedEnd: string | null;
@@ -263,6 +266,16 @@ export interface RespiteWorkspaceData {
     serviceAgreements: (ServiceAgreementSummary & { clientId: number })[];
     fundingSources: FundingOption[];
     clientProfileOptions: ClientProfileOptions;
+    /**
+     * Lookup data for the shared RestraintEventWizard launched from a live stay.
+     * Client is prescoped from the row, so no clients list is needed here.
+     */
+    restraintPickers: {
+        sites: SiteOption[];
+        staff: StaffOption[];
+        incidents: IncidentOption[];
+        plans: PlanPickerOption[];
+    };
 }
 
 export interface FundingOption {

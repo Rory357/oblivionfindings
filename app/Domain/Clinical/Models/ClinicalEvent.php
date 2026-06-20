@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClinicalEvent extends Model
@@ -101,6 +102,11 @@ class ClinicalEvent extends Model
     public function linkedIncident(): BelongsTo
     {
         return $this->belongsTo(ClientIncident::class, 'linked_incident_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(ClinicalAttachment::class, 'attachable')->latest();
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────

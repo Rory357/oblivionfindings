@@ -19,6 +19,7 @@ class NotifiableIncident extends Model
         'title',
         'description',
         'related_incident_id',
+        'workplace_injury_id',
         'severity',
         'status',
         'occurred_at',
@@ -84,6 +85,11 @@ class NotifiableIncident extends Model
     public function relatedIncident(): BelongsTo
     {
         return $this->belongsTo(\App\Models\ClientIncident::class, 'related_incident_id');
+    }
+
+    public function workplaceInjury(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\WorkplaceInjury::class, 'workplace_injury_id');
     }
 
     public function isPending(): bool

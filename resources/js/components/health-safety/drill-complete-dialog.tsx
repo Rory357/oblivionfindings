@@ -23,7 +23,7 @@ import {
     Timer,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { CHIP, fmtEvacTime, type ChipTone } from '@/pages/health-safety/drills/shared';
+import { CHIP, fmtEvacTime, localToUtcIso, type ChipTone } from '@/pages/health-safety/drills/shared';
 
 const STEPS: WizardStep[] = [
     { key: 'timings', label: 'Timings', blurb: 'How it ran', icon: Timer },
@@ -81,6 +81,7 @@ export function DrillCompleteDialog({
 
     const submit = (e?: FormEvent) => {
         e?.preventDefault();
+        form.transform((d) => ({ ...d, completed_at: localToUtcIso(d.completed_at) }));
         form.post(`/health-safety/drills/${drill.id}/complete`, {
             preserveScroll: true,
             onSuccess: (page) => {

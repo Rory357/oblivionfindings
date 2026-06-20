@@ -12,6 +12,7 @@ import {
     BarChart3,
     ChevronRight,
     ClipboardCheck,
+    FileText,
     LayoutDashboard,
     ShieldAlert,
     Siren,
@@ -19,13 +20,14 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 
-export type WorkflowStage = 'report' | 'investigate' | 'drill' | 'resolve' | 'analyse';
+export type WorkflowStage = 'report' | 'investigate' | 'drill' | 'resolve' | 'document' | 'analyse';
 
 const STEPS: { key: WorkflowStage; label: string; href: string; icon: LucideIcon }[] = [
     { key: 'report', label: 'Report & respond', href: '/incidents', icon: ShieldAlert },
     { key: 'investigate', label: 'Investigate', href: '/health-safety/events', icon: ClipboardCheck },
     { key: 'drill', label: 'Drill & prepare', href: '/health-safety/drills', icon: Siren },
     { key: 'resolve', label: 'Resolve', href: '/health-safety/corrective-actions', icon: Wrench },
+    { key: 'document', label: 'Document & control', href: '/health-safety/procedures', icon: FileText },
     { key: 'analyse', label: 'Analyse', href: '/health-safety/analytics', icon: BarChart3 },
 ];
 

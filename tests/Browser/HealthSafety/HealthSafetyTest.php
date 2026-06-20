@@ -103,13 +103,14 @@ test('health safety procedures page loads', function () {
     });
 });
 
-test('health safety procedures create page loads', function () {
+test('health safety procedures create deep-link opens the wizard', function () {
+    // Modal-first: /create now redirects to the register with the New-procedure wizard open.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/health-safety/procedures/create')
-            ->waitForText('Procedure', 10)
-            ->assertSee('Procedure');
+            ->waitForText('New procedure', 10)
+            ->assertSee('Procedure completeness');
     });
 });
 

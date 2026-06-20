@@ -199,6 +199,38 @@ class WorkerParticipationTest extends TestCase
         $this->assertSame('inactive', $rep->fresh()->status);
     }
 
+    public function test_recording_initial_hsr_training_creates_a_tracked_staff_credential(): void
+    {
+        $user = User::factory()->create();
+        $rep = $this->rep(['user_id' => $user->id, 'initial_training_completed_at' => null]);
+        $type = 'HSR Initial Training (NZQA US 29315)';
+
+        // No credential until initial training (NZQA US 29315) is recorded.
+        $this->assertDatabaseMissing('staff_credentials', ['user_id' => $user->id, 'type' => $type]);
+
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/representatives/{$rep->id}", [
+                'initial_training_completed_at' => now()->subMonth()->toDateString(),
+            ])
+            ->assertRedirect();
+
+        // Cross-module: surfaced as a tracked HR credential on the rep's staff record.
+        $this->assertDatabaseHas('staff_credentials', [
+            'user_id' => $user->id,
+            'type' => $type,
+            'issuer' => 'NZQA',
+            'reference' => 'US 29315',
+        ]);
+
+        // Idempotent — re-saving does not duplicate the credential.
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/representatives/{$rep->id}", [
+                'initial_training_completed_at' => now()->subMonth()->toDateString(),
+            ])
+            ->assertRedirect();
+        $this->assertSame(1, \App\Models\StaffCredential::where('user_id', $user->id)->where('type', $type)->count());
+    }
+
     public function test_store_committee_flashes_created_committee_id_for_the_meeting_chain(): void
     {
         $site = Site::factory()->create();
@@ -217,6 +249,36 @@ class WorkerParticipationTest extends TestCase
             ])
             ->assertRedirect()
             ->assertSessionHas('created_committee_id', HsCommittee::where('name', 'New build committee')->value('id'));
+    }
+
+    public function test_store_committee_schedules_its_first_meeting_atomically(): void
+    {
+        Notification::fake();
+        $site = Site::factory()->create();
+        $member = User::factory()->create();
+
+        // The schedule-meeting wizard's "new committee" path posts the committee
+        // AND its first meeting in one request, so the meeting can never be
+        // dropped/orphaned by a fragile two-POST chain across a redirect.
+        $this->actingAs($this->officer())
+            ->post('/health-safety/worker-participation/committees', [
+                'name' => 'Atomic Committee',
+                'site_id' => $site->id,
+                'meeting_frequency' => 'quarterly',
+                'established_at' => now()->toDateString(),
+                'members' => [$member->id],
+                'schedule_meeting' => true,
+                'scheduled_at' => now()->addWeek()->toDateTimeString(),
+                'location' => 'Staff room',
+                'attendees' => [$member->id],
+            ])
+            ->assertRedirect();
+
+        $committee = HsCommittee::where('name', 'Atomic Committee')->firstOrFail();
+        $meeting = HsCommitteeMeeting::where('hs_committee_id', $committee->id)->firstOrFail();
+        $this->assertSame('scheduled', $meeting->status);
+        $this->assertTrue($meeting->attendeeUsers()->where('users.id', $member->id)->exists());
+        Notification::assertSentTo($member, CommitteeMeetingScheduled::class);
     }
 
     /* ---- meetings: pivot attendees + notifications ------------------- */
@@ -300,6 +362,24 @@ class WorkerParticipationTest extends TestCase
             'status' => 'closed',
         ])->assertRedirect();
         $this->assertSame('closed', $consultation->fresh()->status);
+    }
+
+    public function test_consultation_status_never_regresses(): void
+    {
+        $consultation = $this->consultation(['status' => 'actioned', 'outcome' => 'Training scheduled.']);
+
+        // Recording late feedback must not drag an actioned consultation back to
+        // feedback_received — the stage is preserved, but the content still saves.
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/consultations/{$consultation->id}/status", [
+                'status' => 'feedback_received',
+                'worker_feedback_summary' => 'Late feedback captured.',
+            ])
+            ->assertRedirect();
+
+        $consultation->refresh();
+        $this->assertSame('actioned', $consultation->status);
+        $this->assertSame('Late feedback captured.', $consultation->worker_feedback_summary);
     }
 
     public function test_store_consultation_with_supporting_document(): void

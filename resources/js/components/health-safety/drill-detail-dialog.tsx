@@ -52,6 +52,7 @@ import {
     fmtDateTime,
     fmtEvacTime,
     formatFileSize,
+    localToUtcIso,
     outcomeMeta,
     statusMeta,
     titleCase,
@@ -580,6 +581,7 @@ function EditPane({ d, onDone }: { d: DrillDetail; onDone: () => void }) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        form.transform((data) => ({ ...data, scheduled_at: localToUtcIso(data.scheduled_at) }));
         form.put(`/health-safety/drills/${d.id}`, { preserveScroll: true, onSuccess: paneSuccess(onDone) });
     };
 

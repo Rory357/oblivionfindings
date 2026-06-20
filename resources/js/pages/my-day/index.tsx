@@ -5,6 +5,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     FileText,
+    HeartPulse,
     Home,
     Pill,
     ShieldAlert,
@@ -52,12 +53,14 @@ import {
 import type {
     MyDayActiveRound,
     MyDayActiveSite,
+    MyDayFirstAidFollowup,
     MyDayHandover,
     MyDayHrTask,
     MyDayLoneWorkerSession,
     MyDayMedDue,
     MyDayNotification,
     MyDayPageProps,
+    MyDayPpe,
     MyDayPreShiftBriefing,
     MyDayResident,
     MyDayShiftTask,
@@ -534,6 +537,17 @@ export default function MyDay() {
         );
     }, [loneWorkerSessionId]);
 
+    // My PPE — worker self-acknowledges their own issued PPE. The acknowledge-own
+    // route is auth-only + ownership-checked, so support workers (no hazards.* perms)
+    // can confirm receipt from their own My Day.
+    const handleAcknowledgePpe = useCallback((allocationId: number) => {
+        router.post(
+            `/health-safety/ppe/allocations/${allocationId}/acknowledge-own`,
+            {},
+            { preserveScroll: true },
+        );
+    }, []);
+
     const handleAddNote = useCallback((clientId: number | null | undefined) => {
         if (!clientId) {
             router.visit('/clients');
@@ -835,6 +849,19 @@ export default function MyDay() {
                             session={props.active_lone_worker_session}
                             onCheckIn={handleLoneWorkerCheckIn}
                             onEmergency={handleLoneWorkerEmergency}
+                        />
+                    ) : null}
+
+                    {props.first_aid_followups?.length ? (
+                        <FirstAidFollowupsCard
+                            followups={props.first_aid_followups}
+                        />
+                    ) : null}
+
+                    {(props.my_ppe ?? []).length > 0 ? (
+                        <MyPpeCard
+                            items={props.my_ppe ?? []}
+                            onAcknowledge={handleAcknowledgePpe}
                         />
                     ) : null}
 
@@ -1219,6 +1246,175 @@ function LoneWorkerCheckInCard({
                     <AlertTriangle className="h-4 w-4" />I need help
                 </Button>
             </div>
+        </section>
+    );
+}
+
+/**
+ * Read-only "First-aid follow-ups assigned to me" card (the cross-module half
+ * of the First Aid Register redesign). Lists the signed-in worker's open
+ * follow-ups — re-check a wound, lodge the ACC45, call whānau — each row a
+ * one-tap deep-link into the register's record modal. No write affordances
+ * live here; completing a follow-up happens on the record itself.
+ */
+function FirstAidFollowupsCard({
+    followups,
+}: {
+    followups: MyDayFirstAidFollowup[];
+}) {
+    const overdueCount = followups.filter((f) => f.is_overdue).length;
+
+    return (
+        <section
+            aria-label="First-aid follow-ups assigned to me"
+            className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-4"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
+                    <HeartPulse className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-status-warning">
+                        First-aid follow-ups
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {overdueCount > 0
+                            ? `${overdueCount} overdue · ${followups.length} assigned to you`
+                            : `${followups.length} assigned to you`}
+                    </p>
+                </div>
+            </div>
+
+            <ul className="mt-3 space-y-2">
+                {followups.map((item) => (
+                    <li key={item.id}>
+                        {/* eslint-disable-next-line no-restricted-syntax -- custom card-row selector (tone-by-overdue), not a shadcn Button */}
+                        <button
+                            type="button"
+                            onClick={() => router.visit(item.url)}
+                            className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+                                item.is_overdue
+                                    ? 'border-status-critical/30 bg-status-critical-bg hover:bg-status-critical-bg/70'
+                                    : 'border-border bg-card hover:bg-muted'
+                            }`}
+                        >
+                            <span className="line-clamp-2 text-xs font-medium text-foreground">
+                                {item.notes || 'Follow-up required'}
+                            </span>
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                                {item.treated_person_name ? (
+                                    <span className="truncate">
+                                        {item.treated_person_name}
+                                    </span>
+                                ) : null}
+                                {item.site_name ? (
+                                    <span className="flex items-center gap-1">
+                                        <Home className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">
+                                            {item.site_name}
+                                        </span>
+                                    </span>
+                                ) : null}
+                                {item.due_at ? (
+                                    <span
+                                        className={`flex items-center gap-1 ${
+                                            item.is_overdue
+                                                ? 'font-medium text-status-critical'
+                                                : ''
+                                        }`}
+                                    >
+                                        <Calendar className="h-3 w-3 shrink-0" />
+                                        {item.is_overdue
+                                            ? 'Overdue · '
+                                            : 'Due '}
+                                        {formatRelative(item.due_at)}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+/**
+ * "Your PPE needs attention" — the worker's own active allocations awaiting
+ * acknowledgement or an RPE fit-test. One-tap acknowledge posts to the auth-only,
+ * ownership-checked acknowledge-own endpoint.
+ */
+function MyPpeCard({
+    items,
+    onAcknowledge,
+}: {
+    items: MyDayPpe[];
+    onAcknowledge: (allocationId: number) => void;
+}) {
+    return (
+        <section
+            aria-label="My PPE"
+            className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-4"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
+                    <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-status-warning">
+                        Your PPE needs attention
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        Confirm you've received and understand the equipment
+                        issued to you.
+                    </p>
+                </div>
+            </div>
+
+            <ul className="mt-3 space-y-2">
+                {items.map((it) => (
+                    <li
+                        key={it.id}
+                        className="rounded-lg border border-border bg-card/60 p-2.5"
+                    >
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <div className="truncate text-[13px] font-semibold">
+                                    {it.type_name}
+                                </div>
+                                <div className="truncate text-[11px] text-muted-foreground">
+                                    {[it.serial_number, it.site]
+                                        .filter(Boolean)
+                                        .join(' · ') || '—'}
+                                </div>
+                            </div>
+                            {it.acknowledged ? (
+                                <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-status-success">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Acknowledged
+                                </span>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="shrink-0"
+                                    onClick={() => onAcknowledge(it.id)}
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Acknowledge
+                                </Button>
+                            )}
+                        </div>
+                        {it.fit_test_required && !it.fit_test_completed ? (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-status-critical">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                Fit-test required before use (AS/NZS 1715) — see
+                                your coordinator.
+                            </div>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
         </section>
     );
 }

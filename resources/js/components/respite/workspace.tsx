@@ -13,6 +13,7 @@ import {
     type PageHeroMetaItem,
     type PageHeroStat,
 } from '@/components/page';
+import { RestraintEventWizard } from '@/components/health-safety/restraint-event-wizard';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { router, usePage } from '@inertiajs/react';
@@ -44,7 +45,6 @@ import {
     DischargeModal,
     IncidentModal,
     MedicationReconciliationModal,
-    RestraintModal,
 } from './modals/stay-actions';
 import { BookingsPane } from './panes/bookings';
 import { CalendarPane } from './panes/calendar';
@@ -467,10 +467,29 @@ export function RespiteWorkspace({
                 stay={medRecStay}
                 onClose={() => setMedRecStay(null)}
             />
-            <RestraintModal
-                stay={restraintStay}
-                onClose={() => setRestraintStay(null)}
-            />
+            {/* Shared H&S restraint wizard (E2). Prescoped to the stay; posts to
+                the respite endpoint so the RespiteEvent + server-side stay/site
+                derivation are preserved. Keyed + conditionally mounted so each
+                stay gets fresh form state (useForm captures initial once). */}
+            {restraintStay ? (
+                <RestraintEventWizard
+                    key={`restraint-stay-${restraintStay.id}`}
+                    open
+                    onClose={() => setRestraintStay(null)}
+                    endpoint={`/respite/stays/${restraintStay.id}/restraints`}
+                    clients={[]}
+                    sites={data.restraintPickers.sites}
+                    staff={data.restraintPickers.staff}
+                    incidents={data.restraintPickers.incidents}
+                    plans={data.restraintPickers.plans}
+                    prescope={{
+                        client_id: restraintStay.clientId ?? 0,
+                        client_name: restraintStay.client,
+                        site_id: restraintStay.siteId,
+                        stay_id: restraintStay.id,
+                    }}
+                />
+            ) : null}
             <IncidentModal
                 stay={incidentStay}
                 onClose={() => setIncidentStay(null)}

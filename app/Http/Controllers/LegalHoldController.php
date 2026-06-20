@@ -53,11 +53,11 @@ class LegalHoldController extends Controller
     /**
      * Show the form for creating a new legal hold.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
 
-        return Inertia::render('privacy/legal-holds/create');
+        return redirect('/privacy/dashboard?new=hold');
     }
 
     /**
@@ -89,9 +89,15 @@ class LegalHoldController extends Controller
 
         $hold = LegalHold::create($validated);
 
+        $message = 'Legal hold created with reference: ' . $hold->hold_reference;
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', $message);
+        }
+
         return redirect()
             ->route('privacy.legal-holds.index')
-            ->with('success', 'Legal hold created with reference: ' . $hold->hold_reference);
+            ->with('success', $message);
     }
 
     /**

@@ -99,6 +99,7 @@ export type EditableShift = {
     location?: string | null;
     is_sleepover?: boolean;
     is_on_call?: boolean;
+    is_lone_worker?: boolean;
     expected_break_minutes?: number | null;
     notes?: string | null;
     client?: { id: number } | null;
@@ -287,6 +288,7 @@ export function CreateShiftDialog({
             'standard') as ShiftTypeKey,
         is_sleepover: !!initialShift?.is_sleepover,
         is_on_call: !!initialShift?.is_on_call,
+        is_lone_worker: !!initialShift?.is_lone_worker,
         expected_break_minutes:
             initialShift?.expected_break_minutes != null
                 ? String(initialShift.expected_break_minutes)
@@ -675,6 +677,7 @@ export function CreateShiftDialog({
                 shift_type: form.data.shift_type,
                 is_sleepover: form.data.is_sleepover,
                 is_on_call: form.data.is_on_call,
+                is_lone_worker: form.data.is_lone_worker,
                 expected_break_minutes:
                     form.data.expected_break_minutes || null,
                 tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
@@ -1002,6 +1005,30 @@ export function CreateShiftDialog({
                                     <FieldError
                                         message={form.errors.shift_type}
                                     />
+                                    <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40">
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/40"
+                                            checked={form.data.is_lone_worker}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'is_lone_worker',
+                                                    e.target.checked,
+                                                )
+                                            }
+                                        />
+                                        <span className="text-sm">
+                                            <span className="block font-medium text-foreground">
+                                                Lone / remote worker
+                                            </span>
+                                            <span className="block text-xs text-muted-foreground">
+                                                Flag this shift for Lone Worker
+                                                Safety monitoring — it surfaces in
+                                                the watch-tower as a shift needing
+                                                a check-in session.
+                                            </span>
+                                        </span>
+                                    </label>
                                 </Section>
                             ) : null}
 

@@ -34,9 +34,13 @@ class HealthClinicalProtocolController extends Controller
             ->getProtocolRegister($filters)
             ->through(fn (ClinicalProtocol $protocol) => $this->serializeProtocol($protocol));
 
+        $kpis = $this->dashboardService->getKpis();
+
         return inertia('health-clinical/Protocols', [
             'protocols' => $protocols,
             'stats' => $this->dashboardService->getProtocolRegisterStats(),
+            'kpis' => $kpis,
+            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
             'filters' => $filters,
             'filter_options' => $this->filterOptions(),
             'can_manage' => $request->user()?->canDo('clinical.protocols.manage') ?? false,
@@ -56,8 +60,14 @@ class HealthClinicalProtocolController extends Controller
     {
         $this->authorize('create', ClinicalProtocol::class);
 
+        $data = $this->validatedProtocolData($request);
+        // Per-client assignment guard (mirrors storeObservation/storeEvent) — without
+        // it a client_id swap would attach a protocol to a client outside the actor's
+        // remit, altering that client's observation schedule + missed-obs alerts.
+        $this->authorize('view', Client::findOrFail($data['client_id']));
+
         $protocol = ClinicalProtocol::create([
-            ...$this->validatedProtocolData($request),
+            ...$data,
             'created_by' => $request->user()->id,
         ]);
 
@@ -92,6 +102,7 @@ class HealthClinicalProtocolController extends Controller
     public function update(Request $request, ClinicalProtocol $protocol): RedirectResponse
     {
         $this->authorize('update', $protocol);
+        $this->authorize('view', $protocol->loadMissing('client')->client);
 
         $protocol->update($this->validatedProtocolData($request, $protocol));
 
@@ -103,6 +114,7 @@ class HealthClinicalProtocolController extends Controller
     public function toggleActive(Request $request, ClinicalProtocol $protocol): RedirectResponse
     {
         $this->authorize('update', $protocol);
+        $this->authorize('view', $protocol->loadMissing('client')->client);
 
         $protocol->update([
             'is_active' => ! $protocol->is_active,
