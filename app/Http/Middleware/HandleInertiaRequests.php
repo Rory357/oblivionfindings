@@ -246,6 +246,10 @@ class HandleInertiaRequests extends Middleware
                 // The Safe Work Procedure wizard reads this after a successful
                 // create so its success pane can open the new procedure.
                 'created_procedure_id' => session('created_procedure_id'),
+                // The Risk Assessment wizard reads this after a successful create/
+                // supersede so it can upload staged evidence to the new draft and
+                // its success pane can open it.
+                'created_risk_assessment_id' => session('created_risk_assessment_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

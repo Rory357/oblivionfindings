@@ -52,6 +52,8 @@ use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\HsRiskAssessment;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
@@ -1038,6 +1040,22 @@ class ClientController extends Controller
                 ->limit(50)
                 ->get(),
 
+            // Formal H&S risk assessments (polymorphic; distinct from the ClientRisk
+            // care-risk list above — shown as a separate section in the same tab).
+            'hs_risk_assessments' => ($request->user()?->canDo('hazards.view') ?? false)
+                ? HsRiskAssessment::forAssessable(Client::class, $client->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
+                    ->withCount('attachments')
+                    ->orderByDesc('created_at')
+                    ->limit(100)
+                    ->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
+                    ->values()
+                : [],
+            'ra_pickers' => ($request->user()?->canDo('hazards.view') ?? false)
+                ? RiskAssessmentPresenter::pickers()
+                : ['sites' => [], 'clients' => [], 'events' => []],
+
             // Recent incidents (last 5)
             'client_incidents' => ClientIncident::where('client_id', $client->id)
                 ->with(['reporter:id,name'])
@@ -1196,6 +1214,8 @@ class ClientController extends Controller
                 'create_risks' => $request->user()?->canDo('risks.create') ?? false,
                 'update_risks' => $request->user()?->canDo('risks.update') ?? false,
                 'delete_risks' => $request->user()?->canDo('risks.delete') ?? false,
+                'view_hs_risk_assessments' => $request->user()?->canDo('hazards.view') ?? false,
+                'manage_hs_risk_assessments' => $request->user()?->canDo('hazards.manage') ?? false,
                 'care_plans_view' => $request->user()?->canDo('care_plans.viewAny') ?? false,
                 'care_plans_create' => $request->user()?->canDo('care_plans.create') ?? false,
                 'care_plans_update' => $request->user()?->canDo('care_plans.update') ?? false,

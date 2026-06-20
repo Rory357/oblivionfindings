@@ -1,4 +1,6 @@
 import { ChecklistsWorkspace } from '@/components/checklists/workspace';
+import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
+import type { RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
 import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 import { MissingFieldButton } from '@/components/missing-field-button';
 import { DonutChart } from '@/components/ops-stat-card';
@@ -1180,6 +1182,17 @@ export default function SiteShow({
         { value: 'checklists', label: 'Checklists', icon: ClipboardCheck },
         { value: 'hazards', label: 'Hazards', icon: ShieldAlert },
         {
+            value: 'risk_assessments',
+            label: 'Risk Assessments',
+            icon: Shield,
+            badge:
+                (page.props.riskAssessments?.length ?? 0) > 0 ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {page.props.riskAssessments.length}
+                    </Badge>
+                ) : undefined,
+        },
+        {
             value: 'fleet',
             label: 'Fleet',
             icon: Car,
@@ -2350,6 +2363,23 @@ export default function SiteShow({
                                 />
                             </div>
                         ) : null}
+                    </TabsContent>
+
+                    <TabsContent value="risk_assessments">
+                        {page.props.can?.view_hs_risk_assessments ? (
+                            <RaRegisterSection
+                                assessments={(page.props.riskAssessments ?? []) as RaRow[]}
+                                pickers={(page.props.ra_pickers ?? { sites: [], clients: [], events: [] }) as RaPickers}
+                                canManage={Boolean(page.props.can?.manage_hs_risk_assessments)}
+                                lockedAssessable={{ type: 'site', id: site.id, name: site.name }}
+                            />
+                        ) : (
+                            <Card>
+                                <CardContent className="py-10 text-center text-muted-foreground">
+                                    You don&apos;t have permission to view risk assessments.
+                                </CardContent>
+                            </Card>
+                        )}
                     </TabsContent>
 
                     {/* Fleet Tab */}
