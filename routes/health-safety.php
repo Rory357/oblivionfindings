@@ -216,15 +216,30 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{drill}', [EmergencyDrillController::class, 'update'])->name('update');
 
+            // Lifecycle
+            Route::post('/{drill}/start', [EmergencyDrillController::class, 'start'])->name('start');
+            Route::post('/{drill}/complete', [EmergencyDrillController::class, 'complete'])->name('complete');
+            Route::post('/{drill}/cancel', [EmergencyDrillController::class, 'cancel'])->name('cancel');
+
             // Participants
             Route::post('/{drill}/participants', [EmergencyDrillController::class, 'addParticipant'])->name('participants.store');
 
             // Findings
             Route::post('/{drill}/findings', [EmergencyDrillController::class, 'addFinding'])->name('findings.store');
             Route::put('/findings/{finding}', [EmergencyDrillController::class, 'updateFinding'])->name('findings.update');
+            Route::post('/{drill}/findings/{finding}/resolve', [EmergencyDrillController::class, 'resolveFinding'])->name('findings.resolve');
+
+            // Evidence (premium upload)
+            Route::post('/{drill}/attachments', [EmergencyDrillController::class, 'uploadAttachment'])->name('attachments.store');
+            Route::delete('/{drill}/attachments/{attachment}', [EmergencyDrillController::class, 'destroyAttachment'])->name('attachments.destroy');
         });
 
-        // Show route after /create to avoid wildcard conflict
+        // Evidence download (read)
+        Route::get('/{drill}/attachments/{attachment}/download', [EmergencyDrillController::class, 'downloadAttachment'])
+            ->middleware('permission:hazards.view')
+            ->name('attachments.download');
+
+        // Show route after /create + static sub-routes to avoid wildcard conflict
         Route::get('/{drill}', [EmergencyDrillController::class, 'show'])
             ->middleware('permission:hazards.view')
             ->name('show');

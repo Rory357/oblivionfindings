@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
-use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\HsCommittee;
 use App\Models\HsRepresentative;
@@ -79,14 +78,9 @@ class HealthSafetyDashboardController extends Controller
             ? (int) Carbon::parse($lastNotifiable)->diffInDays($now)
             : null;
 
-        // Drill compliance
-        $totalSites = Site::count();
-        $sitesWithRecentDrill = EmergencyDrill::where('completed_at', '>=', $sixMonthsAgo)
-            ->distinct('site_id')
-            ->count('site_id');
-        $drillCompliancePct = $totalSites > 0
-            ? (int) round(($sitesWithRecentDrill / $totalSites) * 100)
-            : 0;
+        // Drill compliance — single source of truth (reconciles with the drills
+        // register hero, analytics site league + site-profile Drills badge).
+        $drillCompliancePct = app(\App\Services\HealthSafety\DrillComplianceService::class)->compliancePct();
 
         // Lone worker active alerts — canonical ControlRoomAlert is the operational source of truth
         $activeAlerts = ControlRoomAlert::where('source', 'lone_worker')

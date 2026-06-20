@@ -698,6 +698,7 @@ class SiteController extends Controller
             'runDetail' => $checklistsData['runDetail'],
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
+            'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],

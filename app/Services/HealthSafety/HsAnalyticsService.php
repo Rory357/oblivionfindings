@@ -4,7 +4,6 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
-use App\Models\EmergencyDrill;
 use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
@@ -622,24 +621,16 @@ class HsAnalyticsService
         })->all();
     }
 
-    /** @return array<int,string> site_id => compliant|due_soon|overdue */
+    /**
+     * @return array<int,string> site_id => compliant|due_soon|overdue
+     *
+     * Delegates to {@see DrillComplianceService} — the single source of truth that
+     * the register hero, dashboard KPI and site profile also use (so the numbers
+     * reconcile across every surface).
+     */
     private function drillStatusBySite(): array
     {
-        $sixMonthsAgo = Carbon::now()->subMonths(6);
-        $lastDrills = EmergencyDrill::query()
-            ->whereNotNull('completed_at')
-            ->groupBy('site_id')
-            ->selectRaw('site_id, MAX(completed_at) as last')
-            ->pluck('last', 'site_id');
-
-        return $lastDrills->map(function ($last) use ($sixMonthsAgo) {
-            $d = Carbon::parse($last);
-            if ($d->gte($sixMonthsAgo)) {
-                return 'compliant';
-            }
-
-            return $d->gte($sixMonthsAgo->copy()->subMonth()) ? 'due_soon' : 'overdue';
-        })->all();
+        return app(DrillComplianceService::class)->statusBySite();
     }
 
     // ── Hero stats + scorecard ──────────────────────────────────────────
