@@ -168,15 +168,19 @@ export function SelectInput({
     onChange,
     placeholder,
     options,
+    ariaLabel,
 }: {
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
     options: { value: string; label: string }[];
+    /** Accessible name for the trigger; falls back to the placeholder so a
+     *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
+    ariaLabel?: string;
 }) {
     return (
         <Select value={value || undefined} onValueChange={onChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full" aria-label={ariaLabel ?? placeholder}>
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
