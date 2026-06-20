@@ -41,6 +41,7 @@ use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
+use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
@@ -211,6 +212,13 @@ app(Schedule::class)
     ->job(new HazardOverdueJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
+
+// Privacy deadlines — access/correction requests overdue or due soon + notifiable
+// breaches still awaiting OPC notification (daily)
+app(Schedule::class)
+    ->job(new PrivacyDeadlineRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:25');
 
 // HR Module Scheduled Jobs
 
