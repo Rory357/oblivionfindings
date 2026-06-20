@@ -99,6 +99,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [FirstAidController::class, 'index'])->name('index');
             // Static sub-routes before the {record} wildcard so they aren't swallowed.
+            Route::get('/export', [FirstAidController::class, 'export'])->name('export');
             Route::get('/{record}/attachments/{attachment}/download', [FirstAidController::class, 'downloadAttachment'])->name('attachments.download');
             Route::get('/{record}', [FirstAidController::class, 'show'])->name('show');
         });
@@ -121,18 +122,34 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Phase 5B: Restraint Register ────────────────────────────────────
     Route::prefix('restraints')->name('restraints.')->group(function () {
 
-        Route::middleware('permission:hazards.view')->group(function () {
+        // View register + detail (detail-as-modal via ?event= / ?plan=) + export + downloads.
+        Route::middleware('permission:restraints.view')->group(function () {
             Route::get('/', [RestraintController::class, 'index'])->name('index');
+            Route::get('/export', [RestraintController::class, 'export'])->name('export');
+            Route::get('/clients/{client}/summary', [RestraintController::class, 'clientSummary'])->name('clients.summary');
+            Route::get('/events/{event}/attachments/{attachment}/download', [RestraintController::class, 'downloadAttachment'])->name('events.attachments.download');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
-            // Restraint Events
+        // Capture — record events, create plans, upload evidence.
+        Route::middleware('permission:restraints.create|restraints.manage')->group(function () {
             Route::post('/events', [RestraintController::class, 'storeEvent'])->name('events.store');
             Route::post('/plans', [RestraintController::class, 'storePlan'])->name('plans.store');
+            Route::post('/events/{event}/attachments', [RestraintController::class, 'storeAttachment'])->name('events.attachments.store');
         });
-        Route::middleware('permission:hazards.manage')->group(function () {
+
+        // Review — event review + plan review sign-off.
+        Route::middleware('permission:restraints.review|restraints.manage')->group(function () {
             Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
+            Route::post('/plans/{plan}/review', [RestraintController::class, 'reviewPlan'])->name('plans.review');
+        });
+
+        // Manage — plan edit + lifecycle + attachment removal.
+        Route::middleware('permission:restraints.manage')->group(function () {
             Route::put('/plans/{plan}', [RestraintController::class, 'updatePlan'])->name('plans.update');
+            Route::post('/plans/{plan}/activate', [RestraintController::class, 'activatePlan'])->name('plans.activate');
+            Route::post('/plans/{plan}/submit-review', [RestraintController::class, 'submitPlanReview'])->name('plans.submit-review');
+            Route::post('/plans/{plan}/archive', [RestraintController::class, 'archivePlan'])->name('plans.archive');
+            Route::delete('/events/{event}/attachments/{attachment}', [RestraintController::class, 'destroyAttachment'])->name('events.attachments.destroy');
         });
     });
 
@@ -141,6 +158,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/', [SafeWorkProcedureController::class, 'index'])->name('index');
+            // Static export before the {procedure} wildcard so it isn't swallowed.
+            Route::get('/export', [SafeWorkProcedureController::class, 'export'])->name('export');
         });
 
         Route::middleware('permission:procedures.create|procedures.manage')->group(function () {
@@ -169,6 +188,9 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // View-gated reads — download lets register-only roles read the master document.
         Route::middleware('permission:procedures.view')->group(function () {
             Route::get('/{procedure}/attachments/{attachment}/download', [SafeWorkProcedureController::class, 'downloadAttachment'])->name('attachments.download');
+
+            // Any viewer can acknowledge they've read & understood the procedure.
+            Route::post('/{procedure}/acknowledge', [SafeWorkProcedureController::class, 'acknowledge'])->name('acknowledge');
 
             // Show route LAST to avoid the /{procedure} wildcard swallowing /create etc.
             Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])->name('show');

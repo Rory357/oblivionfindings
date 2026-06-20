@@ -83,6 +83,12 @@ class SafeWorkProcedure extends Model
         return $this->morphMany(HsAttachment::class, 'attachable')->latest();
     }
 
+    /** Worker acknowledgements ("I have read & understood"), one per (procedure, user). */
+    public function acknowledgements(): HasMany
+    {
+        return $this->hasMany(ProcedureAcknowledgement::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -121,5 +127,30 @@ class SafeWorkProcedure extends Model
                 $q->orWhereJsonContains('applicable_roles', $key);
             }
         });
+    }
+
+    /**
+     * SiteHazard.hazard_type → procedure category map. Only the CLEAN vocabulary
+     * overlaps are mapped (the two taxonomies otherwise diverge — see the redesign
+     * audit); unmapped hazard types intentionally surface no related procedure.
+     */
+    public const HAZARD_TYPE_CATEGORIES = [
+        'manual_handling' => 'manual_handling',
+        'fire' => 'fire_safety',
+        'biological' => 'infection_control',
+        'equipment' => 'equipment_use',
+    ];
+
+    /** Approved procedures that mitigate a given site-hazard type (clean overlaps only). */
+    public function scopeMitigatingHazardType(Builder $query, ?string $hazardType): Builder
+    {
+        $category = self::HAZARD_TYPE_CATEGORIES[$hazardType] ?? null;
+
+        // No clean taxonomy mapping → no related procedure (honest, not a guess).
+        if ($category === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('status', 'approved')->where('category', $category);
     }
 }

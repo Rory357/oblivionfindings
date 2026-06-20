@@ -3342,6 +3342,7 @@ export default function ClientShow({
                             homeHazardDetail={(pageProps.homeHazardDetail ?? null) as any}
                             homeName={(pageProps.homeName ?? null) as any}
                             homeSiteId={(pageProps.homeSiteId ?? null) as any}
+                            homeProcedures={(pageProps.homeProcedures ?? []) as any}
                         />
 
                         {Boolean((can as any).view_hs_risk_assessments) && (

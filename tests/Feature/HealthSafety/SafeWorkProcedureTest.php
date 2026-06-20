@@ -284,7 +284,9 @@ class SafeWorkProcedureTest extends TestCase
 
     public function test_no_permission_user_is_forbidden(): void
     {
-        $this->actingAs($this->userWithRole('support_worker'))
+        // board_trustee has no procedures.* (support_worker now holds procedures.view
+        // for the frontline /hr/my + acknowledge flow).
+        $this->actingAs($this->userWithRole('board_trustee'))
             ->get('/health-safety/procedures')
             ->assertForbidden();
     }
@@ -331,5 +333,62 @@ class SafeWorkProcedureTest extends TestCase
         $this->assertTrue($ids->contains($forRole->id));
         $this->assertTrue($ids->contains($orgWide->id));
         $this->assertFalse($ids->contains($forOther->id));
+    }
+
+    /* ---------------- Acknowledgement ---------------- */
+
+    public function test_frontline_worker_can_acknowledge_a_procedure(): void
+    {
+        $procedure = SafeWorkProcedure::factory()->approved()->create(['current_version' => 2]);
+        $worker = $this->userWithRole('support_worker'); // now holds procedures.view
+
+        $this->actingAs($worker)
+            ->post("/health-safety/procedures/{$procedure->id}/acknowledge")
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('procedure_acknowledgements', [
+            'safe_work_procedure_id' => $procedure->id,
+            'user_id' => $worker->id,
+            'version_acknowledged' => 2,
+        ]);
+
+        // Re-acknowledging updates in place, never duplicates (unique procedure+user).
+        $this->actingAs($worker)->post("/health-safety/procedures/{$procedure->id}/acknowledge");
+        $this->assertSame(1, \App\Models\ProcedureAcknowledgement::query()
+            ->where('safe_work_procedure_id', $procedure->id)->where('user_id', $worker->id)->count());
+
+        // The detail payload reflects the current user's acknowledgement.
+        $this->actingAs($worker)
+            ->get("/health-safety/procedures?procedure={$procedure->id}")
+            ->assertInertia(fn (Assert $page) => $page->where('detail.acknowledged', true)->where('detail.acknowledged_count', 1));
+    }
+
+    /* ---------------- Hazard-type mapping (#4) + export (#7) ---------------- */
+
+    public function test_mitigating_hazard_type_scope_maps_clean_overlaps_only(): void
+    {
+        $manual = SafeWorkProcedure::factory()->approved()->create(['category' => 'manual_handling']);
+        $fire = SafeWorkProcedure::factory()->approved()->create(['category' => 'fire_safety']);
+        $other = SafeWorkProcedure::factory()->approved()->create(['category' => 'medication']);
+
+        $this->assertTrue(SafeWorkProcedure::mitigatingHazardType('manual_handling')->pluck('id')->contains($manual->id));
+        $this->assertTrue(SafeWorkProcedure::mitigatingHazardType('fire')->pluck('id')->contains($fire->id)); // fire → fire_safety
+        $this->assertFalse(SafeWorkProcedure::mitigatingHazardType('manual_handling')->pluck('id')->contains($other->id));
+        // Unmapped hazard types surface nothing (honest, not a guess).
+        $this->assertCount(0, SafeWorkProcedure::mitigatingHazardType('security')->get());
+        $this->assertCount(0, SafeWorkProcedure::mitigatingHazardType(null)->get());
+    }
+
+    public function test_export_streams_filtered_csv(): void
+    {
+        SafeWorkProcedure::factory()->approved()->create(['reference_number' => 'SWP-EX1', 'category' => 'fire_safety']);
+        SafeWorkProcedure::factory()->approved()->create(['reference_number' => 'SWP-EX2', 'category' => 'medication']);
+
+        $res = $this->actingAs($this->hsOfficer())->get('/health-safety/procedures/export?category=fire_safety');
+        $res->assertOk();
+        $body = $res->streamedContent();
+        $this->assertStringContainsString('SWP-EX1', $body);
+        $this->assertStringNotContainsString('SWP-EX2', $body);
+        $this->assertStringContainsString('Reference,Title,Category', $body);
     }
 }

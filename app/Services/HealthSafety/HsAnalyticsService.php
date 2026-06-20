@@ -4,6 +4,7 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
+use App\Models\FirstAidRecord;
 use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsCorrectiveAction;
@@ -17,6 +18,7 @@ use App\Models\WorkplaceInjury;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Builds the Health & Safety Analytics payload — trend / root-cause /
@@ -74,6 +76,10 @@ class HsAnalyticsService
             'injury_data' => [
                 'by_type' => $this->injuriesByType($siteId, $from, $to),
                 'by_body_part' => $this->injuriesByBodyPart($siteId, $from, $to),
+            ],
+            'first_aid_data' => [
+                'by_type' => $this->firstAidByType($siteId, $from, $to),
+                'by_outcome' => $this->firstAidByOutcome($siteId, $from, $to),
             ],
             'hazard_data' => $this->hazardsByRisk($siteId),
             'site_comparison' => $this->siteComparison($from, $to),
@@ -182,6 +188,56 @@ class HsAnalyticsService
             ->orderByDesc('count')
             ->get()
             ->map(fn ($r) => ['body_part' => (string) $r->body_part, 'count' => (int) $r->count])
+            ->all();
+    }
+
+    // ── First aid (leading care-activity signal; excluded from TRIFR) ────
+
+    /**
+     * First-aid treatments by injury/illness type over the window, site-scoped via
+     * first_aid_records.site_id. Mirrors {@see injuriesByType()}.
+     *
+     * @return array<int,array{type:string,count:int}>
+     */
+    private function firstAidByType(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        if (! Schema::hasTable('first_aid_records')) {
+            return [];
+        }
+
+        return FirstAidRecord::query()
+            ->whereBetween('treatment_date', [$from, $to])
+            ->whereNotNull('injury_illness_type')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->selectRaw('injury_illness_type as type, COUNT(*) as count')
+            ->groupBy('injury_illness_type')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => ['type' => (string) $r->type, 'count' => (int) $r->count])
+            ->all();
+    }
+
+    /**
+     * First-aid treatments by treatment outcome over the window, site-scoped via
+     * first_aid_records.site_id. Mirrors {@see injuriesByType()}.
+     *
+     * @return array<int,array{outcome:string,count:int}>
+     */
+    private function firstAidByOutcome(?int $siteId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        if (! Schema::hasTable('first_aid_records')) {
+            return [];
+        }
+
+        return FirstAidRecord::query()
+            ->whereBetween('treatment_date', [$from, $to])
+            ->whereNotNull('treatment_outcome')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->selectRaw('treatment_outcome as outcome, COUNT(*) as count')
+            ->groupBy('treatment_outcome')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => ['outcome' => (string) $r->outcome, 'count' => (int) $r->count])
             ->all();
     }
 

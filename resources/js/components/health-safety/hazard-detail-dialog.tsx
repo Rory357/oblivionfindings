@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AttachmentUploader, FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
+import { ApplicableProceduresPanel } from '@/components/health-safety/applicable-procedures-panel';
 import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import {
     ACTION_TYPES,
@@ -397,6 +398,14 @@ function OverviewSection({ d }: { d: HazardDetail }) {
                     {d.resolution_evidence.length ? <FileList files={d.resolution_evidence} /> : null}
                     {d.closed_at ? <p className="mt-2 text-xs text-muted-foreground">Closed {fmtDay(d.closed_at)}</p> : null}
                 </div>
+            ) : null}
+
+            {d.related_procedures && d.related_procedures.length > 0 ? (
+                <ApplicableProceduresPanel
+                    procedures={d.related_procedures}
+                    title="Mitigating safe work procedures"
+                    subtitle="Approved procedures that control this hazard type"
+                />
             ) : null}
         </div>
     );

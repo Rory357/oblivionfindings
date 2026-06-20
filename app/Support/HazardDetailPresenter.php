@@ -39,6 +39,23 @@ class HazardDetailPresenter
             'hazard_type' => $hazard->hazard_type,
             'hazard_label' => self::hazardLabel($hazard),
             'custom_hazard_type' => $hazard->custom_hazard_type,
+            // Approved safe work procedures that mitigate this hazard type (clean
+            // taxonomy overlaps only — manual handling / fire / biological / equipment).
+            // Gated on procedures.view to match every other procedure surface.
+            'related_procedures' => auth()->user()?->canDo('procedures.view')
+                ? \App\Models\SafeWorkProcedure::query()
+                    ->mitigatingHazardType($hazard->hazard_type)
+                    ->orderBy('title')->limit(8)
+                    ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                    ->map(fn ($p) => [
+                        'id' => $p->id,
+                        'reference_number' => $p->reference_number,
+                        'title' => $p->title,
+                        'category' => $p->category,
+                        'status' => $p->status,
+                        'review_date' => $p->review_date?->toDateString(),
+                    ])->values()
+                : [],
             'severity' => $hazard->severity,
             'likelihood' => $hazard->likelihood,
             'risk_rating' => $hazard->risk_rating,

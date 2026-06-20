@@ -90,14 +90,20 @@ Worktree: `.claude/worktrees/cool-shirley-187cb8` · branch `claude/cool-shirley
       `npm run build` clean (4m 2s, procedures chunk in manifest) · Dusk create-page test retargeted.
 - [x] **Cross-module scopes** — `SafeWorkProcedure::scopeApplicableToSite/ToRoles` added (commit `6c2b5e07`)
       so the deferred Site/HR/Client panels are a trivial, conflict-free follow-up.
-- [ ] **Step 9 (FINAL) — merge → deploy → Chrome-verify on .com.** ⚠️ Live production deploy — gated on the
-      user's go-ahead. On merge: re-run `*PermissionsSeeder --force` on the server (`procedures.*` seeded, not
-      migrated). ⚠️ shared-file edits (additive) may conflict with concurrent loops — resolve keeping both.
+- [x] **Step 9 (FINAL) — merged → deployed → ✅ Chrome-verified LIVE on .com** (merge `d567601c`). Self-
+      sufficient deploy via permissions migration (no 403). Verified register/hero/ribbon-stage/wizard live,
+      0 console errors.
+- [x] **Cross-module panels** (after "continue") — Site profile + `/hr/my` read-only `ApplicableProceduresPanel`
+      via the scopes; merged `d89cd31c`, deployed (server build of the Risk-Assessments merge conflict
+      resolution confirmed live). 18 tests/113 assert; tsc/eslint/build clean.
 
-## FINAL STATE (2026-06-20)
-Core redesign **DONE + committed + fully verified** on branch `claude/cool-shirley-187cb8`
-(commits `b2979d33` + `6c2b5e07`). Ready to merge. Deferred (scope-ready, documented): Site profile /
-`/hr/my` + HR staff profile (separate HR brief) / Client risk-tab read-only panels; hazards↔SiteHazard pivot.
+## FINAL STATE (2026-06-20) — ✅✅✅ DONE + LIVE
+Core redesign + cross-module panels **all merged → origin/main → deployed**; core **Chrome-verified live on
+.com** (commits `b2979d33`/`6c2b5e07`/`17cfb49a` → merge `d567601c`; cross-module `db549d25` → merge `d89cd31c`).
+Still deferred (genuinely need input / separate brief): **HR staff-profile** panel (manager-viewing-employee —
+the separate `PROCEDURES_HR_SURFACING_PROMPT.md` brief) and **Client risk-tab** panel (needs a product
+relevance rule — no category→client-risk mapping exists). Both are a trivial follow-up via the model scopes +
+the reusable `ApplicableProceduresPanel`. hazards↔SiteHazard pivot deferred (vocabulary mismatch).
 
 ---
 

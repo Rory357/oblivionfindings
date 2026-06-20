@@ -3,12 +3,30 @@
 namespace Database\Factories;
 
 use App\Models\SafeWorkProcedure;
+use App\Models\SafeWorkProcedureVersion;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class SafeWorkProcedureFactory extends Factory
 {
     protected $model = SafeWorkProcedure::class;
+
+    /**
+     * Seed the matching version row(s) so tests exercise the real production path
+     * (store/seed always populate a row for current_version) — otherwise lifecycle
+     * snapshots silently dodge the unique (procedure, version) index.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (SafeWorkProcedure $procedure): void {
+            for ($v = 1; $v <= (int) $procedure->current_version; $v++) {
+                SafeWorkProcedureVersion::firstOrCreate(
+                    ['safe_work_procedure_id' => $procedure->id, 'version_number' => $v],
+                    ['content_snapshot' => [], 'change_summary' => $v === 1 ? 'Initial version' : 'Version '.$v, 'changed_by' => $procedure->created_by],
+                );
+            }
+        });
+    }
 
     public function definition(): array
     {

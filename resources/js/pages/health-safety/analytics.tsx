@@ -98,6 +98,7 @@ const REGISTER: Record<string, string> = {
     hazards: '/compliance/hazards',
     sites: '/health-safety',
     root_cause: '/health-safety/events',
+    first_aid: '/health-safety/first-aid',
 };
 
 // Governance report set — same list as the dashboard's export popover; analytics opens each
@@ -586,6 +587,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const incidentTypeItems: BreakdownItem[] = incident_data.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const injuryTypeItems: BreakdownItem[] = injury_data.by_type.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const bodyPartItems: BreakdownItem[] = injury_data.by_body_part.map((d, i) => ({ key: d.body_part, label: d.body_part.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    // First-aid breakdowns (optional + additive). Leading care-activity signal — first-aid-only
+    // treatment is excluded from TRIFR, so these navigate to the First Aid register rather than
+    // the recordable-injury drill modal (the records endpoint has no first-aid view).
+    const firstAidTypeItems: BreakdownItem[] = (props.first_aid_data?.by_type ?? []).map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    const firstAidOutcomeItems: DonutDatum[] = (props.first_aid_data?.by_outcome ?? []).map((d, i) => ({ key: d.outcome, label: d.outcome.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
 
     // ── drill builders ──
     const incidentTypeTarget = (it: BreakdownItem): DrillTarget => ({ view: 'incidents', label: `Incidents · ${it.label}`, filters: { type: it.key }, register: REGISTER.incidents });
@@ -595,6 +601,10 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const bodyPartTarget = (it: BreakdownItem): DrillTarget => ({ view: 'injuries', label: `Injuries · ${it.label}`, filters: { body_part: it.key }, register: REGISTER.injuries });
     const riskTarget = (d: DonutDatum): DrillTarget => ({ view: 'hazards', label: `Hazards · ${d.label} risk`, filters: { risk: d.key }, register: REGISTER.hazards });
     const siteTarget = (s: SiteRow): DrillTarget => ({ view: 'incidents', label: `Site · ${s.name}`, filters: { site_id: s.id }, register: REGISTER.incidents });
+    // First-aid breakdowns are a leading care-activity signal (excluded from TRIFR). The drill
+    // records endpoint has no first-aid view, so row/segment clicks navigate straight to the
+    // First Aid register rather than opening the recordable-injury drill modal.
+    const goFirstAid = () => router.visit(REGISTER.first_aid);
 
     // ── hero pieces ──
     // Cluster tiles read from the scorecard split (it carries the period-over-period
@@ -764,8 +774,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                         injuryTypeItems={injuryTypeItems}
                         bodyPartItems={bodyPartItems}
                         riskSegments={riskSegments}
+                        firstAidTypeItems={firstAidTypeItems}
+                        firstAidOutcomeItems={firstAidOutcomeItems}
                         onDrill={openDrill}
                         onCtx={openCtx}
+                        onFirstAid={goFirstAid}
                         incidentTypeTarget={incidentTypeTarget}
                         severityTarget={severityTarget}
                         causeTarget={causeTarget}
@@ -970,8 +983,11 @@ function BreakdownsTab({
     injuryTypeItems,
     bodyPartItems,
     riskSegments,
+    firstAidTypeItems,
+    firstAidOutcomeItems,
     onDrill,
     onCtx,
+    onFirstAid,
     incidentTypeTarget,
     severityTarget,
     causeTarget,
@@ -985,6 +1001,9 @@ function BreakdownsTab({
     injuryTypeItems: BreakdownItem[];
     bodyPartItems: BreakdownItem[];
     riskSegments: DonutDatum[];
+    firstAidTypeItems: BreakdownItem[];
+    firstAidOutcomeItems: DonutDatum[];
+    onFirstAid: () => void;
     incidentTypeTarget: (i: BreakdownItem) => DrillTarget;
     severityTarget: (d: DonutDatum) => DrillTarget;
     causeTarget: (cause: string) => DrillTarget;
@@ -1018,6 +1037,13 @@ function BreakdownsTab({
                 <ChartCard title="Injury by body part" subtitle="Where harm concentrates" aria="Injury by body part" table={{ caption: 'Injuries by body part', columns: ['Body part', 'Count'], rows: bodyPartItems.map((s) => [s.label, s.value]) }}>
                     <HorizontalBars data={bodyPartItems} />
                     <BreakdownRows items={bodyPartItems} onItem={(d) => onDrill(bodyPartTarget(d))} onItemCtx={(e, d) => onCtx(e, bodyPartTarget(d), String(d.value), 'warning')} />
+                </ChartCard>
+                <ChartCard title="First aid by outcome" subtitle="Care-activity signal — first-aid-only treatment is excluded from TRIFR" aria="First aid by treatment outcome" table={{ caption: 'First aid by outcome', columns: ['Outcome', 'Count'], rows: firstAidOutcomeItems.map((s) => [s.label, s.value]) }}>
+                    <FocusDonut segments={firstAidOutcomeItems} onSegment={onFirstAid} />
+                </ChartCard>
+                <ChartCard title="First aid by type" subtitle="Click to open the First Aid register" aria="First aid by injury or illness type" table={{ caption: 'First aid by type', columns: ['Type', 'Count'], rows: firstAidTypeItems.map((s) => [s.label, s.value]) }}>
+                    <HorizontalBars data={firstAidTypeItems} />
+                    <BreakdownRows items={firstAidTypeItems} onItem={onFirstAid} />
                 </ChartCard>
             </div>
 

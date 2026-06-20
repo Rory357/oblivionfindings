@@ -846,7 +846,8 @@ export default function MyHrIndex({ myHr, overview, announcements, safeWorkProce
                 {safeWorkProcedures.length > 0 ? (
                     <ApplicableProceduresPanel
                         procedures={safeWorkProcedures}
-                        subtitle="Applicable to your role(s) — open any to read the controlled document"
+                        subtitle="Applicable to your role(s) — open any to read the controlled document, then acknowledge"
+                        showAcknowledge
                     />
                 ) : null}
             </div>

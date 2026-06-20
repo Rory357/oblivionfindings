@@ -1,6 +1,6 @@
 import { TabStrip } from '@/components/rostering';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
 import { IncidentTrendCard, LaggingCharts, LeadingCharts, type OpenHazardRow, SiteLeagueCard } from './components/charts';
@@ -79,6 +79,7 @@ type Props = {
     open_hazards_list: OpenHazardRow[];
     worker_participation: { pct: number | null; committees: number };
     procedures: { approved: number; review_due: number; coverage_gap_categories: number };
+    first_aid?: { treatments: number; ambulance: number; hospital: number };
     worklists: WorklistsPayload;
 };
 
@@ -100,6 +101,7 @@ export default function HealthSafetyDashboard({
     open_hazards_list = [],
     worker_participation = { pct: null, committees: 0 },
     procedures = { approved: 0, review_due: 0, coverage_gap_categories: 0 },
+    first_aid = { treatments: 0, ambulance: 0, hospital: 0 },
     worklists,
 }: Props) {
     const [tab, setTab] = useState<string>('overview');
@@ -159,6 +161,7 @@ export default function HealthSafetyDashboard({
 
                 {tab === 'leading' && (
                     <div className="flex flex-col gap-4">
+                        <FirstAidStrip data={first_aid} />
                         <LeadingPanel
                             data={leading_lagging.leading}
                             workerParticipation={worker_participation}
@@ -240,5 +243,39 @@ export default function HealthSafetyDashboard({
                 ) : null}
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * First-aid activity strip (Leading tab) — three deep-link stat cards into the First Aid
+ * Register. A leading care-activity signal: first-aid-only treatment is NOT recordable and
+ * is deliberately excluded from TRIFR, so it lives here rather than among the lagging rates.
+ */
+function FirstAidStrip({ data }: { data: { treatments: number; ambulance: number; hospital: number } }) {
+    const cards: { label: string; value: number; href: string; tone: 'neutral' | 'warning' | 'critical' }[] = [
+        { label: 'First-aid treatments', value: data.treatments, href: '/health-safety/first-aid', tone: 'neutral' },
+        { label: 'Ambulance called', value: data.ambulance, href: '/health-safety/first-aid?tab=ambulance', tone: 'warning' },
+        { label: 'Hospital referrals', value: data.hospital, href: '/health-safety/first-aid?treatment_outcome=sent_to_hospital', tone: 'critical' },
+    ];
+
+    const valueClass = (tone: 'neutral' | 'warning' | 'critical', value: number) => {
+        const colour = value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground';
+        return `mt-1 text-3xl font-bold tabular-nums ${colour}`;
+    };
+
+    return (
+        <div className="grid gap-3 sm:grid-cols-3">
+            {cards.map((c) => (
+                <Link
+                    key={c.label}
+                    href={c.href}
+                    className="group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                    <span className="text-xs font-medium text-muted-foreground">{c.label}</span>
+                    <span className={valueClass(c.tone, c.value)}>{c.value}</span>
+                    <span className="mt-1 text-[11px] text-muted-foreground">last 30 days</span>
+                </Link>
+            ))}
+        </div>
     );
 }
