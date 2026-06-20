@@ -285,6 +285,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [LoneWorkerController::class, 'index'])->name('index');
+            // OpenStreetMap (Nominatim) address autocomplete for the Start-session
+            // wizard — reuses the shared geocoder, gated to anyone who can view the page
+            // (the sites/clients geocode proxies require sites.update/clients.update which
+            // an H&S coordinator may not hold).
+            Route::get('/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])->name('geocode.search');
         });
 
         // Worker self check-in (auth-only). The 3-actor model puts the lone

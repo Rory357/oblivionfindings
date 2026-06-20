@@ -119,8 +119,17 @@ export type ShiftOption = {
     is_lone: boolean;
 };
 
+export type SiteOption = {
+    id: number;
+    name: string;
+    /** Composed one-line address from the Site record — prefills the wizard location. */
+    address: string | null;
+    latitude: string | number | null;
+    longitude: string | number | null;
+};
+
 export type Options = {
-    sites: Entity[];
+    sites: SiteOption[];
     staff: Entity[];
     clients: Entity[];
     shifts: ShiftOption[];
