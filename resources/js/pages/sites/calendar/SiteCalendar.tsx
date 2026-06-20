@@ -270,6 +270,14 @@ const DEFAULT_SOURCES: SourceDef[] = [
         origin: 'Emergency plans',
     },
     {
+        key: 'drill',
+        label: 'Emergency drill',
+        short: 'Drill',
+        group: 'auto',
+        icon: 'Flame',
+        origin: 'Emergency drills',
+    },
+    {
         key: 'respite',
         label: 'Respite booking',
         short: 'Respite',

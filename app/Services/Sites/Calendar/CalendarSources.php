@@ -29,6 +29,7 @@ class CalendarSources
             ['key' => 'meal',       'label' => 'Meal plan',         'short' => 'Meal',       'group' => 'auto',   'icon' => 'Utensils',      'origin' => 'Meal planner'],
             ['key' => 'damage',     'label' => 'Damage follow-up',  'short' => 'Damage',     'group' => 'auto',   'icon' => 'Hammer',        'origin' => 'Damages'],
             ['key' => 'emergency',  'label' => 'Emergency plan',    'short' => 'Emergency',  'group' => 'auto',   'icon' => 'Siren',         'origin' => 'Emergency plans'],
+            ['key' => 'drill',      'label' => 'Emergency drill',   'short' => 'Drill',      'group' => 'auto',   'icon' => 'Flame',         'origin' => 'Emergency drills'],
             ['key' => 'respite',    'label' => 'Respite booking',   'short' => 'Respite',    'group' => 'auto',   'icon' => 'BedDouble',     'origin' => 'Respite'],
             ['key' => 'external',   'label' => 'External busy',     'short' => 'External',   'group' => 'external', 'icon' => 'Lock',        'origin' => 'External calendar'],
         ];

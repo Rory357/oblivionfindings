@@ -55,6 +55,7 @@ import {
     DoorOpen,
     Eye,
     FileText,
+    Flame,
     FolderOpen,
     Fuel,
     GraduationCap,
@@ -586,6 +587,14 @@ type InspectionsSummary = {
     }>;
 };
 
+type DrillsSummary = {
+    drill_status: 'compliant' | 'due_soon' | 'overdue';
+    last_drill_at: string | null;
+    next_drill_at: string | null;
+    scheduled_count: number;
+    open_findings: number;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -631,6 +640,7 @@ type Props = {
     fleet?: SiteFleetData;
     checklistsData?: ChecklistsData;
     inspectionsSummary?: InspectionsSummary;
+    drillsSummary?: DrillsSummary;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -662,6 +672,14 @@ const emptyInspectionsSummary: InspectionsSummary = {
     failed_records: 0,
     schedules: [],
     records: [],
+};
+
+const emptyDrillsSummary: DrillsSummary = {
+    drill_status: 'overdue',
+    last_drill_at: null,
+    next_drill_at: null,
+    scheduled_count: 0,
+    open_findings: 0,
 };
 
 const inspectionResultStyles: Record<
@@ -915,6 +933,7 @@ export default function SiteShow({
     fleet,
     checklistsData,
     inspectionsSummary = emptyInspectionsSummary,
+    drillsSummary = emptyDrillsSummary,
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -1140,6 +1159,17 @@ export default function SiteShow({
                 inspectionsSummary.overdue_schedules > 0 ? (
                     <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
                         {inspectionsSummary.overdue_schedules}
+                    </Badge>
+                ) : undefined,
+        },
+        {
+            value: 'drills',
+            label: 'Drills',
+            icon: Flame,
+            badge:
+                drillsSummary.drill_status !== 'compliant' ? (
+                    <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                        {drillsSummary.drill_status === 'overdue' ? 'Overdue' : 'Due'}
                     </Badge>
                 ) : undefined,
         },
@@ -1941,6 +1971,102 @@ export default function SiteShow({
                     </TabsContent>
 
                     {/* Inspections Tab */}
+                    <TabsContent value="drills" className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Drill compliance
+                                    </p>
+                                    <p
+                                        className={`mt-2 text-lg font-semibold ${
+                                            drillsSummary.drill_status === 'overdue'
+                                                ? 'text-status-critical'
+                                                : drillsSummary.drill_status === 'due_soon'
+                                                  ? 'text-status-warning'
+                                                  : 'text-status-success'
+                                        }`}
+                                    >
+                                        {drillsSummary.drill_status === 'overdue'
+                                            ? 'Overdue'
+                                            : drillsSummary.drill_status === 'due_soon'
+                                              ? 'Due soon'
+                                              : 'Compliant'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Last completed
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold">
+                                        {drillsSummary.last_drill_at
+                                            ? new Date(drillsSummary.last_drill_at).toLocaleDateString('en-NZ', {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })
+                                            : 'None recorded'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Next scheduled
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold">
+                                        {drillsSummary.next_drill_at
+                                            ? new Date(drillsSummary.next_drill_at).toLocaleDateString('en-NZ', {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                              })
+                                            : 'None scheduled'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Open findings
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold">
+                                        {drillsSummary.open_findings}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between gap-3">
+                                <CardTitle>Emergency drills</CardTitle>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={`/health-safety/drills?site_id=${site.id}`}>Open register</Link>
+                                    </Button>
+                                    {can_edit && (
+                                        <Button asChild size="sm">
+                                            <Link href={`/health-safety/drills?site_id=${site.id}&schedule=1`}>
+                                                Schedule drill
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-muted-foreground">
+                                    {drillsSummary.scheduled_count > 0
+                                        ? `${drillsSummary.scheduled_count} drill${drillsSummary.scheduled_count === 1 ? '' : 's'} scheduled. `
+                                        : 'No upcoming drills scheduled. '}
+                                    Compliance is graded on the most recent completed drill within 6 months (FENZ evacuation
+                                    scheme). Full lifecycle, findings and evidence live on the Emergency Drills register.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
                     <TabsContent value="inspections" className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Card>
