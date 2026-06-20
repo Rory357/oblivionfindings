@@ -17,7 +17,7 @@ type Props = {
     breachStats: {
         total: number;
         resolved: number;
-        ico_notifications: number;
+        opc_notifications: number;
     };
     dpiaStats: {
         total: number;
@@ -137,7 +137,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <StatCard label="Total Breaches" value={breachStats.total} />
                             <StatCard label="Resolved" value={breachStats.resolved} color="text-status-success" />
-                            <StatCard label="OPC Notifications" value={breachStats.ico_notifications} color="text-status-critical" />
+                            <StatCard label="OPC Notifications" value={breachStats.opc_notifications} color="text-status-critical" />
                         </div>
                     </CardContent>
                 </Card>

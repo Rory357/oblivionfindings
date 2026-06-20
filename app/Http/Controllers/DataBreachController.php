@@ -60,13 +60,11 @@ class DataBreachController extends Controller
     /**
      * Show the form for creating a new breach record.
      */
-    public function create(Request $request): Response
+    public function create(Request $request): RedirectResponse
     {
         abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
 
-        return Inertia::render('privacy/breaches/create', [
-            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
-        ]);
+        return redirect('/privacy/dashboard?new=breach');
     }
 
     /**
@@ -99,9 +97,15 @@ class DataBreachController extends Controller
 
         $breach = DataBreachLog::create($validated);
 
+        $message = 'Data breach recorded with reference: ' . $breach->breach_reference;
+
+        if ($request->boolean('_modal')) {
+            return back()->with('success', $message);
+        }
+
         return redirect()
             ->route('privacy.breaches.show', $breach)
-            ->with('success', 'Data breach recorded with reference: ' . $breach->breach_reference);
+            ->with('success', $message);
     }
 
     /**

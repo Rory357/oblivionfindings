@@ -788,15 +788,21 @@ class HealthSafetyDemoSeeder extends Seeder
             $lostTimeDays  = ($severity !== 'minor' && rand(0, 1)) ? rand(1, 10) : 0;
             $accClaim      = $lostTimeDays > 0 || $severity === 'serious';
 
-            $status = $injuryDate->diffInDays($now) > 60
-                ? 'closed'
-                : ($injuryDate->diffInDays($now) > 14 ? 'recovering' : 'active');
+            // Canonical injury lifecycle: reported → under_treatment → return_to_work → recovered → closed.
+            $ageDays = $injuryDate->diffInDays($now);
+            $status = match (true) {
+                $ageDays > 90 => 'closed',
+                $ageDays > 60 => 'recovered',
+                $ageDays > 30 => 'return_to_work',
+                $ageDays > 14 => 'under_treatment',
+                default => 'reported',
+            };
 
             $expectedReturn = $lostTimeDays > 0
                 ? $injuryDate->copy()->addDays($lostTimeDays + rand(0, 5))->toDateString()
                 : null;
 
-            $actualReturn = ($status === 'closed' && $expectedReturn)
+            $actualReturn = (in_array($status, ['closed', 'recovered'], true) && $expectedReturn)
                 ? Carbon::parse($expectedReturn)->addDays(rand(-2, 3))->toDateString()
                 : null;
 

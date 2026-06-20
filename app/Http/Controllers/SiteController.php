@@ -19,6 +19,7 @@ use App\Models\FleetVehicleBooking;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SafeWorkProcedure;
 use App\Models\SiteHazard;
 use App\Support\HazardDetailPresenter;
 use App\Models\SiteChecklistAssignment;
@@ -722,6 +723,21 @@ class SiteController extends Controller
                     'unassigned' => ! $h->assigned_to_user_id,
                 ])->values(),
             'siteHazardsOpenCount' => SiteHazard::where('site_id', $site->id)->open()->count(),
+            // Safe Work Procedures that apply to this site (or org-wide), read-only.
+            'safeWorkProcedures' => ($user && $user->canDo('procedures.view'))
+                ? SafeWorkProcedure::query()->applicableToSite($site->id)
+                    ->orderBy('title')
+                    ->limit(15)
+                    ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                    ->map(fn (SafeWorkProcedure $p) => [
+                        'id' => $p->id,
+                        'reference_number' => $p->reference_number,
+                        'title' => $p->title,
+                        'category' => $p->category,
+                        'status' => $p->status,
+                        'review_date' => $p->review_date?->toDateString(),
+                    ])->values()
+                : collect(),
             // Formal H&S risk assessments attached to this site (full inline register tab).
             'riskAssessments' => ($user && $user->canDo('hazards.view'))
                 ? HsRiskAssessment::forAssessable(Site::class, $site->id)

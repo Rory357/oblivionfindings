@@ -199,6 +199,38 @@ class WorkerParticipationTest extends TestCase
         $this->assertSame('inactive', $rep->fresh()->status);
     }
 
+    public function test_recording_initial_hsr_training_creates_a_tracked_staff_credential(): void
+    {
+        $user = User::factory()->create();
+        $rep = $this->rep(['user_id' => $user->id, 'initial_training_completed_at' => null]);
+        $type = 'HSR Initial Training (NZQA US 29315)';
+
+        // No credential until initial training (NZQA US 29315) is recorded.
+        $this->assertDatabaseMissing('staff_credentials', ['user_id' => $user->id, 'type' => $type]);
+
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/representatives/{$rep->id}", [
+                'initial_training_completed_at' => now()->subMonth()->toDateString(),
+            ])
+            ->assertRedirect();
+
+        // Cross-module: surfaced as a tracked HR credential on the rep's staff record.
+        $this->assertDatabaseHas('staff_credentials', [
+            'user_id' => $user->id,
+            'type' => $type,
+            'issuer' => 'NZQA',
+            'reference' => 'US 29315',
+        ]);
+
+        // Idempotent — re-saving does not duplicate the credential.
+        $this->actingAs($this->officer())
+            ->put("/health-safety/worker-participation/representatives/{$rep->id}", [
+                'initial_training_completed_at' => now()->subMonth()->toDateString(),
+            ])
+            ->assertRedirect();
+        $this->assertSame(1, \App\Models\StaffCredential::where('user_id', $user->id)->where('type', $type)->count());
+    }
+
     public function test_store_committee_flashes_created_committee_id_for_the_meeting_chain(): void
     {
         $site = Site::factory()->create();

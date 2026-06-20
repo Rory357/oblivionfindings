@@ -250,6 +250,9 @@ class HandleInertiaRequests extends Middleware
                 // supersede so it can upload staged evidence to the new draft and
                 // its success pane can open it.
                 'created_risk_assessment_id' => session('created_risk_assessment_id'),
+                // The Injury record wizard reads this so its success pane can open
+                // the newly-recorded injury straight on its RTW section.
+                'created_injury_id' => session('created_injury_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the
