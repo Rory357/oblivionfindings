@@ -7,6 +7,8 @@ import {
     FileText,
     Home,
     Pill,
+    ShieldAlert,
+    ShieldCheck,
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +27,7 @@ import useLiveRefresh from '@/hooks/use-live-refresh';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
+import { formatRelative, formatTime } from '@/lib/datetime';
 
 import {
     MealLogDialog,
@@ -51,6 +54,7 @@ import type {
     MyDayActiveSite,
     MyDayHandover,
     MyDayHrTask,
+    MyDayLoneWorkerSession,
     MyDayMedDue,
     MyDayNotification,
     MyDayPageProps,
@@ -499,6 +503,37 @@ export default function MyDay() {
         );
     }, [props.handover?.id]);
 
+    // Lone Worker Safety — worker self check-in (the "You're being monitored"
+    // card). Both actions POST to the existing coordinator check-in endpoint;
+    // the route is auth-only and LoneWorkerController@checkIn authorizes the
+    // session's own worker. Success / failure surface via the global flash
+    // toaster, so there's no bespoke toast here.
+    const loneWorkerSessionId = props.active_lone_worker_session?.id ?? null;
+    const handleLoneWorkerCheckIn = useCallback(() => {
+        if (!loneWorkerSessionId) return;
+        router.post(
+            `/health-safety/lone-workers/sessions/${loneWorkerSessionId}/check-in`,
+            { status: 'ok' },
+            { preserveScroll: true },
+        );
+    }, [loneWorkerSessionId]);
+
+    const handleLoneWorkerEmergency = useCallback(() => {
+        if (!loneWorkerSessionId) return;
+        if (
+            !confirm(
+                'Send an emergency alert? Your coordinator and the Control Room will be notified immediately that you need help.',
+            )
+        ) {
+            return;
+        }
+        router.post(
+            `/health-safety/lone-workers/sessions/${loneWorkerSessionId}/check-in`,
+            { status: 'emergency' },
+            { preserveScroll: true },
+        );
+    }, [loneWorkerSessionId]);
+
     const handleAddNote = useCallback((clientId: number | null | undefined) => {
         if (!clientId) {
             router.visit('/clients');
@@ -795,6 +830,14 @@ export default function MyDay() {
                 />
 
                 <aside className="flex flex-col gap-4">
+                    {props.active_lone_worker_session ? (
+                        <LoneWorkerCheckInCard
+                            session={props.active_lone_worker_session}
+                            onCheckIn={handleLoneWorkerCheckIn}
+                            onEmergency={handleLoneWorkerEmergency}
+                        />
+                    ) : null}
+
                     {activeRound ? (
                         <ActiveRoundBanner round={activeRound} />
                     ) : null}
@@ -1053,6 +1096,130 @@ function ActiveRoundBanner({ round }: { round: MyDayActiveRound }) {
                 </div>
             </div>
         </a>
+    );
+}
+
+/**
+ * Worker-facing Lone Worker Safety card (the cross-module half of the redesign).
+ * Shown only when the signed-in worker is the subject of a live session. One tap
+ * = "I'm OK"; a second, critical-tone affordance = "I need help" (confirmed).
+ * Both POST to the existing check-in endpoint — no register/wizard/hero here.
+ */
+function LoneWorkerCheckInCard({
+    session,
+    onCheckIn,
+    onEmergency,
+}: {
+    session: MyDayLoneWorkerSession;
+    onCheckIn: () => void;
+    onEmergency: () => void;
+}) {
+    const state: 'calm' | 'overdue' | 'emergency' =
+        session.status === 'emergency'
+            ? 'emergency'
+            : session.status === 'overdue' || session.is_check_in_overdue
+              ? 'overdue'
+              : 'calm';
+
+    const tone = {
+        calm: {
+            ring: 'border-status-info/30',
+            bg: 'bg-status-info-bg',
+            fg: 'text-status-info',
+            medallion: 'bg-status-info',
+        },
+        overdue: {
+            ring: 'border-status-warning/30',
+            bg: 'bg-status-warning-bg',
+            fg: 'text-status-warning',
+            medallion: 'bg-status-warning',
+        },
+        emergency: {
+            ring: 'border-status-critical/30',
+            bg: 'bg-status-critical-bg',
+            fg: 'text-status-critical',
+            medallion: 'bg-status-critical',
+        },
+    }[state];
+
+    const subline =
+        state === 'emergency'
+            ? 'Emergency alerted — the Control Room has been notified.'
+            : state === 'overdue'
+              ? "Check-in overdue — tap I'm OK to confirm you're safe."
+              : 'Lone worker safety is watching this shift.';
+
+    const Icon = state === 'calm' ? ShieldCheck : ShieldAlert;
+
+    return (
+        <section
+            aria-label="Lone worker safety check-in"
+            className={`rounded-xl border ${tone.ring} ${tone.bg} p-4`}
+        >
+            <div className="flex items-start gap-3">
+                <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone.medallion} text-white`}
+                >
+                    <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className={`text-sm font-semibold ${tone.fg}`}>
+                        You're being monitored
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {subline}
+                    </p>
+                </div>
+            </div>
+
+            <dl className="mt-3 space-y-1.5 text-xs">
+                {session.site ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Home className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{session.site.name}</span>
+                    </div>
+                ) : null}
+                {session.expected_end_at ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        <span>Until {formatTime(session.expected_end_at)}</span>
+                    </div>
+                ) : null}
+                <div className="flex items-center gap-2 text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    {state === 'overdue' ? (
+                        <span className={tone.fg}>
+                            Check-in overdue
+                            {session.next_check_in_at
+                                ? ` · was due ${formatRelative(session.next_check_in_at)}`
+                                : ''}
+                        </span>
+                    ) : session.next_check_in_at ? (
+                        <span>
+                            Next check-in {formatTime(session.next_check_in_at)}{' '}
+                            · {formatRelative(session.next_check_in_at)}
+                        </span>
+                    ) : (
+                        <span>Check in any time</span>
+                    )}
+                </div>
+            </dl>
+
+            <div className="mt-3 flex gap-2">
+                <Button type="button" className="flex-1" onClick={onCheckIn}>
+                    <CheckCircle2 className="h-4 w-4" />
+                    I'm OK
+                </Button>
+                <Button
+                    type="button"
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={onEmergency}
+                >
+                    <AlertTriangle className="h-4 w-4" />I need help
+                </Button>
+            </div>
+        </section>
     );
 }
 

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\LoneWorkerSession;
@@ -215,5 +217,147 @@ class LoneWorkerControllerTest extends TestCase
                 ->where('tab', 'alerts')
                 ->has('alerts.data', 1)
                 ->where('alerts.data.0.source', 'control_room'));
+    }
+
+    /* ── Worker self check-in (the My Day cross-module half) ─────────────── */
+
+    /**
+     * A frontline support worker (no hazards.manage) must be able to check into
+     * THEIR OWN session — this is the whole point of the My Day card. The route
+     * is auth-only; checkIn() authorizes the session's own worker.
+     */
+    public function test_worker_without_manage_can_check_into_own_session(): void
+    {
+        $worker = $this->supportWorker();
+        $this->assertFalse($worker->fresh()->canDo('hazards.manage'));
+
+        $session = $this->makeSession(['user_id' => $worker->id, 'status' => 'active']);
+
+        $this->actingAs($worker)
+            ->from('/my-day')
+            ->post("/health-safety/lone-workers/sessions/{$session->id}/check-in", [
+                'status' => 'ok',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(1, $session->checkIns()->where('status', 'ok')->count());
+        $session->refresh();
+        $this->assertSame('active', $session->status);
+        $this->assertNotNull($session->last_check_in_at);
+    }
+
+    /**
+     * The same worker must NOT be able to check into someone else's session.
+     */
+    public function test_worker_cannot_check_into_another_workers_session(): void
+    {
+        $worker = $this->supportWorker();
+        $otherWorker = User::factory()->create();
+
+        $session = $this->makeSession(['user_id' => $otherWorker->id, 'status' => 'active']);
+
+        $this->actingAs($worker)
+            ->from('/my-day')
+            ->post("/health-safety/lone-workers/sessions/{$session->id}/check-in", [
+                'status' => 'ok',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, $session->checkIns()->count());
+        $this->assertSame('active', $session->fresh()->status);
+    }
+
+    /* ── Auto-end on shift clock-out ────────────────────────────────────── */
+
+    public function test_clocking_out_a_monitored_shift_auto_ends_the_session(): void
+    {
+        $worker = $this->supportWorker();
+        [$shift, $attendance] = $this->clockedInShift($worker);
+
+        $session = $this->makeSession([
+            'user_id' => $worker->id,
+            'shift_id' => $shift->id,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($worker);
+        app(AttendanceService::class)->clockOut($worker, $attendance, [
+            'force' => true,
+            'override_reason' => 'auto-end test',
+        ]);
+
+        $session->refresh();
+        $this->assertSame('completed', $session->status);
+        $this->assertNotNull($session->ended_at);
+    }
+
+    public function test_clocking_out_never_clears_an_emergency_session(): void
+    {
+        $worker = $this->supportWorker();
+        [$shift, $attendance] = $this->clockedInShift($worker);
+
+        $session = $this->makeSession([
+            'user_id' => $worker->id,
+            'shift_id' => $shift->id,
+            'status' => 'emergency',
+            'emergency_triggered_at' => now()->subMinutes(5),
+        ]);
+
+        $this->actingAs($worker);
+        app(AttendanceService::class)->clockOut($worker, $attendance, [
+            'force' => true,
+            'override_reason' => 'auto-end test',
+        ]);
+
+        // An unresolved emergency must be resolved deliberately in the Control
+        // Room — a routine clock-out must never silently complete it.
+        $this->assertSame('emergency', $session->fresh()->status);
+    }
+
+    /* ── Helpers ────────────────────────────────────────────────────────── */
+
+    /** A frontline support worker — no hazards.* permission. */
+    private function supportWorker(): User
+    {
+        $worker = User::factory()->create(['approved_at' => now()]);
+        $worker->roles()->attach(Role::where('name', 'support_worker')->first());
+
+        return $worker;
+    }
+
+    /**
+     * An in-progress shift the worker has clocked into, with a client that has
+     * no medications or incidents (so no *clinical* clock-out blockers can fire).
+     * The tests force the clock-out, which clears the remaining non-clinical
+     * blockers (tasks / handover) without a manager override.
+     *
+     * @return array{0: Shift, 1: HrAttendanceSession}
+     */
+    private function clockedInShift(User $worker): array
+    {
+        $client = Client::factory()->create();
+        $shift = Shift::factory()->create([
+            'user_id' => $worker->id,
+            'client_id' => $client->id,
+            'status' => 'in_progress',
+            'starts_at' => now()->subHours(2),
+            'ends_at' => now()->addHours(4),
+            'actual_starts_at' => now()->subHours(2),
+            'started_by' => $worker->id,
+            'created_by' => $worker->id,
+        ]);
+
+        $attendance = HrAttendanceSession::create([
+            'user_id' => $worker->id,
+            'shift_id' => $shift->id,
+            'site_id' => $shift->site_id,
+            'clock_in_at' => now()->subHours(2),
+            'status' => 'open',
+            'source' => 'manual',
+            'created_by' => $worker->id,
+        ]);
+
+        return [$shift, $attendance];
     }
 }
