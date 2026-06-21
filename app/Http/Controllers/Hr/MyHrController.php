@@ -912,6 +912,17 @@ class MyHrController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
+        // Guard against a second concurrent clock-in (which would leave two open
+        // entries and a stuck "on shift" banner). One active clock at a time.
+        $alreadyClockedIn = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->exists();
+
+        if ($alreadyClockedIn) {
+            return redirect()->back()->with('error', 'You are already clocked in.');
+        }
+
         try {
             $session = $this->attendanceService->clockIn($user, [
                 'tenant_id' => $tenantId,
@@ -950,6 +961,7 @@ class MyHrController extends Controller
     public function clockOut(Request $request)
     {
         $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
@@ -957,44 +969,54 @@ class MyHrController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $requestedBreak = (int) ($validated['break_minutes'] ?? 0);
+
+        // Close the live attendance session if there is one (this also creates
+        // the Operations timesheet). A stale/seeded time entry can be open with
+        // no matching session — that's fine: we still close the time entry below
+        // so the hero's live clock always clears (never a phantom "on shift").
+        $session = null;
         try {
             $session = $this->attendanceService->clockOut($user, null, [
-                'break_minutes' => $validated['break_minutes'] ?? 0,
+                'break_minutes' => $requestedBreak,
                 'notes' => $validated['notes'] ?? null,
             ]);
+        } catch (\LogicException) {
+            // No open attendance session — fall through and close the entry(ies).
+        }
 
-            // Update corresponding HrTimeEntry
-            $entry = HrTimeEntry::where('attendance_session_id', $session->id)
-                ->where('user_id', $user->id)
-                ->first();
+        $clockOutAt = $session?->clock_out_at ?? now();
 
-            if ($entry) {
-                $totalMinutes = $session->clock_in_at->diffInMinutes($session->clock_out_at) - ($session->break_minutes ?? 0);
-                $totalHours = max(0, round($totalMinutes / 60, 2));
+        // Close every open (clock_out IS NULL) entry for this user — normally
+        // exactly one, but closing all self-heals any duplicate/orphaned actives
+        // so `activeClock` reliably resolves to null after clocking out.
+        $openEntries = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->get();
 
-                // Check break compliance (NZ: 10min rest per 2h, 30min meal per 4h)
-                $workedHours = $totalMinutes / 60;
-                $breakMinutes = $session->break_minutes ?? 0;
-                $requiredBreak = 0;
-                if ($workedHours >= 4) {
-                    $requiredBreak = 30;
-                } elseif ($workedHours >= 2) {
-                    $requiredBreak = 10;
-                }
-                $breakCompliant = $breakMinutes >= $requiredBreak;
+        foreach ($openEntries as $entry) {
+            $breakMinutes = $session?->break_minutes ?? $requestedBreak;
+            $totalMinutes = max(0, $entry->clock_in->diffInMinutes($clockOutAt) - $breakMinutes);
+            $totalHours = round($totalMinutes / 60, 2);
 
-                $entry->update([
-                    'clock_out' => $session->clock_out_at,
-                    'break_minutes' => $session->break_minutes ?? 0,
-                    'total_hours' => $totalHours,
-                    'mileage_km' => $validated['mileage_km'] ?? null,
-                    'break_compliance_met' => $breakCompliant,
-                    'notes' => $validated['notes'] ?? $entry->notes,
-                    'status' => 'submitted',
-                ]);
-            }
-        } catch (\LogicException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            // NZ break compliance (10min rest per 2h, 30min meal per 4h).
+            $workedHours = $totalMinutes / 60;
+            $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+
+            $entry->update([
+                'clock_out' => $clockOutAt,
+                'break_minutes' => $breakMinutes,
+                'total_hours' => $totalHours,
+                'mileage_km' => $validated['mileage_km'] ?? null,
+                'break_compliance_met' => $breakMinutes >= $requiredBreak,
+                'notes' => $validated['notes'] ?? $entry->notes,
+                'status' => 'submitted',
+            ]);
+        }
+
+        if (! $session && $openEntries->isEmpty()) {
+            return redirect()->back()->with('error', 'You are not currently clocked in.');
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');

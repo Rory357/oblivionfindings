@@ -52,8 +52,11 @@ function fmtClock(ms: number): string {
  * The promoted, high-contrast clock panel that sits in the My HR hero's right
  * column (and wraps below the greeting on narrow viewports). It is a glass panel
  * over the brand gradient, not a white card. Backed by the single shared
- * AttendanceService via the existing `/hr/time/clock-in|out` endpoints (no new
- * clock path). The live timer ticks every second; the break toggle pauses the
+ * AttendanceService via the existing self-service `/hr/my/time/clock-in|out`
+ * endpoints (MyHrController — no new clock path, no `timesheets.*` permission
+ * gate, and the system that owns the `HrTimeEntry` the hero reads as its active
+ * clock, so clocking out reliably clears the banner). The live timer ticks
+ * every second; the break toggle pauses the
  * *displayed* elapsed client-side and submits the accrued `break_minutes` at
  * clock-out, which the controller already accepts. When clocked out it shows a
  * calm "Next shift" block instead of the timer.
@@ -135,7 +138,7 @@ export function MyHrClockCard({
     function handleClockIn() {
         setProcessing(true);
         router.post(
-            '/hr/time/clock-in',
+            '/hr/my/time/clock-in',
             {},
             {
                 preserveScroll: true,
@@ -159,7 +162,7 @@ export function MyHrClockCard({
         const worked = elapsed;
         setProcessing(true);
         router.post(
-            '/hr/time/clock-out',
+            '/hr/my/time/clock-out',
             { break_minutes: breakMinutes },
             {
                 preserveScroll: true,
