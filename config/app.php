@@ -73,16 +73,17 @@ return [
     |
     | The AddContentSecurityPolicy middleware emits an app-wide CSP header on
     | HTML responses — defence-in-depth against script/style/object injection
-    | and clickjacking, layered on top of React/Blade output escaping. Ship it
-    | report-only first (csp_enforce=false) so violations surface in the browser
-    | console without breaking the SPA, then flip CSP_ENFORCE=true to enforce.
-    | csp_enabled=false removes the header entirely (escape hatch).
+    | and clickjacking, layered on top of React/Blade output escaping. It was
+    | rolled out report-only first and verified violation-free across the app, so
+    | it now ENFORCES by default; set CSP_ENFORCE=false to drop back to
+    | report-only, or CSP_ENABLED=false to remove the header entirely (escape
+    | hatches for diagnosing a future violation without a code change).
     |
     */
 
     'csp_enabled' => (bool) env('CSP_ENABLED', true),
 
-    'csp_enforce' => (bool) env('CSP_ENFORCE', false),
+    'csp_enforce' => (bool) env('CSP_ENFORCE', true),
 
     /*
     |--------------------------------------------------------------------------
