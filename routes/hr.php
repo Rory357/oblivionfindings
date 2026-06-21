@@ -81,6 +81,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::prefix('my')->name('my.')->group(function () {
         Route::get('/', [MyHrController::class, 'index'])->name('index');
+        Route::get('/calendar', [MyHrController::class, 'calendar'])->name('calendar');
         Route::get('/leave', [MyHrController::class, 'leave'])->name('leave');
         Route::post('/leave', [MyHrController::class, 'submitLeave'])->name('leave.store');
         Route::delete('/leave/{leaveRequest}', [MyHrController::class, 'cancelLeave'])->name('leave.cancel');

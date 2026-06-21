@@ -22,8 +22,8 @@ use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\ESignatureService;
-use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\ExpenseService;
+use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
@@ -31,8 +31,11 @@ use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
+use App\Models\ProcedureAcknowledgement;
 use App\Models\SafeWorkProcedure;
 use App\Models\Shift;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -175,7 +178,7 @@ class MyHrController extends Controller
         // detail modal, with a version-stamped "Acknowledge" affordance. Role-matched
         // + org-wide (approved).
         $roleKeys = $user->roles()->pluck('name')->all();
-        $ackedVersions = \App\Models\ProcedureAcknowledgement::query()
+        $ackedVersions = ProcedureAcknowledgement::query()
             ->where('user_id', $user->id)
             ->pluck('version_acknowledged', 'safe_work_procedure_id');
         $safeWorkProcedures = $user->canDo('procedures.view')
@@ -1042,7 +1045,7 @@ class MyHrController extends Controller
     private function icsEscape(string $value): string
     {
         return str_replace(
-            ["\\", ';', ',', "\r\n", "\n"],
+            ['\\', ';', ',', "\r\n", "\n"],
             ['\\\\', '\\;', '\\,', '\\n', '\\n'],
             $value,
         );
@@ -1232,5 +1235,28 @@ class MyHrController extends Controller
         $filename = $document->original_name ?: basename($document->storage_path);
 
         return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
+    }
+
+    /**
+     * Month feed for the hero footer calendar. The shell seeds the current month
+     * on first paint; this lets the popover page to other months on demand. Same
+     * shape ({ month, events }) the shell uses, built by the shared trait.
+     */
+    public function calendar(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $monthParam = (string) $request->query('month', now()->format('Y-m'));
+
+        try {
+            $anchor = Carbon::createFromFormat('Y-m', $monthParam);
+        } catch (\Throwable) {
+            $anchor = null;
+        }
+
+        return response()->json(
+            $this->myHrCalendarFeed($user, $tenantId, ($anchor ?: now())->startOfMonth()),
+        );
     }
 }

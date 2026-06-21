@@ -11,6 +11,7 @@ export * from './hr-hero';
 export * from './hr-tabs';
 export * from './leave-request-dialog';
 export * from './leave-tabs';
+export * from './my-hr-calendar';
 export * from './my-hr-clock-card';
 export * from './my-hr-esign-dialog';
 export * from './my-hr-hero';
