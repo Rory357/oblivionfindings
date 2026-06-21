@@ -86,6 +86,7 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/my/leave',
     '/hr/my/time',
     '/hr/my/one',
+    '/hr/my/shoutouts',
     '/hr/my/expenses',
     '/hr/my/payslips',
     '/hr/my/reviews',

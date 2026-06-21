@@ -2,6 +2,8 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Models\HrKudosReaction;
+use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -153,4 +155,119 @@ test('sending kudos rejects an unknown category', function () {
         ->assertSessionHasErrors('category');
 
     expect(HrKudos::query()->count())->toBe(0);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Shout-outs (kudos reactions + reply thread)                       */
+/* ------------------------------------------------------------------ */
+
+function myHrMakeKudos(int $from, int $to): HrKudos
+{
+    return HrKudos::query()->create([
+        'tenant_id' => 1,
+        'from_user_id' => $from,
+        'to_user_id' => $to,
+        'category' => 'teamwork',
+        'message' => 'Calm and kind on a tough shift. Ngā mihi.',
+        'is_public' => true,
+    ]);
+}
+
+test('the overview surfaces received shout-outs with reactions + replies', function () {
+    $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
+    HrKudosReaction::query()->create([
+        'tenant_id' => 1, 'kudos_id' => $kudos->id, 'user_id' => $this->teammate->id, 'emoji' => 'heart',
+    ]);
+    HrKudosReply::query()->create([
+        'tenant_id' => 1, 'kudos_id' => $kudos->id, 'user_id' => $this->employee->id, 'body' => 'Thanks!',
+    ]);
+
+    $response = $this->actingAs($this->employee)->get('/hr/my');
+    $response->assertOk();
+
+    $shoutouts = $response->inertiaProps('overview.shoutouts');
+    expect($shoutouts)->toHaveCount(1);
+    expect($shoutouts[0]['giver']['id'])->toBe($this->teammate->id);
+    expect($shoutouts[0]['reactions']['heart'])->toHaveCount(1);
+    expect($shoutouts[0]['replies'])->toHaveCount(1);
+});
+
+test('the shout-outs tab renders received and given boxes', function () {
+    myHrMakeKudos($this->teammate->id, $this->employee->id); // received
+    myHrMakeKudos($this->employee->id, $this->teammate->id); // given
+
+    $response = $this->actingAs($this->employee)->get('/hr/my/shoutouts');
+    $response->assertOk();
+
+    expect($response->inertiaProps('received'))->toHaveCount(1);
+    expect($response->inertiaProps('given'))->toHaveCount(1);
+});
+
+test('an employee can toggle a reaction on a kudos (add then remove)', function () {
+    $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
+
+    $this->actingAs($this->employee)
+        ->post("/hr/my/kudos/{$kudos->id}/react", ['emoji' => 'heart'])
+        ->assertRedirect();
+    expect(HrKudosReaction::query()
+        ->where('kudos_id', $kudos->id)
+        ->where('user_id', $this->employee->id)
+        ->where('emoji', 'heart')
+        ->exists())->toBeTrue();
+
+    // Same emoji again removes it.
+    $this->actingAs($this->employee)
+        ->post("/hr/my/kudos/{$kudos->id}/react", ['emoji' => 'heart'])
+        ->assertRedirect();
+    expect(HrKudosReaction::query()->where('kudos_id', $kudos->id)->count())->toBe(0);
+});
+
+test('reacting rejects an unknown emoji', function () {
+    $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
+
+    $this->actingAs($this->employee)
+        ->post("/hr/my/kudos/{$kudos->id}/react", ['emoji' => 'rocket'])
+        ->assertSessionHasErrors('emoji');
+
+    expect(HrKudosReaction::query()->count())->toBe(0);
+});
+
+test('a party can reply on a kudos thread', function () {
+    $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
+
+    $this->actingAs($this->employee)
+        ->post("/hr/my/kudos/{$kudos->id}/reply", ['body' => 'Thank you so much. 💛'])
+        ->assertRedirect();
+
+    $reply = HrKudosReply::query()->where('kudos_id', $kudos->id)->first();
+    expect($reply)->not->toBeNull();
+    expect($reply->user_id)->toBe($this->employee->id);
+    expect($reply->body)->toBe('Thank you so much. 💛');
+});
+
+test('a non-party cannot reply on a kudos thread', function () {
+    $outsider = User::factory()->create([
+        'organization_id' => 1,
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $outsider->id,
+        'employee_number' => 'EMP-SS-'.$outsider->id,
+        'work_email' => 'ss'.$outsider->id.'@example.test',
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
+
+    $this->actingAs($outsider)
+        ->post("/hr/my/kudos/{$kudos->id}/reply", ['body' => 'Butting in.'])
+        ->assertForbidden();
+
+    expect(HrKudosReply::query()->count())->toBe(0);
 });
