@@ -30,6 +30,7 @@ class ShiftSeries extends Model
         'shift_type',
         'is_sleepover',
         'is_on_call',
+        'is_lone_worker',
         'expected_break_minutes',
         'coverage_roles',
         'created_by',
@@ -41,6 +42,7 @@ class ShiftSeries extends Model
         'by_weekday' => 'array',
         'is_sleepover' => 'boolean',
         'is_on_call' => 'boolean',
+        'is_lone_worker' => 'boolean',
         'expected_break_minutes' => 'integer',
         'coverage_roles' => 'array',
     ];

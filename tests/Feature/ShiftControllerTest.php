@@ -900,6 +900,36 @@ class ShiftControllerTest extends TestCase
         ]);
     }
 
+    public function test_series_store_propagates_is_lone_worker_to_generated_shifts(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('operations.shifts.series.store'), [
+                'client_id' => $this->client->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => null,
+                'start_date' => '2026-05-04',
+                'end_date' => '2026-05-04',
+                'timezone' => 'Pacific/Auckland',
+                'by_weekday' => ['mon'],
+                'starts_time' => '09:00',
+                'ends_time' => '13:00',
+                'status' => 'scheduled',
+                'is_lone_worker' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $series = \App\Models\ShiftSeries::query()->latest('id')->first();
+        $this->assertNotNull($series);
+        $this->assertTrue((bool) $series->is_lone_worker, 'Series should persist is_lone_worker.');
+
+        $shifts = Shift::where('shift_series_id', $series->id)->get();
+        $this->assertGreaterThan(0, $shifts->count());
+        $this->assertTrue(
+            $shifts->every(fn (Shift $s) => $s->is_lone_worker === true),
+            'Every generated shift should inherit is_lone_worker from the series.',
+        );
+    }
+
     // ==========================================
     // SHIFT LIFECYCLE TESTS
     // ==========================================

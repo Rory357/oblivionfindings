@@ -125,6 +125,7 @@ class RosterTemplateController extends Controller
                     'shift_type' => $shift->shift_type,
                     'is_sleepover' => $shift->is_sleepover,
                     'is_on_call' => $shift->is_on_call,
+                    'is_lone_worker' => $shift->is_lone_worker,
                     'expected_break_minutes' => $shift->expected_break_minutes,
                     'required_skills' => $shift->required_skills,
                     'location' => $shift->location,
@@ -271,6 +272,7 @@ class RosterTemplateController extends Controller
                 'shift_type' => $templateShift->shift_type ?? 'standard',
                 'is_sleepover' => (bool) $templateShift->is_sleepover,
                 'is_on_call' => (bool) $templateShift->is_on_call,
+                'is_lone_worker' => (bool) $templateShift->is_lone_worker,
                 'expected_break_minutes' => $templateShift->expected_break_minutes,
                 'created_by' => $auth->id,
             ];
@@ -360,6 +362,7 @@ class RosterTemplateController extends Controller
         $row['shift_type'] = $row['shift_type'] ?? 'standard';
         $row['is_sleepover'] = (bool) ($row['is_sleepover'] ?? false);
         $row['is_on_call'] = (bool) ($row['is_on_call'] ?? false);
+        $row['is_lone_worker'] = (bool) ($row['is_lone_worker'] ?? false);
 
         if ($row['shift_type'] === 'sleepover') {
             $row['is_sleepover'] = true;
@@ -379,6 +382,7 @@ class RosterTemplateController extends Controller
             'shift_type' => $row['shift_type'],
             'is_sleepover' => $row['is_sleepover'],
             'is_on_call' => $row['is_on_call'],
+            'is_lone_worker' => $row['is_lone_worker'],
             'expected_break_minutes' => filled($row['expected_break_minutes'] ?? null)
                 ? (int) $row['expected_break_minutes']
                 : null,

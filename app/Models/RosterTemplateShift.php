@@ -21,6 +21,7 @@ class RosterTemplateShift extends Model
         'shift_type',
         'is_sleepover',
         'is_on_call',
+        'is_lone_worker',
         'expected_break_minutes',
         'required_skills',
         'location',
@@ -31,6 +32,7 @@ class RosterTemplateShift extends Model
         'day_of_week' => 'integer',
         'is_sleepover' => 'boolean',
         'is_on_call' => 'boolean',
+        'is_lone_worker' => 'boolean',
         'expected_break_minutes' => 'integer',
         'required_skills' => 'array',
     ];

@@ -95,6 +95,7 @@ class ShiftSeriesController extends Controller
                 'ends_time' => $row->ends_time,
                 'is_sleepover' => (bool) $row->is_sleepover,
                 'is_on_call' => (bool) $row->is_on_call,
+                'is_lone_worker' => (bool) $row->is_lone_worker,
                 'start_date' => optional($row->start_date)->toDateString(),
                 'end_date' => optional($row->end_date)->toDateString(),
                 'occurrences_total' => (int) ($row->occurrences_total ?? 0),
@@ -186,6 +187,7 @@ class ShiftSeriesController extends Controller
             'shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
             'is_sleepover' => ['nullable', 'boolean'],
             'is_on_call' => ['nullable', 'boolean'],
+            'is_lone_worker' => ['nullable', 'boolean'],
             'expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
             'coverage_roles' => ['nullable', 'array'],
@@ -374,6 +376,7 @@ class ShiftSeriesController extends Controller
                         'shift_type' => $data['shift_type'] ?? 'standard',
                         'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
                         'is_on_call' => (bool) ($data['is_on_call'] ?? false),
+                        'is_lone_worker' => (bool) ($data['is_lone_worker'] ?? false),
                         'expected_break_minutes' => $data['expected_break_minutes'] ?? null,
                         'coverage_roles' => $data['coverage_roles'] ?? null,
                         'created_by' => $auth->id,
@@ -530,6 +533,7 @@ class ShiftSeriesController extends Controller
         $data['shift_type'] = $data['shift_type'] ?? 'standard';
         $data['is_sleepover'] = (bool) ($data['is_sleepover'] ?? false);
         $data['is_on_call'] = (bool) ($data['is_on_call'] ?? false);
+        $data['is_lone_worker'] = (bool) ($data['is_lone_worker'] ?? false);
 
         if ($data['shift_type'] === 'sleepover') {
             $data['is_sleepover'] = true;
