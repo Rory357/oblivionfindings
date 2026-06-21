@@ -2118,7 +2118,9 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         label: 'People',
         items: [],
     };
-    if (can?.hr?.employees?.viewAny || can?.hr?.employees?.viewOwn) {
+    // Route /hr/people requires employees.viewAny; gate on the same (viewOwn,
+    // held by all frontline, used to surface a link that 403'd on click).
+    if (can?.hr?.employees?.viewAny) {
         people.items.push({ title: 'People', href: '/hr/people', icon: Users });
     }
     if (can?.hr?.recruitment?.view) {
@@ -2235,11 +2237,9 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     // Surveys & Wellbeing unified on the richer engagement-survey system
     // (the standalone /hr/surveys system was retired and redirects here).
-    if (
-        can?.hr?.wellbeing?.view ||
-        can?.hr?.analytics?.view ||
-        can?.hr?.surveys?.view
-    ) {
+    // /hr/wellbeing requires wellbeing.view; gate on exactly that so the link
+    // never shows to analytics/surveys-only roles that would 403 on click.
+    if (can?.hr?.wellbeing?.view) {
         engagement.items.push({
             title: 'Surveys & Wellbeing',
             href: '/hr/wellbeing',
@@ -2309,7 +2309,12 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     }
-    if (can?.hr?.cases?.view || can?.hr?.employees?.manage) {
+    // Gate on the exit-interviews perms the route actually requires (was
+    // cases.view||employees.manage, which 403'd for roles lacking exit-interviews).
+    if (
+        can?.hr?.['exit-interviews']?.view ||
+        can?.hr?.['exit-interviews']?.manage
+    ) {
         lifecycle.items.push({
             title: 'Exit Interviews',
             href: '/hr/exit-interviews',
@@ -2359,7 +2364,8 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Settings,
         });
     }
-    if (can?.hr?.employees?.viewAny) {
+    // /hr/import-export requires employees.manage, not just viewAny.
+    if (can?.hr?.employees?.manage) {
         adminConfig.items.push({
             title: 'Import/Export',
             href: '/hr/import-export',
