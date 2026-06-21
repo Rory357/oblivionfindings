@@ -5,7 +5,6 @@ import {
     DepartmentDialog,
     type DepartmentFilters,
     DepartmentsPane,
-    DirectoryPane,
     HrTabs,
     type HrTabItem,
     type OrgNode,
@@ -18,6 +17,7 @@ import {
     PositionDialog,
     type PositionRow,
     PositionsPane,
+    StaffDetailsModal,
     useHrTab,
 } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
@@ -40,7 +40,6 @@ import {
     Briefcase,
     Building2,
     Clock,
-    Contact,
     Download,
     Network,
     Plus,
@@ -271,6 +270,12 @@ export default function EmployeesIndex({
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
     const [tab, setTab] = useHrTab('people');
+    const KNOWN_TABS = ['people', 'positions', 'departments', 'orgchart'];
+    // Fall back to People for unknown/retired tabs (e.g. an old ?tab=directory link).
+    const activeTab = KNOWN_TABS.includes(tab) ? tab : 'people';
+    const [selectedProfileId, setSelectedProfileId] = useState<number | null>(
+        null,
+    );
     const [posDialogOpen, setPosDialogOpen] = useState(false);
     const [editingPosition, setEditingPosition] = useState<PositionRow | null>(
         null,
@@ -284,13 +289,6 @@ export default function EmployeesIndex({
             label: 'People',
             icon: Users,
             tone: 'primary',
-            badge: profiles.total,
-        },
-        {
-            id: 'directory',
-            label: 'Directory',
-            icon: Contact,
-            tone: 'info',
             badge: profiles.total,
         },
         {
@@ -411,13 +409,13 @@ export default function EmployeesIndex({
                 }
             >
                 <HrTabs
-                    value={tab}
+                    value={activeTab}
                     onChange={setTab}
                     items={tabItems}
                     ariaLabel="People views"
                 />
 
-                {tab === 'people' && (
+                {activeTab === 'people' && (
                     <>
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -649,8 +647,8 @@ export default function EmployeesIndex({
                                             className="group cursor-pointer transition-colors hover:bg-muted/40"
                                             onClick={() => {
                                                 if (p.profile_id)
-                                                    router.visit(
-                                                        `/hr/people/${p.profile_id}`,
+                                                    setSelectedProfileId(
+                                                        p.profile_id,
                                                     );
                                             }}
                                         >
@@ -664,21 +662,9 @@ export default function EmployeesIndex({
                                                         )}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        {p.profile_id ? (
-                                                            <Link
-                                                                href={`/hr/people/${p.profile_id}`}
-                                                                className="font-medium text-foreground group-hover:text-primary"
-                                                                onClick={(e) =>
-                                                                    e.stopPropagation()
-                                                                }
-                                                            >
-                                                                {p.user.name}
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="font-medium">
-                                                                {p.user.name}
-                                                            </span>
-                                                        )}
+                                                        <span className="font-medium text-foreground group-hover:text-primary">
+                                                            {p.user.name}
+                                                        </span>
                                                         <div className="truncate text-xs text-muted-foreground">
                                                             {p.user.email}
                                                         </div>
@@ -763,10 +749,6 @@ export default function EmployeesIndex({
                     </>
                 )}
 
-                {tab === 'directory' && (
-                    <DirectoryPane people={profiles.data} />
-                )}
-
                 {tab === 'positions' && (
                     <PositionsPane
                         positions={positions}
@@ -838,6 +820,15 @@ export default function EmployeesIndex({
                     parentOptions={departmentParents}
                 />
             ) : null}
+
+            <StaffDetailsModal
+                profileId={selectedProfileId}
+                open={selectedProfileId !== null}
+                onClose={() => setSelectedProfileId(null)}
+                fullProfileHref={
+                    selectedProfileId ? `/hr/people/${selectedProfileId}` : null
+                }
+            />
         </AppLayout>
     );
 }

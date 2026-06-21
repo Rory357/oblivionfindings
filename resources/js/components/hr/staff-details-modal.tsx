@@ -1,4 +1,6 @@
+import { Link } from '@inertiajs/react';
 import {
+    ArrowRight,
     Award,
     Building2,
     CalendarDays,
@@ -102,10 +104,13 @@ export function StaffDetailsModal({
     profileId,
     open,
     onClose,
+    fullProfileHref,
 }: {
     profileId: number | null;
     open: boolean;
     onClose: () => void;
+    /** When set, shows an "Open full profile" link (e.g. the People hub's management profile). */
+    fullProfileHref?: string | null;
 }) {
     const [data, setData] = useState<StaffDetails | null>(null);
     const [loading, setLoading] = useState(false);
@@ -392,6 +397,17 @@ export function StaffDetailsModal({
                                 </ul>
                             </div>
                         )}
+                    </div>
+                )}
+                {fullProfileHref && !loading && (
+                    <div className="mt-2 border-t pt-4">
+                        <Link
+                            href={fullProfileHref}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                        >
+                            Open full profile
+                            <ArrowRight className="size-3.5" />
+                        </Link>
                     </div>
                 )}
             </DialogContent>

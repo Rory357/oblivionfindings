@@ -3,9 +3,10 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
@@ -16,13 +17,13 @@ beforeEach(function () {
 test('the standalone directory route redirects into the People hub tab', function () {
     $this->actingAs($this->hr)
         ->get('/hr/directory')
-        ->assertRedirect(route('hr.people.index', ['tab' => 'directory']));
+        ->assertRedirect(route('hr.people.index', ['tab' => 'people']));
 });
 
 test('the directory route forwards the search query to the hub', function () {
     $this->actingAs($this->hr)
         ->get('/hr/directory?q=ana')
-        ->assertRedirect(route('hr.people.index', ['tab' => 'directory', 'q' => 'ana']));
+        ->assertRedirect(route('hr.people.index', ['tab' => 'people', 'q' => 'ana']));
 });
 
 test('the people index exposes directory card fields on each row', function () {

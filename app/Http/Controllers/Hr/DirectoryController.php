@@ -25,7 +25,7 @@ class DirectoryController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $params = ['tab' => 'directory'];
+        $params = ['tab' => 'people'];
         if ($q = trim((string) $request->query('q', ''))) {
             $params['q'] = $q;
         }
