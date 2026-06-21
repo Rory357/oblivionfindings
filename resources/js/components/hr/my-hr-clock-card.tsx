@@ -1,7 +1,10 @@
-/* eslint-disable no-restricted-syntax -- The clock-in/out and break controls are
- * bespoke full-width pills whose background flips by clock state (primary →
- * status-critical) and whose layout/typography mirror the design handoff's
- * clock card; the shadcn <Button> can't express them without fighting it. */
+/* eslint-disable no-restricted-syntax -- This is the hero's inline "glass" clock
+ * panel: it dissolves into the brand gradient (translucent primary-foreground
+ * fills, border-left hairline) rather than sitting on a white card, and the
+ * clock-in/out + break controls are bespoke pills whose treatment flips by
+ * state. shadcn <Button>/<Card> can't express the on-gradient glass without
+ * fighting it, so the raw <button>/<div> layout is intentional. Colours stay
+ * token-based (primary / primary-foreground) so white-label theming holds. */
 import { router } from '@inertiajs/react';
 import { Coffee, Loader2, LogIn, LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,11 +13,17 @@ import { toast } from 'sonner';
 import { fireConfetti } from '@/lib/confetti';
 import { cn } from '@/lib/utils';
 
+import type { MyHrShellData } from './my-hr-types';
+
 export type MyHrActiveClock = {
     id: number;
     clock_in: string;
     notes?: string | null;
 } | null;
+
+/** Assumed shift length for the In/Out window track when clocked in (the active
+ *  time entry has no scheduled end of its own). Matches the design handoff. */
+const SHIFT_WINDOW_SECONDS = 8 * 3600;
 
 function fmtTimer(seconds: number): string {
     const h = Math.floor(seconds / 3600);
@@ -31,21 +40,37 @@ function fmtHM(seconds: number): string {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+function fmtClock(ms: number): string {
+    return new Date(ms).toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+}
+
 /**
- * The promoted, high-contrast clock card that sits in the My HR hero. Backed by
- * the single shared AttendanceService via the existing `/hr/time/clock-in|out`
- * endpoints (no new clock path). The live timer ticks every second; the break
- * toggle pauses the *displayed* elapsed client-side and submits the accrued
- * `break_minutes` at clock-out, which the controller already accepts.
+ * The promoted, high-contrast clock panel that sits in the My HR hero's right
+ * column (and wraps below the greeting on narrow viewports). It is a glass panel
+ * over the brand gradient, not a white card. Backed by the single shared
+ * AttendanceService via the existing self-service `/hr/my/time/clock-in|out`
+ * endpoints (MyHrController — no new clock path, no `timesheets.*` permission
+ * gate, and the system that owns the `HrTimeEntry` the hero reads as its active
+ * clock, so clocking out reliably clears the banner). The live timer ticks
+ * every second; the break toggle pauses the
+ * *displayed* elapsed client-side and submits the accrued `break_minutes` at
+ * clock-out, which the controller already accepts. When clocked out it shows a
+ * calm "Next shift" block instead of the timer.
  */
 export function MyHrClockCard({
     activeClock,
     todayTotal,
     siteName,
+    nextShift,
 }: {
     activeClock: MyHrActiveClock;
     todayTotal: number;
     siteName?: string | null;
+    nextShift?: MyHrShellData['nextShift'];
 }) {
     const isClockedIn = !!activeClock;
     const [processing, setProcessing] = useState(false);
@@ -80,19 +105,40 @@ export function MyHrClockCard({
         return Math.max(0, e);
     }, [clockInMs, now, breakAccum, onBreak, breakStart]);
 
-    const liveSince = useMemo(() => {
-        if (!clockInMs) return '';
-        return new Date(clockInMs).toLocaleTimeString('en-NZ', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-        });
-    }, [clockInMs]);
+    // Shift-window track: In = clock-in time, Out = +8h, knob = now within it.
+    const progPct = clockInMs
+        ? Math.max(0, Math.min(100, (elapsed / SHIFT_WINDOW_SECONDS) * 100))
+        : 0;
+    const shiftStart = clockInMs ? fmtClock(clockInMs) : '';
+    const shiftEnd = clockInMs
+        ? fmtClock(clockInMs + SHIFT_WINDOW_SECONDS * 1000)
+        : '';
+
+    // Clocked-out "Next shift" block.
+    const nextShiftStart = nextShift?.starts_at
+        ? new Date(nextShift.starts_at)
+        : null;
+    const nextShiftTime = nextShiftStart
+        ? nextShiftStart.toLocaleTimeString('en-NZ', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+          })
+        : '—';
+    const nextShiftDay = nextShiftStart
+        ? nextShiftStart.toLocaleDateString('en-NZ', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'long',
+          })
+        : null;
+    const nextShiftSite =
+        nextShift?.location ?? nextShift?.service_context_name ?? siteName ?? null;
 
     function handleClockIn() {
         setProcessing(true);
         router.post(
-            '/hr/time/clock-in',
+            '/hr/my/time/clock-in',
             {},
             {
                 preserveScroll: true,
@@ -116,7 +162,7 @@ export function MyHrClockCard({
         const worked = elapsed;
         setProcessing(true);
         router.post(
-            '/hr/time/clock-out',
+            '/hr/my/time/clock-out',
             { break_minutes: breakMinutes },
             {
                 preserveScroll: true,
@@ -149,98 +195,116 @@ export function MyHrClockCard({
         }
     }
 
-    const status = isClockedIn
+    const statusLabel = isClockedIn
         ? onBreak
             ? 'On break'
             : 'On shift'
-        : 'Not clocked in';
-    const statusColor = isClockedIn
-        ? onBreak
-            ? 'text-status-warning'
-            : 'text-live'
-        : 'text-muted-foreground';
-    const sub = isClockedIn
-        ? onBreak
-            ? 'Paused — tap to resume'
-            : `Live since ${liveSince}${siteName ? ` · ${siteName}` : ''}`
-        : 'Tap clock in to start your shift';
+        : 'Off the clock';
 
     return (
-        <div className="w-full rounded-[18px] bg-card p-[18px] text-card-foreground shadow-[0_18px_44px_-16px_rgba(0,0,0,0.5)] md:w-[286px]">
+        <div className="flex w-full flex-col justify-center border-primary-foreground/15 bg-gradient-to-b from-primary-foreground/[0.16] to-primary-foreground/[0.04] p-8 shadow-[inset_1px_0_0_rgba(255,255,255,0.18)] md:w-[348px] md:flex-none md:border-l">
+            {/* status row */}
             <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2">
                     {isClockedIn ? (
                         <span className="relative inline-flex h-2.5 w-2.5">
-                            <span
-                                className={cn(
-                                    'absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 motion-reduce:animate-none',
-                                    onBreak ? 'bg-status-warning' : 'bg-live',
-                                )}
-                            />
+                            {!onBreak ? (
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground opacity-75 motion-reduce:animate-none" />
+                            ) : null}
                             <span
                                 className={cn(
                                     'relative inline-flex h-2.5 w-2.5 rounded-full',
-                                    onBreak ? 'bg-status-warning' : 'bg-live',
+                                    onBreak
+                                        ? 'bg-[color:var(--hr-amber)]'
+                                        : 'bg-primary-foreground',
                                 )}
                             />
                         </span>
-                    ) : null}
-                    <span className={cn('text-[12.5px] font-bold', statusColor)}>
-                        {status}
+                    ) : (
+                        <span className="h-2.5 w-2.5 rounded-full border-2 border-primary-foreground/50" />
+                    )}
+                    <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-primary-foreground/85">
+                        {statusLabel}
                     </span>
                 </div>
-                <span className="text-[11px] text-muted-foreground">
-                    Today {fmtHM(isClockedIn ? elapsed : Math.round(todayTotal * 3600))}
-                </span>
+                {isClockedIn ? (
+                    <span className="text-[11px] font-semibold text-primary-foreground/65">
+                        Today · {fmtHM(elapsed)}
+                    </span>
+                ) : null}
             </div>
 
-            <div className="my-3.5 text-center">
-                <div
+            {/* clocked-in: live timer + shift-window track */}
+            {isClockedIn ? (
+                <>
+                    <div className="mt-3 text-[52px] font-bold leading-none tracking-tight tabular-nums">
+                        {fmtTimer(elapsed)}
+                    </div>
+                    <div className="relative mb-[7px] mt-[22px] h-1.5 rounded-full bg-primary-foreground/20">
+                        <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-primary-foreground"
+                            style={{ width: `${progPct}%` }}
+                        />
+                        <div
+                            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-foreground shadow-[0_0_0_4px_color-mix(in_oklch,var(--primary)_60%,transparent),0_2px_7px_rgba(0,0,0,0.35)]"
+                            style={{ left: `${progPct}%` }}
+                        />
+                    </div>
+                    <div className="flex justify-between text-[10.5px] font-semibold text-primary-foreground/60">
+                        <span>In · {shiftStart}</span>
+                        <span>Out · {shiftEnd}</span>
+                    </div>
+                </>
+            ) : (
+                /* clocked-out: calm "Next shift" block */
+                <div className="pb-0.5 pt-1">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/55">
+                        Next shift
+                    </div>
+                    <div className="mt-[7px] text-4xl font-bold leading-none tracking-tight tabular-nums">
+                        {nextShiftTime}
+                    </div>
+                    <div className="mt-2 text-[12.5px] text-primary-foreground/75">
+                        {nextShiftDay
+                            ? `${nextShiftDay}${nextShiftSite ? ` · ${nextShiftSite}` : ''}`
+                            : 'No upcoming shift scheduled'}
+                    </div>
+                </div>
+            )}
+
+            {/* controls */}
+            <div className="mt-[22px] flex gap-2.5">
+                <button
+                    type="button"
+                    onClick={isClockedIn ? handleClockOut : handleClockIn}
+                    disabled={processing}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-foreground px-3 py-3.5 text-sm font-bold text-primary transition-opacity hover:opacity-90 disabled:opacity-70"
+                >
+                    {processing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isClockedIn ? (
+                        <LogOut className="h-4 w-4" />
+                    ) : (
+                        <LogIn className="h-4 w-4" />
+                    )}
+                    {isClockedIn ? 'Clock out' : 'Clock in'}
+                </button>
+                <button
+                    type="button"
+                    onClick={toggleBreak}
+                    disabled={!isClockedIn}
+                    aria-label={onBreak ? 'End break' : 'Start break'}
+                    title={onBreak ? 'End break' : 'Break'}
                     className={cn(
-                        'text-[42px] font-bold leading-none tabular-nums',
-                        isClockedIn ? 'text-foreground' : 'text-muted-foreground',
+                        'inline-flex w-[46px] flex-none items-center justify-center rounded-xl border border-primary-foreground/25 text-primary-foreground transition-colors disabled:opacity-40',
+                        onBreak
+                            ? 'bg-[color:var(--hr-amber-soft)]'
+                            : 'bg-primary-foreground/10 hover:bg-primary-foreground/20',
                     )}
                 >
-                    {fmtTimer(isClockedIn ? elapsed : 0)}
-                </div>
-                <div className="mt-1.5 text-[11px] text-muted-foreground">{sub}</div>
+                    <Coffee className="h-4 w-4" />
+                </button>
             </div>
-
-            <button
-                type="button"
-                onClick={isClockedIn ? handleClockOut : handleClockIn}
-                disabled={processing}
-                className={cn(
-                    'mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold text-white shadow-md transition-colors disabled:opacity-70',
-                    isClockedIn
-                        ? 'bg-status-critical hover:bg-status-critical/90'
-                        : 'bg-primary hover:bg-primary/90',
-                )}
-            >
-                {processing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isClockedIn ? (
-                    <LogOut className="h-4 w-4" />
-                ) : (
-                    <LogIn className="h-4 w-4" />
-                )}
-                {isClockedIn ? 'Clock out' : 'Clock in'}
-            </button>
-
-            <button
-                type="button"
-                onClick={toggleBreak}
-                disabled={!isClockedIn}
-                className={cn(
-                    'mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50',
-                    onBreak
-                        ? 'bg-status-warning-bg text-status-warning'
-                        : 'bg-card text-foreground hover:bg-muted',
-                )}
-            >
-                <Coffee className="h-3.5 w-3.5" />
-                {onBreak ? 'End break' : 'Start break'}
-            </button>
         </div>
     );
 }
