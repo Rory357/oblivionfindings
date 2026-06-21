@@ -47,8 +47,10 @@ if ($_userReduceMotion) {
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    {{-- Inline script to detect system dark mode preference and apply it immediately --}}
-    <script>
+    {{-- Inline script to detect system dark mode preference and apply it immediately.
+         Carries the CSP nonce so it runs under script-src 'self' 'nonce-…' without
+         needing 'unsafe-inline'. See App\Http\Middleware\AddContentSecurityPolicy. --}}
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         (function() {
             const appearance = '{{ $_userTheme }}';
 
