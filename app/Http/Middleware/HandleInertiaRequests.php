@@ -741,6 +741,10 @@ class HandleInertiaRequests extends Middleware
                     'view' => $user->canDo('hr.skills.view'),
                     'manage' => $user->canDo('hr.skills.manage'),
                 ],
+                'recognition' => [
+                    'view' => $user->canDo('hr.recognition.view'),
+                    'give' => $user->canDo('hr.recognition.give'),
+                ],
                 'announcements' => [
                     'view' => $user->canDo('hr.announcements.view'),
                     'manage' => $user->canDo('hr.announcements.manage'),

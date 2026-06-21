@@ -587,6 +587,7 @@ function buildIconNavItems({
         !!can?.hr?.surveys?.view ||
         !!can?.hr?.expenses?.view ||
         !!can?.hr?.skills?.view ||
+        !!can?.hr?.recognition?.view ||
         !!can?.hr?.announcements?.view ||
         !!can?.hr?.approvals?.view ||
         !!can?.hr?.settings?.manage;
@@ -2195,6 +2196,15 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: ClipboardCheck,
         });
     }
+    // Goals & OKRs is also a tab inside the Performance hub, but surface a
+    // direct link so the register is reachable in one click from the nav.
+    if (can?.hr?.performance?.view) {
+        performance.items.push({
+            title: 'Goals & OKRs',
+            href: '/hr/goals',
+            icon: Target,
+        });
+    }
     if (can?.hr?.training?.view) {
         performance.items.push({
             title: 'Training',
@@ -2206,7 +2216,10 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     // Engagement
     const engagement: SubPanelGroup = { label: 'Engagement', items: [] };
-    if (can?.hr?.announcements?.view || can?.hr?.employees?.viewAny) {
+    // Gate on the recognition-view permission that actually guards the
+    // /hr/feed route (granted to all staff), not announcements/employees —
+    // those hid the peer-recognition feed from the frontline it's meant for.
+    if (can?.hr?.recognition?.view) {
         engagement.items.push({
             title: 'Community Feed',
             href: '/hr/feed',
