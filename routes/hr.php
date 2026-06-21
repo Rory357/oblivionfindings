@@ -562,10 +562,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.employees.viewAny')->group(function () {
         Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
-        Route::get('/directory/{profile}', [DirectoryController::class, 'show'])->name('directory.show');
         Route::post('/directory/{profile}/photo', [DirectoryController::class, 'uploadPhoto'])->name('directory.uploadPhoto')
             ->middleware('permission:hr.employees.manage');
     });
+
+    // Directory card detail (JSON) powering the self-service My HR directory
+    // modal — available to all staff (gated to staff in the controller).
+    // Personal contact and the compliance summary stay manager-only.
+    Route::get('/directory/{profile}', [DirectoryController::class, 'show'])->name('directory.show');
 
     /*
     |--------------------------------------------------------------------------

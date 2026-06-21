@@ -45,6 +45,15 @@ class DirectoryController extends Controller
         abort_unless($user, 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // The route is open to all authenticated users; restrict to staff (the
+        // viewer must have an HR employee profile) so portal/family users can't
+        // pull a colleague's directory card.
+        $viewerIsStaff = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->exists();
+        abort_unless($viewerIsStaff, 403);
+
         $profile->load('user:id,name,email,cellphone,work_phone', 'primarySite:id,name', 'position:id,title,code', 'departmentRelation:id,name');
 
         // Tenure calculation

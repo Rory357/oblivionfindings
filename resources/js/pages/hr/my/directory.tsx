@@ -2,17 +2,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import {
-    Building2,
-    Flame,
-    HeartPulse,
-    Mail,
-    MapPin,
-    Phone,
-    Search,
-    Users,
-} from 'lucide-react';
+    MyHrShell,
+    type MyHrShellData,
+    StaffDetailsModal,
+} from '@/components/hr';
+import { Building2, Flame, HeartPulse, MapPin, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 interface Person {
@@ -48,16 +43,16 @@ function avatarColor(id: number): string {
 }
 
 /**
- * The all-staff "who is who" phonebook, shown as a My HR tab. Self-contained
- * (cards don't link to the manager-only /hr/people profile, which frontline
- * can't open) and work-contact-only — the controller never sends personal
- * phone/email here.
+ * The all-staff "who is who" phonebook, shown as a My HR tab. Each card opens a
+ * read-only staff-details modal (work contact, role, site, manager/reports,
+ * recognition). Cards are summary-only; full contact lives in the modal.
  */
 export default function MyDirectory({ myHr, people }: Props) {
     const [q, setQ] = useState('');
     const [filter, setFilter] = useState<'all' | 'first_aiders' | 'fire_wardens'>(
         'all',
     );
+    const [selectedId, setSelectedId] = useState<number | null>(null);
 
     const firstAiderCount = useMemo(
         () => people.filter((p) => p.is_first_aider).length,
@@ -141,115 +136,100 @@ export default function MyDirectory({ myHr, people }: Props) {
                 {filtered.length > 0 ? (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {filtered.map((p) => (
-                            <Card key={p.id} className="h-full overflow-hidden">
-                                <div className="h-12 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" />
-                                <CardContent className="-mt-8 flex flex-col items-center px-5 pb-5 text-center">
-                                    <Avatar className="size-16 border-4 border-background shadow-md">
-                                        <AvatarImage
-                                            src={
-                                                p.avatar
-                                                    ? `/storage/${p.avatar}`
-                                                    : undefined
-                                            }
-                                            alt={p.name}
-                                        />
-                                        <AvatarFallback
-                                            className={`text-lg font-bold ${avatarColor(p.id)}`}
-                                        >
-                                            {p.initials}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="mt-3 flex items-center justify-center gap-2">
-                                        <h3 className="text-sm font-semibold">
-                                            {p.name}
-                                        </h3>
-                                        {p.is_self && (
-                                            <Badge
-                                                variant="outline"
-                                                className="px-1.5 py-0 text-[10px]"
+                            // eslint-disable-next-line no-restricted-syntax -- whole card is a selector that opens the staff-details modal
+                            <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setSelectedId(p.id)}
+                                className="group block w-full text-left"
+                            >
+                                <Card className="h-full overflow-hidden transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-lg">
+                                    <div className="h-12 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" />
+                                    <CardContent className="-mt-8 flex flex-col items-center px-5 pb-5 text-center">
+                                        <Avatar className="size-16 border-4 border-background shadow-md">
+                                            <AvatarImage
+                                                src={
+                                                    p.avatar
+                                                        ? `/storage/${p.avatar}`
+                                                        : undefined
+                                                }
+                                                alt={p.name}
+                                            />
+                                            <AvatarFallback
+                                                className={`text-lg font-bold ${avatarColor(p.id)}`}
                                             >
-                                                You
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    {p.role && (
-                                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                            {p.role}
-                                        </p>
-                                    )}
-
-                                    <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-                                        {p.site && (
-                                            <Badge
-                                                variant="outline"
-                                                className="gap-0.5 px-2 py-0 text-[10px]"
-                                            >
-                                                <MapPin className="size-2.5" />
-                                                {p.site}
-                                            </Badge>
-                                        )}
-                                        {p.department && (
-                                            <Badge
-                                                variant="secondary"
-                                                className="gap-0.5 px-2 py-0 text-[10px]"
-                                            >
-                                                <Building2 className="size-2.5" />
-                                                {p.department}
-                                            </Badge>
-                                        )}
-                                    </div>
-
-                                    {(p.is_first_aider || p.is_fire_warden) && (
-                                        <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-                                            {p.is_first_aider && (
+                                                {p.initials}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="mt-3 flex items-center justify-center gap-2">
+                                            <h3 className="text-sm font-semibold transition-colors group-hover:text-primary">
+                                                {p.name}
+                                            </h3>
+                                            {p.is_self && (
                                                 <Badge
                                                     variant="outline"
-                                                    className="gap-0.5 border-status-success/30 bg-status-success-bg px-2 py-0 text-[10px] text-status-success-foreground"
+                                                    className="px-1.5 py-0 text-[10px]"
                                                 >
-                                                    <HeartPulse className="size-2.5" />
-                                                    First aider
-                                                </Badge>
-                                            )}
-                                            {p.is_fire_warden && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="gap-0.5 border-status-warning/30 bg-status-warning-bg px-2 py-0 text-[10px] text-status-warning-foreground"
-                                                >
-                                                    <Flame className="size-2.5" />
-                                                    Fire warden
+                                                    You
                                                 </Badge>
                                             )}
                                         </div>
-                                    )}
+                                        {p.role && (
+                                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                                {p.role}
+                                            </p>
+                                        )}
 
-                                    {(p.email || p.phone) && (
-                                        <div className="mt-3 flex w-full flex-col gap-1.5 text-xs">
-                                            {p.email && (
-                                                <a
-                                                    href={`mailto:${p.email}`}
-                                                    className="flex items-center justify-center gap-1.5 text-primary hover:underline"
+                                        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                                            {p.site && (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="gap-0.5 px-2 py-0 text-[10px]"
                                                 >
-                                                    <Mail className="size-3.5 shrink-0" />
-                                                    <span className="truncate">
-                                                        {p.email}
-                                                    </span>
-                                                </a>
+                                                    <MapPin className="size-2.5" />
+                                                    {p.site}
+                                                </Badge>
                                             )}
-                                            {p.phone && (
-                                                <a
-                                                    href={`tel:${p.phone}`}
-                                                    className="flex items-center justify-center gap-1.5 text-primary hover:underline"
+                                            {p.department && (
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="gap-0.5 px-2 py-0 text-[10px]"
                                                 >
-                                                    <Phone className="size-3.5 shrink-0" />
-                                                    <span className="truncate">
-                                                        {p.phone}
-                                                    </span>
-                                                </a>
+                                                    <Building2 className="size-2.5" />
+                                                    {p.department}
+                                                </Badge>
                                             )}
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+
+                                        {(p.is_first_aider || p.is_fire_warden) && (
+                                            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+                                                {p.is_first_aider && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="gap-0.5 border-status-success/30 bg-status-success-bg px-2 py-0 text-[10px] text-status-success-foreground"
+                                                    >
+                                                        <HeartPulse className="size-2.5" />
+                                                        First aider
+                                                    </Badge>
+                                                )}
+                                                {p.is_fire_warden && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="gap-0.5 border-status-warning/30 bg-status-warning-bg px-2 py-0 text-[10px] text-status-warning-foreground"
+                                                    >
+                                                        <Flame className="size-2.5" />
+                                                        Fire warden
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <span className="mt-3 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                                            View details
+                                        </span>
+                                    </CardContent>
+                                </Card>
+                            </button>
                         ))}
                     </div>
                 ) : (
@@ -268,6 +248,12 @@ export default function MyDirectory({ myHr, people }: Props) {
                     </Card>
                 )}
             </div>
+
+            <StaffDetailsModal
+                profileId={selectedId}
+                open={selectedId !== null}
+                onClose={() => setSelectedId(null)}
+            />
         </MyHrShell>
     );
 }
