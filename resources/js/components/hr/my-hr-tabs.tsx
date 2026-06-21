@@ -13,6 +13,7 @@ import {
     Star,
     Target,
     User,
+    Users,
     Wallet,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -27,6 +28,7 @@ export type MyHrTab =
     | 'shoutouts'
     | 'documents'
     | 'profile'
+    | 'directory'
     | 'expenses'
     | 'payslips'
     | 'training'
@@ -43,6 +45,7 @@ const TAB_URLS: Record<MyHrTab, string> = {
     shoutouts: '/hr/my/shoutouts',
     documents: '/hr/my/documents',
     profile: '/hr/my/profile',
+    directory: '/hr/my/directory',
     expenses: '/hr/my/expenses',
     payslips: '/hr/my/payslips',
     training: '/hr/my/training',
@@ -65,6 +68,7 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
     { id: 'shoutouts', label: 'Shout-outs', icon: Megaphone, tone: 'primary' },
     { id: 'documents', label: 'Documents', icon: FileText, tone: 'info' },
     { id: 'profile', label: 'Profile', icon: User, tone: 'info' },
+    { id: 'directory', label: 'Directory', icon: Users, tone: 'info' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },
     { id: 'payslips', label: 'Payslips', icon: Wallet, tone: 'success' },
     { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },

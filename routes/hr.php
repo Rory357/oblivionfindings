@@ -92,6 +92,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
         Route::get('/profile', [MyHrController::class, 'profile'])->name('profile');
         Route::put('/profile', [MyHrController::class, 'updateProfile'])->name('profile.update');
+        Route::get('/directory', [MyHrController::class, 'directory'])->name('directory');
         Route::get('/reviews', [MyHrController::class, 'reviews'])->name('reviews');
         Route::put('/reviews/{review}', [MyHrController::class, 'updateReview'])->name('reviews.update');
         Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');

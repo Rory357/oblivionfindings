@@ -656,6 +656,70 @@ class MyHrController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Staff Directory (phonebook) */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The all-staff "who is who" directory, surfaced as a My HR tab so every
+     * staff member can look up a colleague's role, site and work contact.
+     *
+     * Work contact only — personal phone/email never appear here (those stay on
+     * the person's own Profile tab and the manager-only People hub). Gated to
+     * staff: the viewer must have an HR employee profile, so portal/family users
+     * (who have none) get a 403 rather than the full staff roster.
+     */
+    public function directory(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $viewerProfile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->first(['id']);
+        abort_unless($viewerProfile, 403);
+
+        $people = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->with([
+                'user:id,name,email',
+                'primarySite:id,name',
+                'departmentRelation:id,name',
+            ])
+            ->get()
+            ->map(function (HrEmployeeProfile $p) use ($user) {
+                $name = $p->preferred_name ?: $p->user?->name;
+                if (! $name) {
+                    return null;
+                }
+
+                return [
+                    'id' => $p->id,
+                    'name' => $name,
+                    'initials' => $this->myHrInitials($name),
+                    'role' => $p->position_title,
+                    'department' => $p->departmentRelation?->name ?? $p->department,
+                    'site' => $p->primarySite?->name,
+                    'email' => $p->work_email ?: $p->user?->email,
+                    'phone' => $p->work_phone,
+                    'avatar' => $p->profile_photo_path,
+                    'is_first_aider' => (bool) $p->is_first_aider,
+                    'is_fire_warden' => (bool) $p->is_fire_warden,
+                    'is_self' => $p->user_id === $user->id,
+                ];
+            })
+            ->filter()
+            ->sortBy(fn ($p) => mb_strtolower($p['name']), SORT_NATURAL)
+            ->values()
+            ->all();
+
+        return Inertia::render('hr/my/directory', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'people' => $people,
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Performance Reviews */
     /* ------------------------------------------------------------------ */
 
