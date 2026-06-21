@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type MouseEvent, type ReactNode } from 'react';
 
 import {
     TabStrip,
@@ -22,6 +22,9 @@ export function HrTabs(props: {
     items: HrTabItem[];
     className?: string;
     ariaLabel?: string;
+    onItemContextMenu?: (id: string, event: MouseEvent) => void;
+    decorations?: Record<string, ReactNode>;
+    trailing?: ReactNode;
 }) {
     return <TabStrip {...props} ariaLabel={props.ariaLabel ?? 'HR views'} />;
 }

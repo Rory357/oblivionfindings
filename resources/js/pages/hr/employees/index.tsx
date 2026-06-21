@@ -24,11 +24,15 @@ import {
     useHrTab,
 } from '@/components/hr';
 import { PageLayout } from '@/components/page';
+import {
+    ShiftContextMenu,
+    type ShiftCtxState,
+} from '@/components/rostering/shift-context-menu';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Briefcase, Building2, Network, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Briefcase, Building2, Network, Pin, Star, Users } from 'lucide-react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -71,6 +75,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'People', href: '/hr/people' },
 ];
 
+const KNOWN_TABS = ['people', 'positions', 'departments', 'orgchart'];
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
@@ -97,7 +103,6 @@ export default function EmployeesIndex({
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
     const [tab, setTab] = useHrTab('people');
-    const KNOWN_TABS = ['people', 'positions', 'departments', 'orgchart'];
     // Fall back to People for unknown/retired tabs (e.g. an old ?tab=directory link).
     const activeTab = KNOWN_TABS.includes(tab) ? tab : 'people';
     const [posDialogOpen, setPosDialogOpen] = useState(false);
@@ -106,6 +111,37 @@ export default function EmployeesIndex({
     );
     const [deptDialogOpen, setDeptDialogOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
+    const [pins, setPins] = useState<string[]>([]);
+    const [defaultTab, setDefaultTab] = useState<string>('people');
+    const [tabCtx, setTabCtx] = useState<ShiftCtxState | null>(null);
+
+    // Restore persisted default view + pinned tabs. The stored default is only
+    // applied when opened without an explicit ?tab= — switched after mount so
+    // SSR and the first client render still agree (no hydration mismatch).
+    useEffect(() => {
+        try {
+            const sp = new URLSearchParams(window.location.search);
+            const sd = window.localStorage.getItem('hrp.defaultTab');
+            if (sd && KNOWN_TABS.includes(sd)) {
+                setDefaultTab(sd);
+                if (!sp.get('tab') && sd !== tab) setTab(sd);
+            }
+            const rawPins = window.localStorage.getItem('hrp.pins');
+            if (rawPins) {
+                const parsed: unknown = JSON.parse(rawPins);
+                if (Array.isArray(parsed))
+                    setPins(
+                        parsed.filter(
+                            (p): p is string =>
+                                typeof p === 'string' && KNOWN_TABS.includes(p),
+                        ),
+                    );
+            }
+        } catch {
+            /* ignore malformed storage */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const tabItems: HrTabItem[] = [
         {
@@ -136,6 +172,78 @@ export default function EmployeesIndex({
             tone: 'warning',
         },
     ];
+
+    const setDefaultView = (id: string) => {
+        setDefaultTab(id);
+        try {
+            window.localStorage.setItem('hrp.defaultTab', id);
+        } catch {
+            /* ignore */
+        }
+    };
+
+    const togglePin = (id: string) => {
+        setPins((prev) => {
+            const next = prev.includes(id)
+                ? prev.filter((p) => p !== id)
+                : [...prev, id];
+            try {
+                window.localStorage.setItem('hrp.pins', JSON.stringify(next));
+            } catch {
+                /* ignore */
+            }
+            return next;
+        });
+    };
+
+    // Pinned tabs float to the front (stable order within each group).
+    const orderedTabs = [
+        ...tabItems.filter((t) => pins.includes(t.id)),
+        ...tabItems.filter((t) => !pins.includes(t.id)),
+    ];
+
+    const tabDecorations: Record<string, ReactNode> = {};
+    tabItems.forEach((t) => {
+        const isDefault = defaultTab === t.id;
+        const isPinned = pins.includes(t.id);
+        if (isDefault || isPinned) {
+            tabDecorations[t.id] = (
+                <span className="ml-0.5 inline-flex items-center gap-0.5">
+                    {isDefault ? (
+                        <Star className="h-3 w-3 fill-current text-status-warning" />
+                    ) : null}
+                    {isPinned ? <Pin className="h-3 w-3" /> : null}
+                </span>
+            );
+        }
+    });
+
+    const openTabMenu = (id: string, e: MouseEvent) => {
+        e.preventDefault();
+        const item = tabItems.find((t) => t.id === id);
+        setTabCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: 'Tab',
+            meta: item?.label ?? '',
+            items: [
+                {
+                    icon: <Star className="h-4 w-4" />,
+                    label:
+                        defaultTab === id
+                            ? 'Default view'
+                            : 'Set as default view',
+                    tone: defaultTab === id ? 'primary' : undefined,
+                    onClick: () => setDefaultView(id),
+                },
+                {
+                    icon: <Pin className="h-4 w-4" />,
+                    label: pins.includes(id) ? 'Unpin tab' : 'Pin tab',
+                    onClick: () => togglePin(id),
+                },
+            ],
+        });
+    };
 
     function applyFilter(key: string, value: string | null) {
         router.get(
@@ -219,8 +327,15 @@ export default function EmployeesIndex({
                 <HrTabs
                     value={activeTab}
                     onChange={setTab}
-                    items={tabItems}
+                    items={orderedTabs}
                     ariaLabel="People views"
+                    decorations={tabDecorations}
+                    onItemContextMenu={openTabMenu}
+                    trailing={
+                        <span className="ml-auto hidden px-2 text-[11px] font-medium text-muted-foreground sm:inline">
+                            Right-click a tab to set default or pin
+                        </span>
+                    }
                 />
 
                 {activeTab === 'people' && (
@@ -304,6 +419,13 @@ export default function EmployeesIndex({
                     department={editingDept}
                     managers={departmentManagers}
                     parentOptions={departmentParents}
+                />
+            ) : null}
+
+            {tabCtx ? (
+                <ShiftContextMenu
+                    ctx={tabCtx}
+                    onClose={() => setTabCtx(null)}
                 />
             ) : null}
         </AppLayout>

@@ -16,7 +16,7 @@ Design extract: `C:\Users\steph\Downloads\_hr_people_page_extract`.
 
 ## Phases (build order from HANDOVER §4)
 
-### Phase 1 — PeopleHero golden band + People table upgrade  🔄 IN PROGRESS
+### Phase 1 — PeopleHero golden band + People table upgrade  ✅ COMPLETE (ready to merge)
 - [x] 1a. `people-hero.tsx` — brand-gradient band, HeroStats (Active / New hires 30d / On probation /
       Compliance alerts), QuickActions (Add / Import / Export), Mix-donut ↔ Compliance-ring toggle
       (persisted to localStorage). Dropped the duplicated StatCard grid + standalone type-bar from the
@@ -36,7 +36,11 @@ Design extract: `C:\Users\steph\Downloads\_hr_people_page_extract`.
       denormalised label in sync). `managers` prop threaded from the page. Bulk tests added to
       `PeoplePaneActionsTest`. tsc/lint(0)/build green; php -l clean. (Export-selected + Resend-invite
       deferred — export-by-ids needs ImportExport change; invite needs Phase 2 backend.)
-- [ ] 1c. Right-click tab strip → set default / pin (persisted).
+- [x] 1c. Right-click tab strip → **set default view / pin** (persisted localStorage). Shared
+      `TabStrip` extended additively (`onItemContextMenu` / `decorations` / `trailing` — opt-in, no
+      change for other callers); People page persists `hrp.defaultTab` + `hrp.pins`, floats pinned
+      tabs to the front, shows star/pin decorations, opens a `ShiftContextMenu` on right-click, and
+      restores the default view on load (post-mount, no SSR mismatch). tsc/lint(0)/build green.
 
 ### Phase 2 — Employee intake unification (audit-first)  ⬜ NOT STARTED
 `docs/employee-intake-audit.md` → `EmployeeIntakeService::createOrConvert`; dedupe/link; onboarding

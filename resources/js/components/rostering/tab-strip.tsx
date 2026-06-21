@@ -1,4 +1,9 @@
-import type { ComponentType, KeyboardEvent, ReactNode } from 'react';
+import type {
+    ComponentType,
+    KeyboardEvent,
+    MouseEvent,
+    ReactNode,
+} from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -39,12 +44,21 @@ export function TabStrip({
     items,
     className,
     ariaLabel = 'Roster views',
+    onItemContextMenu,
+    decorations,
+    trailing,
 }: {
     value: string;
     onChange: (next: string) => void;
     items: RosterTabItem[];
     className?: string;
     ariaLabel?: string;
+    /** Optional right-click handler per tab (e.g. set-default / pin menu). */
+    onItemContextMenu?: (id: string, event: MouseEvent) => void;
+    /** Optional trailing node rendered inside each tab (e.g. pin / default icon). */
+    decorations?: Record<string, ReactNode>;
+    /** Optional node pinned to the end of the strip (e.g. a usage hint). */
+    trailing?: ReactNode;
 }) {
     const handleKeyDown = (
         event: KeyboardEvent<HTMLButtonElement>,
@@ -99,6 +113,11 @@ export function TabStrip({
                         role="tab"
                         aria-selected={active}
                         onClick={() => onChange(t.id)}
+                        onContextMenu={
+                            onItemContextMenu
+                                ? (event) => onItemContextMenu(t.id, event)
+                                : undefined
+                        }
                         onKeyDown={(event) => handleKeyDown(event, t.id)}
                         className={cn(
                             'relative inline-flex items-center gap-2 rounded-[9px] px-3 py-2 text-[13px] font-semibold transition-colors',
@@ -121,6 +140,7 @@ export function TabStrip({
                                 {t.badge}
                             </span>
                         ) : null}
+                        {decorations?.[t.id] ?? null}
                         {active ? (
                             <span
                                 className="underline-bar absolute inset-x-3.5 -bottom-px h-0.5 rounded"
@@ -130,6 +150,7 @@ export function TabStrip({
                     </button>
                 );
             })}
+            {trailing}
         </div>
     );
 }
