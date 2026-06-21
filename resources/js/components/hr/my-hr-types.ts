@@ -25,6 +25,70 @@ export type MyHrCalendarFeed = {
     events: Record<string, MyHrCalendarEvent[]>;
 };
 
+/** One person who reacted to a shout-out (the `you` flag marks the viewer). */
+export type MyHrReactor = {
+    id: number;
+    name: string;
+    initials: string;
+    you: boolean;
+};
+
+/** One message in a shout-out reply thread. */
+export type MyHrShoutoutReply = {
+    id: number;
+    user_id: number;
+    name: string;
+    initials: string;
+    you: boolean;
+    body: string;
+    created_at: string | null;
+};
+
+/** The giver / recipient of a shout-out. */
+export type MyHrShoutoutParty = {
+    id: number;
+    name: string;
+    initials: string;
+    role: string | null;
+    you: boolean;
+};
+
+/** A peer-recognition shout-out (an `HrKudos` with its emoji reactions + reply
+ *  thread), as served by `BuildsMyHrOverview::myHrShoutouts`. */
+export type MyHrShoutout = {
+    id: number;
+    giver: MyHrShoutoutParty;
+    recipient: MyHrShoutoutParty;
+    category: string;
+    message: string;
+    created_at: string | null;
+    reactions: {
+        heart: MyHrReactor[];
+        party: MyHrReactor[];
+        hands: MyHrReactor[];
+    };
+    replies: MyHrShoutoutReply[];
+};
+
+/** Emoji reaction keys + their display glyphs, in display order. */
+export const MY_HR_REACTIONS = [
+    { key: 'heart', emoji: '❤️' },
+    { key: 'party', emoji: '🎉' },
+    { key: 'hands', emoji: '🙌' },
+] as const;
+
+export type MyHrReactionKey = (typeof MY_HR_REACTIONS)[number]['key'];
+
+/** Human label for a kudos category key. */
+export const MY_HR_KUDOS_LABELS: Record<string, string> = {
+    teamwork: 'Teamwork',
+    innovation: 'Innovation',
+    leadership: 'Leadership',
+    customer_focus: 'Customer Focus',
+    going_above: 'Going Above & Beyond',
+    other: 'Recognition',
+};
+
 /** Shared hero/clock/badge payload returned by `BuildsMyHrShell` (PHP) and
  *  merged into every `/hr/my/*` Inertia page under the `myHr` prop. */
 export type MyHrShellData = {

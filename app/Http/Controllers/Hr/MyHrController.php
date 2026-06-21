@@ -10,6 +10,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Models\HrKudosReaction;
+use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayslip;
@@ -78,6 +80,84 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Kudos sent! 🎉');
+    }
+
+    /**
+     * The "Shout-outs" tab — the full received recognition spotlight (carousel +
+     * reactions + reply thread) plus the shout-outs this employee has given (so
+     * they can reply back and close the loop). Body reuses the same spotlight
+     * components as the Overview.
+     */
+    public function shoutouts(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        return Inertia::render('hr/my/shoutouts', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'received' => $this->myHrShoutouts($user, $tenantId, 'received'),
+            'given' => $this->myHrShoutouts($user, $tenantId, 'given'),
+        ]);
+    }
+
+    /**
+     * Toggle an emoji reaction on a kudos for the current user (one of each
+     * emoji per person — click again to remove). Open to any teammate in the
+     * tenant since kudos live on the shared recognition feed.
+     */
+    public function reactKudos(Request $request, HrKudos $kudos)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+
+        $validated = $request->validate([
+            'emoji' => ['required', 'string', Rule::in(['heart', 'party', 'hands'])],
+        ]);
+
+        $existing = HrKudosReaction::where('kudos_id', $kudos->id)
+            ->where('user_id', $user->id)
+            ->where('emoji', $validated['emoji'])
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+        } else {
+            HrKudosReaction::create([
+                'tenant_id' => $kudos->tenant_id,
+                'kudos_id' => $kudos->id,
+                'user_id' => $user->id,
+                'emoji' => $validated['emoji'],
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Reaction updated.');
+    }
+
+    /**
+     * Post a reply on a kudos thread. Restricted to the two parties (giver +
+     * receiver) so the conversation stays between them — "Say thanks" posts the
+     * receiver's reply; the giver can write back from their given shout-outs.
+     */
+    public function replyKudos(Request $request, HrKudos $kudos)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        HrKudosReply::create([
+            'tenant_id' => $kudos->tenant_id,
+            'kudos_id' => $kudos->id,
+            'user_id' => $user->id,
+            'body' => $validated['body'],
+        ]);
+
+        return redirect()->back()->with('success', 'Reply posted.');
     }
 
     public function index(Request $request)
@@ -166,13 +246,30 @@ class MyHrController extends Controller
             ->where('created_at', '>=', now()->subDays(30))
             ->count();
 
-        // Announcements (unacknowledged, active)
+        // Announcements (active) for the "Around your team" card + "See all" modal.
+        // The card surfaces unacknowledged ones first; the modal lists every active
+        // notice with its body + an Acknowledge affordance (Seen ✓ once done).
         $announcements = HrAnnouncement::forTenant($tenantId)
             ->active()
-            ->whereDoesntHave('acknowledgements', fn ($q) => $q->where('user_id', $user->id))
+            ->with('creator:id,name')
+            ->withExists(['acknowledgements as acknowledged' => fn ($q) => $q->where('user_id', $user->id)])
+            ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
-            ->limit(5)
-            ->get(['id', 'title', 'priority', 'published_at']);
+            ->limit(12)
+            ->get()
+            ->map(fn (HrAnnouncement $a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'priority' => $a->priority,
+                'content' => $a->content,
+                'published_at' => $a->published_at?->toIso8601String(),
+                'byline' => trim(implode(' · ', array_filter([
+                    $a->creator?->name,
+                    $a->published_at?->isoFormat('D MMM'),
+                ]))),
+                'acknowledged' => (bool) $a->acknowledged,
+            ])
+            ->values();
 
         // Safe Work Procedures applicable to my role(s) — deep-link to the register's
         // detail modal, with a version-stamped "Acknowledge" affordance. Role-matched
@@ -201,6 +298,14 @@ class MyHrController extends Controller
             'myHr' => $this->myHrShellProps($user, $tenantId),
             'overview' => $this->myHrOverviewProps($user, $tenantId),
             'safeWorkProcedures' => $safeWorkProcedures,
+            // Shaped for the Overview's hosted "Request leave" wizard (mirrors
+            // the Leave tab's `balances` contract).
+            'balances' => $leaveBalances->map(fn (HrLeaveBalance $b) => [
+                'leave_type' => $b->leave_type,
+                'entitlement_hours' => (float) $b->accrued_hours,
+                'taken_hours' => (float) $b->used_hours,
+                'remaining_hours' => (float) $b->balance_hours,
+            ])->values(),
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
             'leaveBalances' => $leaveBalances,
@@ -220,6 +325,7 @@ class MyHrController extends Controller
             ] : ['count' => 0, 'total' => 0],
             'kudosReceived' => $kudosReceived,
             'announcements' => $announcements,
+            'canViewFeed' => $user->canDo('hr.announcements.view'),
         ]);
     }
 

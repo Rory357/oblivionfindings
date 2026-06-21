@@ -37,6 +37,32 @@ hover; every list = real empty state + skeleton. Self-scoped (`user_id = me`), `
 - [x] **Step 9 — Placeholder tabs consistency** ✅ commit pending. All 8 remaining tabs (Profile/Expenses/Payslips/Training/Policies/Reviews/Goals/Surveys) converted onto `MyHrShell` so the whole module shares hero+clock+tabs+badges (13/13 my pages now on the shell). Backend: `myHr` added to the 7 MyHrController methods; `PayslipController` (separate, route `hr.my.payslips`) got `use BuildsMyHrShell, ResolvesHrTenant` + `myHr` on `myPayslips()`. Training's LMS "Browse training courses" deep-link (was in the removed hero) re-homed into the body, gated on `can.viewCatalog`. Bodies otherwise unchanged (still functional; deeper-fidelity per-tab rebuilds = future, those tabs were "not yet designed" in the handoff). tsc/eslint/php-l clean. (profile done inline; other 7 via parallel subagents + verify.)
 - [~] **Step 10 — Finalise** (validation done; merge/deploy = user decision). Wrote `MyHrSelfServiceTest` (1:1s render/visibility, acknowledge persist+owner-gate, kudos create+validate) + added `/hr/my/one` to `HrHubTabsRenderTest` (all 13 my pages render under shell). ✅ **Validated**: full `tsc` clean, `eslint` clean, `php -l` clean, branch **merges cleanly into main** (throwaway parent branch), **`vite build` green** (parent repo, exit 0, all chunks emitted). ⚠️ **Backend phpunit NOT run locally** — Herd MySQL not listening on :3306 in this env (GUI-managed; can't start headless). Tests are committed; they run in CI / once MySQL is up. **PENDING USER**: merge `claude/friendly-leakey-ff395a` `--no-ff`→main + push (= prod deploy webhook on .com) + Chrome-verify. 9 commits, not pushed.
 
+## Overview tab redesign + Shout-outs (2026-06-21)
+
+Design drop: **"HR overview tab redesign.zip"** → `design_handoff_hr_my_overview/` (My HR Overview.dc.html + README + TASKS).
+Rebuilds the `/hr/my` **Overview body** around *today's shift → what needs me → recognition & team*, and adds a new **Shout-outs** tab. Persona Aroha Ngata. NZ/en-NZ, web-only, desktop, light-mode.
+
+### New tables (spec → built, additive)
+Per the handoff guardrail (reactions/replies = first-class tables). Both additive, cascade-delete with kudos/user, no changes to existing tables — migration `2026_06_21_120000`:
+- **`hr_kudos_reactions`** — `(tenant_id, kudos_id, user_id, emoji)`, unique `(kudos_id,user_id,emoji)`. One emoji reaction per person per kudos (toggle).
+- **`hr_kudos_replies`** — `(tenant_id, kudos_id, user_id, body)`. Two-way reply thread (giver ↔ receiver).
+Models `HrKudosReaction`/`HrKudosReply` + `HrKudos::reactions()/replies()` + factories.
+
+### Endpoints (in `my.*` group, open to any authed user)
+- `GET /hr/my/shoutouts` → `MyHrController@shoutouts` (received + given boxes).
+- `POST /hr/my/kudos/{kudos}/react` → toggle reaction (tenant-scoped, emoji validated).
+- `POST /hr/my/kudos/{kudos}/reply` → post reply (restricted to giver/receiver).
+- `index()` enriched: `overview.shoutouts/leaveBalance/todayShift/shiftColleagues` + richer `celebrations` (type/date) + `whosOut` (role/days) + `announcements` (content/byline/acknowledged) + `balances` (wizard) + `canViewFeed`.
+
+### Frontend
+- `MyHrShoutoutSpotlight` (shared) — coral band: carousel, ❤️🎉🙌 toggle reactions (optimistic + persisted), reactor facepile + "You, X + N more reacted", collapsible reply thread ("Say thanks" + composer, Enter to send). Used by Overview + Shout-outs tab (perspective received|given).
+- `MyHrAroundModal` — single-step `WizardShell` (Add-Client chrome) "See all" modals for Celebrations / Who's out / Announcements (rail + legend, type chips, Congratulate/Acknowledge, gated "Open HR feed").
+- `index.tsx` rebuilt: Row 1 *Your day* (live next-shift card w/ timeline + "Now" marker + colleagues + add-to-cal/view-roster, This-week ring) → Shout-out spotlight → Row 2 *Needs you* worklist + *Leave balance* bars (hosted `MyHrLeaveWizard`) → *Around your team* 3-column calm card → SafeWorkProcedures.
+- `shoutouts.tsx` — full T11 body: Received/Given toggle + Give-a-shout-out CTA + spotlight.
+- Tab added to `my-hr-tabs` after 1:1s (Megaphone). Tests: 7 new in `MyHrSelfServiceTest` (spotlight/tab/react-toggle/emoji-validate/reply/non-party-403) + `/hr/my/shoutouts` in `HrHubTabsRenderTest`.
+
+Validated: `php -l` all files; `tsc` (my files 0 errors — only pre-existing `@/routes` env noise); `eslint` 0. Build + pint + phpunit run in PARENT post-merge (worktree has no vendor; `@/routes` is Wayfinder-generated).
+
 ## Notes / decisions
 - Hero (greeting + clock + tab strip) is shared chrome on **every** `my/*` page (above the tab strip), via `MyHrShell`.
 - Tab count badges are **dynamic** (pending leave, docs-to-sign, policies-due, 1:1s-needing-ack) not the prototype's hardcoded 1/3/2/1.

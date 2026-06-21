@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Hr\Concerns;
 use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Models\HrKudosReply;
+use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * The Overview tab's "delight" data — recognition, celebrations, who's-out,
@@ -29,11 +33,106 @@ trait BuildsMyHrOverview
 
         return [
             'latestKudos' => $this->overviewLatestKudos($user, $tenantId),
+            'shoutouts' => $this->myHrShoutouts($user, $tenantId, 'received', 12),
             'celebrations' => $this->overviewCelebrations($user, $tenantId, $now, $weekStart, $weekEnd),
             'whosOut' => $this->overviewWhosOut($user, $tenantId, $weekStart, $weekEnd),
+            'leaveBalance' => $this->overviewLeaveBalance($user, $tenantId),
+            'todayShift' => $this->overviewTodayShift($user, $now),
+            'shiftColleagues' => $this->overviewShiftColleagues($user, $tenantId, $now),
             'streak' => $this->overviewClockStreak($user, $tenantId, $now),
             'attention' => $this->overviewAttention($user, $tenantId, $now),
         ];
+    }
+
+    /**
+     * The peer-recognition "shout-outs" for the spotlight carousel + the
+     * Shout-outs tab. `received` = kudos sent TO me; `given` = kudos I sent.
+     * Each carries its emoji reactions (grouped by emoji → reactor list, with a
+     * `you` flag) and its reply thread, so the surface is fully wired to real
+     * data rather than the prototype's in-memory demo state.
+     *
+     * @param  'received'|'given'  $box
+     * @return list<array<string, mixed>>
+     */
+    protected function myHrShoutouts(User $user, int $tenantId, string $box = 'received', ?int $limit = null): array
+    {
+        $column = $box === 'given' ? 'from_user_id' : 'to_user_id';
+
+        $query = HrKudos::where('tenant_id', $tenantId)
+            ->where($column, $user->id)
+            ->with([
+                'fromUser:id,name',
+                'toUser:id,name',
+                'reactions.user:id,name',
+                'replies' => fn ($q) => $q->orderBy('created_at'),
+                'replies.user:id,name',
+            ])
+            ->orderByDesc('created_at');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        $kudos = $query->get();
+
+        // Position titles for everyone involved (givers + recipients), one query.
+        $userIds = $kudos->pluck('from_user_id')
+            ->merge($kudos->pluck('to_user_id'))
+            ->filter()
+            ->unique()
+            ->all();
+        $roles = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->whereIn('user_id', $userIds)
+            ->pluck('position_title', 'user_id');
+
+        return $kudos->map(function (HrKudos $k) use ($user, $roles) {
+            $reactions = ['heart' => [], 'party' => [], 'hands' => []];
+            foreach ($k->reactions as $reaction) {
+                if (! array_key_exists($reaction->emoji, $reactions)) {
+                    continue;
+                }
+                $name = $reaction->user?->name ?? 'Someone';
+                $reactions[$reaction->emoji][] = [
+                    'id' => $reaction->user_id,
+                    'name' => $name,
+                    'initials' => $this->myHrInitials($name),
+                    'you' => $reaction->user_id === $user->id,
+                ];
+            }
+
+            $replies = $k->replies->map(fn (HrKudosReply $reply) => [
+                'id' => $reply->id,
+                'user_id' => $reply->user_id,
+                'name' => $reply->user?->name ?? 'Someone',
+                'initials' => $this->myHrInitials($reply->user?->name ?? '?'),
+                'you' => $reply->user_id === $user->id,
+                'body' => $reply->body,
+                'created_at' => $reply->created_at?->toIso8601String(),
+            ])->values()->all();
+
+            return [
+                'id' => $k->id,
+                'giver' => [
+                    'id' => $k->from_user_id,
+                    'name' => $k->fromUser?->name ?? 'A teammate',
+                    'initials' => $this->myHrInitials($k->fromUser?->name ?? '?'),
+                    'role' => $roles[$k->from_user_id] ?? null,
+                    'you' => $k->from_user_id === $user->id,
+                ],
+                'recipient' => [
+                    'id' => $k->to_user_id,
+                    'name' => $k->toUser?->name ?? 'A teammate',
+                    'initials' => $this->myHrInitials($k->toUser?->name ?? '?'),
+                    'role' => $roles[$k->to_user_id] ?? null,
+                    'you' => $k->to_user_id === $user->id,
+                ],
+                'category' => $k->category,
+                'message' => $k->message,
+                'created_at' => $k->created_at?->toIso8601String(),
+                'reactions' => $reactions,
+                'replies' => $replies,
+            ];
+        })->values()->all();
     }
 
     private function overviewLatestKudos(User $user, int $tenantId): ?array
@@ -85,6 +184,8 @@ trait BuildsMyHrOverview
                         'occasion' => $bd->isSameDay($now)
                             ? '🎂 Birthday today'
                             : '🎂 Birthday · '.$bd->isoFormat('ddd'),
+                        'type' => 'birthday',
+                        'date' => $bd->isSameDay($now) ? 'Today' : $bd->isoFormat('ddd'),
                         'sort' => $bd->timestamp,
                     ];
                 }
@@ -99,6 +200,8 @@ trait BuildsMyHrOverview
                         'user_id' => $p->user_id,
                         'name' => $name,
                         'occasion' => '🎉 '.$years.' year'.($years === 1 ? '' : 's').' at Kauri Care',
+                        'type' => 'anniversary',
+                        'date' => $anniversary->isSameDay($now) ? 'Today' : $anniversary->isoFormat('ddd'),
                         'sort' => $anniversary->timestamp,
                     ];
                 }
@@ -109,6 +212,8 @@ trait BuildsMyHrOverview
                         'user_id' => $p->user_id,
                         'name' => $name,
                         'occasion' => '🌱 New starter · '.$p->start_date->isoFormat('ddd'),
+                        'type' => 'new_starter',
+                        'date' => $p->start_date->isSameDay($now) ? 'Today' : 'This week',
                         'sort' => $p->start_date->timestamp,
                     ];
                 }
@@ -117,13 +222,15 @@ trait BuildsMyHrOverview
 
         return collect($out)
             ->sortBy('sort')
-            ->take(6)
+            ->take(8)
             ->map(fn ($c) => [
                 'id' => $c['id'],
                 'user_id' => $c['user_id'],
                 'name' => $c['name'],
                 'initials' => $this->myHrInitials($c['name']),
                 'occasion' => $c['occasion'],
+                'type' => $c['type'],
+                'date' => $c['date'],
             ])
             ->values()
             ->all();
@@ -173,35 +280,205 @@ trait BuildsMyHrOverview
 
     private function overviewWhosOut(User $user, int $tenantId, Carbon $weekStart, Carbon $weekEnd): array
     {
-        return HrLeaveRequest::where('tenant_id', $tenantId)
+        $leave = HrLeaveRequest::where('tenant_id', $tenantId)
             ->where('status', 'approved')
             ->where('user_id', '!=', $user->id)
             ->whereDate('starts_at', '<=', $weekEnd->toDateString())
             ->whereDate('ends_at', '>=', $weekStart->toDateString())
             ->with('user:id,name')
             ->orderBy('starts_at')
-            ->limit(8)
+            ->limit(12)
+            ->get();
+
+        // Roles + sites for everyone away, in one query (for the "See all" modal).
+        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->whereIn('user_id', $leave->pluck('user_id')->filter()->unique()->all())
+            ->with('primarySite:id,name')
+            ->get(['id', 'user_id', 'position_title', 'primary_site_id'])
+            ->keyBy('user_id');
+
+        return $leave->map(function (HrLeaveRequest $l) use ($weekStart, $weekEnd, $profiles) {
+            $name = $l->user?->name;
+            if (! $name) {
+                return null;
+            }
+            $start = $l->starts_at->greaterThan($weekStart) ? $l->starts_at : $weekStart;
+            $end = $l->ends_at->lessThan($weekEnd) ? $l->ends_at : $weekEnd;
+            $range = $start->isSameDay($end)
+                ? ($start->isToday() ? 'Today' : $start->isoFormat('ddd'))
+                : $start->isoFormat('ddd').' – '.$end->isoFormat('ddd');
+
+            // Whole leave span (not just the in-week slice) for the modal's day count.
+            $days = (int) $l->starts_at->copy()->startOfDay()->diffInDays($l->ends_at->copy()->startOfDay()) + 1;
+            $profile = $profiles->get($l->user_id);
+            $role = trim(implode(' · ', array_filter([
+                $profile?->position_title,
+                $profile?->primarySite?->name,
+            ])));
+
+            return [
+                'user_id' => $l->user_id,
+                'name' => $name,
+                'initials' => $this->myHrInitials($name),
+                'range' => $range,
+                'days' => $days,
+                'days_label' => $days.' day'.($days === 1 ? '' : 's'),
+                'role' => $role !== '' ? $role : 'Team member',
+                'leave_type' => $l->leave_type,
+            ];
+        })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The viewing employee's own leave balances as labelled progress bars
+     * (remaining vs. accrued), token-coloured by type. Drives the Overview's
+     * "Leave balance" card.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function overviewLeaveBalance(User $user, int $tenantId): array
+    {
+        $order = ['annual' => 0, 'sick' => 1, 'alternative' => 2, 'time_in_lieu' => 2, 'lieu' => 2];
+
+        return HrLeaveBalance::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->where('year', now()->year)
             ->get()
-            ->map(function (HrLeaveRequest $l) use ($weekStart, $weekEnd) {
-                $name = $l->user?->name;
-                if (! $name) {
-                    return null;
-                }
-                $start = $l->starts_at->greaterThan($weekStart) ? $l->starts_at : $weekStart;
-                $end = $l->ends_at->lessThan($weekEnd) ? $l->ends_at : $weekEnd;
-                $range = $start->isSameDay($end)
-                    ? ($start->isToday() ? 'Today' : $start->isoFormat('ddd'))
-                    : $start->isoFormat('ddd').' – '.$end->isoFormat('ddd');
+            ->sortBy(fn (HrLeaveBalance $b) => $order[$b->leave_type] ?? 9)
+            ->take(4)
+            ->map(function (HrLeaveBalance $b) {
+                $accrued = (float) $b->accrued_hours;
+                $remaining = (float) $b->balance_hours;
+                $frac = $accrued > 0 ? min(1, max(0, $remaining / $accrued)) : 0;
 
                 return [
-                    'user_id' => $l->user_id,
-                    'name' => $name,
-                    'initials' => $this->myHrInitials($name),
-                    'range' => $range,
-                    'leave_type' => $l->leave_type,
+                    'leave_type' => $b->leave_type,
+                    'label' => $this->overviewLeaveLabel($b->leave_type),
+                    'remaining_days' => round($remaining / 8, 1),
+                    'frac' => round($frac, 3),
+                    'token' => $this->overviewLeaveToken($b->leave_type),
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    private function overviewLeaveLabel(?string $type): string
+    {
+        $key = Str::lower((string) $type);
+        if ($key === 'annual') {
+            return 'Annual leave';
+        }
+        if ($key === 'sick') {
+            return 'Sick leave';
+        }
+        if (Str::contains($key, ['alt', 'lieu'])) {
+            return 'Alternative days';
+        }
+
+        return Str::of($key)->replace('_', ' ')->title()->append(' leave')->toString();
+    }
+
+    private function overviewLeaveToken(?string $type): string
+    {
+        $key = Str::lower((string) $type);
+        if ($key === 'sick') {
+            return '--status-warning';
+        }
+        if (Str::contains($key, ['alt', 'lieu'])) {
+            return '--status-info';
+        }
+        if ($key === 'annual') {
+            return '--category-hr';
+        }
+
+        return '--primary';
+    }
+
+    /**
+     * Today's shift for the live "Your day" feature card — its window powers the
+     * timeline + "Now" marker. Distinct from the shell's `nextShift` (which only
+     * looks ahead and so misses an already-started shift). Returns null on a day
+     * off.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function overviewTodayShift(User $user, Carbon $now): ?array
+    {
+        $shift = Shift::where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->whereDate('starts_at', $now->toDateString())
+            ->orderBy('starts_at')
+            ->with('serviceContext:id,name')
+            ->first(['id', 'starts_at', 'ends_at', 'location', 'service_context_id', 'shift_type']);
+
+        if (! $shift || ! $shift->starts_at) {
+            return null;
+        }
+
+        return [
+            'id' => $shift->id,
+            'starts_at' => $shift->starts_at->toIso8601String(),
+            'ends_at' => $shift->ends_at?->toIso8601String(),
+            'site' => $shift->serviceContext?->name ?? $shift->location ?? 'Shift',
+            'shift_type' => $shift->shift_type ?? 'standard',
+        ];
+    }
+
+    /**
+     * Teammates sharing today's shift (same service context / site, overlapping
+     * window) — powers the "On with Mere & Tomas" line on the next-shift card.
+     * Returns [] whenever there's no shift today or no overlap.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function overviewShiftColleagues(User $user, int $tenantId, Carbon $now): array
+    {
+        $shift = Shift::where('user_id', $user->id)
+            ->visibleToFrontline($user->organization_id)
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->whereDate('starts_at', $now->toDateString())
+            ->orderBy('starts_at')
+            ->first(['id', 'service_context_id', 'location', 'starts_at', 'ends_at']);
+
+        if (! $shift || ! $shift->starts_at) {
+            return [];
+        }
+
+        $end = $shift->ends_at ?: $shift->starts_at->copy()->addHours(8);
+
+        $colleagueIds = Shift::where('user_id', '!=', $user->id)
+            ->visibleToFrontline($user->organization_id)
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->when(
+                $shift->service_context_id,
+                fn ($q) => $q->where('service_context_id', $shift->service_context_id),
+                fn ($q) => $shift->location ? $q->where('location', $shift->location) : $q->whereRaw('1 = 0'),
+            )
+            ->where('starts_at', '<', $end)
+            ->where('ends_at', '>', $shift->starts_at)
+            ->pluck('user_id')
             ->filter()
+            ->unique()
+            ->take(4)
+            ->all();
+
+        if ($colleagueIds === []) {
+            return [];
+        }
+
+        return User::whereIn('id', $colleagueIds)
+            ->get(['id', 'name'])
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'first_name' => trim(explode(' ', $u->name)[0] ?? $u->name),
+                'initials' => $this->myHrInitials($u->name),
+            ])
             ->values()
             ->all();
     }

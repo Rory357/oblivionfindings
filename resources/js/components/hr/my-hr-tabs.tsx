@@ -5,6 +5,7 @@ import {
     FileText,
     GraduationCap,
     LayoutDashboard,
+    Megaphone,
     MessagesSquare,
     MessageSquare,
     Receipt,
@@ -23,6 +24,7 @@ export type MyHrTab =
     | 'leave'
     | 'time'
     | 'one'
+    | 'shoutouts'
     | 'documents'
     | 'profile'
     | 'expenses'
@@ -38,6 +40,7 @@ const TAB_URLS: Record<MyHrTab, string> = {
     leave: '/hr/my/leave',
     time: '/hr/my/time',
     one: '/hr/my/one',
+    shoutouts: '/hr/my/shoutouts',
     documents: '/hr/my/documents',
     profile: '/hr/my/profile',
     expenses: '/hr/my/expenses',
@@ -59,6 +62,7 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
     { id: 'leave', label: 'Leave', icon: CalendarDays, tone: 'success' },
     { id: 'time', label: 'Time & Shifts', icon: Clock, tone: 'violet' },
     { id: 'one', label: '1:1s', icon: MessagesSquare, tone: 'info' },
+    { id: 'shoutouts', label: 'Shout-outs', icon: Megaphone, tone: 'primary' },
     { id: 'documents', label: 'Documents', icon: FileText, tone: 'info' },
     { id: 'profile', label: 'Profile', icon: User, tone: 'info' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },

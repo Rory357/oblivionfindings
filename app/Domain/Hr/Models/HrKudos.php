@@ -6,10 +6,16 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrKudos extends Model
 {
     use HasFactory;
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrKudosFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -42,6 +48,16 @@ class HrKudos extends Model
     public function feedPost(): BelongsTo
     {
         return $this->belongsTo(HrFeedPost::class, 'feed_post_id');
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(HrKudosReaction::class, 'kudos_id');
+    }
+
+    public function replies(): HasMany
+    {
+        return $this->hasMany(HrKudosReply::class, 'kudos_id');
     }
 
     /* ------------------------------------------------------------------ */
