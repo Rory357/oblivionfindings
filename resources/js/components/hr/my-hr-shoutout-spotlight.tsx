@@ -228,8 +228,11 @@ export function MyHrShoutoutSpotlight({
 
     const reactSummary = (() => {
         if (reactors.length === 0) return '';
-        if (reactors.length === 1) return `${firstName(reactors[0].name)} reacted`;
-        const named = reactors.slice(0, 2).map((r) => firstName(r.name));
+        // The viewer always reads as "You" (server returns their real name + a
+        // `you` flag, so match on the flag, not the literal string).
+        const label = (r: MyHrReactor) => (r.you ? 'You' : firstName(r.name));
+        if (reactors.length === 1) return `${label(reactors[0])} reacted`;
+        const named = reactors.slice(0, 2).map(label);
         const rest = reactors.length - named.length;
         return rest > 0
             ? `${named.join(', ')} + ${rest} more reacted`
@@ -374,7 +377,7 @@ export function MyHrShoutoutSpotlight({
                                     title={
                                         list.length
                                             ? `${emoji}  ${list
-                                                  .map((r) => r.name)
+                                                  .map((r) => (r.you ? 'You' : r.name))
                                                   .join(', ')}`
                                             : 'Be the first to react'
                                     }
