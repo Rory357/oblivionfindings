@@ -2,16 +2,14 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
-use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class DirectoryController extends Controller
 {
@@ -144,27 +142,19 @@ class DirectoryController extends Controller
                 ]);
         }
 
-        // Kudos categories
-        $kudosCategories = [
-            'teamwork' => 'Teamwork',
-            'innovation' => 'Innovation',
-            'leadership' => 'Leadership',
-            'customer_focus' => 'Customer Focus',
-            'going_above' => 'Going Above & Beyond',
-            'other' => 'Other',
-        ];
-
-        return Inertia::render('hr/directory/show', [
+        // JSON for the People-hub Directory staff-details modal (the standalone
+        // full-page directory profile was dropped in favour of the modal).
+        // Personal contact is manager-only; everyone else sees work contact.
+        return response()->json([
             'employee' => [
                 'id' => $profile->id,
                 'user_id' => $profile->user_id,
                 'name' => $profile->preferred_name ?? $profile->user?->name ?? 'Unknown',
                 'full_name' => $profile->user?->name ?? 'Unknown',
                 'email' => $profile->work_email ?? $profile->user?->email,
-                'phone' => $profile->work_phone ?? $profile->user?->cellphone ?? $profile->personal_phone,
                 'work_phone' => $profile->work_phone,
-                'cellphone' => $profile->user?->cellphone,
-                'personal_email' => $profile->personal_email,
+                'personal_email' => $canManage ? $profile->personal_email : null,
+                'personal_phone' => $canManage ? ($profile->user?->cellphone ?? $profile->personal_phone) : null,
                 'position_title' => $profile->position_title,
                 'department' => $profile->departmentRelation?->name ?? $profile->department,
                 'team' => $profile->team,
@@ -183,9 +173,7 @@ class DirectoryController extends Controller
             'kudosCount' => $kudosCount,
             'complianceSummary' => $complianceSummary,
             'goals' => $goals,
-            'kudosCategories' => $kudosCategories,
             'canManage' => $canManage,
-            'authUserId' => $user->id,
         ]);
     }
 
