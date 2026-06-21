@@ -229,6 +229,7 @@ export default function EmployeesIndex({
                         filters={filters}
                         sites={sites}
                         departments={departments}
+                        managers={formData?.managers ?? []}
                         canManage={can.manage}
                         onAdd={formData ? () => setAddOpen(true) : undefined}
                     />

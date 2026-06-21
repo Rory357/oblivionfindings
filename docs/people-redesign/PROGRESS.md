@@ -30,8 +30,12 @@ Design extract: `C:\Users\steph\Downloads\_hr_people_page_extract`.
       **row context menu** (reuses `ShiftContextMenu`: View profile / Edit / Deactivate-Reactivate).
       New `PATCH /hr/people/{profile}/active` → `setActive` (manage-gated). Tests: `PeoplePaneActionsTest`
       (setActive + authz + sort) — run post-merge. tsc/lint(0 err)/build green; php -l clean.
-- [ ] 1b-ii. Multi-select + sticky bulk bar (deactivate/reactivate/assign site|dept|manager/export)
-      + bulk endpoint `POST /hr/people/bulk`.
+- [x] 1b-ii. Multi-select (header + per-row Checkbox, per-view selection) + **sticky bulk bar**
+      (Deactivate / Reactivate / Assign site / Assign department / Assign manager via dropdowns +
+      Clear). New `POST /hr/people/bulk` → `bulkAction` (manage-gated; assign_department keeps the
+      denormalised label in sync). `managers` prop threaded from the page. Bulk tests added to
+      `PeoplePaneActionsTest`. tsc/lint(0)/build green; php -l clean. (Export-selected + Resend-invite
+      deferred — export-by-ids needs ImportExport change; invite needs Phase 2 backend.)
 - [ ] 1c. Right-click tab strip → set default / pin (persisted).
 
 ### Phase 2 — Employee intake unification (audit-first)  ⬜ NOT STARTED

@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 
 beforeEach(function () {
@@ -102,4 +103,52 @@ test('people index sorts by start date ascending', function () {
     $recent = $names->search('Recent Hire');
 
     expect($veteran)->toBeLessThan($recent);
+});
+
+test('bulk deactivate sets selected profiles inactive', function () {
+    $a = makeStaffProfile('Bulk One');
+    $b = makeStaffProfile('Bulk Two');
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people/bulk', [
+            'action' => 'deactivate',
+            'ids' => [$a->id, $b->id],
+        ])
+        ->assertRedirect();
+
+    expect($a->fresh()->is_active)->toBeFalse();
+    expect($b->fresh()->is_active)->toBeFalse();
+});
+
+test('bulk assign_site moves selected profiles to the chosen site', function () {
+    $site = Site::factory()->create(['name' => 'Rata House']);
+    $a = makeStaffProfile('Movable Worker');
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people/bulk', [
+            'action' => 'assign_site',
+            'ids' => [$a->id],
+            'site_id' => $site->id,
+        ])
+        ->assertRedirect();
+
+    expect($a->fresh()->primary_site_id)->toBe($site->id);
+});
+
+test('bulk action is forbidden without employees.manage', function () {
+    $a = makeStaffProfile('Guarded Worker');
+    $viewer = User::factory()->create([
+        'name' => 'Viewer Only',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    $this->actingAs($viewer)
+        ->post('/hr/people/bulk', [
+            'action' => 'deactivate',
+            'ids' => [$a->id],
+        ])
+        ->assertForbidden();
+
+    expect($a->fresh()->is_active)->toBeTrue();
 });

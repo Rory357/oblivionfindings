@@ -213,6 +213,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::middleware('permission:hr.employees.manage')->group(function () {
             Route::post('/people', [EmployeeProfileController::class, 'store'])->name('people.store');
+            Route::post('/people/bulk', [EmployeeProfileController::class, 'bulkAction'])->name('people.bulk');
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
             Route::patch('/people/{profile}/active', [EmployeeProfileController::class, 'setActive'])->name('people.active');

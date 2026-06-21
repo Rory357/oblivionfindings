@@ -434,6 +434,42 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  bulkAction — multi-select bulk operations from the People table     */
+    /* ------------------------------------------------------------------ */
+
+    public function bulkAction(Request $request)
+    {
+        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+
+        $data = $request->validate([
+            'action' => ['required', 'string', 'in:deactivate,reactivate,assign_site,assign_department,assign_manager'],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'site_id' => ['required_if:action,assign_site', 'nullable', 'integer', 'exists:sites,id'],
+            'department_id' => ['required_if:action,assign_department', 'nullable', 'integer', 'exists:hr_departments,id'],
+            'manager_user_id' => ['required_if:action,assign_manager', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $query = HrEmployeeProfile::whereIn('id', $data['ids']);
+
+        $count = match ($data['action']) {
+            'deactivate' => $query->update(['is_active' => false]),
+            'reactivate' => $query->update(['is_active' => true]),
+            'assign_site' => $query->update(['primary_site_id' => $data['site_id']]),
+            'assign_department' => $query->update([
+                'department_id' => $data['department_id'],
+                // keep the denormalised label column in sync with the FK so the
+                // table + filter stay consistent (see departments brief).
+                'department' => HrDepartment::find($data['department_id'])?->name,
+            ]),
+            'assign_manager' => $query->update(['manager_user_id' => $data['manager_user_id']]),
+            default => 0,
+        };
+
+        return back()->with('success', "{$count} " . ($count === 1 ? 'person' : 'people') . ' updated.');
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Show — tabbed profile with related data                            */
     /* ------------------------------------------------------------------ */
 

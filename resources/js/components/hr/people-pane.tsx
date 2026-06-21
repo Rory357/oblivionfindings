@@ -6,19 +6,22 @@ import { Link, router } from '@inertiajs/react';
 import {
     ArrowDown,
     ArrowUp,
+    Building2,
     ChevronsUpDown,
     Columns3,
     Eye,
+    MapPin,
     MoreHorizontal,
     Pencil,
-    Plus,
     Rows3,
     Search,
     UserCheck,
+    UserCog,
     UserPlus,
     UserX,
     Users,
     X,
+    type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -29,14 +32,15 @@ import {
 } from '@/components/rostering/shift-context-menu';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -180,6 +184,7 @@ export function PeoplePane({
     filters,
     sites,
     departments,
+    managers = [],
     canManage,
     onAdd,
 }: {
@@ -187,6 +192,7 @@ export function PeoplePane({
     filters: PeopleFilters;
     sites: Array<{ id: number; name: string }>;
     departments: Array<{ id: number; name: string }>;
+    managers?: Array<{ value: string; label: string }>;
     canManage: boolean;
     onAdd?: () => void;
 }) {
@@ -195,6 +201,14 @@ export function PeoplePane({
     const [density, setDensity] = useState<Density>('comfortable');
     const [loading, setLoading] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+
+    // Selection is per-view: clear it whenever the displayed rows change
+    // (filter / sort / page / post-bulk reload).
+    const pageKey = profiles.data.map((p) => p.id).join(',');
+    useEffect(() => {
+        setSelected(new Set());
+    }, [pageKey]);
 
     // Restore persisted column visibility + density after mount (SSR-safe).
     useEffect(() => {
@@ -268,6 +282,45 @@ export function PeoplePane({
             `/hr/people/${row.profile_id}/active`,
             { is_active: active },
             { preserveScroll: true, preserveState: true },
+        );
+    };
+
+    /* --- multi-select + bulk actions --- */
+    const selectableIds = profiles.data
+        .filter((p) => p.profile_id)
+        .map((p) => p.profile_id as number);
+    const allSelected =
+        selectableIds.length > 0 &&
+        selectableIds.every((id) => selected.has(id));
+    const someSelected = selectableIds.some((id) => selected.has(id));
+
+    const toggleAll = () => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (allSelected) selectableIds.forEach((id) => next.delete(id));
+            else selectableIds.forEach((id) => next.add(id));
+            return next;
+        });
+    };
+
+    const toggleRow = (id: number) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const bulkAction = (action: string, extra: Record<string, number> = {}) => {
+        router.post(
+            '/hr/people/bulk',
+            { action, ids: Array.from(selected), ...extra },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setSelected(new Set()),
+            },
         );
     };
 
@@ -535,6 +588,69 @@ export function PeoplePane({
                 </div>
             ) : null}
 
+            {/* Sticky bulk bar */}
+            {canManage && selected.size > 0 ? (
+                <div className="sticky top-2 z-30 flex flex-wrap items-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-primary-foreground shadow-lg">
+                    <span className="px-1 text-sm font-bold">
+                        {selected.size} selected
+                    </span>
+                    <span className="h-5 w-px bg-primary-foreground/25" />
+                    <BulkButton
+                        icon={UserX}
+                        label="Deactivate"
+                        onClick={() => bulkAction('deactivate')}
+                    />
+                    <BulkButton
+                        icon={UserCheck}
+                        label="Reactivate"
+                        onClick={() => bulkAction('reactivate')}
+                    />
+                    <BulkAssign
+                        icon={MapPin}
+                        label="Assign site"
+                        options={sites.map((s) => ({
+                            value: s.id,
+                            label: s.name,
+                        }))}
+                        onPick={(id) => bulkAction('assign_site', { site_id: id })}
+                    />
+                    <BulkAssign
+                        icon={Building2}
+                        label="Assign department"
+                        options={departments.map((d) => ({
+                            value: d.id,
+                            label: d.name,
+                        }))}
+                        onPick={(id) =>
+                            bulkAction('assign_department', {
+                                department_id: id,
+                            })
+                        }
+                    />
+                    <BulkAssign
+                        icon={UserCog}
+                        label="Assign manager"
+                        options={managers.map((m) => ({
+                            value: Number(m.value),
+                            label: m.label,
+                        }))}
+                        onPick={(id) =>
+                            bulkAction('assign_manager', {
+                                manager_user_id: id,
+                            })
+                        }
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setSelected(new Set())}
+                        aria-label="Clear selection"
+                        className="ml-auto rounded-md p-1.5 hover:bg-primary-foreground/15"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+            ) : null}
+
             {/* Table */}
             <Card>
                 <CardContent className="p-0">
@@ -542,6 +658,21 @@ export function PeoplePane({
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
+                                    {canManage ? (
+                                        <th className="w-10 px-3 py-3">
+                                            <Checkbox
+                                                checked={
+                                                    allSelected
+                                                        ? true
+                                                        : someSelected
+                                                          ? 'indeterminate'
+                                                          : false
+                                                }
+                                                onCheckedChange={toggleAll}
+                                                aria-label="Select all on this page"
+                                            />
+                                        </th>
+                                    ) : null}
                                     <SortableTh
                                         label="Employee"
                                         sortKey="name"
@@ -618,6 +749,7 @@ export function PeoplePane({
                                               key={i}
                                               cols={cols}
                                               rowPad={rowPad}
+                                              canManage={canManage}
                                           />
                                       ))
                                     : profiles.data.map((p) => (
@@ -639,6 +771,25 @@ export function PeoplePane({
                                                       : 'opacity-70'
                                               }`}
                                           >
+                                              {canManage ? (
+                                                  <td
+                                                      className={`px-3 ${rowPad}`}
+                                                  >
+                                                      {p.profile_id ? (
+                                                          <Checkbox
+                                                              checked={selected.has(
+                                                                  p.profile_id,
+                                                              )}
+                                                              onCheckedChange={() =>
+                                                                  toggleRow(
+                                                                      p.profile_id as number,
+                                                                  )
+                                                              }
+                                                              aria-label={`Select ${p.user.name}`}
+                                                          />
+                                                      ) : null}
+                                                  </td>
+                                              ) : null}
                                               <td
                                                   className={`cursor-pointer px-4 ${rowPad}`}
                                                   onClick={() =>
@@ -903,9 +1054,11 @@ function SortableTh({
 function SkeletonRow({
     cols,
     rowPad,
+    canManage,
 }: {
     cols: Record<ColKey, boolean>;
     rowPad: string;
+    canManage: boolean;
 }) {
     const bar = (w: string, extra = '') => (
         <span
@@ -914,6 +1067,11 @@ function SkeletonRow({
     );
     return (
         <tr>
+            {canManage ? (
+                <td className={`px-3 ${rowPad}`}>
+                    <span className="block h-4 w-4 animate-pulse rounded bg-muted" />
+                </td>
+            ) : null}
             <td className={`px-4 ${rowPad}`}>
                 <div className="flex items-center gap-3">
                     <span className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted" />
@@ -951,6 +1109,70 @@ function SkeletonRow({
             <td className={`px-4 ${rowPad}`}>{bar('w-14', 'rounded-full')}</td>
             <td className={`px-4 ${rowPad}`} />
         </tr>
+    );
+}
+
+function BulkButton({
+    icon: Icon,
+    label,
+    onClick,
+}: {
+    icon: LucideIcon;
+    label: string;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-xs font-semibold transition-colors hover:bg-primary-foreground/20"
+        >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+        </button>
+    );
+}
+
+function BulkAssign({
+    icon: Icon,
+    label,
+    options,
+    onPick,
+}: {
+    icon: LucideIcon;
+    label: string;
+    options: { value: number; label: string }[];
+    onPick: (id: number) => void;
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-xs font-semibold transition-colors hover:bg-primary-foreground/20"
+                >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+                align="start"
+                className="max-h-72 w-56 overflow-y-auto"
+            >
+                {options.length === 0 ? (
+                    <DropdownMenuItem disabled>No options</DropdownMenuItem>
+                ) : (
+                    options.map((o) => (
+                        <DropdownMenuItem
+                            key={o.value}
+                            onSelect={() => onPick(o.value)}
+                        >
+                            {o.label}
+                        </DropdownMenuItem>
+                    ))
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
