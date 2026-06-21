@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\User;
+use Database\Factories\Hr\HrKudosFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ class HrKudos extends Model
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrKudosFactory::new();
+        return HrKudosFactory::new();
     }
 
     protected $fillable = [
@@ -32,7 +33,7 @@ class HrKudos extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function fromUser(): BelongsTo
@@ -61,7 +62,7 @@ class HrKudos extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant($query, ?int $tenantId)

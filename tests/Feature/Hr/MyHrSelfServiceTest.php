@@ -158,7 +158,7 @@ test('sending kudos rejects an unknown category', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Shout-outs (kudos reactions + reply thread)                       */
+/*  Shout-outs (kudos reactions + reply thread) */
 /* ------------------------------------------------------------------ */
 
 function myHrMakeKudos(int $from, int $to): HrKudos

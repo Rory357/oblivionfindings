@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Schema;
  * Both are additive (no changes to existing tables) and cascade-delete with the
  * parent kudos / user, so they leave nothing behind.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         if (! Schema::hasTable('hr_kudos_reactions')) {
