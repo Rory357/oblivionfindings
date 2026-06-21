@@ -215,6 +215,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/people', [EmployeeProfileController::class, 'store'])->name('people.store');
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
+            Route::patch('/people/{profile}/active', [EmployeeProfileController::class, 'setActive'])->name('people.active');
             Route::post('/people/{profile}/documents', [HrDocumentController::class, 'storeForProfile'])->name('people.documents.store');
             Route::put('/people/{profile}/documents/{document}', [HrDocumentController::class, 'updateForProfile'])->name('people.documents.update');
             Route::delete('/people/{profile}/documents/{document}', [HrDocumentController::class, 'destroyForProfile'])->name('people.documents.destroy');

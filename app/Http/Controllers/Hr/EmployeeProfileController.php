@@ -56,15 +56,40 @@ class EmployeeProfileController extends Controller
         $joined = $request->query('joined');       // '30' = hired within the last 30 days
         $probation = $request->query('probation'); // '1' = currently on probation
 
+        // Server-side sort. Whitelist column → real (qualified) column so the
+        // table headers can sort by any displayed field across all pages.
+        $sortColumns = [
+            'name' => 'users.name',
+            'employee_number' => 'hr_employee_profiles.employee_number',
+            'position' => 'hr_employee_profiles.position_title',
+            'department' => 'hr_employee_profiles.department',
+            'type' => 'hr_employee_profiles.employment_type',
+            'site' => 'sites.name',
+            'start' => 'hr_employee_profiles.start_date',
+            'status' => 'hr_employee_profiles.is_active',
+        ];
+        $sortKey = (string) $request->query('sort', 'name');
+        $sortColumn = $sortColumns[$sortKey] ?? 'users.name';
+        $sortDir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
         $profiles = User::query()
             ->staff()
+            ->select('users.*')
+            // LEFT joins purely for sorting by profile / site columns (1:1, so no
+            // row multiplication); the soft-delete guard keeps the join a true
+            // LEFT (users with no live profile still list with NULL sort keys).
+            ->leftJoin('hr_employee_profiles', function ($join) {
+                $join->on('hr_employee_profiles.user_id', '=', 'users.id')
+                    ->whereNull('hr_employee_profiles.deleted_at');
+            })
+            ->leftJoin('sites', 'sites.id', '=', 'hr_employee_profiles.primary_site_id')
             ->with([
                 'hrEmployeeProfile.primarySite:id,name',
             ])
             ->when($search !== '', fn ($q) =>
                 $q->where(function ($inner) use ($search) {
-                    $inner->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                    $inner->where('users.name', 'like', "%{$search}%")
+                        ->orWhere('users.email', 'like', "%{$search}%");
                 })
             )
             ->when($status === 'active', fn ($q) =>
@@ -103,7 +128,8 @@ class EmployeeProfileController extends Controller
                     ->whereNotNull('probation_end_date')
                     ->where('probation_end_date', '>=', now()))
             )
-            ->orderBy('name')
+            ->orderBy($sortColumn, $sortDir)
+            ->orderBy('users.name')
             ->paginate(20)
             ->through(function (User $staffUser) {
                 $profile = $staffUser->hrEmployeeProfile;
@@ -302,6 +328,8 @@ class EmployeeProfileController extends Controller
                 'employment_type' => $employmentType,
                 'joined' => $joined,
                 'probation' => $probation,
+                'sort' => $sortKey,
+                'dir' => $sortDir,
             ],
             'summary' => [
                 'active' => $activeCount,
@@ -381,6 +409,28 @@ class EmployeeProfileController extends Controller
         $next = (int) (HrEmployeeProfile::withTrashed()->max('id') ?? 0) + 1;
 
         return 'EMP-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  setActive — deactivate / reactivate a single employee (row menu)    */
+    /* ------------------------------------------------------------------ */
+
+    public function setActive(Request $request, HrEmployeeProfile $profile)
+    {
+        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $profile->update(['is_active' => $data['is_active']]);
+
+        return back()->with(
+            'success',
+            $data['is_active']
+                ? "{$profile->user?->name} has been reactivated."
+                : "{$profile->user?->name} has been deactivated.",
+        );
     }
 
     /* ------------------------------------------------------------------ */

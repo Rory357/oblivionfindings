@@ -24,10 +24,15 @@ Design extract: `C:\Users\steph\Downloads\_hr_people_page_extract`.
       On probation→probation=1 (2 new controller filters), Compliance→/hr/compliance. Needs-attention
       chips (compliance/probation) render from summary. **Invite quick-action deferred to Phase 2**
       (intake/invite backend doesn't exist yet — no dead buttons). tsc/lint/build green; php -l clean.
-- [ ] 1b. People table upgrade — sortable headers, multi-select + sticky bulk bar, StatusBadge,
-      column chooser, density toggle, right-click row menu, skeleton + empty states.
+- [x] 1b-i. `people-pane.tsx` extracted — **server-side sortable headers** (controller `sort`/`dir`
+      whitelist + leftJoin), **column chooser** + **density** toggle (persisted localStorage),
+      StatusBadge pills, active-filter chips, **loading skeleton**, refined empty state, and a
+      **row context menu** (reuses `ShiftContextMenu`: View profile / Edit / Deactivate-Reactivate).
+      New `PATCH /hr/people/{profile}/active` → `setActive` (manage-gated). Tests: `PeoplePaneActionsTest`
+      (setActive + authz + sort) — run post-merge. tsc/lint(0 err)/build green; php -l clean.
+- [ ] 1b-ii. Multi-select + sticky bulk bar (deactivate/reactivate/assign site|dept|manager/export)
+      + bulk endpoint `POST /hr/people/bulk`.
 - [ ] 1c. Right-click tab strip → set default / pin (persisted).
-- [ ] 1d. Bulk endpoints (deactivate/reactivate/assign site|dept|manager/export/resend-invite).
 
 ### Phase 2 — Employee intake unification (audit-first)  ⬜ NOT STARTED
 `docs/employee-intake-audit.md` → `EmployeeIntakeService::createOrConvert`; dedupe/link; onboarding
