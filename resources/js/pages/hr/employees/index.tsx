@@ -10,6 +10,7 @@ import {
     type OrgNode,
     type OrgPerson,
     OrgChartPane,
+    PeopleHero,
     type PaginatedDepartments,
     type PaginatedPositions,
     type PositionFilters,
@@ -19,7 +20,7 @@ import {
     PositionsPane,
     useHrTab,
 } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,13 +39,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Briefcase,
     Building2,
-    Clock,
-    Download,
     Network,
-    Plus,
     Search,
-    ShieldAlert,
-    UserPlus,
     Users,
     X,
 } from 'lucide-react';
@@ -83,6 +79,8 @@ interface Props {
         site_id: string | null;
         department: string | null;
         employment_type: string | null;
+        joined: string | null;
+        probation: string | null;
     };
     summary: {
         active: number;
@@ -154,14 +152,6 @@ const TYPE_STYLES: Record<string, string> = {
         'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
 };
 
-const TYPE_BAR_COLORS: Record<string, string> = {
-    full_time: 'bg-status-info',
-    part_time: 'bg-status-warning',
-    casual: 'bg-primary',
-    fixed_term: 'bg-status-info',
-    contractor: 'bg-status-warning',
-};
-
 function formatLabel(s: string): string {
     return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -176,71 +166,6 @@ function formatDate(value?: string | null): string {
               month: 'short',
               year: 'numeric',
           });
-}
-
-/* ------------------------------------------------------------------ */
-/*  Stat Card                                                          */
-/* ------------------------------------------------------------------ */
-
-interface StatCardProps {
-    label: string;
-    value: number;
-    icon: React.ElementType;
-    color: 'blue' | 'emerald' | 'amber' | 'red';
-    href?: string;
-}
-
-const STAT_COLORS = {
-    blue: {
-        bg: 'bg-status-info-bg',
-        icon: 'text-status-info dark:text-status-info',
-        ring: 'ring-status-info dark:ring-status-info/20',
-    },
-    emerald: {
-        bg: 'bg-status-success-bg',
-        icon: 'text-status-success dark:text-status-success',
-        ring: 'ring-status-success dark:ring-status-success/20',
-    },
-    amber: {
-        bg: 'bg-status-warning-bg',
-        icon: 'text-status-warning dark:text-status-warning',
-        ring: 'ring-status-warning dark:ring-status-warning/20',
-    },
-    red: {
-        bg: 'bg-status-critical-bg',
-        icon: 'text-status-critical dark:text-status-critical',
-        ring: 'ring-status-critical dark:ring-status-critical/20',
-    },
-};
-
-function StatCard({ label, value, icon: Icon, color, href }: StatCardProps) {
-    const c = STAT_COLORS[color];
-    const inner = (
-        <div
-            className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}
-        >
-            <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}
-            >
-                <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-                <p className="text-2xl font-bold tracking-tight">{value}</p>
-                <p className="truncate text-xs font-medium text-muted-foreground">
-                    {label}
-                </p>
-            </div>
-        </div>
-    );
-
-    if (href) {
-        return (
-            <Link href={href} className="block">
-                {inner}
-            </Link>
-        );
-    }
-    return inner;
 }
 
 /* ------------------------------------------------------------------ */
@@ -356,11 +281,24 @@ export default function EmployeesIndex({
         filters.status ||
         filters.site_id ||
         filters.department ||
-        filters.employment_type
+        filters.employment_type ||
+        filters.joined ||
+        filters.probation
     );
 
-    const typeTotal =
-        Object.values(summary.type_counts).reduce((a, b) => a + b, 0) || 1;
+    const needs: { key: string; label: string; onClick: () => void }[] = [];
+    if (summary.compliance_alerts > 0)
+        needs.push({
+            key: 'compliance',
+            label: `${summary.compliance_alerts} compliance ${summary.compliance_alerts === 1 ? 'alert' : 'alerts'}`,
+            onClick: () => router.visit('/hr/compliance'),
+        });
+    if (summary.on_probation > 0)
+        needs.push({
+            key: 'probation',
+            label: `${summary.on_probation} on probation`,
+            onClick: () => applyFilter('probation', '1'),
+        });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -368,39 +306,24 @@ export default function EmployeesIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        icon={Users}
-                        title="People"
-                        description={`Manage your workforce — ${profiles.total} ${profiles.total === 1 ? 'person' : 'people'} total.`}
-                        stats={[
-                            { label: 'Active', value: summary.active },
-                            { label: 'New hires', value: summary.new_hires },
-                            { label: 'On probation', value: summary.on_probation },
-                            { label: 'Compliance alerts', value: summary.compliance_alerts },
-                        ]}
-                        actions={can.manage ? (
-                            <div className="flex items-center gap-2">
-                                {formData ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setAddOpen(true)}
-                                        className="gap-1.5 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        Add employee
-                                    </Button>
-                                ) : null}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={submitExport}
-                                    className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Export
-                                </Button>
-                            </div>
-                        ) : null}
+                    <PeopleHero
+                        totalPeople={profiles.total}
+                        siteCount={sites.length}
+                        summary={summary}
+                        canManage={can.manage}
+                        needs={needs}
+                        handlers={{
+                            onAdd: formData ? () => setAddOpen(true) : undefined,
+                            onImport: can.manage
+                                ? () => router.visit('/hr/import-export')
+                                : undefined,
+                            onExport: can.manage ? submitExport : undefined,
+                            onStatActive: () => applyFilter('status', 'active'),
+                            onStatNew: () => applyFilter('joined', '30'),
+                            onStatProbation: () => applyFilter('probation', '1'),
+                            onStatCompliance: () =>
+                                router.visit('/hr/compliance'),
+                        }}
                     />
                 }
             >
@@ -413,81 +336,6 @@ export default function EmployeesIndex({
 
                 {activeTab === 'people' && (
                     <>
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <StatCard
-                        label="Active Employees"
-                        value={summary.active}
-                        icon={Users}
-                        color="blue"
-                    />
-                    <StatCard
-                        label="New Hires (30 days)"
-                        value={summary.new_hires}
-                        icon={UserPlus}
-                        color="emerald"
-                    />
-                    <StatCard
-                        label="On Probation"
-                        value={summary.on_probation}
-                        icon={Clock}
-                        color="amber"
-                    />
-                    <StatCard
-                        label="Compliance Alerts"
-                        value={summary.compliance_alerts}
-                        icon={ShieldAlert}
-                        color="red"
-                        href="/hr/compliance"
-                    />
-                </div>
-
-                {/* Employment Type Bar */}
-                {typeTotal > 0 && (
-                    <Card>
-                        <CardContent className="py-3">
-                            <div className="mb-2 flex items-center gap-2">
-                                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Employment Type Breakdown
-                                </span>
-                            </div>
-                            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                                {Object.entries(summary.type_counts).map(
-                                    ([type, count]) => (
-                                        <div
-                                            key={type}
-                                            className={`${TYPE_BAR_COLORS[type] || 'bg-muted'} transition-all`}
-                                            style={{
-                                                width: `${(count / typeTotal) * 100}%`,
-                                            }}
-                                            title={`${formatLabel(type)}: ${count}`}
-                                        />
-                                    ),
-                                )}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                                {Object.entries(summary.type_counts).map(
-                                    ([type, count]) => (
-                                        <div
-                                            key={type}
-                                            className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                                        >
-                                            <span
-                                                className={`inline-block h-2.5 w-2.5 rounded-full ${TYPE_BAR_COLORS[type] || 'bg-muted'}`}
-                                            />
-                                            {formatLabel(type)}{' '}
-                                            <span className="font-medium text-foreground">
-                                                {count}
-                                            </span>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">

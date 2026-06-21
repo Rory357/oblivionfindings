@@ -28,6 +28,7 @@ export * from './offer-wizard-dialog';
 export * from './onboarding-tabs';
 export * from './onboarding-wizard-dialog';
 export * from './payroll-tabs';
+export * from './people-hero';
 export * from './people-picker';
 export * from './people/org-chart-pane';
 export * from './performance-tabs';

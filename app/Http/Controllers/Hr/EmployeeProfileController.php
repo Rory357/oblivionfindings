@@ -53,6 +53,8 @@ class EmployeeProfileController extends Controller
         $siteId = $request->query('site_id');
         $department = $request->query('department');
         $employmentType = $request->query('employment_type');
+        $joined = $request->query('joined');       // '30' = hired within the last 30 days
+        $probation = $request->query('probation'); // '1' = currently on probation
 
         $profiles = User::query()
             ->staff()
@@ -89,6 +91,17 @@ class EmployeeProfileController extends Controller
             )
             ->when($employmentType, fn ($q) =>
                 $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('employment_type', $employmentType))
+            )
+            ->when($joined === '30', fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                    ->where('is_active', true)
+                    ->where('start_date', '>=', now()->subDays(30)))
+            )
+            ->when($probation, fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                    ->where('is_active', true)
+                    ->whereNotNull('probation_end_date')
+                    ->where('probation_end_date', '>=', now()))
             )
             ->orderBy('name')
             ->paginate(20)
@@ -287,6 +300,8 @@ class EmployeeProfileController extends Controller
                 'site_id' => $siteId,
                 'department' => $department,
                 'employment_type' => $employmentType,
+                'joined' => $joined,
+                'probation' => $probation,
             ],
             'summary' => [
                 'active' => $activeCount,
