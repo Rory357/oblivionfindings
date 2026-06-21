@@ -468,6 +468,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/hazards/{hazard}/media', [SiteHazardController::class, 'media'])
         ->name('sites.hazards.media')
         ->middleware('permission:hazards.manage');
+    // Authenticated evidence serving — hazard photos/documents live on the private disk
+    // and are streamed (nosniff + CSP) instead of being world-readable under /storage.
+    Route::get('/hazards/{hazard}/media/{kind}/{index}', [SiteHazardController::class, 'showMedia'])
+        ->whereIn('kind', ['photo', 'document', 'resolution'])
+        ->whereNumber('index')
+        ->name('sites.hazards.media.show')
+        ->middleware('permission:hazards.view');
     Route::post('/hazards/{hazard}/actions', [SiteHazardController::class, 'storeAction'])
         ->name('sites.hazards.actions.store')
         ->middleware('permission:hazards.manage');

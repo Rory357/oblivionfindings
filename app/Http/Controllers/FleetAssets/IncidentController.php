@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\ClientIncident;
@@ -21,10 +22,12 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
 {
     use RespondsToInertiaOrJson;
+    use ServesPrivateAttachments;
 
     /** Tab → model scope (worklist views). */
     private const TAB_SCOPES = [
@@ -286,7 +289,7 @@ class IncidentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('fleet_incident_attachments', $disk);
 
         $incident->attachments()->create([
@@ -308,21 +311,24 @@ class IncidentController extends Controller
         ]);
     }
 
-    public function downloadAttachment(Request $request, FleetIncident $incident, FleetIncidentAttachment $attachment)
+    public function downloadAttachment(Request $request, FleetIncident $incident, FleetIncidentAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $attachment->fleet_incident_id === (int) $incident->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroyAttachment(Request $request, FleetIncident $incident, FleetIncidentAttachment $attachment)
     {
         abort_unless((int) $attachment->fleet_incident_id === (int) $incident->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }
@@ -706,7 +712,7 @@ class IncidentController extends Controller
             'attachments' => $incident->attachments->map(fn (FleetIncidentAttachment $a) => [
                 'id' => $a->id,
                 'original_name' => $a->original_name,
-                'url' => Storage::disk($a->disk ?: 'public')->url($a->path),
+                'url' => route('fleet-assets.incidents.attachments.download', [$incident->id, $a->id]),
                 'mime' => $a->mime,
                 'kind' => $a->kind,
                 'notes' => $a->notes,

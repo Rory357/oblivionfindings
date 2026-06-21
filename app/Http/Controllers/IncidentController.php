@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
@@ -18,9 +19,12 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /**
      * Unified Incidents register (redesign): hs-hero-kit hero with incident stat
      * clusters, an 8-tab TabStrip, Site/Client/Source filters, and right-click
@@ -1085,7 +1089,7 @@ class IncidentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('incident_attachments', $disk);
 
         ClientIncidentAttachment::create([
@@ -1117,7 +1121,7 @@ class IncidentController extends Controller
             abort_unless($incident->isEditableByReporter($user), 403);
         }
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }
@@ -1127,13 +1131,17 @@ class IncidentController extends Controller
         return back()->with('success', 'Attachment removed.');
     }
 
-    public function downloadAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment)
+    public function downloadAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment): StreamedResponse
     {
         $this->authorize('view', $incident);
         abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 }

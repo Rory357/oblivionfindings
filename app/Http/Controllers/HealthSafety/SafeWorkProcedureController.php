@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\HsAttachment;
 use App\Models\ProcedureAcknowledgement;
@@ -28,6 +29,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class SafeWorkProcedureController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /** Canonical categories (the design's category→tone map). */
     private const PROCEDURE_CATEGORIES = [
         'manual_handling',
@@ -324,10 +327,12 @@ class SafeWorkProcedureController extends Controller
     {
         $this->assertAttachmentBelongsTo($procedure, $attachment);
 
-        $disk = $attachment->disk ?: 'private';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime_type,
+        );
     }
 
     public function destroyAttachment(SafeWorkProcedure $procedure, HsAttachment $attachment): RedirectResponse

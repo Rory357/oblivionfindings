@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\StorePpeInventoryRequest;
 use App\Http\Requests\HealthSafety\StorePpeTypeRequest;
@@ -19,9 +20,12 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PpeController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /**
      * PPE & Equipment register — H&S gold-standard command centre.
      *
@@ -501,7 +505,9 @@ class PpeController extends Controller
         return $attachments->map(fn ($a) => [
             'id' => $a->id,
             'original_name' => $a->original_name,
-            'url' => Storage::disk($a->disk ?: 'public')->url($a->path),
+            // Private disk → no public URL; the thumbnail/preview loads through the
+            // authenticated download route (Content-Disposition is ignored for <img>).
+            'url' => "{$base}/{$a->id}/download",
             'download_url' => "{$base}/{$a->id}/download",
             'mime' => $a->mime,
             'kind' => $a->kind,
@@ -894,9 +900,9 @@ class PpeController extends Controller
 
         return [
             'uploaded_by' => $request->user()?->id,
-            'disk' => 'public',
+            'disk' => 'private',
             'original_name' => $file->getClientOriginalName(),
-            'path' => $file->store($folder, 'public'),
+            'path' => $file->store($folder, 'private'),
             'mime' => $file->getClientMimeType(),
             'size' => $file->getSize(),
             'kind' => $data['kind'] ?? null,
@@ -915,9 +921,9 @@ class PpeController extends Controller
             }
             $relation->create([
                 'uploaded_by' => $request->user()?->id,
-                'disk' => 'public',
+                'disk' => 'private',
                 'original_name' => $file->getClientOriginalName(),
-                'path' => $file->store($folder, 'public'),
+                'path' => $file->store($folder, 'private'),
                 'mime' => $file->getClientMimeType(),
                 'size' => $file->getSize(),
                 'kind' => $request->input("documents.$i.kind") ?: ($file->getClientMimeType() && str_starts_with($file->getClientMimeType(), 'image/') ? 'inspection_photo' : $defaultKind),
@@ -926,19 +932,24 @@ class PpeController extends Controller
         }
     }
 
-    private function downloadAttachment($attachment, bool $owns)
+    private function downloadAttachment($attachment, bool $owns): StreamedResponse
     {
         abort_unless($owns, 404);
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
 
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        // (Existence check + hardened streaming live in the trait.)
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     private function destroyAttachment($attachment, bool $owns): RedirectResponse
     {
         abort_unless($owns, 404);
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

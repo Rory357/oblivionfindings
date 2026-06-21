@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\EmergencyDrill;
 use App\Models\EmergencyDrillAttachment;
@@ -20,9 +21,12 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmergencyDrillController extends Controller
 {
+    use ServesPrivateAttachments;
+
     private const FIRE_DRILL_TYPES = ['fire', 'fire_evacuation'];
 
     private const DRILL_TYPES = ['fire_evacuation', 'earthquake', 'lockdown', 'tsunami', 'chemical_spill', 'medical_emergency', 'other'];
@@ -447,7 +451,7 @@ class EmergencyDrillController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('emergency_drill_attachments', $disk);
 
         $drill->attachments()->create([
@@ -465,21 +469,24 @@ class EmergencyDrillController extends Controller
         return back()->with('success', 'Evidence uploaded.');
     }
 
-    public function downloadAttachment(Request $request, EmergencyDrill $drill, EmergencyDrillAttachment $attachment)
+    public function downloadAttachment(Request $request, EmergencyDrill $drill, EmergencyDrillAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $attachment->emergency_drill_id === (int) $drill->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroyAttachment(Request $request, EmergencyDrill $drill, EmergencyDrillAttachment $attachment): RedirectResponse
     {
         abort_unless((int) $attachment->emergency_drill_id === (int) $drill->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

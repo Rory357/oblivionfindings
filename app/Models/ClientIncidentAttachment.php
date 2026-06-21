@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class ClientIncidentAttachment extends Model
 {
@@ -40,7 +39,11 @@ class ClientIncidentAttachment extends Model
 
     public function url(): ?string
     {
-        $disk = $this->disk ?: 'public';
-        return $this->path ? Storage::disk($disk)->url($this->path) : null;
+        // Files now live on the PRIVATE disk (no public /storage URL). Preview/download
+        // goes through the authenticated, IDOR-guarded route which streams with
+        // nosniff + CSP sandbox (see ServesPrivateAttachments).
+        return $this->path
+            ? route('incidents.attachments.download', [$this->incident_id, $this->id])
+            : null;
     }
 }

@@ -326,7 +326,7 @@ class HsRiskAssessmentControllerTest extends TestCase
 
     public function test_upload_download_and_delete_attachment(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $ra = HsRiskAssessment::factory()->active()->create();
 
         // upload
@@ -340,19 +340,24 @@ class HsRiskAssessmentControllerTest extends TestCase
 
         $attachment = HsRiskAssessmentAttachment::where('hs_risk_assessment_id', $ra->id)->firstOrFail();
         $this->assertEquals('swms.pdf', $attachment->original_name);
-        Storage::disk('public')->assertExists($attachment->path);
+        // Stored on the PRIVATE disk now — never world-readable under /storage.
+        Storage::disk('private')->assertExists($attachment->path);
+        $this->assertSame('private', $attachment->disk);
 
-        // download
+        // download — streamed from the private disk with the hardened headers
+        // (nosniff + CSP sandbox) from ServesPrivateAttachments.
         $this->actingAs($this->hsOfficer())
             ->get("/health-safety/risk-assessments/{$ra->id}/attachments/{$attachment->id}/download")
-            ->assertOk();
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // delete
         $this->actingAs($this->hsOfficer())
             ->delete("/health-safety/risk-assessments/{$ra->id}/attachments/{$attachment->id}")
             ->assertRedirect();
 
-        Storage::disk('public')->assertMissing($attachment->path);
+        Storage::disk('private')->assertMissing($attachment->path);
         $this->assertSoftDeleted('hs_risk_assessment_attachments', ['id' => $attachment->id]);
     }
 

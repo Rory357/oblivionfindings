@@ -1595,6 +1595,11 @@ function buildGovernanceSubPanelGroups({
     if (can?.governance?.compliance?.view || can?.governance?.view) {
         risk.push({ title: 'Compliance', href: '/governance/compliance', icon: Shield });
     }
+    // Operational compliance command centre (org-wide exception roll-up) — surfaced for
+    // board assurance. Distinct from the obligations register above; gate on its own view perm.
+    if (can?.compliance?.view || can?.governance?.view) {
+        risk.push({ title: 'Operational Compliance', href: '/compliance', icon: ShieldCheck });
+    }
     if (can?.governance?.clinical?.view || can?.governance?.view) {
         risk.push({ title: 'Clinical Governance', href: '/governance/clinical', icon: Shield });
     }

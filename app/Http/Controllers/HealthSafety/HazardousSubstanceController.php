@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
@@ -12,13 +13,14 @@ use App\Models\SubstanceStorageLocation;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HazardousSubstanceController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /**
      * Chemical register (redesign): hs-hero-kit hero with chemical-register stat
      * clusters, a 6-tab TabStrip (All · Active · Controlled · SDS expiring ·
@@ -357,9 +359,13 @@ class HazardousSubstanceController extends Controller
     public function downloadSds(HazardousSubstance $substance, SafetyDataSheet $sds): StreamedResponse
     {
         abort_unless($sds->hazardous_substance_id === $substance->id, 404);
-        abort_unless($sds->document_path && Storage::disk('private')->exists($sds->document_path), 404);
+        abort_unless((bool) $sds->document_path, 404);
 
-        return Storage::disk('private')->download($sds->document_path, basename($sds->document_path));
+        return $this->streamPrivateAttachment(
+            'private',
+            $sds->document_path,
+            basename($sds->document_path),
+        );
     }
 
     /**

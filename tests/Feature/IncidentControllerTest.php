@@ -1530,7 +1530,8 @@ class IncidentControllerTest extends TestCase
 
     public function test_attachment_upload_in_draft_status(): void
     {
-        Storage::fake('public');
+        // Uploads now land on the PRIVATE disk (controller stores 'disk' => 'private').
+        Storage::fake('private');
 
         $incident = ClientIncident::factory()->create([
             'status' => 'draft',

@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class RestraintEventAttachment extends Model
 {
@@ -36,8 +35,8 @@ class RestraintEventAttachment extends Model
 
     public function url(): ?string
     {
-        $disk = $this->disk ?: 'public';
-
-        return $this->path ? Storage::disk($disk)->url($this->path) : null;
+        return $this->path
+            ? route('health-safety.restraints.events.attachments.download', [$this->restraint_event_id, $this->id])
+            : null;
     }
 }

@@ -276,7 +276,7 @@ class FirstAidControllerTest extends TestCase
 
     public function test_upload_download_destroy_attachment_with_idor_guard(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $record = $this->record();
         $other = $this->record();
 
@@ -291,17 +291,22 @@ class FirstAidControllerTest extends TestCase
         $att = FirstAidAttachment::where('first_aid_record_id', $record->id)->first();
         $this->assertNotNull($att);
         $this->assertSame('acc45', $att->kind);
-        Storage::disk('public')->assertExists($att->path);
+        // Stored on the PRIVATE disk now — never world-readable under /storage.
+        Storage::disk('private')->assertExists($att->path);
+        $this->assertSame('private', $att->disk);
 
         // IDOR guard: the attachment belongs to $record, not $other → 404 under $other's id.
         $this->actingAs($this->admin)
             ->get('/health-safety/first-aid/'.$other->id.'/attachments/'.$att->id.'/download')
             ->assertNotFound();
 
-        // Correct parent downloads fine.
+        // Correct parent downloads fine — streamed from the private disk with the
+        // hardened headers (nosniff + CSP sandbox) from ServesPrivateAttachments.
         $this->actingAs($this->admin)
             ->get('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id.'/download')
-            ->assertOk();
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // Destroy (FirstAidAttachment uses SoftDeletes).
         $this->actingAs($this->admin)
