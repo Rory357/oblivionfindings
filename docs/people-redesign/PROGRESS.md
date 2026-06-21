@@ -68,5 +68,7 @@ per-row actions; footer deep-links.
   hero/table. Set up node_modules junction. Wrote memory + this tracker. Starting Phase 1a.
 - 2026-06-22: Phase 1 complete (1a `65c3c9db`, 1b-i `18b587a8`, 1b-ii `c8a7e225`, 1c `208532d3`).
   Set up full worktree workbench (robocopy vendor + .env). **Merged Phase 1 → origin/main**
-  (FF `b6004905..208532d3`) → deploy webhook triggered. Pending: Chrome-verify on .com +
-  run PeoplePaneActionsTest from parent. Next phase: employee intake unification (audit-first).
+  (FF `b6004905..208532d3`) → deployed → **✅ Chrome-verified LIVE on .com** (hero/donut/tabs/table
+  render; 0 console errors; server-side sort proven). Fixed default-star bug `d80d1ec9` (ships next
+  merge). ⚠️PeoplePaneActionsTest committed but not run (shared local test DB → would wipe dev data).
+  Next: Phase 2 — employee intake unification (audit-first).
