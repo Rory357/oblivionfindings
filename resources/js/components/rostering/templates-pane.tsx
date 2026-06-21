@@ -47,6 +47,7 @@ export type RosterTemplateShiftRow = {
     shift_type: string;
     is_sleepover: boolean;
     is_on_call: boolean;
+    is_lone_worker: boolean;
     expected_break_minutes: number | null;
     required_skills: string[];
     location: string | null;

@@ -22,6 +22,7 @@ class RosterPublishingService
         'shift_type',
         'is_sleepover',
         'is_on_call',
+        'is_lone_worker',
         'expected_break_minutes',
         'coverage_roles',
         'location',

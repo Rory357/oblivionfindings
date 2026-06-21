@@ -164,6 +164,7 @@ type WizardShiftRow = {
     shift_type: string;
     is_sleepover: boolean;
     is_on_call: boolean;
+    is_lone_worker: boolean;
     expected_break_minutes: string;
     required_skills: string; // comma separated in the form
     location: string;
@@ -189,6 +190,7 @@ function emptyRow(): WizardShiftRow {
         shift_type: 'standard',
         is_sleepover: false,
         is_on_call: false,
+        is_lone_worker: false,
         expected_break_minutes: '',
         required_skills: '',
         location: '',
@@ -209,6 +211,7 @@ function toWizardRow(shift: RosterTemplateShiftRow): WizardShiftRow {
         shift_type: shift.shift_type || 'standard',
         is_sleepover: !!shift.is_sleepover,
         is_on_call: !!shift.is_on_call,
+        is_lone_worker: !!shift.is_lone_worker,
         expected_break_minutes:
             shift.expected_break_minutes != null
                 ? String(shift.expected_break_minutes)
@@ -425,6 +428,7 @@ function WizardBody({
                 shift_type: row.shift_type,
                 is_sleepover: row.is_sleepover,
                 is_on_call: row.is_on_call,
+                is_lone_worker: row.is_lone_worker,
                 expected_break_minutes: row.expected_break_minutes
                     ? Number(row.expected_break_minutes)
                     : null,
@@ -975,6 +979,15 @@ function RowEditor({
                         />
                         On-call
                     </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                            checked={row.is_lone_worker}
+                            onCheckedChange={(v) =>
+                                onChange({ is_lone_worker: v })
+                            }
+                        />
+                        Lone / remote worker
+                    </label>
                 </div>
             </div>
 
@@ -1099,6 +1112,11 @@ function ReviewPane({
                                             {r.is_on_call ? (
                                                 <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
                                                     On-call
+                                                </span>
+                                            ) : null}
+                                            {r.is_lone_worker ? (
+                                                <span className="rounded bg-status-warning/15 px-1.5 text-[11px] font-semibold text-status-warning">
+                                                    Lone worker
                                                 </span>
                                             ) : null}
                                         </li>
@@ -1536,6 +1554,11 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                     {shift.is_on_call ? (
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
                             On-call
+                        </span>
+                    ) : null}
+                    {shift.is_lone_worker ? (
+                        <span className="rounded-full bg-status-warning/15 px-2 py-0.5 font-semibold text-status-warning">
+                            Lone worker
                         </span>
                     ) : null}
                 </div>

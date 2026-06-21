@@ -48,6 +48,53 @@ class HazardModuleTest extends TestCase
         ], $overrides));
     }
 
+    /* ---- Private-disk evidence serving (ServesPrivateAttachments) ---- */
+
+    public function test_hazard_media_serves_photo_from_private_disk_with_hardened_headers(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+        $hazard = $this->makeHazard();
+        $path = "hazards/{$hazard->id}/photos/evidence.png";
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+        \Illuminate\Support\Facades\Storage::disk('private')->put($path, $png);
+        $hazard->update(['photo_paths' => [$path]]);
+
+        $res = $this->actingAs($this->admin)->get("/hazards/{$hazard->id}/media/photo/0");
+
+        $res->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'")
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+        $this->assertSame($png, $res->streamedContent());
+    }
+
+    public function test_hazard_detail_emits_authenticated_media_route_not_public_storage(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+        $hazard = $this->makeHazard();
+        $path = "hazards/{$hazard->id}/photos/evidence.png";
+        \Illuminate\Support\Facades\Storage::disk('private')->put($path, 'x');
+        $hazard->update(['photo_paths' => [$path]]);
+
+        $response = $this->actingAs($this->admin)->get("/compliance/hazards?hazard={$hazard->id}");
+        $response->assertOk();
+
+        $url = data_get($response->viewData('page'), 'props.detail.photo_paths.0');
+        $this->assertNotNull($url, 'detail.photo_paths[0] should be the authenticated serve URL');
+        $this->assertStringContainsString("/hazards/{$hazard->id}/media/photo/0", (string) $url);
+        $this->assertStringNotContainsString('/storage/', (string) $url);
+    }
+
+    public function test_hazard_media_returns_404_for_out_of_range_index(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+        $hazard = $this->makeHazard(['photo_paths' => []]);
+
+        $this->actingAs($this->admin)
+            ->get("/hazards/{$hazard->id}/media/photo/0")
+            ->assertNotFound();
+    }
+
     public function test_global_register_returns_events_shaped_props(): void
     {
         $this->makeHazard();

@@ -213,6 +213,42 @@ it('snaps a non-Monday week_start to the Monday anchor', function () {
     expect(Shift::first()->starts_at->toDateString())->toBe('2026-05-04');
 });
 
+it('carries is_lone_worker from a template shift onto the generated shift', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $assignee = User::factory()->create(['organization_id' => 1]);
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+    ]);
+
+    RosterTemplateShift::factory()->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'user_id' => $assignee->id,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+        'is_lone_worker' => true,
+    ]);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-04',
+            'confirm_warnings' => true,
+        ])
+        ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
+
+    expect(Shift::count())->toBe(1);
+    expect(Shift::first()->is_lone_worker)->toBeTrue();
+});
+
 function rosteringTemplateActor(): User
 {
     $actor = User::factory()->create(['organization_id' => 1]);

@@ -35,6 +35,7 @@ class StoreRosterTemplateRequest extends FormRequest
             'template_shifts.*.shift_type' => ['nullable', 'string', 'in:standard,sleepover,on_call,split,travel'],
             'template_shifts.*.is_sleepover' => ['nullable', 'boolean'],
             'template_shifts.*.is_on_call' => ['nullable', 'boolean'],
+            'template_shifts.*.is_lone_worker' => ['nullable', 'boolean'],
             'template_shifts.*.expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'template_shifts.*.required_skills' => ['nullable', 'array'],
             'template_shifts.*.required_skills.*' => ['string', 'max:100'],
