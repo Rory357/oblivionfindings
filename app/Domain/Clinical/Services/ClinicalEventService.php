@@ -92,6 +92,70 @@ class ClinicalEventService
         return $event;
     }
 
+    // ── Workflow actions (review / follow-up / escalate) ─────────────────
+
+    /**
+     * Review & sign off an event (RN gate `clinical.events.review`).
+     */
+    public function review(ClinicalEvent $event, User $reviewer): ClinicalEvent
+    {
+        $event->update([
+            'reviewed_by' => $reviewer->id,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->recordActionTimeline($event, $reviewer, 'Clinical event reviewed', 'Reviewed and signed off by '.$reviewer->name);
+
+        return $event->fresh();
+    }
+
+    /**
+     * Mark an event's follow-up complete.
+     */
+    public function completeFollowup(ClinicalEvent $event, User $user): ClinicalEvent
+    {
+        $event->update([
+            'followup_completed_at' => now(),
+            'followup_completed_by' => $user->id,
+        ]);
+
+        $this->recordActionTimeline($event, $user, 'Follow-up completed', 'Follow-up marked complete by '.$user->name);
+
+        return $event->fresh();
+    }
+
+    /**
+     * Escalate an event to on-call clinical leadership — raises a forced
+     * high-priority Control Room signal (the app's escalation surface).
+     */
+    public function escalate(ClinicalEvent $event, User $user): ClinicalEvent
+    {
+        $event->loadMissing('client');
+        $this->signalService->emitForEscalation($event, $user);
+        $this->recordActionTimeline($event, $user, 'Clinical event escalated', 'Escalated to on-call leadership by '.$user->name);
+
+        return $event->fresh();
+    }
+
+    protected function recordActionTimeline(ClinicalEvent $event, User $actor, string $subject, string $body): void
+    {
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            'type' => self::TIMELINE_TYPE_CLINICAL_EVENT,
+            'source_type' => ClinicalEvent::class,
+            'source_id' => $event->id,
+            'occurred_at' => now(),
+            'actor_user_id' => $actor->id,
+            'client_id' => $event->client_id,
+            'shift_id' => $event->shift_id,
+            'site_id' => $event->site_id,
+            'subject' => $subject,
+            'body' => $body,
+            'meta' => ['clinical_event_id' => $event->id],
+            'visibility' => 'internal',
+            'created_by' => $actor->id,
+        ]);
+    }
+
     /**
      * Get clinical events for a client, optionally filtered by type.
      */

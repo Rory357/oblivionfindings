@@ -1,1333 +1,628 @@
-import { PageHero } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { EntityFilter, ShiftContextMenu, TabStrip, type RosterTabItem, type ShiftCtxItem, type ShiftCtxState } from '@/components/rostering';
+import { BspDetailDialog } from '@/components/health-safety/bsp-detail-dialog';
+import { BspWizard } from '@/components/health-safety/bsp-wizard';
+import { RestraintEventDetailDialog, type RestraintEventActionKey, type RestraintSectionKey } from '@/components/health-safety/restraint-event-detail-dialog';
+import { RestraintEventWizard, type PlanPickerOption, type Prescope } from '@/components/health-safety/restraint-event-wizard';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Check, FileEdit, Plus, ShieldAlert, X } from 'lucide-react';
-import { useState } from 'react';
+import { HeroCluster, HeroClusterTile, HeroMedallion, HeroSegmented, HeroShell, HeroStatusPill, fmt } from '@/pages/health-safety/components/hs-hero-kit';
+import { FlagBadge, RegisterTableHeader, entityTone, initials } from '@/pages/health-safety/components/register-row-kit';
+import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
+import {
+    CHIP,
+    DOT,
+    ICON_TEXT,
+    PERIOD_ITEMS,
+    REVIEW_STATE_META,
+    RESTRAINT_TYPE_OPTIONS,
+    durationLabel,
+    planStatusMeta,
+    severityMeta,
+    titleCase,
+    typeMeta,
+    whenLabel,
+    type ChipTone,
+    type ClientOption,
+    type EventDetail,
+    type EventRow,
+    type IncidentOption,
+    type PlanDetail,
+    type PlanRow,
+    type RestraintFilters,
+    type RestraintHero,
+    type RestraintTabCounts,
+    type SiteOption,
+    type StaffOption,
+} from '@/pages/health-safety/restraints/shared';
+import { Head, router } from '@inertiajs/react';
+import {
+    Activity,
+    AlertTriangle,
+    Archive,
+    BarChart3,
+    BookOpen,
+    CalendarClock,
+    CheckCircle2,
+    ClipboardCheck,
+    ClipboardList,
+    Eye,
+    FileEdit,
+    FileText,
+    HeartPulse,
+    LayoutDashboard,
+    LayoutList,
+    MousePointer2,
+    Plus,
+    ShieldAlert,
+    ShieldCheck,
+    TrendingDown,
+    Users,
+    XCircle,
+    type LucideIcon,
+} from 'lucide-react';
+import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+
+type Paginated<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[]; last_page: number };
 
 type Props = {
-    events: { data: any[]; links: any[] };
-    plans: any[];
-    stats: { events_30d: number; active_plans: number; reviews_due: number };
-    clients: Array<{ id: number; first_name: string; last_name: string }>;
-    staff: Array<{ id: number; name: string }>;
-    sites: Array<{ id: number; name: string }>;
-    can_create: boolean;
-    can_review: boolean;
+    lens: 'events' | 'plans';
+    tab: string;
+    events: Paginated<EventRow>;
+    plans: Paginated<PlanRow>;
+    tabCounts: RestraintTabCounts;
+    hero: RestraintHero;
+    filters: RestraintFilters;
+    clients: ClientOption[];
+    sites: SiteOption[];
+    staff: StaffOption[];
+    incidents: IncidentOption[];
+    plansForPicker: PlanPickerOption[];
+    detail: EventDetail | PlanDetail | null;
+    can: { create: boolean; review: boolean; manage: boolean };
 };
 
-const RESTRAINT_TYPES = [
-    { value: 'physical', label: 'Physical' },
-    { value: 'chemical', label: 'Chemical' },
-    { value: 'mechanical', label: 'Mechanical' },
-    { value: 'seclusion', label: 'Seclusion' },
-    { value: 'environmental', label: 'Environmental' },
-];
+const BADGE_TONE: Record<ChipTone, string> = {
+    success: 'bg-status-success-bg text-status-success',
+    warning: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
+    info: 'bg-status-info-bg text-status-info',
+    neutral: 'border border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground',
+};
 
-const SEVERITY_OPTIONS = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'critical', label: 'Critical' },
-];
+export default function RestraintsIndex({ lens, tab, events, plans, tabCounts, hero, filters, clients, sites, staff, incidents, plansForPicker, detail, can }: Props) {
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [eventWizard, setEventWizard] = useState(false);
+    const [eventPrescope, setEventPrescope] = useState<Prescope | undefined>(undefined);
+    const [planWizard, setPlanWizard] = useState(false);
+    const [pendingSection, setPendingSection] = useState<RestraintSectionKey>('overview');
+    const [pendingAction, setPendingAction] = useState<RestraintEventActionKey | null>(null);
+    const [planSection, setPlanSection] = useState<'overview' | 'content' | 'lifecycle' | 'reviews'>('overview');
+    const [planAction, setPlanAction] = useState<'review' | null>(null);
 
-const RESTRICTIVE_PRACTICE_TYPES = [
-    { value: 'physical', label: 'Physical' },
-    { value: 'chemical', label: 'Chemical' },
-    { value: 'mechanical', label: 'Mechanical' },
-    { value: 'seclusion', label: 'Seclusion' },
-    { value: 'environmental', label: 'Environmental' },
-];
+    const go = (next: Partial<RestraintFilters & { lens: string; tab: string }>) =>
+        router.get('/health-safety/restraints', { ...filters, lens, tab, ...next }, { preserveState: true, preserveScroll: true, replace: true });
 
-function restraintTypeBadge(type: string) {
-    switch (type) {
-        case 'physical':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'chemical':
-            return 'bg-primary/10 text-primary border-primary';
-        case 'mechanical':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'seclusion':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'environmental':
-            return 'bg-status-info-bg text-status-info border-status-info/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-}
+    const setLens = (next: 'events' | 'plans') => router.get('/health-safety/restraints', { ...filters, lens: next, tab: 'all' }, { preserveScroll: true });
 
-function severityBadge(s: string) {
-    switch (s) {
-        case 'critical':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'high':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'medium':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'low':
-            return 'bg-status-info-bg text-status-info border-status-info/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-}
+    const setTab = (id: string) => router.get('/health-safety/restraints', { ...filters, lens, tab: id }, { preserveScroll: true });
 
-function statusBadgeColor(s: string) {
-    switch (s) {
-        case 'active':
-            return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'draft':
-            return 'bg-muted text-foreground border-border';
-        case 'expired':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'under_review':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-}
+    const openEvent = (id: number, opts?: { section?: RestraintSectionKey; action?: RestraintEventActionKey }) => {
+        setPendingSection(opts?.section ?? 'overview');
+        setPendingAction(opts?.action ?? null);
+        router.get('/health-safety/restraints', { ...filters, lens, tab, event: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
+    const openPlan = (id: number, opts?: { section?: 'overview' | 'content' | 'lifecycle' | 'reviews'; action?: 'review' | null }) => {
+        setPlanSection(opts?.section ?? 'overview');
+        setPlanAction(opts?.action ?? null);
+        router.get('/health-safety/restraints', { ...filters, lens, tab, plan: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+    };
+    const closeDetail = () => router.get('/health-safety/restraints', { ...filters, lens, tab }, { preserveState: true, preserveScroll: true, only: ['detail'] });
 
-export default function RestraintsIndex({
-    events,
-    plans,
-    stats,
-    clients,
-    staff,
-    sites,
-    can_create,
-    can_review,
-}: Props) {
-    const [eventDialogOpen, setEventDialogOpen] = useState(false);
-    const [planDialogOpen, setPlanDialogOpen] = useState(false);
-    const [reviewingEvent, setReviewingEvent] = useState<any>(null);
+    const openEventWizard = (prescope?: Prescope) => {
+        setEventPrescope(prescope);
+        setEventWizard(true);
+    };
 
-    // Event form
-    const eventForm = useForm({
-        client_id: '',
-        behaviour_support_plan_id: '',
-        site_id: '',
-        started_at: '',
-        ended_at: '',
-        restraint_type: '',
-        severity: 'low',
-        trigger_description: '',
-        de_escalation_attempted: '',
-        restraint_description: '',
-        person_response: '',
-        post_incident_support: '',
-        injury_occurred: false,
-        injury_details: '',
-        within_support_plan: false,
-        deviation_reason: '',
-    });
+    const clearFilters = () => router.get('/health-safety/restraints', { lens, tab }, { preserveState: true, preserveScroll: true, replace: true });
+    const hasFilters = !!(filters.q || filters.client_id || filters.site_id || filters.restraint_type || filters.severity || (filters.period && filters.period !== '30d') || filters.from);
 
-    // Plan form
-    const planForm = useForm({
-        client_id: '',
-        title: '',
-        triggers: '',
-        de_escalation_strategies: '',
-        approved_interventions: '',
-        prohibited_interventions: '',
-        restrictive_practice_type: '',
-        review_date: '',
-    });
+    const exportHref = `/health-safety/restraints/export?${new URLSearchParams({
+        lens,
+        ...(filters.client_id ? { client_id: String(filters.client_id) } : {}),
+        ...(filters.site_id ? { site_id: String(filters.site_id) } : {}),
+        ...(filters.restraint_type ? { restraint_type: filters.restraint_type } : {}),
+    }).toString()}`;
 
-    // Review form
-    const reviewForm = useForm({
-        review_notes: '',
-        lessons_learned: '',
-    });
+    const EVENT_TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: tabCounts.events.all || undefined },
+        { id: 'unreviewed', label: 'Unreviewed', icon: ClipboardCheck, tone: 'warning', badge: tabCounts.events.unreviewed || undefined },
+        { id: 'out_of_plan', label: 'Out of plan', icon: AlertTriangle, tone: 'critical', badge: tabCounts.events.out_of_plan || undefined },
+        { id: 'injury', label: 'Injury', icon: HeartPulse, tone: 'critical', badge: tabCounts.events.injury || undefined },
+        { id: 'critical', label: 'Critical', icon: ShieldAlert, tone: 'critical', badge: tabCounts.events.critical || undefined },
+        { id: '30d', label: '30 days', icon: CalendarClock, tone: 'info', badge: tabCounts.events['30d'] || undefined },
+    ];
+    const PLAN_TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: tabCounts.plans.all || undefined },
+        { id: 'active', label: 'Active', icon: CheckCircle2, tone: 'success', badge: tabCounts.plans.active || undefined },
+        { id: 'draft', label: 'Draft', icon: FileEdit, tone: 'violet', badge: tabCounts.plans.draft || undefined },
+        { id: 'review_due', label: 'Review due', icon: CalendarClock, tone: 'warning', badge: tabCounts.plans.review_due || undefined },
+        { id: 'under_review', label: 'Under review', icon: Eye, tone: 'warning', badge: tabCounts.plans.under_review || undefined },
+        { id: 'archived', label: 'Archived', icon: Archive, tone: 'info', badge: tabCounts.plans.archived || undefined },
+    ];
 
-    const submitEvent = (e: React.FormEvent) => {
+    /* ---- context menus ---- */
+    const openEventRowCtx = (e: ReactMouseEvent, row: EventRow) => {
         e.preventDefault();
-        eventForm.post('/health-safety/restraints/events', {
-            onSuccess: () => {
-                setEventDialogOpen(false);
-                eventForm.reset();
-            },
+        const items: ShiftCtxItem[] = [{ icon: <Eye className="h-3.5 w-3.5" />, label: 'View event', sub: row.reference, tone: 'primary', onClick: () => openEvent(row.id) }];
+        if (can.review && row.flags.unreviewed) items.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Review event', sub: 'confirm & close out', onClick: () => openEvent(row.id, { section: 'review', action: 'review' }) });
+        if (row.behaviour_support_plan_id) items.push({ icon: <BookOpen className="h-3.5 w-3.5" />, label: 'Open linked plan', onClick: () => openPlan(row.behaviour_support_plan_id!) });
+        if (row.related_incident_id) items.push({ icon: <ClipboardList className="h-3.5 w-3.5" />, label: 'Open linked incident', onClick: () => router.visit(`/incidents?incident=${row.related_incident_id}`) });
+        if (row.client) items.push({ icon: <Users className="h-3.5 w-3.5" />, label: 'Open client profile', onClick: () => router.visit(`/operations/clients/${row.client!.id}`) });
+        setCtx({ x: e.clientX, y: e.clientY, tag: severityMeta(row.severity).label.toUpperCase(), meta: `${row.reference} · ${typeMeta(row.restraint_type).label}`, items });
+    };
+
+    const openPlanRowCtx = (e: ReactMouseEvent, row: PlanRow) => {
+        e.preventDefault();
+        const items: ShiftCtxItem[] = [{ icon: <Eye className="h-3.5 w-3.5" />, label: 'View plan', sub: row.reference, tone: 'primary', onClick: () => openPlan(row.id) }];
+        if (can.create && row.client) items.push({ icon: <Plus className="h-3.5 w-3.5" />, label: 'Record event under this plan', onClick: () => openEventWizard({ client_id: row.client!.id, client_name: row.client!.name, behaviour_support_plan_id: row.id }) });
+        if (can.manage && row.status === 'draft') items.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Activate plan', sub: 'draft → active', onClick: () => router.post(`/health-safety/restraints/plans/${row.id}/activate`, {}, { preserveScroll: true }) });
+        if (can.manage && row.status === 'active') items.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Submit for review', onClick: () => router.post(`/health-safety/restraints/plans/${row.id}/submit-review`, {}, { preserveScroll: true }) });
+        if (can.review) items.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Record review', onClick: () => openPlan(row.id, { section: 'reviews', action: 'review' }) });
+        if (can.manage && row.status !== 'archived') items.push({ icon: <Archive className="h-3.5 w-3.5" />, label: 'Archive plan', tone: 'critical', onClick: () => router.post(`/health-safety/restraints/plans/${row.id}/archive`, {}, { preserveScroll: true }) });
+        if (row.client) {
+            items.push({ sep: true });
+            items.push({ icon: <Users className="h-3.5 w-3.5" />, label: 'Open client profile', onClick: () => router.visit(`/operations/clients/${row.client!.id}`) });
+        }
+        setCtx({ x: e.clientX, y: e.clientY, tag: planStatusMeta(row.status).label.toUpperCase(), meta: row.reference, items });
+    };
+
+    const openHeroCtx = (e: ReactMouseEvent) => {
+        e.preventDefault();
+        const items: ShiftCtxItem[] = [];
+        if (can.create) {
+            items.push({ icon: <Plus className="h-3.5 w-3.5" />, label: 'Record restraint event', tone: 'primary', onClick: () => openEventWizard() });
+            items.push({ icon: <BookOpen className="h-3.5 w-3.5" />, label: 'Create behaviour support plan', onClick: () => setPlanWizard(true) });
+        }
+        items.push({
+            icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+            label: 'Jump to unreviewed',
+            onClick: () => router.get('/health-safety/restraints', { ...filters, lens: 'events', tab: 'unreviewed' }, { preserveScroll: true }),
         });
+        items.push({ sep: true });
+        items.push({ icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Restraint analytics', onClick: () => router.visit('/health-safety/analytics') });
+        setCtx({ x: e.clientX, y: e.clientY, tag: 'RESTRAINTS', meta: 'Quick actions', items });
     };
 
-    const submitPlan = (e: React.FormEvent) => {
-        e.preventDefault();
-        planForm.post('/health-safety/restraints/plans', {
-            onSuccess: () => {
-                setPlanDialogOpen(false);
-                planForm.reset();
-            },
-        });
-    };
-
-    const submitReview = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!reviewingEvent) return;
-        reviewForm.put(
-            `/health-safety/restraints/events/${reviewingEvent.id}`,
-            {
-                onSuccess: () => {
-                    setReviewingEvent(null);
-                    reviewForm.reset();
-                },
-            },
-        );
-    };
-
-    const isOverdueReview = (date: string | null) => {
-        if (!date) return false;
-        return new Date(date) < new Date();
-    };
+    const live = hero.live;
+    const at = hero.attention;
+    const b = hero.badges;
+    const reductionTone: ChipTone = b.reduction_trend_pct < 0 ? 'success' : b.reduction_trend_pct > 0 ? 'warning' : 'neutral';
+    const reductionLabel = b.reduction_trend_pct === 0 ? 'no change' : `${b.reduction_trend_pct < 0 ? '↓' : '↑'} ${Math.abs(b.reduction_trend_pct)}%`;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Restraints', href: '/health-safety/restraints' },
-            ]}
-        >
+        <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Restraints & Behaviour Support', href: '/health-safety/restraints' }]}>
             <Head title="Restraints & Behaviour Support" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Hero Header */}
-                <PageHero
-                    title="Restraints & Behaviour Support"
-                    description="Record restraint events and manage behaviour support plans"
-                    icon={<ShieldAlert className="h-7 w-7 text-white" />}
-                    stats={[
-                        { label: 'Events (30d)', value: stats.events_30d },
-                        { label: 'Active Plans', value: stats.active_plans },
-                        { label: 'Reviews Due', value: stats.reviews_due },
-                    ]}
-                />
-
-                {/* Tabs */}
-                <Tabs defaultValue="events">
-                    <TabsList>
-                        <TabsTrigger value="events">
-                            Restraint Events
-                        </TabsTrigger>
-                        <TabsTrigger value="plans">
-                            Behaviour Support Plans
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* Events Tab */}
-                    <TabsContent value="events" className="space-y-4">
-                        {can_create && (
-                            <div className="flex justify-end">
-                                <Dialog
-                                    open={eventDialogOpen}
-                                    onOpenChange={setEventDialogOpen}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button size="sm">
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Record Event
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Record Restraint Event
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <form
-                                            onSubmit={submitEvent}
-                                            className="space-y-4"
-                                        >
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <div>
-                                                    <Label>Client</Label>
-                                                    <Select
-                                                        value={
-                                                            eventForm.data
-                                                                .client_id
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            eventForm.setData(
-                                                                'client_id',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select client" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {clients.map(
-                                                                (c) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            c.id
-                                                                        }
-                                                                        value={String(
-                                                                            c.id,
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            c.first_name
-                                                                        }{' '}
-                                                                        {
-                                                                            c.last_name
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {eventForm.errors
-                                                        .client_id && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                eventForm.errors
-                                                                    .client_id
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <Label>
-                                                        Behaviour Support Plan
-                                                        (optional)
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            eventForm.data
-                                                                .behaviour_support_plan_id ||
-                                                            '__none__'
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            eventForm.setData(
-                                                                'behaviour_support_plan_id',
-                                                                v === '__none__'
-                                                                    ? ''
-                                                                    : v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select plan" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="__none__">
-                                                                None
-                                                            </SelectItem>
-                                                            {plans.map(
-                                                                (p: any) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            p.id
-                                                                        }
-                                                                        value={String(
-                                                                            p.id,
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            p.title
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid gap-3 sm:grid-cols-3">
-                                                <div>
-                                                    <Label>Site</Label>
-                                                    <Select
-                                                        value={
-                                                            eventForm.data
-                                                                .site_id
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            eventForm.setData(
-                                                                'site_id',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select site" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {sites.map((s) => (
-                                                                <SelectItem
-                                                                    key={s.id}
-                                                                    value={String(
-                                                                        s.id,
-                                                                    )}
-                                                                >
-                                                                    {s.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {eventForm.errors
-                                                        .site_id && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                eventForm.errors
-                                                                    .site_id
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <Label>Started At</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={
-                                                            eventForm.data
-                                                                .started_at
-                                                        }
-                                                        onChange={(e) =>
-                                                            eventForm.setData(
-                                                                'started_at',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    {eventForm.errors
-                                                        .started_at && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                eventForm.errors
-                                                                    .started_at
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <Label>Ended At</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={
-                                                            eventForm.data
-                                                                .ended_at
-                                                        }
-                                                        onChange={(e) =>
-                                                            eventForm.setData(
-                                                                'ended_at',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <div>
-                                                    <Label>
-                                                        Restraint Type
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            eventForm.data
-                                                                .restraint_type
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            eventForm.setData(
-                                                                'restraint_type',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {RESTRAINT_TYPES.map(
-                                                                (t) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            t.value
-                                                                        }
-                                                                        value={
-                                                                            t.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            t.label
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {eventForm.errors
-                                                        .restraint_type && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                eventForm.errors
-                                                                    .restraint_type
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <Label>Severity</Label>
-                                                    <Select
-                                                        value={
-                                                            eventForm.data
-                                                                .severity
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            eventForm.setData(
-                                                                'severity',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {SEVERITY_OPTIONS.map(
-                                                                (s) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            s.value
-                                                                        }
-                                                                        value={
-                                                                            s.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            s.label
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    Trigger Description
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        eventForm.data
-                                                            .trigger_description
-                                                    }
-                                                    onChange={(e) =>
-                                                        eventForm.setData(
-                                                            'trigger_description',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    De-escalation Attempted
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        eventForm.data
-                                                            .de_escalation_attempted
-                                                    }
-                                                    onChange={(e) =>
-                                                        eventForm.setData(
-                                                            'de_escalation_attempted',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    Restraint Description
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        eventForm.data
-                                                            .restraint_description
-                                                    }
-                                                    onChange={(e) =>
-                                                        eventForm.setData(
-                                                            'restraint_description',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>Person's Response</Label>
-                                                <Textarea
-                                                    value={
-                                                        eventForm.data
-                                                            .person_response
-                                                    }
-                                                    onChange={(e) =>
-                                                        eventForm.setData(
-                                                            'person_response',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    Post-incident Support
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        eventForm.data
-                                                            .post_incident_support
-                                                    }
-                                                    onChange={(e) =>
-                                                        eventForm.setData(
-                                                            'post_incident_support',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                <div className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id="injury_occurred"
-                                                        checked={
-                                                            eventForm.data
-                                                                .injury_occurred
-                                                        }
-                                                        onCheckedChange={(v) =>
-                                                            eventForm.setData(
-                                                                'injury_occurred',
-                                                                !!v,
-                                                            )
-                                                        }
-                                                    />
-                                                    <Label
-                                                        htmlFor="injury_occurred"
-                                                        className="text-sm"
-                                                    >
-                                                        Injury occurred
-                                                    </Label>
-                                                </div>
-                                                {eventForm.data
-                                                    .injury_occurred && (
-                                                    <div>
-                                                        <Label>
-                                                            Injury Details
-                                                        </Label>
-                                                        <Textarea
-                                                            value={
-                                                                eventForm.data
-                                                                    .injury_details
-                                                            }
-                                                            onChange={(e) =>
-                                                                eventForm.setData(
-                                                                    'injury_details',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            rows={2}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                <div className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id="within_support_plan"
-                                                        checked={
-                                                            eventForm.data
-                                                                .within_support_plan
-                                                        }
-                                                        onCheckedChange={(v) =>
-                                                            eventForm.setData(
-                                                                'within_support_plan',
-                                                                !!v,
-                                                            )
-                                                        }
-                                                    />
-                                                    <Label
-                                                        htmlFor="within_support_plan"
-                                                        className="text-sm"
-                                                    >
-                                                        Within behaviour support
-                                                        plan
-                                                    </Label>
-                                                </div>
-                                                {!eventForm.data
-                                                    .within_support_plan && (
-                                                    <div>
-                                                        <Label>
-                                                            Reason for Deviation
-                                                        </Label>
-                                                        <Textarea
-                                                            value={
-                                                                eventForm.data
-                                                                    .deviation_reason
-                                                            }
-                                                            onChange={(e) =>
-                                                                eventForm.setData(
-                                                                    'deviation_reason',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            rows={2}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setEventDialogOpen(
-                                                            false,
-                                                        )
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        eventForm.processing
-                                                    }
-                                                >
-                                                    Save Event
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        )}
-
-                        {/* Events Table */}
-                        <Card>
-                            <CardContent className="pt-4">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-xs text-muted-foreground">
-                                                <th className="pb-2 font-medium">
-                                                    Date
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Client
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Type
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Duration
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Severity
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Within Plan
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Reviewed
-                                                </th>
-                                                <th className="pb-2 font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {events.data.map((ev: any) => {
-                                                const durationMins =
-                                                    ev.started_at && ev.ended_at
-                                                        ? Math.round(
-                                                              (new Date(
-                                                                  ev.ended_at,
-                                                              ).getTime() -
-                                                                  new Date(
-                                                                      ev.started_at,
-                                                                  ).getTime()) /
-                                                                  60000,
-                                                          )
-                                                        : null;
-                                                return (
-                                                    <tr
-                                                        key={ev.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2 whitespace-nowrap">
-                                                            {formatDateTimeLong(
-                                                                ev.started_at,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2">
-                                                            {
-                                                                ev.client
-                                                                    ?.first_name
-                                                            }{' '}
-                                                            {
-                                                                ev.client
-                                                                    ?.last_name
-                                                            }
-                                                        </td>
-                                                        <td className="py-2">
-                                                            <Badge
-                                                                className={restraintTypeBadge(
-                                                                    ev.restraint_type,
-                                                                )}
-                                                            >
-                                                                {
-                                                                    ev.restraint_type
-                                                                }
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2">
-                                                            {durationMins !==
-                                                            null
-                                                                ? `${durationMins} min`
-                                                                : '-'}
-                                                        </td>
-                                                        <td className="py-2">
-                                                            <Badge
-                                                                className={severityBadge(
-                                                                    ev.severity,
-                                                                )}
-                                                            >
-                                                                {ev.severity}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2 text-center">
-                                                            {ev.within_support_plan ? (
-                                                                <Check className="mx-auto h-4 w-4 text-status-success" />
-                                                            ) : (
-                                                                <X className="mx-auto h-4 w-4 text-status-critical" />
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 text-center">
-                                                            {ev.reviewed_at ? (
-                                                                <Check className="mx-auto h-4 w-4 text-status-success" />
-                                                            ) : (
-                                                                <X className="mx-auto h-4 w-4 text-muted-foreground" />
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2">
-                                                            {!ev.reviewed_at &&
-                                                                can_review && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() =>
-                                                                            setReviewingEvent(
-                                                                                ev,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <FileEdit className="mr-1 h-3 w-3" />
-                                                                        Review
-                                                                    </Button>
-                                                                )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            {!events.data.length && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={8}
-                                                        className="py-8 text-center text-muted-foreground"
-                                                    >
-                                                        No restraint events
-                                                        found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Pagination */}
-                        {events.links?.length ? (
-                            <div className="flex flex-wrap gap-2">
-                                {events.links.map((l: any) => (
-                                    <Button
-                                        type="button"
-                                        key={l.label}
-                                        disabled={!l.url}
-                                        variant={
-                                            l.active ? 'secondary' : 'outline'
-                                        }
-                                        size="sm"
-                                        className="text-xs"
-                                        onClick={() =>
-                                            l.url &&
-                                            router.get(
-                                                l.url,
-                                                {},
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            )
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: l.label,
+                {/* ---- Hero ---- */}
+                <div onContextMenu={openHeroCtx}>
+                    <HeroShell
+                        footer={
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <HeroSegmented label="Period" variant="pill" ariaLabel="Date range" items={PERIOD_ITEMS} value={filters.period || '30d'} onChange={(key) => go({ period: key, from: null })} />
+                                {clients?.length ? <EntityFilter label="Client" allLabel="All clients" items={clients} value={filters.client_id} onChange={(id) => go({ client_id: id })} onDark /> : null}
+                                <label className="inline-flex items-center gap-1.5">
+                                    <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Type</span>
+                                    <select
+                                        value={filters.restraint_type ?? ''}
+                                        onChange={(e) => go({ restraint_type: e.target.value || null })}
+                                        aria-label="Restraint type filter"
+                                        className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
+                                    >
+                                        <option value="">All types</option>
+                                        {RESTRAINT_TYPE_OPTIONS.map((o) => (
+                                            <option key={o.value} value={o.value}>
+                                                {o.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <div className="relative ml-auto">
+                                    <ShieldAlert className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+                                    <input
+                                        type="search"
+                                        placeholder="Search restraints…"
+                                        defaultValue={filters.q ?? ''}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') go({ q: (e.target as HTMLInputElement).value || null });
                                         }}
+                                        className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                                     />
-                                ))}
-                            </div>
-                        ) : null}
-                    </TabsContent>
-
-                    {/* Plans Tab */}
-                    <TabsContent value="plans" className="space-y-4">
-                        {can_create && (
-                            <div className="flex justify-end">
-                                <Dialog
-                                    open={planDialogOpen}
-                                    onOpenChange={setPlanDialogOpen}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button size="sm">
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Create Plan
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Create Behaviour Support Plan
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <form
-                                            onSubmit={submitPlan}
-                                            className="space-y-4"
-                                        >
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <div>
-                                                    <Label>Client</Label>
-                                                    <Select
-                                                        value={
-                                                            planForm.data
-                                                                .client_id
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            planForm.setData(
-                                                                'client_id',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select client" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {clients.map(
-                                                                (c) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            c.id
-                                                                        }
-                                                                        value={String(
-                                                                            c.id,
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            c.first_name
-                                                                        }{' '}
-                                                                        {
-                                                                            c.last_name
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {planForm.errors
-                                                        .client_id && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                planForm.errors
-                                                                    .client_id
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <Label>Title</Label>
-                                                    <Input
-                                                        value={
-                                                            planForm.data.title
-                                                        }
-                                                        onChange={(e) =>
-                                                            planForm.setData(
-                                                                'title',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Plan title"
-                                                    />
-                                                    {planForm.errors.title && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            {
-                                                                planForm.errors
-                                                                    .title
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <Label>Triggers</Label>
-                                                <Textarea
-                                                    value={
-                                                        planForm.data.triggers
-                                                    }
-                                                    onChange={(e) =>
-                                                        planForm.setData(
-                                                            'triggers',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                    placeholder="Known triggers for the behaviour"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    De-escalation Strategies
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        planForm.data
-                                                            .de_escalation_strategies
-                                                    }
-                                                    onChange={(e) =>
-                                                        planForm.setData(
-                                                            'de_escalation_strategies',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    Approved Interventions
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        planForm.data
-                                                            .approved_interventions
-                                                    }
-                                                    onChange={(e) =>
-                                                        planForm.setData(
-                                                            'approved_interventions',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>
-                                                    Prohibited Interventions
-                                                </Label>
-                                                <Textarea
-                                                    value={
-                                                        planForm.data
-                                                            .prohibited_interventions
-                                                    }
-                                                    onChange={(e) =>
-                                                        planForm.setData(
-                                                            'prohibited_interventions',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                />
-                                            </div>
-
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <div>
-                                                    <Label>
-                                                        Restrictive Practice
-                                                        Type
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            planForm.data
-                                                                .restrictive_practice_type
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            planForm.setData(
-                                                                'restrictive_practice_type',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {RESTRICTIVE_PRACTICE_TYPES.map(
-                                                                (t) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            t.value
-                                                                        }
-                                                                        value={
-                                                                            t.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            t.label
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label>Review Date</Label>
-                                                    <Input
-                                                        type="date"
-                                                        value={
-                                                            planForm.data
-                                                                .review_date
-                                                        }
-                                                        onChange={(e) =>
-                                                            planForm.setData(
-                                                                'review_date',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setPlanDialogOpen(false)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        planForm.processing
-                                                    }
-                                                >
-                                                    Create Plan
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        )}
-
-                        {/* Plans Cards */}
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {plans.map((plan: any) => (
-                                <Card key={plan.id}>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <div className="font-semibold">
-                                                        {
-                                                            plan.client
-                                                                ?.first_name
-                                                        }{' '}
-                                                        {plan.client?.last_name}
-                                                    </div>
-                                                    <div className="mt-0.5 text-sm font-normal text-muted-foreground">
-                                                        {plan.title}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <div className="flex flex-wrap gap-1.5">
-                                            <Badge
-                                                className={statusBadgeColor(
-                                                    plan.status,
-                                                )}
-                                            >
-                                                {plan.status?.replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                            {plan.restrictive_practice_type && (
-                                                <Badge
-                                                    className={restraintTypeBadge(
-                                                        plan.restrictive_practice_type,
-                                                    )}
-                                                >
-                                                    {
-                                                        plan.restrictive_practice_type
-                                                    }
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            <span className="font-medium">
-                                                Review:
-                                            </span>{' '}
-                                            <span
-                                                className={
-                                                    isOverdueReview(
-                                                        plan.review_date,
-                                                    )
-                                                        ? 'font-semibold text-status-critical'
-                                                        : ''
-                                                }
-                                            >
-                                                {formatDateLong(plan.review_date)}
-                                            </span>
-                                        </div>
-                                        {plan.de_escalation_strategies && (
-                                            <div className="text-xs text-muted-foreground">
-                                                <span className="font-medium">
-                                                    De-escalation:
-                                                </span>{' '}
-                                                {plan.de_escalation_strategies
-                                                    .length > 100
-                                                    ? plan.de_escalation_strategies.slice(
-                                                          0,
-                                                          100,
-                                                      ) + '...'
-                                                    : plan.de_escalation_strategies}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ))}
-                            {!plans.length && (
-                                <div className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                                    No behaviour support plans found.
                                 </div>
-                            )}
-                        </div>
-                    </TabsContent>
-                </Tabs>
+                                {hasFilters ? (
+                                    // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
+                                    <button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground">
+                                        <XCircle className="h-3 w-3" /> Clear
+                                    </button>
+                                ) : null}
+                            </div>
+                        }
+                    >
+                        <WorkflowRibbon current="report" />
 
-                {/* Review Dialog */}
-                <Dialog
-                    open={!!reviewingEvent}
-                    onOpenChange={(open) => {
-                        if (!open) setReviewingEvent(null);
-                    }}
-                >
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Review Restraint Event</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={submitReview} className="space-y-4">
-                            <div>
-                                <Label>Review Notes</Label>
-                                <Textarea
-                                    value={reviewForm.data.review_notes}
-                                    onChange={(e) =>
-                                        reviewForm.setData(
-                                            'review_notes',
-                                            e.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                                {reviewForm.errors.review_notes && (
-                                    <p className="mt-1 text-xs text-status-critical">
-                                        {reviewForm.errors.review_notes}
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                                <HeroMedallion icon={ShieldAlert} />
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <HeroStatusPill>Restraint register · synced</HeroStatusPill>
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
+                                            <TrendingDown className="h-3.5 w-3.5" /> Restrictive-practice reduction
+                                        </span>
+                                    </div>
+                                    <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">Restraints &amp; Behaviour Support</h1>
+                                    <p className="max-w-xl text-sm text-primary-foreground/70">
+                                        Every restrictive-practice episode and behaviour support plan in one register — recorded against Ngā Paerewa NZS 8134:2021, reviewed, and driven toward least-restrictive care.
                                     </p>
-                                )}
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                        <HeroBadge icon={ClipboardCheck} tone={b.unreviewed > 0 ? 'warning' : 'success'}>
+                                            Unreviewed restraints · {b.unreviewed}
+                                        </HeroBadge>
+                                        <HeroBadge icon={TrendingDown} tone={reductionTone}>
+                                            Restrictive-practice reduction · {reductionLabel}
+                                        </HeroBadge>
+                                        <HeroBadge icon={ShieldCheck} tone={b.nga_paerewa_certified ? 'success' : 'warning'}>
+                                            Ngā Paerewa NZS 8134:2021 · {b.nga_paerewa_certified ? 'Certified' : 'At risk'}
+                                        </HeroBadge>
+                                        <HeroBadge icon={CalendarClock} tone={b.plans_overdue > 0 ? 'critical' : 'success'}>
+                                            {b.plans_overdue > 0 ? `Plans overdue review · ${b.plans_overdue}` : 'Plan reviews current'}
+                                        </HeroBadge>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <Label>Lessons Learned</Label>
-                                <Textarea
-                                    value={reviewForm.data.lessons_learned}
-                                    onChange={(e) =>
-                                        reviewForm.setData(
-                                            'lessons_learned',
-                                            e.target.value,
-                                        )
-                                    }
-                                    rows={3}
-                                />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setReviewingEvent(null)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={reviewForm.processing}
-                                >
-                                    Submit Review
-                                </Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button size="sm" className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20">
+                                        <FileText className="mr-1.5 h-4 w-4" /> Export / Board reports
+                                        <span aria-hidden className="ml-1">▾</span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-60 p-1.5">
+                                    <a href={exportHref} className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted">
+                                        <FileText className="h-4 w-4 shrink-0 text-primary" /> Export {lens === 'plans' ? 'plans' : 'events'} (CSV)
+                                    </a>
+                                    {[
+                                        { label: 'Restraint analytics', href: '/health-safety/analytics', icon: BarChart3 },
+                                        { label: 'H&S dashboard', href: '/health-safety', icon: LayoutDashboard },
+                                    ].map((r) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link)
+                                        <button key={r.href} type="button" onClick={() => router.visit(r.href)} className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted">
+                                            <r.icon className="h-4 w-4 shrink-0 text-primary" /> {r.label}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        {/* stat clusters */}
+                        <div className="grid gap-3 lg:grid-cols-2">
+                            <HeroCluster title="Live · this period" icon={Activity}>
+                                <HeroClusterTile href="/health-safety/restraints?lens=events&tab=30d" label="Events · 30d" value={fmt(live.events_30d)} caption="recorded" tone="neutral" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=events&tab=out_of_plan" label="Out of plan" value={fmt(live.out_of_plan)} caption="deviations" tone="critical" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=events&tab=injury" label="Injuries" value={fmt(live.injuries)} caption="with harm" tone="critical" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=events&tab=critical" label="Critical" value={fmt(live.critical)} caption="severity" tone="critical" />
+                            </HeroCluster>
+                            <HeroCluster title="Needs attention" icon={AlertTriangle}>
+                                <HeroClusterTile href="/health-safety/restraints?lens=events&tab=unreviewed" label="Unreviewed" value={fmt(at.unreviewed)} caption="need review" tone="warning" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=plans&tab=review_due" label="Review due" value={fmt(at.plans_review_due)} caption="plans" tone="warning" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=plans&tab=under_review" label="Under review" value={fmt(at.plans_under_review)} caption="plans" tone="neutral" />
+                                <HeroClusterTile href="/health-safety/restraints?lens=plans&tab=all" label="No active BSP" value={fmt(at.clients_no_active_bsp)} caption="clients" tone="critical" />
+                            </HeroCluster>
+                        </div>
+                    </HeroShell>
+                </div>
+
+                {/* ---- Lens toggle + tabs ---- */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="inline-flex gap-1 rounded-xl bg-muted p-1">
+                        <LensButton active={lens === 'events'} icon={ShieldAlert} label="Events" onClick={() => setLens('events')} />
+                        <LensButton active={lens === 'plans'} icon={BookOpen} label="Plans" onClick={() => setLens('plans')} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <TabStrip value={tab} items={lens === 'events' ? EVENT_TABS : PLAN_TABS} onChange={setTab} ariaLabel={`${lens === 'events' ? 'Event' : 'Plan'} views`} />
+                    </div>
+                </div>
+
+                {/* ---- Record CTA ---- */}
+                {can.create ? (
+                    <div>
+                        {lens === 'events' ? (
+                            <Button onClick={() => openEventWizard()}>
+                                <Plus className="mr-1.5 h-4 w-4" /> Record restraint event
+                            </Button>
+                        ) : (
+                            <Button onClick={() => setPlanWizard(true)}>
+                                <Plus className="mr-1.5 h-4 w-4" /> Create behaviour support plan
+                            </Button>
+                        )}
+                    </div>
+                ) : null}
+
+                {/* ---- Body ---- */}
+                {lens === 'events' ? (
+                    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                        <RegisterTableHeader icon={ShieldAlert} title="All restraint events" subtitle="restrictive-practice episodes" hint="Right-click a row for the full workflow" hintIcon={MousePointer2} />
+                        <EventTable rows={events.data} onRowCtx={openEventRowCtx} onOpen={openEvent} />
+                    </section>
+                ) : (
+                    <PlanGrid rows={plans.data} onRowCtx={openPlanRowCtx} onOpen={openPlan} />
+                )}
+
+                {lens === 'events' && events.last_page > 1 ? <LaravelPagination links={events.links} /> : null}
+                {lens === 'plans' && plans.last_page > 1 ? <LaravelPagination links={plans.links} /> : null}
             </div>
+
+            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+
+            {detail && detail.kind === 'event' ? (
+                <RestraintEventDetailDialog key={`e-${detail.id}`} detail={detail} open onClose={closeDetail} incidents={incidents} initialSection={pendingSection} initialAction={pendingAction} onOpenPlan={(id) => openPlan(id)} />
+            ) : null}
+            {detail && detail.kind === 'plan' ? (
+                <BspDetailDialog
+                    key={`p-${detail.id}`}
+                    detail={detail}
+                    open
+                    onClose={closeDetail}
+                    initialSection={planSection}
+                    initialAction={planAction}
+                    onRecordEvent={
+                        can.create && detail.client
+                            ? () => {
+                                  closeDetail();
+                                  openEventWizard({ client_id: detail.client!.id, client_name: detail.client!.name, behaviour_support_plan_id: detail.id });
+                              }
+                            : undefined
+                    }
+                />
+            ) : null}
+
+            <RestraintEventWizard
+                open={eventWizard}
+                onClose={() => setEventWizard(false)}
+                clients={clients}
+                sites={sites}
+                staff={staff}
+                incidents={incidents}
+                plans={plansForPicker}
+                prescope={eventPrescope}
+                onOpenEvent={(id) => {
+                    setEventWizard(false);
+                    openEvent(id);
+                }}
+            />
+            <BspWizard
+                open={planWizard}
+                onClose={() => setPlanWizard(false)}
+                clients={clients}
+                staff={staff}
+                onOpenPlan={(id) => {
+                    setPlanWizard(false);
+                    openPlan(id);
+                }}
+            />
         </AppLayout>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Hero badge + lens button                                          */
+/* ------------------------------------------------------------------ */
+
+function HeroBadge({ icon: Icon, tone, children }: { icon: LucideIcon; tone: ChipTone; children: ReactNode }) {
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${BADGE_TONE[tone]}`}>
+            <Icon className="h-3.5 w-3.5" /> {children}
+        </span>
+    );
+}
+
+function LensButton({ active, icon: Icon, label, onClick }: { active: boolean; icon: LucideIcon; label: string; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            aria-pressed={active}
+            onClick={onClick}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+            <Icon className="h-4 w-4" /> {label}
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Events table                                                      */
+/* ------------------------------------------------------------------ */
+
+function EventTable({ rows, onRowCtx, onOpen }: { rows: EventRow[]; onRowCtx: (e: ReactMouseEvent, row: EventRow) => void; onOpen: (id: number) => void }) {
+    if (rows.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                <ShieldAlert className="h-8 w-8 text-muted-foreground" />
+                <div className="text-sm font-semibold">No restraint events here</div>
+                <p className="text-xs text-muted-foreground">Nothing matches this tab and filters.</p>
+            </div>
+        );
+    }
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full min-w-[1040px] text-sm">
+                <thead>
+                    <tr className="border-b border-border bg-muted/70 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <th className="px-4 py-2.5">When</th>
+                        <th className="px-4 py-2.5">Client</th>
+                        <th className="px-4 py-2.5">Type</th>
+                        <th className="px-4 py-2.5">Duration</th>
+                        <th className="px-4 py-2.5">Severity</th>
+                        <th className="px-4 py-2.5">Within plan</th>
+                        <th className="px-4 py-2.5">Reviewed</th>
+                        <th className="px-4 py-2.5">Flags</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                    {rows.map((row) => (
+                        <EventRowView key={row.id} row={row} onRowCtx={onRowCtx} onOpen={onOpen} />
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function EventRowView({ row, onRowCtx, onOpen }: { row: EventRow; onRowCtx: (e: ReactMouseEvent, row: EventRow) => void; onOpen: (id: number) => void }) {
+    const type = typeMeta(row.restraint_type);
+    const sev = severityMeta(row.severity);
+    return (
+        <tr
+            onClick={() => onOpen(row.id)}
+            onContextMenu={(e) => onRowCtx(e, row)}
+            tabIndex={0}
+            aria-label={`Open restraint event ${row.reference}`}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpen(row.id);
+                }
+            }}
+            className="cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-none"
+        >
+            <td className="px-4 py-3 align-top">
+                <div className="font-semibold">{whenLabel(row.started_at)}</div>
+                <div className="text-xs text-muted-foreground">{row.reference}</div>
+            </td>
+            <td className="px-4 py-3 align-top">
+                {row.client ? (
+                    <div className="flex items-center gap-2">
+                        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${entityTone(row.client.id)}`}>{initials(row.client.name)}</span>
+                        <div className="min-w-0">
+                            <div className="truncate font-medium">{row.client.name}</div>
+                            {row.site ? <div className="truncate text-xs text-muted-foreground">{row.site.name}</div> : null}
+                        </div>
+                    </div>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                )}
+            </td>
+            <td className="px-4 py-3 align-top">
+                <span className="inline-flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${DOT[type.tone]}`} />
+                    <type.icon className={`h-4 w-4 ${ICON_TEXT[type.tone]}`} /> {type.label}
+                </span>
+            </td>
+            <td className="px-4 py-3 align-top text-muted-foreground">{durationLabel(row.duration_minutes)}</td>
+            <td className="px-4 py-3 align-top">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CHIP[sev.tone]}`}>{sev.label}</span>
+            </td>
+            <td className="px-4 py-3 align-top">
+                {row.within_support_plan ? (
+                    <CheckCircle2 className="h-4 w-4 text-status-success" />
+                ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-status-critical">
+                        <XCircle className="h-4 w-4" /> No
+                    </span>
+                )}
+            </td>
+            <td className="px-4 py-3 align-top">{row.reviewed_at ? <CheckCircle2 className="h-4 w-4 text-status-success" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}</td>
+            <td className="px-4 py-3 align-top">
+                <div className="flex flex-wrap gap-1.5">
+                    {row.flags.unreviewed ? (
+                        <FlagBadge icon={ClipboardCheck} tone="warning" title="Not yet reviewed">
+                            Unreviewed
+                        </FlagBadge>
+                    ) : null}
+                    {row.flags.out_of_plan ? (
+                        <FlagBadge icon={AlertTriangle} tone="critical" title="Outside the behaviour support plan">
+                            Out of plan
+                        </FlagBadge>
+                    ) : null}
+                    {row.flags.injury ? (
+                        <FlagBadge icon={HeartPulse} tone="critical" title="An injury occurred">
+                            Injury
+                        </FlagBadge>
+                    ) : null}
+                    {row.flags.linked_incident ? (
+                        <FlagBadge icon={ClipboardList} tone="info" title="Linked to an incident">
+                            Incident
+                        </FlagBadge>
+                    ) : null}
+                    {!row.flags.unreviewed && !row.flags.out_of_plan && !row.flags.injury && !row.flags.linked_incident ? <span className="text-muted-foreground">—</span> : null}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Plans grid (first-class cards)                                    */
+/* ------------------------------------------------------------------ */
+
+function PlanGrid({ rows, onRowCtx, onOpen }: { rows: PlanRow[]; onRowCtx: (e: ReactMouseEvent, row: PlanRow) => void; onOpen: (id: number) => void }) {
+    if (rows.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-16 text-center shadow-sm">
+                <BookOpen className="h-8 w-8 text-muted-foreground" />
+                <div className="text-sm font-semibold">No behaviour support plans here</div>
+                <p className="text-xs text-muted-foreground">Nothing matches this tab and filters.</p>
+            </div>
+        );
+    }
+    return (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rows.map((row) => {
+                const status = planStatusMeta(row.status);
+                const reviewState = REVIEW_STATE_META[row.review_state] ?? REVIEW_STATE_META.ok;
+                return (
+                    <div
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onOpen(row.id)}
+                        onContextMenu={(e) => onRowCtx(e, row)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onOpen(row.id);
+                            }
+                        }}
+                        aria-label={`Open plan ${row.reference}`}
+                        className="flex cursor-pointer flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 focus-visible:border-primary/40 focus-visible:outline-none"
+                    >
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${row.client ? entityTone(row.client.id) : 'bg-muted text-muted-foreground'}`}>{initials(row.client?.name)}</span>
+                                <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold">{row.client?.name ?? 'Unknown client'}</div>
+                                    <div className="text-xs text-muted-foreground">{row.reference}</div>
+                                </div>
+                            </div>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${CHIP[status.tone]}`}>
+                                <status.icon className="h-3 w-3" /> {status.label}
+                            </span>
+                        </div>
+                        <div className="text-sm font-medium">{row.title}</div>
+                        <div className="mt-auto flex flex-wrap items-center gap-1.5">
+                            {row.restrictive_practice_type ? <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{titleCase(row.restrictive_practice_type)}</span> : null}
+                            {row.status === 'active' && row.review_state !== 'ok' ? (
+                                <FlagBadge icon={CalendarClock} tone={reviewState.tone === 'critical' ? 'critical' : 'warning'} title="Review status">
+                                    {reviewState.label}
+                                </FlagBadge>
+                            ) : null}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
     );
 }

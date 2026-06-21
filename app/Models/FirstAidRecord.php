@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FirstAidRecord extends Model
@@ -15,6 +16,7 @@ class FirstAidRecord extends Model
     protected $fillable = [
         'site_id',
         'treated_person_id',
+        'client_id',
         'treated_person_name',
         'treated_person_type',
         'treatment_date',
@@ -52,6 +54,11 @@ class FirstAidRecord extends Model
         return $this->belongsTo(User::class, 'treated_person_id');
     }
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
     public function firstAider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'first_aider_id');
@@ -70,5 +77,15 @@ class FirstAidRecord extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(FirstAidAttachment::class, 'first_aid_record_id');
+    }
+
+    public function followups(): HasMany
+    {
+        return $this->hasMany(FirstAidFollowup::class, 'first_aid_record_id');
     }
 }

@@ -243,7 +243,7 @@ class InjuriesControllerTest extends TestCase
 
     public function test_upload_download_destroy_attachment_with_idor_guard(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $inj = $this->injury();
         $other = $this->injury();
 
@@ -258,17 +258,22 @@ class InjuriesControllerTest extends TestCase
         $att = WorkplaceInjuryAttachment::where('workplace_injury_id', $inj->id)->first();
         $this->assertNotNull($att);
         $this->assertSame('medical_cert', $att->kind);
-        Storage::disk('public')->assertExists($att->path);
+        // Stored on the PRIVATE disk now — never world-readable under /storage.
+        Storage::disk('private')->assertExists($att->path);
+        $this->assertSame('private', $att->disk);
 
         // IDOR guard: the attachment belongs to $inj, not $other → 404 under $other.
         $this->actingAs($this->admin)
             ->get('/health-safety/injuries/'.$other->id.'/attachments/'.$att->id.'/download')
             ->assertNotFound();
 
-        // Correct parent downloads fine.
+        // Correct parent downloads fine — streamed from the private disk with the
+        // hardened headers (nosniff + CSP sandbox) from ServesPrivateAttachments.
         $this->actingAs($this->admin)
             ->get('/health-safety/injuries/'.$inj->id.'/attachments/'.$att->id.'/download')
-            ->assertOk();
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // Destroy
         $this->actingAs($this->admin)
@@ -279,7 +284,7 @@ class InjuriesControllerTest extends TestCase
 
     public function test_attachment_rejects_scriptable_type(): void
     {
-        Storage::fake('public');
+        Storage::fake('private');
         $inj = $this->injury();
 
         $this->actingAs($this->admin)
@@ -305,6 +310,50 @@ class InjuriesControllerTest extends TestCase
             'workplace_injury_id' => $inj->id,
             'notification_authority' => 'worksafe',
         ]);
+    }
+
+    public function test_notifiable_incidents_submitted_by_accepts_null(): void
+    {
+        // Item 1 — the column is nullable, so a queued/CLI auto-registration with no
+        // created_by and no auth() user still inserts the statutory record.
+        $id = \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insertGetId([
+            'incident_type' => 'serious_harm',
+            'notification_authority' => 'worksafe',
+            'title' => 'No submitter',
+            'description' => 'Notifiable record with a null submitter.',
+            'severity' => 'high',
+            'status' => 'pending',
+            'occurred_at' => now(),
+            'submitted_by' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('notifiable_incidents', ['id' => $id, 'submitted_by' => null]);
+    }
+
+    public function test_notifiable_incidents_workplace_injury_id_is_unique(): void
+    {
+        // Item 2 — a unique index DB-enforces one NotifiableIncident per injury, closing
+        // the observer's exists()-only race. Two non-null rows for one injury must fail.
+        $inj = $this->injury();
+        $row = [
+            'incident_type' => 'serious_harm',
+            'notification_authority' => 'worksafe',
+            'title' => 'First',
+            'description' => 'First notifiable for the injury.',
+            'severity' => 'high',
+            'status' => 'pending',
+            'occurred_at' => now(),
+            'workplace_injury_id' => $inj->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insert($row);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insert(array_merge($row, ['title' => 'Duplicate']));
     }
 
     public function test_update_does_not_change_status(): void

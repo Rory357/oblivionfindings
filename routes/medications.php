@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsReportController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\Compliance\ComplianceDashboardController;
 use App\Support\EmarUrl;
 
 /**
@@ -47,8 +46,5 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:medications.administer.correct')
         ->name('medications.corrections.reject');
 
-    // Compliance dashboard
-    Route::get('/compliance', [ComplianceDashboardController::class, 'index'])
-        ->middleware('permission:compliance.view')
-        ->name('compliance.index');
+    // NB: the /compliance command-centre route now lives in routes/compliance.php.
 });

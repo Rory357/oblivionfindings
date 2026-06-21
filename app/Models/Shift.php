@@ -39,6 +39,7 @@ class Shift extends Model
         'shift_type',
         'is_sleepover',
         'is_on_call',
+        'is_lone_worker',
         'expected_break_minutes',
         'coverage_roles',
         'created_by',
@@ -54,6 +55,7 @@ class Shift extends Model
         'publish_dirty_at' => 'datetime',
         'is_sleepover' => 'boolean',
         'is_on_call' => 'boolean',
+        'is_lone_worker' => 'boolean',
         'expected_break_minutes' => 'integer',
         'coverage_roles' => 'array',
     ];

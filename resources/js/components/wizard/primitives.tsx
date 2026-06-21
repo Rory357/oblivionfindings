@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Check } from 'lucide-react';
-import type { ComponentType, ReactNode } from 'react';
+import { cloneElement, isValidElement, useId, type ComponentType, type ReactElement, type ReactNode } from 'react';
 
 export type IconType = ComponentType<{ className?: string }>;
 
@@ -66,10 +66,21 @@ export function Field({
     span?: boolean;
     children: ReactNode;
 }) {
+    // Associate the visible label with its control for screen readers. Only a
+    // single child element without its own id is given the generated id (so
+    // composite controls — Select/TilePicker/fragments — are left untouched and
+    // the htmlFor simply doesn't bind, exactly as before).
+    const generatedId = useId();
+    const child = isValidElement(children) ? (children as ReactElement<{ id?: string }>) : null;
+    const controlId = child && child.props.id == null ? generatedId : undefined;
+    const control = controlId
+        ? cloneElement(child as ReactElement<{ id?: string }>, { id: controlId })
+        : children;
+
     return (
         <div className={cn('min-w-0', span && 'sm:col-span-2')}>
             {label ? (
-                <Label className="mb-1.5 flex items-center gap-1.5">
+                <Label htmlFor={controlId} className="mb-1.5 flex items-center gap-1.5">
                     {label}
                     {required ? (
                         <span className="text-status-critical">*</span>
@@ -81,7 +92,7 @@ export function Field({
                     ) : null}
                 </Label>
             ) : null}
-            {children}
+            {control}
             <FieldErr>{error}</FieldErr>
         </div>
     );
@@ -157,15 +168,19 @@ export function SelectInput({
     onChange,
     placeholder,
     options,
+    ariaLabel,
 }: {
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
     options: { value: string; label: string }[];
+    /** Accessible name for the trigger; falls back to the placeholder so a
+     *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
+    ariaLabel?: string;
 }) {
     return (
         <Select value={value || undefined} onValueChange={onChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full" aria-label={ariaLabel ?? placeholder}>
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>

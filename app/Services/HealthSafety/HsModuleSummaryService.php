@@ -2,9 +2,11 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\HazardousSubstance;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsRiskAssessment;
+use App\Models\SubstanceStorageLocation;
 
 /**
  * Provides H&S summary data for module context pages
@@ -51,6 +53,57 @@ class HsModuleSummaryService
                 ->limit(self::RECENT_EVENTS_LIMIT)
                 ->get(self::RECENT_EVENT_COLUMNS)
                 ->toArray(),
+        ];
+    }
+
+    /**
+     * Hazardous substances stored at a site — the read-mostly "Chemicals stored
+     * here" panel. The master record lives in the Chemical register; each row
+     * deep-links back to it. Reuses the substance SDS-state signal.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, summary: array<string, int>}
+     */
+    public function chemicalsStoredForSite(int $siteId): array
+    {
+        $locations = SubstanceStorageLocation::query()
+            ->where('site_id', $siteId)
+            ->with(['hazardousSubstance' => fn ($q) => $q->with('currentSds')])
+            ->orderBy('location_description')
+            ->get();
+
+        $rows = $locations->map(function (SubstanceStorageLocation $loc) {
+            $substance = $loc->hazardousSubstance;
+
+            return [
+                'id' => $loc->id,
+                'substance' => $substance ? [
+                    'id' => $substance->id,
+                    'name' => $substance->name,
+                    'common_name' => $substance->common_name,
+                    'is_controlled_substance' => (bool) $substance->is_controlled_substance,
+                ] : null,
+                'location_description' => $loc->location_description,
+                'current_quantity' => $loc->current_quantity !== null ? (float) $loc->current_quantity : null,
+                'quantity_unit' => $loc->quantity_unit,
+                'maximum_quantity' => $loc->maximum_quantity !== null ? (float) $loc->maximum_quantity : null,
+                'container_type' => $loc->container_type,
+                'properly_labelled' => (bool) $loc->properly_labelled,
+                'segregation_compliant' => (bool) $loc->segregation_compliant,
+                'last_audit_date' => optional($loc->last_audit_date)->toDateString(),
+                'sds_state' => $substance?->sds_state ?? 'missing',
+            ];
+        })->values();
+
+        return [
+            'rows' => $rows->all(),
+            'summary' => [
+                'count' => $rows->count(),
+                'controlled' => $rows->where('substance.is_controlled_substance', true)->count(),
+                'sds_to_action' => $rows->whereIn('sds_state', ['expiring', 'expired', 'missing'])->count(),
+                'segregation_gaps' => $rows->where('segregation_compliant', false)->count(),
+            ],
+            // Active substances for the "Add storage here" picker (master record in the register).
+            'substances' => HazardousSubstance::query()->where('status', 'active')->orderBy('name')->get(['id', 'name']),
         ];
     }
 

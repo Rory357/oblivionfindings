@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Services\ComplianceEngineService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HealthSafety\StoreConsultationRequest;
 use App\Http\Requests\HealthSafety\StoreMeetingRequest;
@@ -13,13 +14,13 @@ use App\Models\HsCommitteeMeeting;
 use App\Models\HsConsultation;
 use App\Models\HsRepresentative;
 use App\Models\Site;
+use App\Models\StaffCredential;
 use App\Models\User;
 use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -41,10 +42,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class WorkerParticipationController extends Controller
 {
+    use ServesPrivateAttachments;
+
     private const TABS = ['representatives', 'meetings', 'consultations'];
 
     /** Canonical consultation lifecycle, in order. */
     private const CONSULT_STAGES = ['open', 'feedback_received', 'actioned', 'closed'];
+
+    /** StaffCredential.type used to track a trained HSR (NZQA US 29315). */
+    private const HSR_CREDENTIAL_TYPE = 'HSR Initial Training (NZQA US 29315)';
 
     public function __construct(
         private readonly ComplianceEngineService $compliance,
@@ -249,7 +255,9 @@ class WorkerParticipationController extends Controller
             'created_by' => $request->user()->id,
         ]));
 
-        $this->syncRepresentativeObligations($rep->fresh('user'), $request->user());
+        $fresh = $rep->fresh('user');
+        $this->syncRepresentativeObligations($fresh, $request->user());
+        $this->syncTrainedHsrCredential($fresh);
 
         return back()->with('success', 'H&S representative added successfully.');
     }
@@ -260,12 +268,15 @@ class WorkerParticipationController extends Controller
             'status' => ['sometimes', 'string', 'in:active,inactive,resigned'],
             'work_group' => ['sometimes', 'nullable', 'string', 'max:120'],
             'training_days_completed' => ['sometimes', 'integer', 'min:0', 'max:30'],
+            'initial_training_completed_at' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'term_expires_at' => ['sometimes', 'nullable', 'date', 'before_or_equal:'.now()->addYears(3)->toDateString()],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
         $representative->update($validated);
-        $this->syncRepresentativeObligations($representative->fresh('user'), $request->user());
+        $fresh = $representative->fresh('user');
+        $this->syncRepresentativeObligations($fresh, $request->user());
+        $this->syncTrainedHsrCredential($fresh);
 
         return back()->with('success', 'Representative updated successfully.');
     }
@@ -310,6 +321,32 @@ class WorkerParticipationController extends Controller
         }
     }
 
+    /**
+     * Surface a trained HSR (completed NZQA Unit Standard 29315) as a tracked HR
+     * credential on the rep's staff record — visible on /staff/{id}/credentials and
+     * read by the HR compliance evaluator's `credential` check. Reuses the existing
+     * staff_credentials table (no parallel credential system) and is idempotent on
+     * [user_id, type], so re-saving the rep never duplicates. Closes the
+     * cross-module gap where "trained HSR" (a precondition for issuing PINs /
+     * directing cease-unsafe-work) was not a tracked credential.
+     */
+    private function syncTrainedHsrCredential(HsRepresentative $rep): void
+    {
+        if (! $rep->initial_training_completed_at || ! $rep->user_id) {
+            return;
+        }
+
+        StaffCredential::updateOrCreate(
+            ['user_id' => $rep->user_id, 'type' => self::HSR_CREDENTIAL_TYPE],
+            [
+                'issuer' => 'NZQA',
+                'reference' => 'US 29315',
+                'issued_at' => $rep->initial_training_completed_at,
+                'notes' => 'Auto-recorded from the H&S Representative register (initial HSR training).',
+            ]
+        );
+    }
+
     private function obligationExists(string $code): bool
     {
         return ComplianceObligation::where('obligation_code', $code)
@@ -331,12 +368,45 @@ class WorkerParticipationController extends Controller
             'terms_of_reference' => ['nullable', 'string', 'max:5000'],
             'members' => ['required', 'array', 'min:1'],
             'members.*' => ['integer', 'exists:users,id'],
+            // Optional inline first meeting — lets the schedule-meeting wizard
+            // stand up a brand-new committee AND its first meeting in ONE atomic
+            // request, instead of a fragile two-POST chain across an Inertia
+            // redirect (which could orphan the committee).
+            'schedule_meeting' => ['sometimes', 'boolean'],
+            'scheduled_at' => ['required_if:schedule_meeting,true', 'date'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'agenda_items' => ['nullable', 'array'],
+            'agenda_items.*' => ['string', 'max:255'],
+            'attendees' => ['nullable', 'array'],
+            'attendees.*' => ['integer', 'exists:users,id'],
         ]);
 
-        $committee = HsCommittee::create(array_merge($validated, [
+        $committee = HsCommittee::create([
+            'name' => $validated['name'],
+            'site_id' => $validated['site_id'],
+            'meeting_frequency' => $validated['meeting_frequency'],
+            'established_at' => $validated['established_at'],
+            'terms_of_reference' => $validated['terms_of_reference'] ?? null,
+            'members' => $validated['members'],
             'status' => 'active',
             'created_by' => $request->user()->id,
-        ]));
+        ]);
+
+        if ($request->boolean('schedule_meeting')) {
+            $meeting = $committee->meetings()->create([
+                'scheduled_at' => $validated['scheduled_at'],
+                'location' => $validated['location'] ?? null,
+                'agenda_items' => $validated['agenda_items'] ?? [],
+                'status' => 'scheduled',
+                'created_by' => $request->user()->id,
+            ]);
+
+            $attendeeIds = $this->cleanIds($validated['attendees'] ?? $committee->members ?? []);
+            $meeting->attendeeUsers()->sync($attendeeIds);
+            $this->notifyMeeting($meeting, $attendeeIds, $committee, notifyWorkers: true);
+
+            return back()->with('success', 'Committee created and first meeting scheduled.');
+        }
 
         return back()->with('success', 'Committee created successfully.')->with('created_committee_id', $committee->id);
     }
@@ -476,9 +546,13 @@ class WorkerParticipationController extends Controller
     public function downloadMeetingMinutes(HsCommitteeMeeting $meeting): StreamedResponse
     {
         $path = $meeting->minutes_document_path;
-        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Minutes document not found.');
+        abort_unless((bool) $path, 404, 'Minutes document not found.');
 
-        return Storage::disk('private')->download($path, $meeting->minutes_document_name ?? basename($path));
+        return $this->streamPrivateAttachment(
+            'private',
+            $path,
+            $meeting->minutes_document_name ?? basename($path),
+        );
     }
 
     /**
@@ -565,6 +639,16 @@ class WorkerParticipationController extends Controller
             'workers_consulted.*' => ['integer', 'exists:users,id'],
         ]);
 
+        // The lifecycle is monotonic — never regress the stage (e.g. recording
+        // late feedback on an already-actioned consultation keeps the later
+        // stage); content fields still save. Defense-in-depth — the front-end
+        // already computes a non-regressing target.
+        $current = array_search($consultation->status, self::CONSULT_STAGES, true);
+        $target = array_search($validated['status'], self::CONSULT_STAGES, true);
+        if ($current !== false && $target !== false && $target < $current) {
+            $validated['status'] = $consultation->status;
+        }
+
         $consultation->update($validated);
 
         return back()->with('success', 'Consultation status updated successfully.');
@@ -595,9 +679,13 @@ class WorkerParticipationController extends Controller
             ? [$consultation->document_path, $consultation->document_name]
             : [$consultation->outcome_document_path, $consultation->outcome_document_name];
 
-        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Document not found.');
+        abort_unless((bool) $path, 404, 'Document not found.');
 
-        return Storage::disk('private')->download($path, $name ?? basename($path));
+        return $this->streamPrivateAttachment(
+            'private',
+            $path,
+            $name ?? basename($path),
+        );
     }
 
     /* ================================================================== */

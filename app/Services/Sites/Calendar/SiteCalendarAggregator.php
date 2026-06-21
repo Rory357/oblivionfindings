@@ -14,6 +14,7 @@ use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
+use App\Services\Sites\Calendar\Providers\PpeObligationProvider;
 use App\Services\Sites\Calendar\Providers\RespiteObligationProvider;
 use App\Services\Sites\Calendar\Providers\VendorReminderProvider;
 use App\Services\Sites\Calendar\Providers\WorkerParticipationObligationProvider;
@@ -68,6 +69,7 @@ class SiteCalendarAggregator
             new AssetMaintenanceObligationProvider(),
             new EmergencyPlanObligationProvider(),
             new DrillObligationProvider(),
+            new PpeObligationProvider(),
             new RespiteObligationProvider(),
             new WorkerParticipationObligationProvider(),
         ];

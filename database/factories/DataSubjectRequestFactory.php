@@ -17,7 +17,9 @@ class DataSubjectRequestFactory extends Factory
             'request_details' => fake()->paragraph(),
             'received_at' => fake()->dateTimeBetween('-14 days', 'now'),
             'due_date' => fake()->dateTimeBetween('now', '+20 days'),
-            'status' => fake()->randomElement(['pending', 'in_progress', 'completed']),
+            // 'pending' is not a valid status enum value (received/under_review/
+            // identity_verification/in_progress/completed/rejected/withdrawn).
+            'status' => fake()->randomElement(['received', 'in_progress', 'completed']),
         ];
     }
 }

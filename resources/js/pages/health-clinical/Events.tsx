@@ -10,11 +10,33 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Filter, X } from 'lucide-react';
-import { useState } from 'react';
+import {
+    ShiftContextMenu,
+    type ShiftCtxItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
+import {
+    HealthClinicalShell,
+    RegisterStatStrip,
+    type HealthClinicalKpis,
+} from '@/pages/health-clinical/components/health-clinical-shell';
+import { cn } from '@/lib/utils';
+import { Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowUpRight,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    Filter,
+    ListChecks,
+    MoreVertical,
+    Paperclip,
+    Stethoscope,
+    User,
+    X,
+} from 'lucide-react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type PaginatedData<T> = {
     data: T[];
@@ -31,36 +53,25 @@ type EventRecord = {
     severity: string;
     occurred_at: string;
     description: string;
+    immediate_action_taken: string | null;
+    outcome: string | null;
+    witnesses: string[] | null;
     requires_followup: boolean;
+    followup_notes: string | null;
     followup_completed_at: string | null;
     reviewed_at: string | null;
     status: string;
+    attachments_count?: number;
     client:
-        | {
-              id: number;
-              first_name: string;
-              last_name: string;
-              site_id: number | null;
-              site?: { id: number; name: string } | null;
-          }
+        | { id: number; first_name: string; last_name: string; site_id: number | null; site?: { id: number; name: string } | null }
         | null;
     site: { id: number; name: string } | null;
     reporter: { id: number; name: string } | null;
     reviewer: { id: number; name: string } | null;
 };
 
-type Stats = {
-    total_7d: number;
-    total_30d: number;
-    pending_follow_ups: number;
-    unreviewed: number;
-};
-
-type SelectOption = {
-    value: string;
-    label: string;
-};
-
+type Stats = { total_7d: number; total_30d: number; pending_follow_ups: number; unreviewed: number };
+type SelectOption = { value: string; label: string };
 type FilterOptions = {
     clients: Array<{ id: number; first_name: string; last_name: string }>;
     sites: Array<{ id: number; name: string }>;
@@ -69,7 +80,6 @@ type FilterOptions = {
     follow_up_statuses: SelectOption[];
     review_statuses: SelectOption[];
 };
-
 type Filters = {
     client_id?: string;
     event_type?: string;
@@ -80,39 +90,34 @@ type Filters = {
     date_from?: string;
     date_to?: string;
 };
-
 type Props = {
     events: PaginatedData<EventRecord>;
     stats: Stats;
     filters: Filters;
     filter_options: FilterOptions;
+    kpis: HealthClinicalKpis;
+    tab_counts?: Record<string, number>;
 };
+
+type ClinicalAbilities = { eventsReview?: boolean; eventsEscalate?: boolean; eventsRecord?: boolean };
 
 const ALL_SENTINEL = '__all__';
 
-const severityColor: Record<string, string> = {
-    low: 'bg-status-info-bg text-status-info',
-    medium: 'bg-status-warning-bg text-status-warning',
-    high: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
+const SEV: Record<string, { border: string; pill: string; tile: string }> = {
+    low: { border: 'border-l-status-info', pill: 'bg-status-info-bg text-status-info', tile: 'bg-status-info-bg text-status-info' },
+    medium: { border: 'border-l-status-warning', pill: 'bg-status-warning-bg text-status-warning', tile: 'bg-status-warning-bg text-status-warning' },
+    high: { border: 'border-l-status-warning', pill: 'bg-status-warning-bg text-status-warning', tile: 'bg-status-warning-bg text-status-warning' },
+    critical: { border: 'border-l-status-critical', pill: 'bg-status-critical-bg text-status-critical', tile: 'bg-status-critical-bg text-status-critical' },
 };
 
 function formatNzDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function EventRegister({
-    events,
-    stats,
-    filters,
-    filter_options,
-}: Props) {
+export default function EventRegister({ events, stats, filters, filter_options, kpis, tab_counts }: Props) {
+    const page = usePage<{ auth?: { can?: { clinical?: ClinicalAbilities } } }>();
+    const can = page.props.auth?.can?.clinical ?? {};
+
     const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
         event_type: filters.event_type ?? '',
@@ -123,382 +128,240 @@ export default function EventRegister({
         date_from: filters.date_from ?? '',
         date_to: filters.date_to ?? '',
     });
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [expanded, setExpanded] = useState<number | null>(null);
 
     const applyFilters = () => {
-        const clean = Object.fromEntries(
-            Object.entries(local).filter(([, value]) => value !== '' && value !== undefined),
-        );
-
-        router.get('/health-clinical/events', clean, {
-            preserveState: true,
-            replace: true,
-        });
+        const clean = Object.fromEntries(Object.entries(local).filter(([, v]) => v !== '' && v !== undefined));
+        router.get('/health-clinical/events', clean, { preserveState: true, replace: true });
     };
-
     const clearFilters = () => {
         setLocal({});
-        router.get('/health-clinical/events', {}, {
-            preserveState: true,
-            replace: true,
-        });
+        router.get('/health-clinical/events', {}, { preserveState: true, replace: true });
+    };
+    const hasFilters = Object.values(local).some((v) => v !== '' && v !== undefined);
+    const eventTypeLabel = (value: string) => filter_options.event_types.find((t) => t.value === value)?.label ?? value;
+    const siteName = (e: EventRecord) => e.site?.name ?? e.client?.site?.name ?? '—';
+    const clientName = (e: EventRecord) => (e.client ? `${e.client.first_name} ${e.client.last_name}`.trim() : 'No client');
+
+    const reload = { preserveScroll: true } as const;
+    const review = (id: number) => router.patch(`/health-clinical/events/${id}/review`, {}, reload);
+    const completeFollowup = (id: number) => router.patch(`/health-clinical/events/${id}/follow-up/complete`, {}, reload);
+    const escalate = (id: number) => router.post(`/health-clinical/events/${id}/escalate`, {}, reload);
+
+    const openRowCtx = (e: ReactMouseEvent, ev: EventRecord) => {
+        e.preventDefault();
+        const needsSignOff = !ev.reviewed_at;
+        const followUpDue = ev.requires_followup && !ev.followup_completed_at;
+        const items: ShiftCtxItem[] = [
+            ...(ev.client
+                ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View client', sub: clientName(ev), onClick: () => router.visit(`/operations/clients/${ev.client!.id}`) } satisfies ShiftCtxItem]
+                : []),
+            { sep: true },
+            ...(can.eventsReview && needsSignOff
+                ? [{ icon: <Check className="h-3.5 w-3.5" />, label: 'Review & sign off', tone: 'primary', onClick: () => review(ev.id) } satisfies ShiftCtxItem]
+                : []),
+            ...(followUpDue && (can.eventsReview || can.eventsRecord)
+                ? [{ icon: <ListChecks className="h-3.5 w-3.5" />, label: 'Mark follow-up complete', onClick: () => completeFollowup(ev.id) } satisfies ShiftCtxItem]
+                : []),
+            ...(can.eventsEscalate
+                ? [{ icon: <ArrowUpRight className="h-3.5 w-3.5" />, label: 'Escalate', tone: 'critical', onClick: () => escalate(ev.id) } satisfies ShiftCtxItem]
+                : []),
+        ];
+        setCtx({ x: e.clientX, y: e.clientY, tag: ev.severity.toUpperCase(), meta: `${clientName(ev)} · ${eventTypeLabel(ev.event_type)}`, items });
     };
 
-    const hasFilters = Object.values(local).some((value) => value !== '' && value !== undefined);
-
-    const eventTypeLabel = (value: string) =>
-        filter_options.event_types.find((type) => type.value === value)?.label ?? value;
-
-    const siteName = (event: EventRecord) =>
-        event.site?.name ?? event.client?.site?.name ?? '—';
-
     return (
-        <AppLayout>
-            <Head title="Clinical Event Register — Health & Clinical" />
+        <HealthClinicalShell activeTab="clinical_events" kpis={kpis} tabCounts={tab_counts}>
+            <RegisterStatStrip
+                stats={[
+                    { label: 'Events · 7d', value: stats.total_7d },
+                    { label: '30d', value: stats.total_30d },
+                    { label: 'Pending follow-up', value: stats.pending_follow_ups, tone: stats.pending_follow_ups > 0 ? 'warning' : 'default' },
+                    { label: 'Unreviewed', value: stats.unreviewed, tone: stats.unreviewed > 0 ? 'warning' : 'default' },
+                ]}
+            />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={AlertTriangle}
-                        title="Clinical Event Register"
-                        description="Cross-client oversight of recorded clinical events."
-                        stats={[
-                            { label: 'Last 7d', value: stats.total_7d },
-                            { label: 'Last 30d', value: stats.total_30d },
-                            { label: 'Pending follow-up', value: stats.pending_follow_ups },
-                            { label: 'Unreviewed', value: stats.unreviewed },
-                        ]}
-                        actions={
-                            <Link href="/health-clinical">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    Dashboard
-                                </Button>
-                            </Link>
-                        }
-                    />
-                }
-            >
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-sm">
-                            <Filter className="h-4 w-4" /> Filters
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-                            <div>
-                                <Label className="text-xs">Client</Label>
-                                <Select
-                                    value={local.client_id || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            client_id: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="All clients" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>All clients</SelectItem>
-                                        {filter_options.clients.map((client) => (
-                                            <SelectItem key={client.id} value={String(client.id)}>
-                                                {client.first_name} {client.last_name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Type</Label>
-                                <Select
-                                    value={local.event_type || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            event_type: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="All types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>All types</SelectItem>
-                                        {filter_options.event_types.map((type) => (
-                                            <SelectItem key={type.value} value={type.value}>
-                                                {type.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Severity</Label>
-                                <Select
-                                    value={local.severity || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            severity: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="All severities" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>All severities</SelectItem>
-                                        {filter_options.severities.map((severity) => (
-                                            <SelectItem key={severity.value} value={severity.value}>
-                                                {severity.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Follow-up</Label>
-                                <Select
-                                    value={local.follow_up_status || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            follow_up_status: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="Any status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>Any status</SelectItem>
-                                        {filter_options.follow_up_statuses.map((status) => (
-                                            <SelectItem key={status.value} value={status.value}>
-                                                {status.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Review</Label>
-                                <Select
-                                    value={local.review_status || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            review_status: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="Any review status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>Any review status</SelectItem>
-                                        {filter_options.review_statuses.map((status) => (
-                                            <SelectItem key={status.value} value={status.value}>
-                                                {status.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Site</Label>
-                                <Select
-                                    value={local.site_id || ALL_SENTINEL}
-                                    onValueChange={(value) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            site_id: value === ALL_SENTINEL ? '' : value,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger className="h-8 text-xs">
-                                        <SelectValue placeholder="All sites" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ALL_SENTINEL}>All sites</SelectItem>
-                                        {filter_options.sites.map((site) => (
-                                            <SelectItem key={site.id} value={String(site.id)}>
-                                                {site.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">From</Label>
-                                <Input
-                                    type="date"
-                                    className="h-8 text-xs"
-                                    value={local.date_from ?? ''}
-                                    onChange={(event) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            date_from: event.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">To</Label>
-                                <Input
-                                    type="date"
-                                    className="h-8 text-xs"
-                                    value={local.date_to ?? ''}
-                                    onChange={(event) =>
-                                        setLocal((current) => ({
-                                            ...current,
-                                            date_to: event.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                        <Filter className="h-4 w-4" /> Filters
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+                        <FilterSelect label="Client" value={local.client_id} onChange={(v) => setLocal((c) => ({ ...c, client_id: v }))} placeholder="All clients"
+                            options={filter_options.clients.map((c) => ({ value: String(c.id), label: `${c.first_name} ${c.last_name}` }))} />
+                        <FilterSelect label="Type" value={local.event_type} onChange={(v) => setLocal((c) => ({ ...c, event_type: v }))} placeholder="All types" options={filter_options.event_types} />
+                        <FilterSelect label="Severity" value={local.severity} onChange={(v) => setLocal((c) => ({ ...c, severity: v }))} placeholder="All severities" options={filter_options.severities} />
+                        <FilterSelect label="Follow-up" value={local.follow_up_status} onChange={(v) => setLocal((c) => ({ ...c, follow_up_status: v }))} placeholder="Any status" options={filter_options.follow_up_statuses} />
+                        <FilterSelect label="Review" value={local.review_status} onChange={(v) => setLocal((c) => ({ ...c, review_status: v }))} placeholder="Any review" options={filter_options.review_statuses} />
+                        <FilterSelect label="Site" value={local.site_id} onChange={(v) => setLocal((c) => ({ ...c, site_id: v }))} placeholder="All sites"
+                            options={filter_options.sites.map((s) => ({ value: String(s.id), label: s.name }))} />
+                        <div>
+                            <Label className="text-xs">From</Label>
+                            <Input type="date" className="h-8 text-xs" value={local.date_from ?? ''} onChange={(e) => setLocal((c) => ({ ...c, date_from: e.target.value }))} />
                         </div>
-                        <div className="mt-3 flex gap-2">
-                            <Button size="sm" onClick={applyFilters}>
-                                Apply
+                        <div>
+                            <Label className="text-xs">To</Label>
+                            <Input type="date" className="h-8 text-xs" value={local.date_to ?? ''} onChange={(e) => setLocal((c) => ({ ...c, date_to: e.target.value }))} />
+                        </div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                        <Button size="sm" onClick={applyFilters}>Apply</Button>
+                        {hasFilters && (
+                            <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1">
+                                <X className="h-3 w-3" /> Clear
                             </Button>
-                            {hasFilters && (
-                                <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1">
-                                    <X className="h-3 w-3" /> Clear
-                                </Button>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
+            {events.data.length === 0 ? (
                 <Card>
-                    <CardContent className="p-0">
-                        {events.data.length === 0 ? (
-                            <div className="p-8 text-center text-sm text-muted-foreground">
-                                No clinical events match the selected filters.
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/40">
-                                            <th className="px-4 py-3 text-left font-medium">Client</th>
-                                            <th className="px-4 py-3 text-left font-medium">Type</th>
-                                            <th className="px-4 py-3 text-left font-medium">Severity</th>
-                                            <th className="px-4 py-3 text-left font-medium">Summary</th>
-                                            <th className="px-4 py-3 text-left font-medium">Occurred</th>
-                                            <th className="px-4 py-3 text-left font-medium">Reported by</th>
-                                            <th className="px-4 py-3 text-left font-medium">Site</th>
-                                            <th className="px-4 py-3 text-left font-medium">Follow-up</th>
-                                            <th className="px-4 py-3 text-left font-medium">Review</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {events.data.map((event) => (
-                                            <tr
-                                                key={event.id}
-                                                className={`border-b transition-colors hover:bg-muted/20 ${
-                                                    event.severity === 'critical' ? 'bg-status-critical-bg' : ''
-                                                }`}
-                                            >
-                                                <td className="px-4 py-3">
-                                                    {event.client ? (
-                                                        <Link
-                                                            href={`/operations/clients/${event.client.id}`}
-                                                            className="font-medium text-status-info hover:underline"
-                                                        >
-                                                            {event.client.first_name} {event.client.last_name}
-                                                        </Link>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className="text-[10px]">
-                                                        {eventTypeLabel(event.event_type)}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <Badge className={`text-[10px] ${severityColor[event.severity] ?? ''}`}>
-                                                        {event.severity}
-                                                    </Badge>
-                                                </td>
-                                                <td className="max-w-[260px] truncate px-4 py-3 text-xs text-muted-foreground">
-                                                    {event.description || '—'}
-                                                </td>
-                                                <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                                                    {formatNzDate(event.occurred_at)}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    {event.reporter?.name ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-muted-foreground">
-                                                    {siteName(event)}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    {!event.requires_followup ? (
-                                                        <span className="text-muted-foreground">None</span>
-                                                    ) : event.followup_completed_at ? (
-                                                        <Badge variant="secondary" className="text-[10px]">
-                                                            Complete
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="destructive" className="text-[10px]">
-                                                            Pending
-                                                        </Badge>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    {event.reviewed_at ? (
-                                                        <div className="space-y-1">
-                                                            <Badge variant="secondary" className="text-[10px]">
-                                                                Reviewed
-                                                            </Badge>
-                                                            <p className="text-muted-foreground">
-                                                                {event.reviewer?.name ?? '—'}
-                                                            </p>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">Unreviewed</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {events.last_page > 1 && (
-                            <div className="flex items-center justify-between border-t px-4 py-3">
-                                <p className="text-xs text-muted-foreground">
-                                    Page {events.current_page} of {events.last_page} ({events.total} total)
-                                </p>
-                                <div className="flex gap-1">
-                                    {events.links.map((link, index) => (
-                                        <Button
-                                            key={index}
-                                            variant={link.active ? 'default' : 'outline'}
-                                            size="sm"
-                                            className="h-7 min-w-[28px] px-2 text-xs"
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                router.get(link.url, {}, { preserveState: true })
-                                            }
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    <CardContent className="p-12 text-center">
+                        <Stethoscope className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                        <p className="font-medium text-muted-foreground">No clinical events here</p>
+                        <p className="mt-1 text-sm text-muted-foreground/70">Nothing matches the selected filters.</p>
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+            ) : (
+                <div className="flex flex-col gap-2.5">
+                    {events.data.map((ev) => {
+                        const sev = SEV[ev.severity] ?? SEV.low;
+                        const isOpen = expanded === ev.id;
+                        const hasDetail = !!(ev.immediate_action_taken || ev.outcome || (ev.witnesses && ev.witnesses.length) || ev.followup_notes || (ev.attachments_count ?? 0) > 0 || ev.reviewed_at);
+                        return (
+                            <div
+                                key={ev.id}
+                                onContextMenu={(e) => openRowCtx(e, ev)}
+                                className={cn('rounded-xl border border-l-4 border-border bg-card p-3.5 shadow-sm transition-colors hover:bg-muted/30', sev.border)}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg', sev.tile)}>
+                                        <Stethoscope className="h-5 w-5" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm font-semibold">{eventTypeLabel(ev.event_type)}</span>
+                                            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium capitalize', sev.pill)}>{ev.severity}</span>
+                                            {!ev.reviewed_at ? (
+                                                <Badge variant="outline" className="border-status-warning/40 text-[10px] text-status-warning">Needs sign-off</Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="border-status-success/40 text-[10px] text-status-success">Reviewed</Badge>
+                                            )}
+                                            {ev.requires_followup && !ev.followup_completed_at ? (
+                                                <Badge variant="outline" className="border-status-critical/40 text-[10px] text-status-critical">Follow-up due</Badge>
+                                            ) : null}
+                                        </div>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {ev.client ? (
+                                                <Link href={`/operations/clients/${ev.client.id}`} className="font-medium text-status-info hover:underline">{clientName(ev)}</Link>
+                                            ) : clientName(ev)}
+                                            {' · '}{siteName(ev)}
+                                        </p>
+                                        {ev.description ? <p className={cn('mt-1 text-[13px] text-foreground', isOpen ? 'whitespace-pre-wrap' : 'line-clamp-2')}>{ev.description}</p> : null}
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                                            <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{formatNzDate(ev.occurred_at)}</span>
+                                            {ev.reporter ? <span>· {ev.reporter.name}</span> : null}
+                                            {(ev.attachments_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{ev.attachments_count}</span> : null}
+                                            {hasDetail ? (
+                                                // eslint-disable-next-line no-restricted-syntax -- inline disclosure toggle, not a shadcn Button
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpanded(isOpen ? null : ev.id)}
+                                                    aria-expanded={isOpen}
+                                                    aria-controls={`event-detail-${ev.id}`}
+                                                    className="ml-auto inline-flex items-center gap-1 font-medium hover:text-foreground"
+                                                >
+                                                    {isOpen ? <>Hide detail <ChevronUp className="h-3.5 w-3.5" /></> : <>View detail <ChevronDown className="h-3.5 w-3.5" /></>}
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    {/* eslint-disable-next-line no-restricted-syntax -- icon-only context-menu trigger, not a shadcn Button */}
+                                    <button
+                                        type="button"
+                                        aria-label="Event actions"
+                                        onClick={(e) => openRowCtx(e, ev)}
+                                        className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <MoreVertical className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                {isOpen ? (
+                                    <div id={`event-detail-${ev.id}`} className="mt-3 grid gap-2.5 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2">
+                                        <DetailField label="Immediate action taken" value={ev.immediate_action_taken} />
+                                        <DetailField label="Outcome" value={ev.outcome} />
+                                        <DetailField label="Witnesses" value={ev.witnesses && ev.witnesses.length ? ev.witnesses.join(', ') : null} />
+                                        {ev.requires_followup ? <DetailField label="Follow-up notes" value={ev.followup_notes} /> : null}
+                                        <div className="sm:col-span-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+                                            {ev.reviewed_at ? <span>Reviewed {formatNzDate(ev.reviewed_at)}{ev.reviewer ? ` · ${ev.reviewer.name}` : ''}</span> : <span>Not yet reviewed</span>}
+                                            {(ev.attachments_count ?? 0) > 0 ? <span>{ev.attachments_count} attachment{ev.attachments_count === 1 ? '' : 's'}</span> : null}
+                                        </div>
+                                        <div className="sm:col-span-2 flex flex-wrap gap-2">
+                                            {can.eventsReview && !ev.reviewed_at ? (
+                                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => review(ev.id)}><Check className="h-3.5 w-3.5" /> Review &amp; sign off</Button>
+                                            ) : null}
+                                            {ev.requires_followup && !ev.followup_completed_at && (can.eventsReview || can.eventsRecord) ? (
+                                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => completeFollowup(ev.id)}><ListChecks className="h-3.5 w-3.5" /> Mark follow-up complete</Button>
+                                            ) : null}
+                                            {can.eventsEscalate ? (
+                                                <Button size="sm" variant="ghost" className="gap-1.5 text-status-critical" onClick={() => escalate(ev.id)}><ArrowUpRight className="h-3.5 w-3.5" /> Escalate</Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {events.last_page > 1 ? (
+                <div className="flex items-center justify-between px-1">
+                    <p className="text-xs text-muted-foreground">Page {events.current_page} of {events.last_page} ({events.total} total)</p>
+                    <div className="flex gap-1">
+                        {events.links.map((link, i) => (
+                            <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" className="h-7 min-w-[28px] px-2 text-xs" disabled={!link.url}
+                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                dangerouslySetInnerHTML={{ __html: link.label }} />
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+        </HealthClinicalShell>
+    );
+}
+
+function DetailField({ label, value }: { label: string; value: string | null }) {
+    return (
+        <div>
+            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+            <p className="mt-0.5 text-[13px] whitespace-pre-wrap text-foreground">{value || '—'}</p>
+        </div>
+    );
+}
+
+function FilterSelect({ label, value, onChange, placeholder, options }: { label: string; value?: string; onChange: (v: string) => void; placeholder: string; options: SelectOption[] }) {
+    return (
+        <div>
+            <Label className="text-xs">{label}</Label>
+            <Select value={value || ALL_SENTINEL} onValueChange={(v) => onChange(v === ALL_SENTINEL ? '' : v)}>
+                <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder={placeholder} />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value={ALL_SENTINEL}>{placeholder}</SelectItem>
+                    {options.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
     );
 }

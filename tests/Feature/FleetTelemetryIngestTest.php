@@ -11,9 +11,12 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\FleetTelemetryEvent;
+use App\Models\LoneWorkerSession;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -610,6 +613,47 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame(1, FleetSignal::query()->where('signal_type', 'resident.sos')->count());
     }
 
+    public function test_staff_tracker_sos_routes_to_lone_worker_emergency_not_resident(): void
+    {
+        config(['services.telemetry.ingest_token' => 'test-token']);
+
+        $worker = User::factory()->create();
+        ['device' => $device, 'asset' => $asset] = $this->createStaffTracker('QUE-STAFF-SOS', $worker->id);
+        $session = LoneWorkerSession::create([
+            'user_id' => $worker->id,
+            'started_at' => now()->subHour(),
+            'expected_end_at' => now()->addHour(),
+            'last_check_in_at' => now()->subMinutes(20),
+            'check_in_interval_minutes' => 30,
+            'status' => 'active',
+            'created_by' => $worker->id,
+            'updated_by' => $worker->id,
+        ]);
+
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => 'QUE-STAFF-SOS',
+                'gps_time' => now()->toISOString(),
+                'alarm' => 'sos',
+                'event_type' => 'man_down',
+                'sos_flag' => true,
+                'lat' => -41.5,
+                'lng' => 174.5,
+                'command_word' => 'GTMAN',
+            ])
+            ->assertStatus(200);
+
+        // The worker's live session flips to emergency...
+        $this->assertSame('emergency', $session->fresh()->status);
+        // ...a lone-worker Control Room alert is raised...
+        $this->assertTrue(
+            ControlRoomAlert::where('source', 'lone_worker')->exists(),
+            'Expected a lone_worker Control Room alert from the staff tracker SOS.',
+        );
+        // ...and it is NOT mislabelled as a resident SOS (the guard).
+        $this->assertDatabaseMissing('fleet_signals', ['signal_type' => 'resident.sos']);
+    }
+
     public function test_gl30_charging_state_updates_device_health_without_battery_percentage_or_location(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
@@ -676,6 +720,46 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame('charging', $device->meta['charging_status']);
         $this->assertTrue($device->meta['external_power']);
         $this->assertSame('Charging', $device->meta['battery_status_label']);
+    }
+
+    /**
+     * A Queclink personal tracker paired to a STAFF member (lone worker) — no client,
+     * no consent; the canonical link is a TARGET_STAFF DeviceAssignment.
+     *
+     * @return array{asset: Asset, tracker: AssetTracker, device: Device}
+     */
+    private function createStaffTracker(string $deviceUid, int $userId): array
+    {
+        $site = Site::create(['name' => 'Field Base']);
+        $asset = Asset::create([
+            'site_id' => $site->id,
+            'name' => "Lone-worker tracker {$deviceUid}",
+            'status' => 'active',
+            'risk_level' => 'medium',
+            'category' => 'personal_tracker',
+        ]);
+        $tracker = AssetTracker::create([
+            'asset_id' => $asset->id,
+            'vendor' => 'queclink',
+            'device_uid' => $deviceUid,
+            'imei' => $deviceUid,
+            'status' => 'paired',
+            'paired_at' => now(),
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => $deviceUid,
+            'device_uid' => $deviceUid,
+            'legacy_asset_tracker_id' => $tracker->id,
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'staff',
+            'assignable_id' => $userId,
+            'assigned_at' => now(),
+        ]);
+
+        return compact('asset', 'tracker', 'device');
     }
 
     /**

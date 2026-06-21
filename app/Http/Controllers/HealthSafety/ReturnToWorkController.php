@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ClientIncident;
@@ -32,6 +33,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReturnToWorkController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /** Canonical injury_type → human label (15 enum values). */
     private const TYPE_LABELS = [
         'strain' => 'Muscle strain',
@@ -373,7 +376,9 @@ class ReturnToWorkController extends Controller
             'attachments' => $injury->attachments->map(fn (WorkplaceInjuryAttachment $a) => [
                 'id' => $a->id,
                 'original_name' => $a->original_name,
-                'url' => Storage::disk($a->disk ?: 'public')->url($a->path),
+                // Private disk → no public URL; the thumbnail/preview loads through the
+                // authenticated download route (Content-Disposition is ignored for <img>).
+                'url' => route('health-safety.injuries.attachments.download', [$injury->id, $a->id]),
                 'mime' => $a->mime,
                 'kind' => $a->kind,
                 'notes' => $a->notes,
@@ -667,7 +672,8 @@ class ReturnToWorkController extends Controller
     {
         $validated = $request->validate([
             // Allowlist the expected evidence formats — never accept scriptable types
-            // (svg/html) since attachments are served same-origin from the public disk.
+            // (svg/html). Files are stored on the private disk and streamed through the
+            // authenticated download route with nosniff + CSP sandbox (defence in depth).
             'file' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,gif,doc,docx'],
             'kind' => ['nullable', 'string', 'in:medical_cert,acc_form,rtw_clearance,photo,document'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -675,7 +681,7 @@ class ReturnToWorkController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('workplace_injury_attachments', $disk);
 
         $injury->attachments()->create([
@@ -693,22 +699,24 @@ class ReturnToWorkController extends Controller
         return back()->with('success', 'Document uploaded.');
     }
 
-    public function downloadAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment)
+    public function downloadAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): StreamedResponse
     {
         abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
-        abort_unless(Storage::disk($disk)->exists($attachment->path), 404);
-
-        // nosniff so a mislabelled file can't be re-interpreted as executable content.
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name, ['X-Content-Type-Options' => 'nosniff']);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroyAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): RedirectResponse
     {
         abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

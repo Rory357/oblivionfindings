@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Models\SafeguardingAttachment;
 use App\Models\SafeguardingConcern;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Safeguarding redesign — Step 7a (W8). Evidence upload/download/delete.
@@ -14,6 +16,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class SafeguardingAttachmentController extends Controller
 {
+    use ServesPrivateAttachments;
+
     public function store(Request $request, SafeguardingConcern $concern): RedirectResponse
     {
         $this->authorize('update', $concern);
@@ -27,7 +31,7 @@ class SafeguardingAttachmentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('safeguarding_attachments', $disk);
 
         $concern->attachments()->create([
@@ -44,7 +48,7 @@ class SafeguardingAttachmentController extends Controller
         return back()->with('success', 'Evidence uploaded.');
     }
 
-    public function download(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment)
+    public function download(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment): StreamedResponse
     {
         $this->authorize('view', $concern);
         abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
@@ -54,9 +58,13 @@ class SafeguardingAttachmentController extends Controller
             abort_unless((bool) $request->user()?->can('viewSensitive', SafeguardingConcern::class), 403);
         }
 
-        $disk = $attachment->disk ?: 'public';
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 
     public function destroy(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment): RedirectResponse
@@ -64,7 +72,7 @@ class SafeguardingAttachmentController extends Controller
         $this->authorize('update', $concern);
         abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
 
-        $disk = $attachment->disk ?: 'public';
+        $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }

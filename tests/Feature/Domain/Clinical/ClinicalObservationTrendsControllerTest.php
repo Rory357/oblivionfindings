@@ -70,7 +70,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/clients/' . $client->id . '/trends?date_from=' . now()->subDays(7)->toDateString() . '&date_to=' . now()->toDateString())
+            ->get('/health-clinical/clients/'.$client->id.'/trends?date_from='.now()->subDays(7)->toDateString().'&date_to='.now()->toDateString())
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientTrends')
@@ -87,7 +87,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($user)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.date_from', now()->subDays(29)->toDateString())
@@ -97,7 +97,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($supportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientTrends')
@@ -106,11 +106,91 @@ class ClinicalObservationTrendsControllerTest extends TestCase
             );
 
         $this->actingAs($unassignedSupportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
             ->assertForbidden();
 
         $this->actingAs($unauthorizedUser)
-            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->get('/health-clinical/clients/'.$client->id.'/trends')
+            ->assertForbidden();
+    }
+
+    public function test_module_trends_tab_renders_and_scopes_by_client(): void
+    {
+        $user = $this->createUserWithRole('clinical_lead');
+        $unauthorizedUser = User::factory()->create(['approved_at' => now()]);
+        $client = Client::factory()->create();
+
+        ClinicalObservation::factory()->weight()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(3),
+            'data' => ['weight_kg' => 70.5],
+        ]);
+        ClinicalObservation::factory()->vitals()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(2),
+            'data' => ['systolic' => 150, 'diastolic' => 92, 'pulse' => 110],
+            'news2_score' => 4,
+            'news2_band' => 'medium',
+        ]);
+
+        // No client selected → client-picker state, no trend sets yet.
+        $this->actingAs($user)
+            ->get('/health-clinical/trends')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->has('clients')
+                ->has('kpis')
+                ->where('selected_client', null)
+                ->where('trend_sets', null));
+
+        // Client selected → trend sets incl. the module-only NEWS2 series.
+        $this->actingAs($user)
+            ->get('/health-clinical/trends?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->where('selected_client.id', $client->id)
+                ->where('trend_sets.weight.points.0.weight_kg', 70.5)
+                ->where('trend_sets.news2.points.0.score', 4)
+                ->where('trend_sets.news2.points.0.band', 'medium'));
+
+        // No clinical-observation permission → forbidden.
+        $this->actingAs($unauthorizedUser)
+            ->get('/health-clinical/trends')
+            ->assertForbidden();
+    }
+
+    public function test_module_trends_enforces_per_client_assignment_for_assigned_only_users(): void
+    {
+        // A viewAssigned-only user must not chart a client they are not assigned to:
+        // the module Trends tab must apply the same per-client guard as the per-client page.
+        $assigned = $this->createUserWithRole('support_worker');
+        $unassigned = $this->createUserWithRole('support_worker');
+        $client = Client::factory()->create();
+        Client::factory()->create(); // another client this worker is NOT assigned to
+        $client->supportWorkers()->attach($assigned->id);
+
+        ClinicalObservation::factory()->weight()->create([
+            'client_id' => $client->id,
+            'recorded_at' => now()->subDays(2),
+            'data' => ['weight_kg' => 70.5],
+        ]);
+
+        $this->actingAs($assigned)
+            ->get('/health-clinical/trends?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('health-clinical/Trends')
+                ->where('selected_client.id', $client->id)
+                ->where('trend_sets.weight.points.0.weight_kg', 70.5)
+                // Picker is scoped to the worker's caseload — the other client is excluded.
+                ->has('clients', 1)
+                ->where('clients.0.id', $client->id));
+
+        // Unassigned worker swapping in another client's id → 403, no PHI leaked.
+        $this->actingAs($unassigned)
+            ->get('/health-clinical/trends?client_id='.$client->id)
             ->assertForbidden();
     }
 

@@ -317,6 +317,40 @@ export interface MyDayLoneWorkerSession {
     client: { id: number; name: string } | null;
 }
 
+/**
+ * One open first-aid follow-up assigned to the signed-in worker — the data
+ * behind the My Day "First-aid follow-ups assigned to me" card. Read-only;
+ * `url` deep-links to the First Aid Register's record modal. Mirrors
+ * `MyTasksController::getFirstAidFollowups()`.
+ */
+export interface MyDayFirstAidFollowup {
+    id: number;
+    notes: string | null;
+    due_at: string | null;
+    is_overdue: boolean;
+    record_id: number;
+    treated_person_name: string | null;
+    site_name: string | null;
+    url: string;
+}
+
+/**
+ * One of the signed-in worker's own active PPE allocations needing attention —
+ * the data behind the My Day "Your PPE needs attention" card. Mirrors
+ * `MyTasksController::getMyPpe()`.
+ */
+export interface MyDayPpe {
+    id: number;
+    type_name: string;
+    category: string | null;
+    serial_number: string | null;
+    site: string | null;
+    allocated_at: string | null;
+    acknowledged: boolean;
+    fit_test_required: boolean;
+    fit_test_completed: boolean;
+}
+
 export interface MyDayPreShiftBriefing {
     id: number;
     starts_at: string;
@@ -377,6 +411,8 @@ export interface MyDayPageProps {
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
     active_round?: MyDayActiveRound | null;
     active_lone_worker_session?: MyDayLoneWorkerSession | null;
+    first_aid_followups?: MyDayFirstAidFollowup[];
+    my_ppe?: MyDayPpe[];
     shiftChecklists?: ShiftChecklistRun[];
     checklistConfig?: MyDayChecklistConfig;
     runDetail?: RunDetail | null;

@@ -28,10 +28,21 @@ class ClinicalPermissionsSeeder extends Seeder
             ['key' => 'clinical.events.viewAssigned', 'description' => 'View clinical events for assigned clients', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.record', 'description' => 'Record clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.review', 'description' => 'Review and close clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.events.escalate', 'description' => 'Escalate clinical events to on-call clinical leadership', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
+            // Behaviour (ABC)
+            ['key' => 'clinical.behaviour.viewAny', 'description' => 'View the cross-client behaviour (ABC) register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
+            // Health Monitoring rollup
+            ['key' => 'clinical.monitoring.viewAny', 'description' => 'View the cross-client health-monitoring rollup', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Protocols
             ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Create, edit, and deactivate clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
+            // Assessments & Risk (FRAT / Braden / MUST / IDDSI)
+            ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Module access
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
@@ -81,6 +92,10 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.record',
             'clinical.observations.recordClinical',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
+            'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
@@ -94,8 +109,13 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
+            'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
+            'clinical.events.escalate',
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
@@ -110,8 +130,13 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
+            'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
+            'clinical.events.escalate',
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
@@ -126,8 +151,13 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.observations.recordClinical',
             'clinical.observations.correct',
             'clinical.events.viewAny',
+            'clinical.behaviour.viewAny',
+            'clinical.monitoring.viewAny',
+            'clinical.assessments.viewAny',
+            'clinical.assessments.record',
             'clinical.events.record',
             'clinical.events.review',
+            'clinical.events.escalate',
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',

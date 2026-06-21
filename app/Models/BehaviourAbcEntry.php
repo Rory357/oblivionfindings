@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Domain\Clinical\Enums\BehaviourFunction;
+use App\Domain\Clinical\Models\ClinicalAttachment;
 use App\Models\Concerns\AuditableChanges;
 use Database\Factories\BehaviourAbcEntryFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -105,6 +107,11 @@ class BehaviourAbcEntry extends Model
     public function carePlan(): BelongsTo
     {
         return $this->belongsTo(CarePlan::class, 'linked_care_plan_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(ClinicalAttachment::class, 'attachable')->latest();
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────

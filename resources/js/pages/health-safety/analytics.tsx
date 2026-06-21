@@ -98,6 +98,7 @@ const REGISTER: Record<string, string> = {
     hazards: '/compliance/hazards',
     sites: '/health-safety',
     root_cause: '/health-safety/events',
+    first_aid: '/health-safety/first-aid',
 };
 
 // Governance report set — same list as the dashboard's export popover; analytics opens each
@@ -524,7 +525,7 @@ function DrillModal({ target, query, onClose, onExport }: { target: DrillTarget;
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function HealthSafetyAnalytics(props: AnalyticsProps) {
-    const { trends, scorecard, period_summary, worksafe_notifiable, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison } = props;
+    const { trends, scorecard, period_summary, worksafe_notifiable, sds_expiring, hours_meta, filters, sites, incident_data, severity_data, root_cause_data, injury_data, hazard_data, site_comparison, restraint_analytics } = props;
 
     // Board-report routes are gated on governance.view; hide the launcher + the
     // Governance-tab report packs for register-only roles to avoid a hard 403.
@@ -586,6 +587,11 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const incidentTypeItems: BreakdownItem[] = incident_data.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const injuryTypeItems: BreakdownItem[] = injury_data.by_type.map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
     const bodyPartItems: BreakdownItem[] = injury_data.by_body_part.map((d, i) => ({ key: d.body_part, label: d.body_part.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    // First-aid breakdowns (optional + additive). Leading care-activity signal — first-aid-only
+    // treatment is excluded from TRIFR, so these navigate to the First Aid register rather than
+    // the recordable-injury drill modal (the records endpoint has no first-aid view).
+    const firstAidTypeItems: BreakdownItem[] = (props.first_aid_data?.by_type ?? []).map((d, i) => ({ key: d.type, label: d.type.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
+    const firstAidOutcomeItems: DonutDatum[] = (props.first_aid_data?.by_outcome ?? []).map((d, i) => ({ key: d.outcome, label: d.outcome.replace(/_/g, ' '), value: d.count, color: PALETTE[i % PALETTE.length] }));
 
     // ── drill builders ──
     const incidentTypeTarget = (it: BreakdownItem): DrillTarget => ({ view: 'incidents', label: `Incidents · ${it.label}`, filters: { type: it.key }, register: REGISTER.incidents });
@@ -595,6 +601,10 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const bodyPartTarget = (it: BreakdownItem): DrillTarget => ({ view: 'injuries', label: `Injuries · ${it.label}`, filters: { body_part: it.key }, register: REGISTER.injuries });
     const riskTarget = (d: DonutDatum): DrillTarget => ({ view: 'hazards', label: `Hazards · ${d.label} risk`, filters: { risk: d.key }, register: REGISTER.hazards });
     const siteTarget = (s: SiteRow): DrillTarget => ({ view: 'incidents', label: `Site · ${s.name}`, filters: { site_id: s.id }, register: REGISTER.incidents });
+    // First-aid breakdowns are a leading care-activity signal (excluded from TRIFR). The drill
+    // records endpoint has no first-aid view, so row/segment clicks navigate straight to the
+    // First Aid register rather than opening the recordable-injury drill modal.
+    const goFirstAid = () => router.visit(REGISTER.first_aid);
 
     // ── hero pieces ──
     // Cluster tiles read from the scorecard split (it carries the period-over-period
@@ -713,7 +723,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                 <span className="underline decoration-primary-foreground/40 underline-offset-4">{siteScope}</span>
                                 {' · Ngā Paerewa NZS 8134:2021 · HSWA 2015 · ACC'}
                             </p>
-                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={0} drillsOverdue={drillsOverdue} />
+                            <HeroComplianceBadges worksafeAwaiting={worksafe_notifiable.awaiting} sdsExpiring={sds_expiring} drillsOverdue={drillsOverdue} />
                         </div>
                     </div>
 
@@ -757,22 +767,28 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                 {tab === 'trends' ? <TrendsTab trends={trends} /> : null}
 
                 {tab === 'breakdowns' ? (
-                    <BreakdownsTab
-                        incidentTypeItems={incidentTypeItems}
-                        severitySegments={severitySegments}
-                        rootCause={root_cause_data}
-                        injuryTypeItems={injuryTypeItems}
-                        bodyPartItems={bodyPartItems}
-                        riskSegments={riskSegments}
-                        onDrill={openDrill}
-                        onCtx={openCtx}
-                        incidentTypeTarget={incidentTypeTarget}
-                        severityTarget={severityTarget}
-                        causeTarget={causeTarget}
-                        injuryTypeTarget={injuryTypeTarget}
-                        bodyPartTarget={bodyPartTarget}
-                        riskTarget={riskTarget}
-                    />
+                    <div className="grid gap-4">
+                        <BreakdownsTab
+                            incidentTypeItems={incidentTypeItems}
+                            severitySegments={severitySegments}
+                            rootCause={root_cause_data}
+                            injuryTypeItems={injuryTypeItems}
+                            bodyPartItems={bodyPartItems}
+                            riskSegments={riskSegments}
+                            firstAidTypeItems={firstAidTypeItems}
+                            firstAidOutcomeItems={firstAidOutcomeItems}
+                            onDrill={openDrill}
+                            onCtx={openCtx}
+                            onFirstAid={goFirstAid}
+                            incidentTypeTarget={incidentTypeTarget}
+                            severityTarget={severityTarget}
+                            causeTarget={causeTarget}
+                            injuryTypeTarget={injuryTypeTarget}
+                            bodyPartTarget={bodyPartTarget}
+                            riskTarget={riskTarget}
+                        />
+                        <RestraintBreakdowns data={restraint_analytics} />
+                    </div>
                 ) : null}
 
                 {tab === 'sites' ? (
@@ -970,8 +986,11 @@ function BreakdownsTab({
     injuryTypeItems,
     bodyPartItems,
     riskSegments,
+    firstAidTypeItems,
+    firstAidOutcomeItems,
     onDrill,
     onCtx,
+    onFirstAid,
     incidentTypeTarget,
     severityTarget,
     causeTarget,
@@ -985,6 +1004,9 @@ function BreakdownsTab({
     injuryTypeItems: BreakdownItem[];
     bodyPartItems: BreakdownItem[];
     riskSegments: DonutDatum[];
+    firstAidTypeItems: BreakdownItem[];
+    firstAidOutcomeItems: DonutDatum[];
+    onFirstAid: () => void;
     incidentTypeTarget: (i: BreakdownItem) => DrillTarget;
     severityTarget: (d: DonutDatum) => DrillTarget;
     causeTarget: (cause: string) => DrillTarget;
@@ -1019,6 +1041,13 @@ function BreakdownsTab({
                     <HorizontalBars data={bodyPartItems} />
                     <BreakdownRows items={bodyPartItems} onItem={(d) => onDrill(bodyPartTarget(d))} onItemCtx={(e, d) => onCtx(e, bodyPartTarget(d), String(d.value), 'warning')} />
                 </ChartCard>
+                <ChartCard title="First aid by outcome" subtitle="Care-activity signal — first-aid-only treatment is excluded from TRIFR" aria="First aid by treatment outcome" table={{ caption: 'First aid by outcome', columns: ['Outcome', 'Count'], rows: firstAidOutcomeItems.map((s) => [s.label, s.value]) }}>
+                    <FocusDonut segments={firstAidOutcomeItems} onSegment={onFirstAid} />
+                </ChartCard>
+                <ChartCard title="First aid by type" subtitle="Click to open the First Aid register" aria="First aid by injury or illness type" table={{ caption: 'First aid by type', columns: ['Type', 'Count'], rows: firstAidTypeItems.map((s) => [s.label, s.value]) }}>
+                    <HorizontalBars data={firstAidTypeItems} />
+                    <BreakdownRows items={firstAidTypeItems} onItem={onFirstAid} />
+                </ChartCard>
             </div>
 
             <ChartCard title="Open hazards by risk rating" subtitle="Hover to focus · click to drill" aria="Open hazards by risk rating" className="lg:max-w-xl" table={{ caption: 'Hazards by risk rating', columns: ['Risk', 'Count'], rows: riskSegments.map((s) => [s.label, s.value]) }}>
@@ -1026,6 +1055,96 @@ function BreakdownsTab({
             </ChartCard>
         </div>
     );
+}
+
+/**
+ * Restraint & behaviour-support breakdowns (Ngā Paerewa NZS 8134:2021 least-restrictive
+ * practice). Additive analytics section — restraint events by type/severity and BSPs by
+ * status, with a governance summary strip. Rows deep-link into the restraints register.
+ */
+function RestraintBreakdowns({ data }: { data: AnalyticsProps['restraint_analytics'] }) {
+    if (!data) return null;
+    const s = data.summary;
+    const toItems = (rows: { label: string; count: number }[], colour: (label: string, i: number) => string): BreakdownItem[] =>
+        rows.map((r, i) => ({ key: r.label || 'unspecified', label: titleCaseLabel(r.label), value: r.count, color: colour(r.label, i) }));
+
+    const typeItems = toItems(data.breakdowns.by_type, (_l, i) => [TOKEN.primary, TOKEN.c2, TOKEN.c3, TOKEN.c4, TOKEN.c5][i % 5]);
+    const severityItems = toItems(data.breakdowns.by_severity, (l) => severityFill(l));
+    const planStatusItems = toItems(data.breakdowns.by_plan_status, (l) => planStatusFill(l));
+
+    const stats: { label: string; value: number; tone: 'neutral' | 'warning' | 'critical'; href: string }[] = [
+        { label: 'Events (period)', value: s.events_in_period, tone: 'neutral', href: '/health-safety/restraints?lens=events&tab=30d' },
+        { label: 'Out of plan', value: s.out_of_plan, tone: 'critical', href: '/health-safety/restraints?lens=events&tab=out_of_plan' },
+        { label: 'With injury', value: s.with_injury, tone: 'critical', href: '/health-safety/restraints?lens=events&tab=injury' },
+        { label: 'Unreviewed', value: s.unreviewed, tone: 'warning', href: '/health-safety/restraints?lens=events&tab=unreviewed' },
+        { label: 'Active BSPs', value: s.active_plans, tone: 'neutral', href: '/health-safety/restraints?lens=plans&tab=active' },
+        { label: 'Plans review due', value: s.plans_review_due, tone: 'warning', href: '/health-safety/restraints?lens=plans&tab=review_due' },
+    ];
+    const statValueClass = (tone: 'neutral' | 'warning' | 'critical', value: number) =>
+        `mt-0.5 text-xl font-bold tabular-nums ${value <= 0 ? 'text-foreground' : tone === 'critical' ? 'text-status-critical' : tone === 'warning' ? 'text-status-warning' : 'text-foreground'}`;
+
+    return (
+        <div className="grid gap-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-bold text-foreground">Restraint &amp; behaviour support</h3>
+                    <p className="text-xs text-muted-foreground">Least-restrictive practice — Ngā Paerewa NZS 8134:2021. Click a tile to open the register.</p>
+                </div>
+                <Link href="/health-safety/restraints" className="shrink-0 text-xs font-medium text-primary hover:underline">
+                    Open register →
+                </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {stats.map((st) => (
+                    <Link
+                        key={st.label}
+                        href={st.href}
+                        className="flex flex-col rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                        <span className="text-[11px] font-medium text-muted-foreground">{st.label}</span>
+                        <span className={statValueClass(st.tone, st.value)}>{st.value}</span>
+                    </Link>
+                ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+                <ChartCard title="Restraints by type" subtitle="Restrictive practice used" aria="Restraint events by type" table={{ caption: 'Restraint events by type', columns: ['Type', 'Count'], rows: typeItems.map((s) => [s.label, s.value]) }}>
+                    {typeItems.length ? <HorizontalBars data={typeItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+                <ChartCard title="Restraints by severity" subtitle="Distribution this period" aria="Restraint events by severity" table={{ caption: 'Restraint events by severity', columns: ['Severity', 'Count'], rows: severityItems.map((s) => [s.label, s.value]) }}>
+                    {severityItems.length ? <HorizontalBars data={severityItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+                <ChartCard title="Behaviour support plans" subtitle="By lifecycle status" aria="Behaviour support plans by status" table={{ caption: 'Behaviour support plans by status', columns: ['Status', 'Count'], rows: planStatusItems.map((s) => [s.label, s.value]) }}>
+                    {planStatusItems.length ? <HorizontalBars data={planStatusItems} /> : <EmptyBreakdown />}
+                </ChartCard>
+            </div>
+        </div>
+    );
+}
+
+function EmptyBreakdown() {
+    return <p className="flex h-[120px] items-center justify-center text-xs text-muted-foreground">No data for this period.</p>;
+}
+
+function titleCaseLabel(s: string): string {
+    if (!s) return 'Unspecified';
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function planStatusFill(status: string): string {
+    switch (status) {
+        case 'active':
+            return TOKEN.success;
+        case 'under_review':
+            return TOKEN.warning;
+        case 'draft':
+            return TOKEN.info;
+        case 'archived':
+            return TOKEN.c5;
+        default:
+            return TOKEN.primary;
+    }
 }
 
 function GovernanceTab({ scorecard, trends, reportUrl, exportUrl, canViewReports }: { scorecard: AnalyticsProps['scorecard']; trends: AnalyticsProps['trends']; reportUrl: (n: string) => string; exportUrl: () => void; canViewReports: boolean }) {

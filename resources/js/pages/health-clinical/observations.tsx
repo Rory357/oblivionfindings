@@ -10,10 +10,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { Head, Link, router } from '@inertiajs/react';
-import { Activity, ClipboardList, Eye, Filter, X } from 'lucide-react';
+import {
+    HealthClinicalShell,
+    RegisterStatStrip,
+    type HealthClinicalKpis,
+} from '@/pages/health-clinical/components/health-clinical-shell';
+import { Link, router } from '@inertiajs/react';
+import { Filter, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -71,6 +74,8 @@ type Props = {
     stats: Stats;
     filters: Filters;
     filter_options: FilterOptions;
+    kpis: HealthClinicalKpis;
+    tab_counts?: Record<string, number>;
 };
 
 function formatNzDate(iso: string): string {
@@ -117,6 +122,8 @@ export default function ObservationRegister({
     stats,
     filters,
     filter_options,
+    kpis,
+    tab_counts,
 }: Props) {
     const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
@@ -151,35 +158,16 @@ export default function ObservationRegister({
         filter_options.observation_types.find((t) => t.value === value)?.label ?? value;
 
     return (
-        <AppLayout>
-            <Head title="Observation Register — Health & Clinical" />
+        <HealthClinicalShell activeTab="observations" kpis={kpis} tabCounts={tab_counts}>
+            <RegisterStatStrip
+                stats={[
+                    { label: 'Observations · 7d', value: stats.total_7d },
+                    { label: '30d', value: stats.total_30d },
+                    { label: 'Shown', value: observations.total },
+                ]}
+            />
 
-            <PageLayout
-                hero={
-                    <PageHero
-                        icon={Eye}
-                        title="Observation Register"
-                        description="All clinical observations across clients."
-                        stats={[
-                            { label: 'Last 7d', value: stats.total_7d },
-                            { label: 'Last 30d', value: stats.total_30d },
-                            { label: 'Total Page', value: observations.total },
-                        ]}
-                        actions={
-                            <Link href="/health-clinical">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    Dashboard
-                                </Button>
-                            </Link>
-                        }
-                    />
-                }
-            >
-                {/* Filters */}
+            {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -424,7 +412,6 @@ export default function ObservationRegister({
                         )}
                     </CardContent>
                 </Card>
-            </PageLayout>
-        </AppLayout>
+        </HealthClinicalShell>
     );
 }

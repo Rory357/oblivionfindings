@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\HsEvent;
 use App\Models\SubstanceExposureRecord;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Support\Facades\Log;
 
@@ -12,6 +13,7 @@ class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
 {
     public function __construct(
         private readonly HsEventService $hsEventService,
+        private readonly NotifiableEventClassifier $classifier,
     ) {}
 
     public function created(SubstanceExposureRecord $record): void
@@ -19,12 +21,15 @@ class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
         try {
             $record->loadMissing(['relatedIncident:id,client_id,shift_id']);
 
+            $severity = $this->severityFor($record);
+
             $this->hsEventService->recordEvent([
                 'source' => $record,
                 'event_category' => HsEvent::CATEGORY_EXPOSURE,
-                'severity' => $record->medical_attention_sought
-                    ? HsEvent::SEVERITY_HIGH
-                    : HsEvent::SEVERITY_MEDIUM,
+                'severity' => $severity,
+                // Classify against the WorkSafe NZ notifiable threshold (HSWA 2015
+                // ss.23–25): hospitalisation/death, or a critical-severity event.
+                'worksafe_notifiable' => $this->classifier->isNotifiable($record->medical_treatment, $severity),
                 'occurred_at' => $record->exposed_at,
                 'reported_at' => $record->created_at,
                 'site_id' => $record->site_id,
@@ -39,5 +44,16 @@ class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function severityFor(SubstanceExposureRecord $record): string
+    {
+        return match ($record->medical_treatment) {
+            'death' => HsEvent::SEVERITY_CRITICAL,
+            'hospitalisation', 'medical' => HsEvent::SEVERITY_HIGH,
+            'first_aid' => HsEvent::SEVERITY_MEDIUM,
+            'none' => HsEvent::SEVERITY_LOW,
+            default => $record->medical_attention_sought ? HsEvent::SEVERITY_HIGH : HsEvent::SEVERITY_MEDIUM,
+        };
     }
 }

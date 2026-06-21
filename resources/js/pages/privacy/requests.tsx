@@ -64,13 +64,13 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
 
     const getRequestTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            'access': 'Right to Access (Art. 15)',
-            'rectification': 'Right to Rectification (Art. 16)',
-            'erasure': 'Right to Erasure (Art. 17)',
-            'restriction': 'Right to Restriction (Art. 18)',
-            'portability': 'Right to Portability (Art. 20)',
-            'objection': 'Right to Object (Art. 21)',
-            'automated_decision': 'Automated Decision Rights (Art. 22)',
+            'access': 'Access · IPP 6',
+            'rectification': 'Correction · IPP 7',
+            'erasure': 'Deletion',
+            'restriction': 'Restriction of use',
+            'portability': 'Portability',
+            'objection': 'Objection',
+            'automated_decision': 'Automated decision',
         };
         return labels[type] || type;
     };
@@ -144,13 +144,13 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="access">Access (Art. 15)</SelectItem>
-                                    <SelectItem value="rectification">Rectification (Art. 16)</SelectItem>
-                                    <SelectItem value="erasure">Erasure (Art. 17)</SelectItem>
-                                    <SelectItem value="restriction">Restriction (Art. 18)</SelectItem>
-                                    <SelectItem value="portability">Portability (Art. 20)</SelectItem>
-                                    <SelectItem value="objection">Objection (Art. 21)</SelectItem>
-                                    <SelectItem value="automated_decision">Automated Decision (Art. 22)</SelectItem>
+                                    <SelectItem value="access">Access (IPP 6)</SelectItem>
+                                    <SelectItem value="rectification">Correction (IPP 7)</SelectItem>
+                                    <SelectItem value="erasure">Deletion</SelectItem>
+                                    <SelectItem value="restriction">Restriction</SelectItem>
+                                    <SelectItem value="portability">Portability</SelectItem>
+                                    <SelectItem value="objection">Objection</SelectItem>
+                                    <SelectItem value="automated_decision">Automated decision</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

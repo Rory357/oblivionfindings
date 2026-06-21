@@ -25,10 +25,12 @@ class HsAttachment extends Model
         'mime_type',
         'size_bytes',
         'description',
+        'version_at_upload',
     ];
 
     protected $casts = [
         'size_bytes' => 'integer',
+        'version_at_upload' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */

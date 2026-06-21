@@ -2,6 +2,7 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\Acvpu;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Events\ObservationRecorded;
 use App\Domain\Clinical\Models\ClinicalObservation;
@@ -18,6 +19,11 @@ use Illuminate\Validation\ValidationException;
 class ClinicalObservationService
 {
     public const TIMELINE_TYPE_OBSERVATION = 'clinical_observation';
+
+    public function __construct(
+        protected News2Scorer $news2Scorer,
+        protected ClinicalSignalService $signalService,
+    ) {}
 
     /**
      * Record a clinical observation.
@@ -42,6 +48,12 @@ class ClinicalObservationService
 
         $input['data'] = $this->validateDataForType($type, $input['data']);
 
+        // NEWS2 is computed on write for vitals so registers/trends/the watchlist
+        // can read the stored score + band without recomputation.
+        $news2 = $type === ObservationType::Vitals
+            ? $this->news2Scorer->score($input['data'])
+            : null;
+
         $observation = ClinicalObservation::create([
             'client_id' => $client->id,
             'shift_id' => $shift?->id,
@@ -50,7 +62,12 @@ class ClinicalObservationService
             'observation_type' => $type,
             'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
             'data' => $input['data'],
+            'news2_score' => $news2?->score,
+            'news2_band' => $news2?->band,
             'notes' => $input['notes'] ?? null,
+            'is_flagged' => $isFlagged = (bool) ($input['is_flagged'] ?? false),
+            'flagged_reason' => $isFlagged ? ($input['flagged_reason'] ?? null) : null,
+            'flagged_by' => $isFlagged ? $recorder->id : null,
             'protocol_schedule_id' => $input['protocol_schedule_id'] ?? null,
         ]);
 
@@ -62,6 +79,11 @@ class ClinicalObservationService
                 $recorder->id,
                 $observation->id,
             );
+        }
+
+        // Deterioration escalation — Medium/High NEWS2 raises a clinical signal.
+        if ($news2 && $news2->band->isOnWatch()) {
+            $this->signalService->emitForDeterioration($observation, $news2);
         }
 
         ObservationRecorded::dispatch($observation);
@@ -105,8 +127,69 @@ class ClinicalObservationService
             ->ofType($type)
             ->recordedBetween($from, $to)
             ->orderBy('recorded_at')
-            ->select(['id', 'recorded_at', 'data'])
+            ->select(['id', 'recorded_at', 'data', 'news2_score', 'news2_band'])
             ->get();
+    }
+
+    /**
+     * Build the chartable trend sets (weight / pain / vitals / fluid, plus NEWS2
+     * when requested) for a client over a date range. Shared by the per-client
+     * Trends page and the module Trends tab so the two never drift.
+     *
+     * @return array<string, array{key: string, label: string, description: string, points: array<int, array<string, mixed>>, count: int, latest: array<string, mixed>|null}>
+     */
+    public function buildTrendSets(Client $client, \DateTimeInterface $from, \DateTimeInterface $to, bool $includeNews2 = false): array
+    {
+        $sets = [
+            'weight' => $this->trendSet('weight', 'Weight', 'Track body weight over time.', $client, ObservationType::Weight, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['weight_kg'] ?? null) ? ['weight_kg' => round((float) $o->data['weight_kg'], 1)] : null),
+            'pain' => $this->trendSet('pain', 'Pain Score', 'Track pain score observations on the 0 to 10 scale.', $client, ObservationType::Pain, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['score'] ?? null) ? ['score' => (float) $o->data['score'], 'location' => $o->data['location'] ?? null] : null),
+            'vitals' => $this->trendSet('vitals', 'Vitals', 'Blood pressure and pulse trends.', $client, ObservationType::Vitals, $from, $to,
+                fn (ClinicalObservation $o) => (is_numeric($o->data['systolic'] ?? null) && is_numeric($o->data['diastolic'] ?? null) && is_numeric($o->data['pulse'] ?? null))
+                    ? ['systolic' => (float) $o->data['systolic'], 'diastolic' => (float) $o->data['diastolic'], 'pulse' => (float) $o->data['pulse']] : null),
+            'fluid_intake' => $this->trendSet('fluid_intake', 'Fluid Intake', 'Track fluid intake amounts in millilitres.', $client, ObservationType::FluidIntake, $from, $to,
+                fn (ClinicalObservation $o) => is_numeric($o->data['amount_ml'] ?? null) ? ['amount_ml' => (float) $o->data['amount_ml'], 'fluid_type' => $o->data['fluid_type'] ?? null] : null),
+        ];
+
+        if ($includeNews2) {
+            $sets['news2'] = $this->trendSet('news2', 'NEWS2', 'Early-warning score from recorded vitals.', $client, ObservationType::Vitals, $from, $to,
+                fn (ClinicalObservation $o) => $o->news2_score === null ? null : ['score' => (int) $o->news2_score, 'band' => $o->news2_band?->value]);
+        }
+
+        return $sets;
+    }
+
+    /**
+     * @param  callable(ClinicalObservation): (array<string, mixed>|null)  $mapPoint
+     * @return array{key: string, label: string, description: string, points: array<int, array<string, mixed>>, count: int, latest: array<string, mixed>|null}
+     */
+    private function trendSet(string $key, string $label, string $description, Client $client, ObservationType $type, \DateTimeInterface $from, \DateTimeInterface $to, callable $mapPoint): array
+    {
+        $points = $this->getTrends($client, $type, $from, $to)
+            ->map(function (ClinicalObservation $observation) use ($mapPoint) {
+                $extra = $mapPoint($observation);
+                if ($extra === null) {
+                    return null;
+                }
+
+                return array_merge([
+                    'id' => $observation->id,
+                    'recorded_at' => $observation->recorded_at->toISOString(),
+                    'short_label' => $observation->recorded_at->format('j M'),
+                ], $extra);
+            })
+            ->filter()
+            ->values();
+
+        return [
+            'key' => $key,
+            'label' => $label,
+            'description' => $description,
+            'points' => $points->all(),
+            'count' => $points->count(),
+            'latest' => $points->last(),
+        ];
     }
 
     // ── Validation ───────────────────────────────────────────────────────
@@ -180,6 +263,29 @@ class ClinicalObservationService
         $this->numericField($data, $errors, 'temperature', 30, 45, required: false);
         $this->numericField($data, $errors, 'respiration_rate', 4, 60, required: false);
         $this->numericField($data, $errors, 'o2_saturation', 50, 100, required: false);
+
+        // NEWS2 inputs (optional — present when a full early-warning set is recorded).
+        if ($this->hasValue($data, 'consciousness')) {
+            $level = (string) $data['consciousness'];
+            if (Acvpu::tryFrom($level) === null) {
+                $errors['data.consciousness'] = 'Choose a valid level of consciousness (ACVPU).';
+            } else {
+                $data['consciousness'] = $level;
+            }
+        }
+
+        if (array_key_exists('on_oxygen', $data) && $data['on_oxygen'] !== null && $data['on_oxygen'] !== '') {
+            $data['on_oxygen'] = filter_var($data['on_oxygen'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($this->hasValue($data, 'spo2_scale')) {
+            $scale = (int) $data['spo2_scale'];
+            if (! in_array($scale, [1, 2], true)) {
+                $errors['data.spo2_scale'] = 'SpO₂ scale must be 1 or 2.';
+            } else {
+                $data['spo2_scale'] = $scale;
+            }
+        }
     }
 
     /**

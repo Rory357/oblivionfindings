@@ -54,13 +54,13 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
 
     const getRequestTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            access: 'Right to Access (Art. 15)',
-            rectification: 'Right to Rectification (Art. 16)',
-            erasure: 'Right to Erasure (Art. 17)',
-            restriction: 'Right to Restriction (Art. 18)',
-            portability: 'Right to Portability (Art. 20)',
-            objection: 'Right to Object (Art. 21)',
-            automated_decision: 'Automated Decision Rights (Art. 22)',
+            access: 'Access · IPP 6',
+            rectification: 'Correction · IPP 7',
+            erasure: 'Deletion',
+            restriction: 'Restriction of use',
+            portability: 'Portability',
+            objection: 'Objection',
+            automated_decision: 'Automated decision',
         };
         return labels[type] || type;
     };

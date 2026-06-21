@@ -125,7 +125,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Hazards
         Route::get('/hazards', [SiteHazardController::class, 'index'])
-            ->name('sites.hazards.index');
+            ->name('sites.hazards.index')
+            ->middleware('permission:hazards.view');
         Route::get('/hazards/create', [SiteHazardController::class, 'create'])
             ->name('sites.hazards.create')
             ->middleware('permission:hazards.create');
@@ -458,6 +459,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/hazards/{hazard}/close', [SiteHazardController::class, 'close'])
         ->name('sites.hazards.close')
         ->middleware('permission:hazards.close');
+    Route::post('/hazards/{hazard}/status', [SiteHazardController::class, 'transition'])
+        ->name('sites.hazards.status')
+        ->middleware('permission:hazards.manage');
+    Route::post('/hazards/{hazard}/review', [SiteHazardController::class, 'review'])
+        ->name('sites.hazards.review')
+        ->middleware('permission:hazards.manage');
+    Route::post('/hazards/{hazard}/media', [SiteHazardController::class, 'media'])
+        ->name('sites.hazards.media')
+        ->middleware('permission:hazards.manage');
+    // Authenticated evidence serving — hazard photos/documents live on the private disk
+    // and are streamed (nosniff + CSP) instead of being world-readable under /storage.
+    Route::get('/hazards/{hazard}/media/{kind}/{index}', [SiteHazardController::class, 'showMedia'])
+        ->whereIn('kind', ['photo', 'document', 'resolution'])
+        ->whereNumber('index')
+        ->name('sites.hazards.media.show')
+        ->middleware('permission:hazards.view');
+    Route::post('/hazards/{hazard}/actions', [SiteHazardController::class, 'storeAction'])
+        ->name('sites.hazards.actions.store')
+        ->middleware('permission:hazards.manage');
+    Route::post('/hazard-actions/{action}/complete', [SiteHazardController::class, 'completeAction'])
+        ->name('sites.hazards.actions.complete')
+        ->middleware('permission:hazards.manage');
 
     // Checklist run routes
     Route::get('/checklists/runs/{run}', fn (SiteChecklistRun $run) => redirect("/sites/{$run->site_id}/checklists?run={$run->id}"))
@@ -488,6 +511,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:calendar.manage_recurring');
 
     // Global Hazards page
+    Route::get('/compliance/hazards/export', [SiteHazardController::class, 'export'])
+        ->name('compliance.hazards.export')
+        ->middleware('permission:hazards.view');
     Route::get('/compliance/hazards', [SiteHazardController::class, 'globalIndex'])
         ->name('compliance.hazards')
         ->middleware('permission:hazards.view');

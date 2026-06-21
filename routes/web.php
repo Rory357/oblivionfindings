@@ -196,6 +196,7 @@ require __DIR__.'/control-room.php';
 require __DIR__.'/security-devices.php';
 require __DIR__.'/shifts.php';
 require __DIR__.'/medications.php';
+require __DIR__.'/compliance.php';
 require __DIR__.'/reports.php';
 require __DIR__.'/integrations.php';
 require __DIR__.'/settings.php';

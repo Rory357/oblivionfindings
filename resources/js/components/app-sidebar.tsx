@@ -1254,7 +1254,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.hazards?.view || can?.compliance?.view)
         registers.push({
-            title: 'PPE Management',
+            title: 'PPE & Equipment',
             href: '/health-safety/ppe',
             icon: HardHat,
         });
@@ -1264,9 +1264,9 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/health-safety/first-aid',
             icon: HeartPulse,
         });
-    if (can?.hazards?.view || can?.safeguarding?.viewAny)
+    if (can?.restraints?.view)
         registers.push({
-            title: 'Restraint Register',
+            title: 'Restraints & Behaviour Support',
             href: '/health-safety/restraints',
             icon: Clipboard,
         });
@@ -1594,6 +1594,11 @@ function buildGovernanceSubPanelGroups({
     }
     if (can?.governance?.compliance?.view || can?.governance?.view) {
         risk.push({ title: 'Compliance', href: '/governance/compliance', icon: Shield });
+    }
+    // Operational compliance command centre (org-wide exception roll-up) — surfaced for
+    // board assurance. Distinct from the obligations register above; gate on its own view perm.
+    if (can?.compliance?.view || can?.governance?.view) {
+        risk.push({ title: 'Operational Compliance', href: '/compliance', icon: ShieldCheck });
     }
     if (can?.governance?.clinical?.view || can?.governance?.view) {
         risk.push({ title: 'Clinical Governance', href: '/governance/clinical', icon: Shield });

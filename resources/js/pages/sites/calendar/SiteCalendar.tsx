@@ -278,12 +278,28 @@ const DEFAULT_SOURCES: SourceDef[] = [
         origin: 'Emergency drills',
     },
     {
+        key: 'ppe',
+        label: 'PPE & equipment',
+        short: 'PPE',
+        group: 'auto',
+        icon: 'HardHat',
+        origin: 'PPE register',
+    },
+    {
         key: 'respite',
         label: 'Respite booking',
         short: 'Respite',
         group: 'auto',
         icon: 'BedDouble',
         origin: 'Respite',
+    },
+    {
+        key: 'participation',
+        label: 'Worker participation',
+        short: 'Participation',
+        group: 'auto',
+        icon: 'Users',
+        origin: 'Worker participation',
     },
     {
         key: 'external',

@@ -22,6 +22,8 @@ use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\AssetGeofence;
 use App\Models\AuditLog;
 use App\Models\CarePlan;
+use App\Models\SiteHazard;
+use App\Support\HazardDetailPresenter;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientBowelEntry;
@@ -50,6 +52,8 @@ use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\HsRiskAssessment;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
@@ -517,7 +521,65 @@ class ClientController extends Controller
 
         $actionsReviews = app(ActionsAggregator::class)->forClient($client, $request->user());
 
+        // Site / environmental hazards at the client's current home (read-only
+        // context — managed from the Hazards register). Open + mitigated only.
+        $siteId = $client->site_id;
+        $homeHazards = $siteId
+            ? SiteHazard::query()
+                ->where('site_id', $siteId)
+                ->whereIn('status', ['open', 'in_progress', 'mitigated'])
+                ->with('assignedTo:id,name')
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get()
+                ->map(fn (SiteHazard $h) => [
+                    'id' => $h->id,
+                    'reference_number' => $h->reference_number,
+                    'hazard_label' => HazardDetailPresenter::hazardLabel($h),
+                    'description' => $h->description,
+                    'risk_rating' => $h->risk_rating,
+                    'severity' => $h->severity,
+                    'status' => $h->status,
+                    'due_date' => $h->due_date?->toDateString(),
+                    'overdue' => $h->isOverdue(),
+                    'site_id' => $h->site_id,
+                ])->values()
+            : collect();
+
+        $homeHazardDetail = null;
+        if ($request->filled('hazard') && $siteId) {
+            $hz = SiteHazard::query()
+                ->where('site_id', $siteId)
+                ->with(['site:id,name,type', 'reportedBy:id,name', 'assignedTo:id,name', 'statusChangedBy:id,name', 'closedBy:id,name', 'actions.assignedTo:id,name', 'actions.completedBy:id,name'])
+                ->find($request->query('hazard'));
+            if ($hz) {
+                $homeHazardDetail = HazardDetailPresenter::make($hz, ['manage' => false, 'assign' => false, 'close' => false]);
+            }
+        }
+
+        // Safe Work Procedures governing care at this client's home (site-scoped +
+        // org-wide, approved), read-only — deep-links to the procedures register.
+        $homeProcedures = ($siteId && $request->user()?->canDo('procedures.view'))
+            ? \App\Models\SafeWorkProcedure::query()->applicableToSite($siteId)
+                ->orderBy('title')
+                ->limit(15)
+                ->get(['id', 'reference_number', 'title', 'category', 'status', 'review_date'])
+                ->map(fn ($p) => [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number,
+                    'title' => $p->title,
+                    'category' => $p->category,
+                    'status' => $p->status,
+                    'review_date' => $p->review_date?->toDateString(),
+                ])->values()
+            : collect();
+
         return inertia('operations/clients/show', [
+            'homeHazards' => $homeHazards,
+            'homeHazardDetail' => $homeHazardDetail,
+            'homeProcedures' => $homeProcedures,
+            'homeName' => $client->site?->name,
+            'homeSiteId' => $siteId,
             'client' => [
                 'id' => $client->id,
                 'nhi_number' => $client->nhi_number,
@@ -996,12 +1058,38 @@ class ClientController extends Controller
                 ->limit(50)
                 ->get(),
 
+            // Formal H&S risk assessments (polymorphic; distinct from the ClientRisk
+            // care-risk list above — shown as a separate section in the same tab).
+            'hs_risk_assessments' => ($request->user()?->canDo('hazards.view') ?? false)
+                ? HsRiskAssessment::forAssessable(Client::class, $client->id)
+                    ->with(['assessedBy:id,name', 'assessable', 'hsEvent:id,reference_number'])
+                    ->withCount('attachments')
+                    ->orderByDesc('created_at')
+                    ->limit(100)
+                    ->get()
+                    ->map(fn (HsRiskAssessment $ra) => RiskAssessmentPresenter::row($ra))
+                    ->values()
+                : [],
+            'ra_pickers' => ($request->user()?->canDo('hazards.view') ?? false)
+                ? RiskAssessmentPresenter::pickers()
+                : ['sites' => [], 'clients' => [], 'events' => []],
+
             // Recent incidents (last 5)
             'client_incidents' => ClientIncident::where('client_id', $client->id)
                 ->with(['reporter:id,name'])
                 ->orderByDesc('occurred_at')
                 ->limit(5)
                 ->get(),
+
+            // First-aid treatments recorded for this client (read-only panel; gated on the
+            // first_aid_records.client_id FK added by the gold-standard rebuild).
+            'first_aid_records' => \Illuminate\Support\Facades\Schema::hasTable('first_aid_records')
+                ? \App\Models\FirstAidRecord::where('client_id', $client->id)
+                    ->with(['site:id,name', 'firstAider:id,name'])
+                    ->orderByDesc('treatment_date')
+                    ->limit(10)
+                    ->get()
+                : [],
 
             'care_plans_summary' => [
                 // The "current" plan: the active plan if one exists, otherwise the
@@ -1144,6 +1232,8 @@ class ClientController extends Controller
                 'create_risks' => $request->user()?->canDo('risks.create') ?? false,
                 'update_risks' => $request->user()?->canDo('risks.update') ?? false,
                 'delete_risks' => $request->user()?->canDo('risks.delete') ?? false,
+                'view_hs_risk_assessments' => $request->user()?->canDo('hazards.view') ?? false,
+                'manage_hs_risk_assessments' => $request->user()?->canDo('hazards.manage') ?? false,
                 'care_plans_view' => $request->user()?->canDo('care_plans.viewAny') ?? false,
                 'care_plans_create' => $request->user()?->canDo('care_plans.create') ?? false,
                 'care_plans_update' => $request->user()?->canDo('care_plans.update') ?? false,
@@ -1304,6 +1394,20 @@ class ClientController extends Controller
             'transport' => Inertia::optional(fn () => $this->buildTransportData($client)),
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
             'safety' => ClientSafetyPayload::forClient($client),
+            // Read-only Privacy panel — the client's Privacy Act 2020 access/
+            // correction requests (gated on the privacy view permission).
+            'data_subject_requests' => $request->user()?->canDo('privacy.viewRequests')
+                ? $client->dataSubjectRequests()->with('assignedTo:id,name')->latest('received_at')->get()->map(fn ($r) => [
+                    'id' => $r->id,
+                    'reference' => $r->reference_number,
+                    'request_type' => $r->request_type,
+                    'status' => $r->status,
+                    'received_at' => optional($r->received_at)->toDateString(),
+                    'due_date' => optional($r->extended_due_date ?: $r->due_date)->toDateString(),
+                    'is_overdue' => $r->isOverdue(),
+                    'assigned_to' => $r->assignedTo?->name,
+                ])->all()
+                : [],
         ]);
     }
 

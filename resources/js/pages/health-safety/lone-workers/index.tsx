@@ -78,6 +78,7 @@ import {
     RadioTower,
     Search,
     ShieldCheck,
+    Trash2,
     User,
     Users,
     X,
@@ -187,6 +188,12 @@ export default function LoneWorkerIndex({ tab, sessions, alerts, detail, tabCoun
             { sep: true },
             ...(s.user ? ([{ icon: <User className="h-3.5 w-3.5" />, label: 'Open worker profile', sub: s.user.name, onClick: () => router.visit(`/staff/${s.user!.id}`) }] satisfies ShiftCtxItem[]) : []),
             { icon: <Link2 className="h-3.5 w-3.5" />, label: 'Copy link', onClick: () => copyLink({ session: s.id }) },
+            ...(can.manage && s.status === 'completed'
+                ? ([
+                      { sep: true },
+                      { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove session', sub: 'Soft-delete · retained for audit', tone: 'critical', onClick: () => setAction({ kind: 'delete', session: s }) },
+                  ] satisfies ShiftCtxItem[])
+                : []),
         ];
     };
 

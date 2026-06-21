@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Models;
 
+use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,13 +13,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ComplianceObligation extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'framework',
         'obligation_code',
         'obligation_title',
         'description',
+        'requirements',
+        'priority',
         'frequency',
         'workforce_requirement_id',
         'due_date',
@@ -52,7 +55,7 @@ class ComplianceObligation extends Model
     protected static function boot(): void
     {
         parent::boot();
-        
+
         static::saving(function ($model) {
             $model->updateStatus();
         });
@@ -65,7 +68,7 @@ class ComplianceObligation extends Model
         }
 
         $daysUntilDue = now()->diffInDays($this->due_date, false);
-        
+
         if ($daysUntilDue < 0) {
             $this->status = 'overdue';
         } elseif ($daysUntilDue <= 7) {
@@ -88,7 +91,7 @@ class ComplianceObligation extends Model
      */
     public function workforceRequirement(): BelongsTo
     {
-        return $this->belongsTo(\App\Domain\Hr\Models\HrComplianceRequirement::class, 'workforce_requirement_id');
+        return $this->belongsTo(HrComplianceRequirement::class, 'workforce_requirement_id');
     }
 
     public function completedBy(): BelongsTo
@@ -144,7 +147,7 @@ class ComplianceObligation extends Model
 
     public function isDueSoon(int $days = 7): bool
     {
-        return now()->diffInDays($this->due_date, false) <= $days && !$this->isOverdue();
+        return now()->diffInDays($this->due_date, false) <= $days && ! $this->isOverdue();
     }
 
     public function markComplete(int $userId): void
@@ -166,7 +169,19 @@ class ComplianceObligation extends Model
 
     public function getFrameworkLabel(): string
     {
-        return match($this->framework) {
+        return self::frameworkOptions()[$this->framework] ?? $this->framework;
+    }
+
+    /**
+     * Canonical framework key => label map. Single source for both the obligation
+     * label accessor and any framework picker (e.g. the /compliance "Log obligation"
+     * wizard) so labels never drift.
+     *
+     * @return array<string, string>
+     */
+    public static function frameworkOptions(): array
+    {
+        return [
             'charities' => 'Charities Services',
             'nga_paerewa' => 'Ngā Paerewa NZS 8134:2021',
             'hdsa_safety' => 'Health and Disability Services (Safety) Act',
@@ -177,7 +192,6 @@ class ComplianceObligation extends Model
             'funding_moh' => 'MoH/Health NZ Funding',
             'funding_msd' => 'MSD Funding',
             'funding_acc' => 'ACC Funding',
-            default => $this->framework,
-        };
+        ];
     }
 }

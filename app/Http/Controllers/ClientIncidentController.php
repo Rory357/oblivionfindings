@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
@@ -10,9 +11,12 @@ use App\Services\NotificationService;
 use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientIncidentController extends Controller
 {
+    use ServesPrivateAttachments;
+
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
@@ -163,7 +167,7 @@ class ClientIncidentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $disk = 'public';
+        $disk = 'private';
         $path = $file->store('incident_attachments', $disk);
 
         ClientIncidentAttachment::create([
@@ -180,7 +184,7 @@ class ClientIncidentController extends Controller
         return back()->with('success', 'Attachment uploaded.');
     }
 
-    public function downloadAttachment(Request $request, Client $client, ClientIncident $incident, ClientIncidentAttachment $attachment)
+    public function downloadAttachment(Request $request, Client $client, ClientIncident $incident, ClientIncidentAttachment $attachment): StreamedResponse
     {
         $this->authorize('view', $client);
         abort_unless((int) $incident->client_id === (int) $client->id, 404);
@@ -189,8 +193,12 @@ class ClientIncidentController extends Controller
         // require incident view perms
         $this->authorize('view', $incident);
 
-        $disk = $attachment->disk ?: 'public';
-
-        return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
+        // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
     }
 }

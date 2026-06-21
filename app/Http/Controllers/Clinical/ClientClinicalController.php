@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers\Clinical;
 
-use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
-use App\Enums\AlertSeverity;
+use App\Http\Controllers\Clinical\Concerns\RecordsClinicalRecords;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class ClientClinicalController extends Controller
 {
+    use RecordsClinicalRecords;
+
     public function __construct(
         protected ClinicalObservationService $observationService,
         protected ClinicalEventService $eventService,
@@ -63,32 +62,10 @@ class ClientClinicalController extends Controller
         $this->authorize('view', $client);
 
         $user = $request->user();
-
-        // Check base recording permission
-        if (! $user->canDo('clinical.observations.record') && ! $user->canDo('clinical.observations.recordClinical')) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'observation_type' => ['required', Rule::in(array_column(ObservationType::cases(), 'value'))],
-            'data' => ['present', 'array'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'recorded_at' => ['nullable', 'date'],
-            'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
-        ]);
-
+        $validated = $this->validateObservationInput($request, $user);
         $type = ObservationType::from($validated['observation_type']);
 
-        // Check clinical permission for clinical types
-        if ($type->requiresClinicalPermission() && ! $user->canDo('clinical.observations.recordClinical')) {
-            abort(403, 'Clinical observation permission required for ' . $type->label());
-        }
-
-        try {
-            $observation = $this->observationService->record($client, $user, $validated);
-        } catch (ValidationException $e) {
-            throw $e;
-        }
+        $observation = $this->observationService->record($client, $user, $validated);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -109,26 +86,10 @@ class ClientClinicalController extends Controller
         $this->authorize('view', $client);
 
         $user = $request->user();
-
-        if (! $user->canDo('clinical.events.record')) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'event_type' => ['required', Rule::in(array_map(
-                fn (ClinicalEventType $type) => $type->value,
-                ClinicalEventType::cases(),
-            ))],
-            'severity' => ['required', Rule::in(AlertSeverity::ALL)],
-            'occurred_at' => ['required', 'date'],
-            'description' => ['required', 'string', 'max:5000'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
-            'outcome' => ['nullable', 'string', 'max:5000'],
-            'requires_followup' => ['nullable', 'boolean'],
-            'followup_notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $validated = $this->validateClinicalEventInput($request, $user);
 
         $event = $this->eventService->record($client, $user, $validated);
+        $this->saveClinicalAttachments($request, $event);
 
         if ($request->wantsJson()) {
             return response()->json([
