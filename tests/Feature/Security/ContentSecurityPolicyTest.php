@@ -20,7 +20,7 @@ class ContentSecurityPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_html_responses_get_a_report_only_csp_by_default(): void
+    public function test_html_responses_get_a_report_only_csp_when_not_enforcing(): void
     {
         $this->withoutVite();
         config(['app.csp_enabled' => true, 'app.csp_enforce' => false]);
