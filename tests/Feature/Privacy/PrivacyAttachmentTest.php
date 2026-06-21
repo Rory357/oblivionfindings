@@ -114,7 +114,7 @@ class PrivacyAttachmentTest extends TestCase
         $this->actingAs($this->admin)
             ->get("/privacy/attachments/{$attachment->id}/download")
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
     }
 
     public function test_destroy_removes_the_attachment_and_file(): void

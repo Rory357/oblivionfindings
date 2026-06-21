@@ -14,11 +14,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *     (config/filesystems.php → 'private', serve:false), so it is NEVER reachable
  *     at a public /storage/... URL — only via a route that has already run auth
  *     plus the owning module's IDOR / permission checks.
- *   • X-Content-Type-Options: nosniff — the browser must honour our Content-Type
- *     and may not re-interpret a mislabelled upload as executable HTML/JS.
- *   • Content-Security-Policy: default-src 'none'; sandbox — even if a scriptable
- *     file (HTML/SVG) slipped past the upload mimetype allowlist and is opened as a
- *     top-level document, scripts/forms/plugins are inert and it cannot be framed.
+ *   • Content-Security-Policy: default-src 'none'; sandbox; frame-ancestors 'none'
+ *     — the authoritative control: even if a scriptable file (HTML/SVG) slips past
+ *     the upload mimetype allowlist and is opened as a top-level document,
+ *     scripts/forms/plugins are inert, it can sniff nothing executable, and it
+ *     cannot be framed. X-Content-Type-Options (nosniff) and X-Frame-Options are
+ *     deliberately NOT set here — the edge/web-server layer already emits them on
+ *     every response, so repeating them only produced a doubled "nosniff, nosniff"
+ *     / conflicting "X-Frame-Options: DENY, SAMEORIGIN" header on the wire.
  *
  * Served as an attachment by default (mirrors the prior Storage::download()
  * behaviour); pass $disposition='inline' for a preview endpoint. Inline <img>/
@@ -37,11 +40,11 @@ trait ServesPrivateAttachments
     /**
      * Stream a stored attachment with the hardened header set.
      *
-     * @param  string|null  $disk          Stored disk (falls back to the private disk).
-     * @param  string       $path          Stored relative path.
-     * @param  string       $downloadName  Filename presented to the browser.
-     * @param  string|null  $mime          Stored MIME (sets Content-Type for reliable preview).
-     * @param  string       $disposition   'attachment' (default) or 'inline'.
+     * @param  string|null  $disk  Stored disk (falls back to the private disk).
+     * @param  string  $path  Stored relative path.
+     * @param  string  $downloadName  Filename presented to the browser.
+     * @param  string|null  $mime  Stored MIME (sets Content-Type for reliable preview).
+     * @param  string  $disposition  'attachment' (default) or 'inline'.
      */
     protected function streamPrivateAttachment(
         ?string $disk,
@@ -54,12 +57,14 @@ trait ServesPrivateAttachments
 
         abort_unless(Storage::disk($disk)->exists($path), 404);
 
+        // X-Content-Type-Options (nosniff) and X-Frame-Options are emitted globally
+        // for every response by the edge/web-server layer, so we deliberately do NOT
+        // repeat them here — a duplicate only yields "nosniff, nosniff" / a conflicting
+        // "X-Frame-Options: DENY, SAMEORIGIN" on the wire. The attachment-specific CSP
+        // is the authoritative control: default-src 'none' + sandbox makes a smuggled
+        // HTML/SVG upload inert (no scripts, no sniffing-to-execution) and
+        // frame-ancestors 'none' denies framing regardless of X-Frame-Options.
         $headers = [
-            'X-Content-Type-Options' => 'nosniff',
-            // Framing is denied via the CSP frame-ancestors directive (the authoritative
-            // modern control). We deliberately do NOT set X-Frame-Options here: the app's
-            // global security middleware already emits one, and a second value produces a
-            // malformed "X-Frame-Options: DENY, SAMEORIGIN" that some browsers ignore.
             'Content-Security-Policy' => "default-src 'none'; sandbox; frame-ancestors 'none'",
             'Referrer-Policy' => 'no-referrer',
         ];

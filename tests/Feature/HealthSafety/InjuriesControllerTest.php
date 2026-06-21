@@ -11,8 +11,10 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Models\WorkplaceInjuryAttachment;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -268,11 +270,11 @@ class InjuriesControllerTest extends TestCase
             ->assertNotFound();
 
         // Correct parent downloads fine — streamed from the private disk with the
-        // hardened headers (nosniff + CSP sandbox) from ServesPrivateAttachments.
+        // hardened CSP-sandbox header from ServesPrivateAttachments (nosniff +
+        // X-Frame-Options come from the edge layer, not the app).
         $this->actingAs($this->admin)
             ->get('/health-safety/injuries/'.$inj->id.'/attachments/'.$att->id.'/download')
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // Destroy
@@ -316,7 +318,7 @@ class InjuriesControllerTest extends TestCase
     {
         // Item 1 — the column is nullable, so a queued/CLI auto-registration with no
         // created_by and no auth() user still inserts the statutory record.
-        $id = \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insertGetId([
+        $id = DB::table('notifiable_incidents')->insertGetId([
             'incident_type' => 'serious_harm',
             'notification_authority' => 'worksafe',
             'title' => 'No submitter',
@@ -350,10 +352,10 @@ class InjuriesControllerTest extends TestCase
             'updated_at' => now(),
         ];
 
-        \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insert($row);
+        DB::table('notifiable_incidents')->insert($row);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
-        \Illuminate\Support\Facades\DB::table('notifiable_incidents')->insert(array_merge($row, ['title' => 'Duplicate']));
+        $this->expectException(QueryException::class);
+        DB::table('notifiable_incidents')->insert(array_merge($row, ['title' => 'Duplicate']));
     }
 
     public function test_update_does_not_change_status(): void

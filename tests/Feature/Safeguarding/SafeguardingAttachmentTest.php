@@ -116,7 +116,7 @@ class SafeguardingAttachmentTest extends TestCase
         $this->actingAs($viewer)
             ->get("/safeguarding/{$concern->id}/attachments/{$att->id}/download")
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
     }
 
     public function test_destroy_removes_attachment(): void

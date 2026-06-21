@@ -7,7 +7,9 @@ use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\SiteHazardAction;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -21,13 +23,14 @@ class HazardModuleTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Site $site;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -52,17 +55,16 @@ class HazardModuleTest extends TestCase
 
     public function test_hazard_media_serves_photo_from_private_disk_with_hardened_headers(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('private');
+        Storage::fake('private');
         $hazard = $this->makeHazard();
         $path = "hazards/{$hazard->id}/photos/evidence.png";
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-        \Illuminate\Support\Facades\Storage::disk('private')->put($path, $png);
+        Storage::disk('private')->put($path, $png);
         $hazard->update(['photo_paths' => [$path]]);
 
         $res = $this->actingAs($this->admin)->get("/hazards/{$hazard->id}/media/photo/0");
 
         $res->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'")
             ->assertHeader('Referrer-Policy', 'no-referrer');
         $this->assertSame($png, $res->streamedContent());
@@ -70,10 +72,10 @@ class HazardModuleTest extends TestCase
 
     public function test_hazard_detail_emits_authenticated_media_route_not_public_storage(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('private');
+        Storage::fake('private');
         $hazard = $this->makeHazard();
         $path = "hazards/{$hazard->id}/photos/evidence.png";
-        \Illuminate\Support\Facades\Storage::disk('private')->put($path, 'x');
+        Storage::disk('private')->put($path, 'x');
         $hazard->update(['photo_paths' => [$path]]);
 
         $response = $this->actingAs($this->admin)->get("/compliance/hazards?hazard={$hazard->id}");
@@ -87,7 +89,7 @@ class HazardModuleTest extends TestCase
 
     public function test_hazard_media_returns_404_for_out_of_range_index(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('private');
+        Storage::fake('private');
         $hazard = $this->makeHazard(['photo_paths' => []]);
 
         $this->actingAs($this->admin)

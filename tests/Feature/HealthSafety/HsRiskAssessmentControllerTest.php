@@ -59,7 +59,7 @@ class HsRiskAssessmentControllerTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Register payload + scoping                                       */
+    /*  Register payload + scoping */
     /* ---------------------------------------------------------------- */
 
     public function test_index_renders_gold_standard_payload(): void
@@ -140,7 +140,7 @@ class HsRiskAssessmentControllerTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Lifecycle write actions                                          */
+    /*  Lifecycle write actions */
     /* ---------------------------------------------------------------- */
 
     public function test_store_creates_draft_and_flashes_id(): void
@@ -321,7 +321,7 @@ class HsRiskAssessmentControllerTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Premium evidence attachments                                     */
+    /*  Premium evidence attachments */
     /* ---------------------------------------------------------------- */
 
     public function test_upload_download_and_delete_attachment(): void
@@ -344,12 +344,12 @@ class HsRiskAssessmentControllerTest extends TestCase
         Storage::disk('private')->assertExists($attachment->path);
         $this->assertSame('private', $attachment->disk);
 
-        // download — streamed from the private disk with the hardened headers
-        // (nosniff + CSP sandbox) from ServesPrivateAttachments.
+        // download — streamed from the private disk with the hardened CSP-sandbox
+        // header from ServesPrivateAttachments (nosniff + X-Frame-Options come from
+        // the edge layer, not the app).
         $this->actingAs($this->hsOfficer())
             ->get("/health-safety/risk-assessments/{$ra->id}/attachments/{$attachment->id}/download")
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // delete
@@ -379,7 +379,7 @@ class HsRiskAssessmentControllerTest extends TestCase
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Permission gating                                                */
+    /*  Permission gating */
     /* ---------------------------------------------------------------- */
 
     public function test_index_requires_hazards_view(): void

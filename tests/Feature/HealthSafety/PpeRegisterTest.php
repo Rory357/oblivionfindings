@@ -4,7 +4,6 @@ namespace Tests\Feature\HealthSafety;
 
 use App\Models\PpeAllocation;
 use App\Models\PpeAttachment;
-use App\Models\PpeInspection;
 use App\Models\PpeInventory;
 use App\Models\PpeType;
 use App\Models\Role;
@@ -327,11 +326,11 @@ class PpeRegisterTest extends TestCase
         Storage::disk('private')->assertExists($att->path);
         $this->assertSame('private', $att->disk);
 
-        // download — streamed from the private disk with the hardened headers
-        // (nosniff + CSP sandbox) from ServesPrivateAttachments.
+        // download — streamed from the private disk with the hardened CSP-sandbox
+        // header from ServesPrivateAttachments (nosniff + X-Frame-Options come from
+        // the edge layer, not the app).
         $this->actingAs($manager)->get('/health-safety/ppe/inventory/'.$item->id.'/attachments/'.$att->id.'/download')
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         $this->actingAs($manager)->delete('/health-safety/ppe/inventory/'.$item->id.'/attachments/'.$att->id)->assertRedirect();

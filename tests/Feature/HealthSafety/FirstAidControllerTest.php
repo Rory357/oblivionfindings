@@ -77,7 +77,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  Register page                                                      */
+    /*  Register page */
     /* ================================================================== */
 
     public function test_index_renders_hero_tabcounts_can_and_pickers(): void
@@ -126,7 +126,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  CRUD                                                               */
+    /*  CRUD */
     /* ================================================================== */
 
     public function test_store_creates_record_and_stamps_creator(): void
@@ -211,7 +211,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  Incident escalation (linkIncident)                                 */
+    /*  Incident escalation (linkIncident) */
     /* ================================================================== */
 
     public function test_link_incident_creates_incident_for_a_client_treatment(): void
@@ -271,7 +271,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  Attachments (premium document upload + IDOR guard)                 */
+    /*  Attachments (premium document upload + IDOR guard) */
     /* ================================================================== */
 
     public function test_upload_download_destroy_attachment_with_idor_guard(): void
@@ -301,11 +301,11 @@ class FirstAidControllerTest extends TestCase
             ->assertNotFound();
 
         // Correct parent downloads fine — streamed from the private disk with the
-        // hardened headers (nosniff + CSP sandbox) from ServesPrivateAttachments.
+        // hardened CSP-sandbox header from ServesPrivateAttachments (nosniff +
+        // X-Frame-Options come from the edge layer, not the app).
         $this->actingAs($this->admin)
             ->get('/health-safety/first-aid/'.$record->id.'/attachments/'.$att->id.'/download')
             ->assertOk()
-            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox; frame-ancestors 'none'");
 
         // Destroy (FirstAidAttachment uses SoftDeletes).
@@ -316,7 +316,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  Export                                                             */
+    /*  Export */
     /* ================================================================== */
 
     public function test_export_streams_csv_with_reference(): void
@@ -332,7 +332,7 @@ class FirstAidControllerTest extends TestCase
     }
 
     /* ================================================================== */
-    /*  Show redirect + permission gating                                  */
+    /*  Show redirect + permission gating */
     /* ================================================================== */
 
     public function test_show_redirects_to_register_modal(): void
