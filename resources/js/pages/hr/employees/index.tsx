@@ -112,7 +112,9 @@ export default function EmployeesIndex({
     const [deptDialogOpen, setDeptDialogOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
     const [pins, setPins] = useState<string[]>([]);
-    const [defaultTab, setDefaultTab] = useState<string>('people');
+    // '' = no explicit default chosen yet (so the star only shows once a user
+    // sets one); the page still opens to People via useHrTab's default.
+    const [defaultTab, setDefaultTab] = useState<string>('');
     const [tabCtx, setTabCtx] = useState<ShiftCtxState | null>(null);
 
     // Restore persisted default view + pinned tabs. The stored default is only
