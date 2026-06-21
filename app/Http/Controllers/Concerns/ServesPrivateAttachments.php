@@ -56,8 +56,11 @@ trait ServesPrivateAttachments
 
         $headers = [
             'X-Content-Type-Options' => 'nosniff',
+            // Framing is denied via the CSP frame-ancestors directive (the authoritative
+            // modern control). We deliberately do NOT set X-Frame-Options here: the app's
+            // global security middleware already emits one, and a second value produces a
+            // malformed "X-Frame-Options: DENY, SAMEORIGIN" that some browsers ignore.
             'Content-Security-Policy' => "default-src 'none'; sandbox; frame-ancestors 'none'",
-            'X-Frame-Options' => 'DENY',
             'Referrer-Policy' => 'no-referrer',
         ];
 
