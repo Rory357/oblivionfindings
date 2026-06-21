@@ -660,6 +660,18 @@ class ShiftControllerTest extends TestCase
     {
         config(['app.worker_timezone' => 'Pacific/Auckland']);
 
+        // Anchored relative to "today" so the shift always satisfies the
+        // `after_or_equal:today` rule on store (avoids date-rot). The shift runs
+        // 23:30 → 03:30 the next NZ day, spanning local midnight, so the
+        // scheduler must key the checklist run off the START's *local* NZ day.
+        // Assignments start exactly a week earlier so the weekly template is due
+        // on the shift's local day while the fortnightly one is not.
+        $tz = 'Pacific/Auckland';
+        $shiftLocalDate = Carbon::today($tz)->addWeek();
+        $shiftDate = $shiftLocalDate->toDateString();
+        $shiftEndDate = $shiftLocalDate->copy()->addDay()->toDateString();
+        $assignmentStartDate = $shiftLocalDate->copy()->subWeek()->toDateString();
+
         $dueTemplate = SiteChecklistTemplate::create([
             'tenant_id' => $this->site->tenant_id,
             'key' => 'shift_due_'.uniqid(),
@@ -691,7 +703,7 @@ class ShiftControllerTest extends TestCase
             'template_id' => $dueTemplate->id,
             'frequency' => 'weekly',
             'assigned_to_user_id' => $this->admin->id,
-            'start_date' => '2026-06-01',
+            'start_date' => $assignmentStartDate,
             'is_active' => true,
         ]);
         $existingAssignment = SiteChecklistAssignment::create([
@@ -699,7 +711,7 @@ class ShiftControllerTest extends TestCase
             'tenant_id' => $this->site->tenant_id,
             'template_id' => $existingTemplate->id,
             'frequency' => 'daily',
-            'start_date' => '2026-06-01',
+            'start_date' => $assignmentStartDate,
             'is_active' => true,
         ]);
         $notDueAssignment = SiteChecklistAssignment::create([
@@ -707,7 +719,7 @@ class ShiftControllerTest extends TestCase
             'tenant_id' => $this->site->tenant_id,
             'template_id' => $notDueTemplate->id,
             'frequency' => 'fortnightly',
-            'start_date' => '2026-06-01',
+            'start_date' => $assignmentStartDate,
             'is_active' => true,
         ]);
 
@@ -716,7 +728,7 @@ class ShiftControllerTest extends TestCase
             'site_id' => $this->site->id,
             'tenant_id' => $this->site->tenant_id,
             'template_id' => $existingTemplate->id,
-            'scheduled_date' => '2026-06-08',
+            'scheduled_date' => $shiftDate,
             'status' => 'scheduled',
         ]);
 
@@ -725,8 +737,8 @@ class ShiftControllerTest extends TestCase
                 'client_id' => $this->client->id,
                 'service_context_id' => $this->serviceContext->id,
                 'user_id' => $this->staff->id,
-                'starts_at' => Carbon::parse('2026-06-08 23:30:00', 'Pacific/Auckland')->utc()->format('Y-m-d H:i:s'),
-                'ends_at' => Carbon::parse('2026-06-09 03:30:00', 'Pacific/Auckland')->utc()->format('Y-m-d H:i:s'),
+                'starts_at' => Carbon::parse($shiftDate.' 23:30:00', $tz)->utc()->format('Y-m-d H:i:s'),
+                'ends_at' => Carbon::parse($shiftEndDate.' 03:30:00', $tz)->utc()->format('Y-m-d H:i:s'),
                 'status' => 'scheduled',
             ]);
 
@@ -738,19 +750,19 @@ class ShiftControllerTest extends TestCase
             'site_id' => $this->site->id,
             'tenant_id' => $this->site->tenant_id,
             'template_id' => $dueTemplate->id,
-            'scheduled_date' => '2026-06-08',
+            'scheduled_date' => $shiftDate,
             'assigned_to_user_id' => $this->staff->id,
             'status' => 'scheduled',
         ]);
         $this->assertSame(
             1,
             SiteChecklistRun::where('assignment_id', $existingAssignment->id)
-                ->whereDate('scheduled_date', '2026-06-08')
+                ->whereDate('scheduled_date', $shiftDate)
                 ->count()
         );
         $this->assertDatabaseMissing('site_checklist_runs', [
             'assignment_id' => $notDueAssignment->id,
-            'scheduled_date' => '2026-06-08',
+            'scheduled_date' => $shiftDate,
         ]);
     }
 
