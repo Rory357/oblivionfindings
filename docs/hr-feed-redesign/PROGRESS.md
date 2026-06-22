@@ -124,7 +124,13 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
       tests: multi-recipient, impact default/reject, react toggle/reject, reply
       authz, tenant-scoped picker, payload shape, self-service multi). php -l clean.
       ⚠️ Run from PARENT post-merge (worktree has no vendor/DB).
-- [ ] Adversarial review pass.
+- [x] Adversarial review pass (agent, full `main...HEAD` diff). **0 high / 0 medium**;
+      authz/tenant/null-safety/back-compat all verified sound. 3 low: (2) fixed —
+      `toggleReaction` now swallows the unique-constraint race (no 500 on rapid
+      double-click); (3) fixed — react/reply/acknowledge use `preserveState:true` +
+      `only:[…]` partial reloads (keeps search box + reply drafts). (1) accepted —
+      recipient `exists:users,id` not tenant-scoped: pre-existing, no leak/escalation,
+      app is single-tenant, and staff-scoping would break the existing tests.
 
 ### Phase 7 — Ship
 - [ ] Merge → origin/main · deploy webhook · Chrome-verify on oblivionfindings.com.

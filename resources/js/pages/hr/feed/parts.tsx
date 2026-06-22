@@ -175,7 +175,7 @@ export function KudosCard({
         router.post(
             `/hr/feed/kudos/${kudos.id}/react`,
             { emoji },
-            { preserveScroll: true, preserveState: false },
+            { preserveScroll: true, preserveState: true, only: ['posts'] },
         );
     };
 
@@ -187,6 +187,8 @@ export function KudosCard({
             { body: replyBody },
             {
                 preserveScroll: true,
+                preserveState: true,
+                only: ['posts'],
                 onSuccess: () => {
                     setReplyBody('');
                     setShowReply(false);
@@ -321,7 +323,11 @@ export function AnnouncementCard({
     const pct = a.audience_count > 0 ? Math.round((a.acknowledged_count / a.audience_count) * 100) : 0;
 
     const acknowledge = () => {
-        router.post(`/hr/announcements/${a.id}/acknowledge`, {}, { preserveScroll: true, preserveState: false });
+        router.post(
+            `/hr/announcements/${a.id}/acknowledge`,
+            {},
+            { preserveScroll: true, preserveState: true, only: ['announcements'] },
+        );
     };
 
     return (

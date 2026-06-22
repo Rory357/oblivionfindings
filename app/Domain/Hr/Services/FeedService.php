@@ -136,12 +136,17 @@ class FeedService
             return false;
         }
 
-        HrKudosReaction::create([
-            'tenant_id' => $kudos->tenant_id,
-            'kudos_id' => $kudos->id,
-            'user_id' => $userId,
-            'emoji' => $emoji,
-        ]);
+        try {
+            HrKudosReaction::create([
+                'tenant_id' => $kudos->tenant_id,
+                'kudos_id' => $kudos->id,
+                'user_id' => $userId,
+                'emoji' => $emoji,
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // A concurrent identical reaction won the race (rapid double-click) —
+            // the unique(kudos_id,user_id,emoji) index already holds it. No-op.
+        }
 
         return true;
     }
