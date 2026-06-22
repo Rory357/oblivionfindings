@@ -42,7 +42,7 @@ Design extract: `C:\Users\steph\Downloads\_hr_people_page_extract`.
       tabs to the front, shows star/pin decorations, opens a `ShiftContextMenu` on right-click, and
       restores the default view on load (post-mount, no SSR mismatch). tsc/lint(0)/build green.
 
-### Phase 2 — Employee intake unification (audit-first)  🔄 IN PROGRESS
+### Phase 2 — Employee intake unification (audit-first)  ✅ COMPLETE (ready to merge)
 Audit: `docs/employee-intake-audit.md` (signed off — autonomous).
 - [x] 2a (backend) — `EmployeeIntakeService::intake()` = single writer (User firstOrCreate-link +
       profile upsert by user_id + onboarding toggle + one invite/reset-link + `employee.created`
@@ -50,9 +50,12 @@ Audit: `docs/employee-intake-audit.md` (signed off — autonomous).
       `StoreEmployeeRequest` drops unique-email, adds RTW/visa + emergency + toggles. Tests updated
       (AddEmployeeWizardTest link/dedupe; OfferAcceptOnboardingFlowTest preserved). Boot + DI verified
       (tinker resolves service; employee.created registered). php -l clean. Commit `b2e939b9`.
-- [ ] 2b (frontend) — Add-Employee dialog → WizardShell (Add-Client shell): Person → Job →
-      Right-to-work → Emergency contact → Review; "Start onboarding now" + "Send login invite"
-      toggles; dedupe "Link to existing record" callout; post the new fields.
+- [x] 2b (frontend) — Add-Employee dialog extended on the existing WizardShell to 5 steps
+      (Person → Job → Right-to-work → Emergency contact → Review). RTW step (work-rights status +
+      conditional visa type/expiry), repeatable emergency-contact rows, "Start onboarding now" +
+      "Send login invite" Switch toggles on Review, and the dedupe **"Link to existing record"**
+      callout (shows on the email conflict; button → "Link & add"). Posts all new fields to the
+      unified endpoint. tsc/lint(0)/build green.
 
 ### Phase 3 — Positions → recruitment automation (audit-first)  ⬜ NOT STARTED
 `docs/positions-recruitment-audit.md` → `HrJobRequisition.position_id` FK; vacancy =

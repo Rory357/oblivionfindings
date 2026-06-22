@@ -1,24 +1,33 @@
-/* eslint-disable no-restricted-syntax -- The wizard footer uses native <button>
- * elements to match the Add-Client modal chrome (see components/wizard/shell.tsx
- * and primitives.tsx, which do the same). */
+/* eslint-disable no-restricted-syntax -- The wizard footer + emergency-contact
+ * rows use native <button>/<label> elements to match the Add-Client modal chrome
+ * (see components/wizard/shell.tsx and primitives.tsx, which do the same). All
+ * colours are semantic design tokens. */
 import { useForm } from '@inertiajs/react';
 import {
     Briefcase,
     ClipboardCheck,
+    Contact,
+    Link2,
+    Plus,
+    ShieldCheck,
     UserPlus,
     UsersRound,
+    X,
 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 import { PeoplePicker, type PersonOption } from './people-picker';
 import {
     Field,
+    InfoCard,
     ReviewCard,
     ReviewRow,
     SelectInput,
     StepHead,
+    SubHead,
     useWizard,
     WizardShell,
     WizardStepPane,
@@ -36,12 +45,41 @@ const STEPS: readonly WizardStep[] = [
     { key: 'person', label: 'Person', blurb: 'Name & contact', icon: UsersRound },
     { key: 'job', label: 'Job', blurb: 'Role & placement', icon: Briefcase },
     {
+        key: 'rtw',
+        label: 'Right to work',
+        blurb: 'Visa & eligibility',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'emergency',
+        label: 'Emergency',
+        blurb: 'Next of kin',
+        icon: Contact,
+    },
+    {
         key: 'review',
         label: 'Review',
         blurb: 'Confirm & create',
         icon: ClipboardCheck,
     },
 ];
+
+const WORK_RIGHTS = [
+    { value: 'citizen', label: 'NZ citizen' },
+    { value: 'permanent_resident', label: 'Permanent resident' },
+    { value: 'resident_visa', label: 'Resident visa' },
+    { value: 'work_visa', label: 'Work visa' },
+    { value: 'student_visa', label: 'Student visa' },
+    { value: 'other', label: 'Other' },
+];
+
+const VISA_STATUSES = ['resident_visa', 'work_visa', 'student_visa'];
+
+type EmergencyContact = { name: string; relationship: string; phone: string };
+
+const WORK_RIGHTS_LABEL: Record<string, string> = Object.fromEntries(
+    WORK_RIGHTS.map((w) => [w.value, w.label]),
+);
 
 export function AddEmployeeDialog({
     open,
@@ -69,6 +107,15 @@ export function AddEmployeeDialog({
         manager_user_id: '',
         start_date: '',
         work_phone: '',
+        work_rights_status: '',
+        visa_type: '',
+        visa_expires_at: '',
+        emergency_contacts: [
+            { name: '', relationship: '', phone: '' },
+        ] as EmergencyContact[],
+        start_onboarding: true,
+        send_invite: false,
+        link_existing: false,
     });
 
     const close = () => {
@@ -84,14 +131,28 @@ export function AddEmployeeDialog({
             position_id: data.position_id || null,
             primary_site_id: data.primary_site_id || null,
             manager_user_id: data.manager_user_id || null,
+            work_rights_status: data.work_rights_status || null,
+            visa_type: data.visa_type || null,
+            visa_expires_at: data.visa_expires_at || null,
+            emergency_contacts: data.emergency_contacts.filter(
+                (c) => c.name.trim() !== '',
+            ),
         }));
         form.post('/hr/people', {
             preserveScroll: true,
             // On success the controller redirects to the new profile — Inertia
             // follows it, so no success pane is needed here.
-            onError: () => {
-                // Jump to the step that owns the first error.
-                if (form.errors.name || form.errors.email) wizard.goTo(0);
+            onError: (errors) => {
+                // A dedupe conflict is resolved in place on the Review step
+                // (the "link to existing record" callout) — don't jump away.
+                if (errors.email?.includes('Link to existing')) return;
+                if (errors.name || errors.email) wizard.goTo(0);
+                else if (
+                    errors.work_rights_status ||
+                    errors.visa_type ||
+                    errors.visa_expires_at
+                )
+                    wizard.goTo(2);
                 else wizard.goTo(1);
             },
         });
@@ -104,6 +165,26 @@ export function AddEmployeeDialog({
         value: m.value,
         label: m.label,
     }));
+
+    const contacts = form.data.emergency_contacts;
+    const setContact = (i: number, key: keyof EmergencyContact, val: string) =>
+        form.setData(
+            'emergency_contacts',
+            contacts.map((c, idx) => (idx === i ? { ...c, [key]: val } : c)),
+        );
+    const addContact = () =>
+        form.setData('emergency_contacts', [
+            ...contacts,
+            { name: '', relationship: '', phone: '' },
+        ]);
+    const removeContact = (i: number) =>
+        form.setData(
+            'emergency_contacts',
+            contacts.filter((_, idx) => idx !== i),
+        );
+
+    const needsVisa = VISA_STATUSES.includes(form.data.work_rights_status);
+    const linkConflict = form.errors.email?.includes('Link to existing') ?? false;
 
     const positionLabel =
         formData.positions.find((p) => String(p.id) === form.data.position_id)
@@ -122,6 +203,7 @@ export function AddEmployeeDialog({
         formData.employmentTypes.find(
             (t) => t.value === form.data.employment_type,
         )?.label ?? '—';
+    const namedContacts = contacts.filter((c) => c.name.trim() !== '');
 
     return (
         <WizardShell
@@ -167,7 +249,11 @@ export function AddEmployeeDialog({
                                     'cursor-not-allowed opacity-50',
                             )}
                         >
-                            {form.processing ? 'Adding…' : 'Add employee'}
+                            {form.processing
+                                ? 'Adding…'
+                                : linkConflict
+                                  ? 'Link & add'
+                                  : 'Add employee'}
                         </button>
                     ) : (
                         <button
@@ -217,7 +303,7 @@ export function AddEmployeeDialog({
                         <Field
                             label="Work email"
                             required
-                            error={form.errors.email}
+                            error={linkConflict ? undefined : form.errors.email}
                         >
                             <Input
                                 type="email"
@@ -359,9 +445,158 @@ export function AddEmployeeDialog({
             {wizard.index === 2 && (
                 <WizardStepPane>
                     <StepHead
+                        icon={ShieldCheck}
+                        title="Right to work"
+                        blurb="Confirm their eligibility to work in New Zealand. Optional now — required before they start."
+                    />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field
+                            label="Work rights status"
+                            hint="optional"
+                            error={form.errors.work_rights_status}
+                        >
+                            <SelectInput
+                                value={form.data.work_rights_status}
+                                onChange={(v) =>
+                                    form.setData('work_rights_status', v)
+                                }
+                                placeholder="Select status"
+                                options={WORK_RIGHTS}
+                            />
+                        </Field>
+                        {needsVisa ? (
+                            <>
+                                <Field
+                                    label="Visa type"
+                                    hint="optional"
+                                    error={form.errors.visa_type}
+                                >
+                                    <Input
+                                        value={form.data.visa_type}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'visa_type',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. Essential Skills"
+                                    />
+                                </Field>
+                                <Field
+                                    label="Visa expires"
+                                    hint="optional"
+                                    error={form.errors.visa_expires_at}
+                                >
+                                    <Input
+                                        type="date"
+                                        value={form.data.visa_expires_at}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'visa_expires_at',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </Field>
+                            </>
+                        ) : null}
+                        <InfoCard icon={ShieldCheck} tone="info">
+                            Visa expiry feeds compliance reminders so nobody works
+                            past their right-to-work date.
+                        </InfoCard>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 3 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={Contact}
+                        title="Emergency contact"
+                        blurb="Who should we call in an emergency? Optional — add one or more next of kin."
+                    />
+                    <div className="space-y-3">
+                        {contacts.map((c, i) => (
+                            <div
+                                key={i}
+                                className="rounded-xl border border-border bg-card/60 p-3"
+                            >
+                                <div className="mb-2 flex items-center justify-between">
+                                    <SubHead icon={Contact}>
+                                        Contact {i + 1}
+                                    </SubHead>
+                                    {contacts.length > 1 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeContact(i)}
+                                            aria-label={`Remove contact ${i + 1}`}
+                                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    ) : null}
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <Field label="Name">
+                                        <Input
+                                            value={c.name}
+                                            onChange={(e) =>
+                                                setContact(
+                                                    i,
+                                                    'name',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Full name"
+                                        />
+                                    </Field>
+                                    <Field label="Relationship">
+                                        <Input
+                                            value={c.relationship}
+                                            onChange={(e) =>
+                                                setContact(
+                                                    i,
+                                                    'relationship',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g. Partner"
+                                        />
+                                    </Field>
+                                    <Field label="Phone">
+                                        <Input
+                                            value={c.phone}
+                                            onChange={(e) =>
+                                                setContact(
+                                                    i,
+                                                    'phone',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="021 555 0000"
+                                        />
+                                    </Field>
+                                </div>
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={addContact}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-semibold text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add another contact
+                        </button>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 4 && (
+                <WizardStepPane>
+                    <StepHead
                         icon={ClipboardCheck}
                         title="Review & create"
-                        blurb="Confirm the details. A user account is created and an invite can be sent from their profile."
+                        blurb="Confirm the details, then create the record and (optionally) start onboarding and send a login invite."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <ReviewCard
@@ -399,10 +634,121 @@ export function AddEmployeeDialog({
                             />
                             <ReviewRow label="Reports to" value={managerLabel} />
                         </ReviewCard>
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="Right to work"
+                            onEdit={() => wizard.goTo(2)}
+                        >
+                            <ReviewRow
+                                label="Status"
+                                value={
+                                    form.data.work_rights_status
+                                        ? WORK_RIGHTS_LABEL[
+                                              form.data.work_rights_status
+                                          ]
+                                        : undefined
+                                }
+                            />
+                            {needsVisa ? (
+                                <>
+                                    <ReviewRow
+                                        label="Visa type"
+                                        value={form.data.visa_type}
+                                    />
+                                    <ReviewRow
+                                        label="Visa expires"
+                                        value={form.data.visa_expires_at}
+                                    />
+                                </>
+                            ) : null}
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={Contact}
+                            title="Emergency"
+                            onEdit={() => wizard.goTo(3)}
+                        >
+                            {namedContacts.length === 0 ? (
+                                <ReviewRow label="Contacts" value={undefined} />
+                            ) : (
+                                namedContacts.map((c, i) => (
+                                    <ReviewRow
+                                        key={i}
+                                        label={c.relationship || 'Contact'}
+                                        value={[c.name, c.phone]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    />
+                                ))
+                            )}
+                        </ReviewCard>
+
+                        {linkConflict ? (
+                            <InfoCard icon={Link2} tone="warn">
+                                <div className="font-semibold text-foreground">
+                                    This email already belongs to a staff member.
+                                </div>
+                                <p className="mt-0.5">
+                                    Link to and update their existing record
+                                    instead of creating a duplicate.
+                                </p>
+                                <label className="mt-2 flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold">
+                                    <Switch
+                                        checked={form.data.link_existing}
+                                        onCheckedChange={(v) =>
+                                            form.setData('link_existing', v)
+                                        }
+                                    />
+                                    Link to existing record
+                                </label>
+                            </InfoCard>
+                        ) : null}
+
+                        <div className="col-span-full space-y-3 rounded-xl border border-border bg-card/70 p-4">
+                            <ToggleRow
+                                label="Start onboarding now"
+                                desc="Generate the onboarding checklist for this hire."
+                                checked={form.data.start_onboarding}
+                                onChange={(v) =>
+                                    form.setData('start_onboarding', v)
+                                }
+                            />
+                            <ToggleRow
+                                label="Send login invite"
+                                desc="Email a set-your-password link so they can sign in."
+                                checked={form.data.send_invite}
+                                onChange={(v) =>
+                                    form.setData('send_invite', v)
+                                }
+                            />
+                        </div>
                     </div>
                 </WizardStepPane>
             )}
         </WizardShell>
+    );
+}
+
+function ToggleRow({
+    label,
+    desc,
+    checked,
+    onChange,
+}: {
+    label: string;
+    desc: string;
+    checked: boolean;
+    onChange: (v: boolean) => void;
+}) {
+    return (
+        <label className="flex cursor-pointer items-center justify-between gap-4">
+            <span className="min-w-0">
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-xs text-muted-foreground">
+                    {desc}
+                </span>
+            </span>
+            <Switch checked={checked} onCheckedChange={onChange} />
+        </label>
     );
 }
 
