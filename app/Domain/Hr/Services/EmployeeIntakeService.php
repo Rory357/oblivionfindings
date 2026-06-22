@@ -30,6 +30,11 @@ class EmployeeIntakeService
     /**
      * Create (or link to) the user and upsert their single employee profile.
      *
+     * The User + profile write is atomic (one transaction). Side-effects —
+     * onboarding, the invite, the domain event — run AFTER the commit and are
+     * each best-effort: a failing checklist template, mail outage, or webhook
+     * must never roll back or block a hire.
+     *
      * Resolves the user by email — so a person who already exists (e.g. a
      * candidate-created account) is linked and updated rather than duplicated or
      * rejected. `hr_employee_profiles.user_id` is UNIQUE, so the profile is a
@@ -48,16 +53,14 @@ class EmployeeIntakeService
         bool $sendInvite = false,
         string $source = 'manual',
     ): HrEmployeeProfile {
-        return DB::transaction(function () use (
+        /** @var array{user: User, profile: HrEmployeeProfile, linkedExisting: bool} $written */
+        $written = DB::transaction(function () use (
             $name,
             $email,
             $roleName,
             $profileAttributes,
             $actorId,
             $tenantId,
-            $startOnboarding,
-            $sendInvite,
-            $source,
         ) {
             // 1. Resolve the user by email — link an existing account instead of
             //    erroring/duplicating; create one otherwise.
@@ -113,54 +116,71 @@ class EmployeeIntakeService
                 $values,
             );
 
-            // 3. Onboarding parity (toggle; idempotent).
-            if ($startOnboarding) {
-                $this->maybeGenerateOnboarding($profile, $actorId);
-            }
+            return ['user' => $user, 'profile' => $profile, 'linkedExisting' => $linkedExisting];
+        });
 
-            // 4. One invite path — the password-reset link doubles as "set your
-            //    password & first login". Shared by both doors. Non-fatal.
-            if ($sendInvite) {
-                try {
-                    Password::broker()->sendResetLink(['email' => $user->email]);
-                } catch (\Throwable $e) {
-                    Log::warning('Employee intake invite failed.', [
-                        'email' => $user->email,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+        $user = $written['user'];
+        $profile = $written['profile'];
 
-            // 5. Consistent domain signal regardless of source.
+        // --- Best-effort side-effects (post-commit; never block the hire) ---
+
+        // 3. Onboarding parity (toggle; idempotent).
+        if ($startOnboarding) {
+            $this->maybeGenerateOnboarding($profile, $actorId);
+        }
+
+        // 4. One invite path — the password-reset link doubles as "set your
+        //    password & first login". Shared by both doors.
+        if ($sendInvite) {
+            try {
+                Password::broker()->sendResetLink(['email' => $user->email]);
+            } catch (\Throwable $e) {
+                Log::warning('Employee intake invite failed.', [
+                    'email' => $user->email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // 5. Consistent domain signal regardless of source.
+        try {
             $this->webhooks->publish($tenantId, 'employee.created', [
                 'employee_profile_id' => $profile->id,
                 'user_id' => $user->id,
                 'source' => $source,
-                'linked_existing_user' => $linkedExisting,
+                'linked_existing_user' => $written['linkedExisting'],
             ]);
+        } catch (\Throwable $e) {
+            Log::warning('employee.created webhook publish failed.', [
+                'employee_profile_id' => $profile->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
-            return $profile->fresh();
-        });
+        // Return the committed model (no extra query — side-effects don't touch
+        // the profile's own columns).
+        return $profile;
     }
 
     /**
      * Generate the onboarding checklist once. Idempotent (skips if one exists)
-     * and tolerant of a missing template (logs + continues so a hire is never
-     * blocked by onboarding config).
+     * and fully best-effort: a missing template, mail outage, or any other
+     * failure is logged and swallowed so onboarding config can never block a
+     * hire.
      */
     public function maybeGenerateOnboarding(HrEmployeeProfile $profile, int $actorId): void
     {
-        $alreadyHasChecklist = HrOnboardingChecklist::query()
-            ->where('employee_profile_id', $profile->id)
-            ->exists();
-        if ($alreadyHasChecklist) {
-            return;
-        }
-
         try {
+            $alreadyHasChecklist = HrOnboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->exists();
+            if ($alreadyHasChecklist) {
+                return;
+            }
+
             $this->onboarding->generateChecklist($profile, $actorId);
-        } catch (\RuntimeException $e) {
-            Log::warning('Onboarding checklist not generated (no matching template).', [
+        } catch (\Throwable $e) {
+            Log::warning('Onboarding checklist not generated for new hire.', [
                 'employee_profile_id' => $profile->id,
                 'error' => $e->getMessage(),
             ]);
