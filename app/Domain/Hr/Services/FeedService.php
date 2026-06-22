@@ -284,84 +284,83 @@ class FeedService
     }
 
     /**
-     * Get upcoming milestones: birthdays, work anniversaries, new hires.
+     * Get upcoming milestones: birthdays, work anniversaries, new hires. All date
+     * maths is whole-day and direction-agnostic so it is correct under Carbon 3
+     * (where `diffIn*` returns a signed float).
      */
     public function getMilestones(?int $tenantId): array
     {
-        $now = now();
+        $today = now()->startOfDay();
 
-        // Work anniversaries — employees whose start_date month/day matches upcoming 30 days
+        // Work anniversaries — ≥ 1 year of service, next anniversary within 30 days.
         $anniversaries = HrEmployeeProfile::forTenant($tenantId)
             ->active()
             ->whereNotNull('start_date')
-            ->where('start_date', '<', $now->copy()->subYear())
+            ->where('start_date', '<', $today->copy()->subYear())
             ->with('user:id,name')
             ->get()
-            ->filter(function ($profile) use ($now) {
-                $start = $profile->start_date;
-                $anniversaryThisYear = $start->copy()->year($now->year);
-                if ($anniversaryThisYear->isPast() && $anniversaryThisYear->diffInDays($now) > 0) {
-                    $anniversaryThisYear->addYear();
-                }
-                return $anniversaryThisYear->diffInDays($now) <= 30;
+            ->map(function ($profile) use ($today) {
+                $start = $profile->start_date->copy()->startOfDay();
+                $next = $this->nextRecurrence($start, $today);
+
+                return [
+                    'type' => 'anniversary',
+                    'user_name' => $profile->user?->name ?? 'Unknown',
+                    'user_id' => $profile->user_id,
+                    'date' => $start->format('M d'),
+                    'days_away' => $this->wholeDaysBetween($today, $next),
+                    'years' => $next->year - $start->year,
+                ];
             })
-            ->map(fn ($profile) => [
-                'type' => 'anniversary',
-                'user_name' => $profile->user?->name ?? 'Unknown',
-                'user_id' => $profile->user_id,
-                'date' => $profile->start_date->format('M d'),
-                'days_away' => $this->daysUntilNextAnniversary($profile->start_date, $now),
-                'years' => $profile->start_date->diffInYears($now),
-            ])
+            ->filter(fn ($m) => $m['days_away'] <= 30)
             ->values()
             ->all();
 
-        // Birthdays — date_of_birth is encrypted so we need to decrypt and check
+        // Birthdays — date_of_birth is encrypted; decrypt, find next birthday ≤ 30 days.
         $birthdays = HrEmployeeProfile::forTenant($tenantId)
             ->active()
             ->whereNotNull('date_of_birth')
             ->with('user:id,name')
             ->get()
-            ->filter(function ($profile) use ($now) {
+            ->map(function ($profile) use ($today) {
                 try {
-                    $dob = \Carbon\Carbon::parse($profile->date_of_birth);
-                    $birthdayThisYear = $dob->copy()->year($now->year);
-                    if ($birthdayThisYear->isPast() && $birthdayThisYear->diffInDays($now) > 0) {
-                        $birthdayThisYear->addYear();
-                    }
-                    return $birthdayThisYear->diffInDays($now) <= 30;
+                    $dob = \Carbon\Carbon::parse($profile->date_of_birth)->startOfDay();
                 } catch (\Exception) {
-                    return false;
+                    return null;
                 }
-            })
-            ->map(function ($profile) use ($now) {
-                $dob = \Carbon\Carbon::parse($profile->date_of_birth);
+                $next = $this->nextRecurrence($dob, $today);
+
                 return [
                     'type' => 'birthday',
                     'user_name' => $profile->user?->name ?? 'Unknown',
                     'user_id' => $profile->user_id,
                     'date' => $dob->format('M d'),
-                    'days_away' => $this->daysUntilNextRecurrence($dob, $now),
+                    'days_away' => $this->wholeDaysBetween($today, $next),
                 ];
             })
+            ->filter(fn ($m) => $m !== null && $m['days_away'] <= 30)
             ->values()
             ->all();
 
-        // New hires — started in the last 30 days
+        // New hires — started in the last 30 days (days_away negative = days since start).
         $newHires = HrEmployeeProfile::forTenant($tenantId)
             ->active()
             ->whereNotNull('start_date')
-            ->where('start_date', '>=', $now->copy()->subDays(30))
+            ->where('start_date', '>=', $today->copy()->subDays(30))
             ->with('user:id,name')
             ->get()
-            ->map(fn ($profile) => [
-                'type' => 'new_hire',
-                'user_name' => $profile->user?->name ?? 'Unknown',
-                'user_id' => $profile->user_id,
-                'date' => $profile->start_date->format('M d'),
-                'days_away' => -1 * $profile->start_date->diffInDays($now),
-                'position' => $profile->position_title,
-            ])
+            ->map(function ($profile) use ($today) {
+                $start = $profile->start_date->copy()->startOfDay();
+
+                return [
+                    'type' => 'new_hire',
+                    'user_name' => $profile->user?->name ?? 'Unknown',
+                    'user_id' => $profile->user_id,
+                    'date' => $start->format('M d'),
+                    'days_away' => -1 * $this->wholeDaysBetween($start, $today),
+                    'position' => $profile->position_title,
+                ];
+            })
             ->values()
             ->all();
 
@@ -372,22 +371,23 @@ class FeedService
         ];
     }
 
-    /**
-     * Whole days from now until the next recurrence of a month/day (birthday).
-     */
-    private function daysUntilNextRecurrence(Carbon $date, Carbon $now): int
+    /** The next occurrence of a month/day on or after $today (this year or next). */
+    private function nextRecurrence(Carbon $date, Carbon $today): Carbon
     {
-        $next = $date->copy()->year($now->year);
-        if ($next->isPast() && $next->diffInDays($now) > 0) {
+        $next = $date->copy()->year($today->year)->startOfDay();
+        if ($next->lt($today)) {
             $next->addYear();
         }
 
-        return (int) ceil($next->diffInDays($now));
+        return $next;
     }
 
-    private function daysUntilNextAnniversary(Carbon $start, Carbon $now): int
+    /** Whole calendar days between two dates, direction-agnostic. */
+    private function wholeDaysBetween(Carbon $a, Carbon $b): int
     {
-        return $this->daysUntilNextRecurrence($start, $now);
+        return (int) abs(round(
+            $a->copy()->startOfDay()->diffInDays($b->copy()->startOfDay()),
+        ));
     }
 
     /**
