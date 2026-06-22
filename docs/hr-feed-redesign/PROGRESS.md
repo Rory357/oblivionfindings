@@ -75,13 +75,17 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
 - [x] `php -l` all touched PHP files — clean. tsc baseline 0 (after junctions).
 - Note: old feed page still renders (new props additive); PHP tests deferred to P6.
 
-### Phase 2 — Shared wizard family (`resources/js/components/recognition/`)
-- [ ] `recognition-wizard.tsx` — Recipients (multi) → Recognition (value + impact +
-      message) → Review & send. `{open,onClose,onSuccess?,defaults?}`.
-- [ ] `compose-wizard.tsx` — Type (Update/Question/Win) → Compose → Review & post.
-- [ ] `announce-wizard.tsx` — Title → Body & options (audience/sites, require-ack,
-      pin) → Review & publish.
-- [ ] `index.ts` barrel.
+### Phase 2 — Shared wizard family (`resources/js/components/recognition/`) ✅ (commit pending)
+- [x] `recognition-wizard.tsx` — Recipients (multi) → Recognition (value TilePicker +
+      impact Segmented + message) → Review & send. `{open,onClose,onSuccess?,
+      employees,kudosCategories,kudosImpacts,defaults?}`. Save & add another +
+      SuccessPane. POSTs `to_user_ids[]`+impact to `/hr/feed/kudos`.
+- [x] `compose-wizard.tsx` — Type (Update/Question/Win) → Compose → Review & post.
+      POSTs `/hr/feed`.
+- [x] `announce-wizard.tsx` — Title → Body & options (audience/sites Segmented,
+      priority, require-ack + pin toggles) → Review & publish. POSTs `/hr/announcements`
+      (store now `redirect()->back()` so it works from the feed too).
+- [x] `index.ts` barrel. tsc 0 · eslint 0 on the new dir.
 
 ### Phase 3 — Feed page redesign
 - [ ] `feed-hero.tsx` (golden band) + celebrations strip.

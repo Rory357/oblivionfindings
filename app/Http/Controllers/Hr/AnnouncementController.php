@@ -118,7 +118,10 @@ class AnnouncementController extends Controller
             }
         });
 
-        return redirect()->route('hr.announcements.index')->with('success', 'Announcement published.');
+        // Redirect back to the originating surface (announcements index *or* the
+        // community feed, where the Make-announcement wizard is also mounted) so
+        // the new notice appears in place without yanking the user off the page.
+        return redirect()->back()->with('success', 'Announcement published.');
     }
 
     /**
