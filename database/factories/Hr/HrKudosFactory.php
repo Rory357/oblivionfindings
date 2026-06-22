@@ -19,6 +19,9 @@ class HrKudosFactory extends Factory
             'category' => fake()->randomElement([
                 'teamwork', 'innovation', 'leadership', 'customer_focus', 'going_above', 'other',
             ]),
+            'impact' => fake()->randomElement([
+                'thank_you', 'good_job', 'impressive', 'exceptional',
+            ]),
             'message' => fake()->sentence(12),
             'is_public' => true,
         ];

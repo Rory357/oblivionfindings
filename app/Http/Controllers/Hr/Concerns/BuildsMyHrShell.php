@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Shift;
 use App\Models\User;
@@ -107,6 +108,8 @@ trait BuildsMyHrShell
 
         return [
             'teammates' => $teammates,
+            'kudosCategories' => FeedService::KUDOS_CATEGORIES,
+            'kudosImpacts' => FeedService::KUDOS_IMPACTS,
             'profile' => [
                 'name' => $name,
                 'first_name' => trim(explode(' ', $name)[0] ?? $name),

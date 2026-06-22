@@ -818,6 +818,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.recognition.give')->group(function () {
             Route::post('/', [FeedController::class, 'store'])->name('store');
             Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+            // Feed-scoped react/reply aliases onto the shared HrKudos path.
+            Route::post('/kudos/{kudos}/react', [FeedController::class, 'react'])->name('kudos.react');
+            Route::post('/kudos/{kudos}/reply', [FeedController::class, 'reply'])->name('kudos.reply');
         });
     });
 

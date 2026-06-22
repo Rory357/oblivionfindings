@@ -23,6 +23,7 @@ class HrKudos extends Model
         'from_user_id',
         'to_user_id',
         'category',
+        'impact',
         'message',
         'is_public',
         'feed_post_id',

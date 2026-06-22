@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Services\FeedService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Domain\Hr\Services\FeedService;
+use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -18,7 +21,7 @@ class FeedController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — community feed with milestones sidebar & kudos leaderboard */
+    /*  Index — community & recognition feed                               */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -30,52 +33,33 @@ class FeedController extends Controller
         $type = $request->query('type');
 
         $posts = $this->feedService->getFeed($tenantId, $type);
-        $milestones = $this->feedService->getMilestones($tenantId);
-        $leaderboard = $this->feedService->getKudosLeaderboard($tenantId);
-
-        $posts->through(fn ($post) => [
-            'id' => $post->id,
-            'post_type' => $post->post_type,
-            'content' => $post->content,
-            'is_pinned' => $post->is_pinned,
-            'user' => $post->user ? [
-                'id' => $post->user->id,
-                'name' => $post->user->name,
-            ] : null,
-            'kudos' => $post->kudos ? [
-                'id' => $post->kudos->id,
-                'category' => $post->kudos->category,
-                'from_user' => $post->kudos->fromUser ? [
-                    'id' => $post->kudos->fromUser->id,
-                    'name' => $post->kudos->fromUser->name,
-                ] : null,
-                'to_user' => $post->kudos->toUser ? [
-                    'id' => $post->kudos->toUser->id,
-                    'name' => $post->kudos->toUser->name,
-                ] : null,
-            ] : null,
-            'created_at' => $post->created_at?->diffForHumans(),
-            'created_at_date' => $post->created_at?->toDateTimeString(),
-        ]);
+        $posts->through(fn ($post) => $this->transformPost($post, $user->id));
 
         return Inertia::render('hr/feed/index', [
             'posts' => $posts,
-            'milestones' => $milestones,
-            'leaderboard' => $leaderboard,
+            'announcements' => $this->feedService->getFeedAnnouncements($tenantId, $user->id),
+            'metrics' => $this->feedService->getMetrics($tenantId),
+            'valueBreakdown' => $this->feedService->getValueBreakdown($tenantId),
+            'milestones' => $this->feedService->getMilestones($tenantId),
+            'leaderboard' => $this->feedService->getKudosLeaderboard($tenantId),
             'filters' => [
                 'type' => $type,
             ],
             'kudosCategories' => FeedService::KUDOS_CATEGORIES,
+            'kudosImpacts' => FeedService::KUDOS_IMPACTS,
             'postTypes' => FeedService::POST_TYPES,
-            'employees' => \App\Models\User::query()
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
+            'reactionEmojis' => FeedService::REACTION_EMOJIS,
+            'employees' => $this->tenantEmployees($tenantId),
+            'sites' => $this->tenantSites($tenantId),
+            'currentUserId' => $user->id,
+            'can' => [
+                'manageAnnouncements' => (bool) $user->canDo('hr.announcements.manage'),
+            ],
         ]);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — create a feed post                                         */
+    /*  Store — create a feed post (update)                                */
     /* ------------------------------------------------------------------ */
 
     public function store(Request $request)
@@ -90,7 +74,7 @@ class FeedController extends Controller
 
         try {
             $this->feedService->createPost($user, $validated, $this->resolveHrTenantIdForUser($user));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
@@ -98,7 +82,7 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Send Kudos — send recognition to another employee                  */
+    /*  Send Kudos — recognition to one or more colleagues                 */
     /* ------------------------------------------------------------------ */
 
     public function sendKudos(Request $request)
@@ -106,24 +90,181 @@ class FeedController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $validated = $request->validate([
-            'to_user_id' => ['required', 'integer', 'exists:users,id'],
+            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id'],
+            'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
+            'to_user_ids.*' => ['integer', 'exists:users,id'],
             'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
+            'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
+        $recipientIds = $validated['to_user_ids'] ?? [$validated['to_user_id']];
+
         try {
-            $this->feedService->sendKudos(
+            $this->feedService->sendKudosToMany(
                 $user,
-                $validated['to_user_id'],
+                $recipientIds,
                 $validated['category'],
                 $validated['message'],
-                $this->resolveHrTenantIdForUser($user),
+                $tenantId,
+                $validated['impact'] ?? null,
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Kudos sent!');
+        $count = count($recipientIds);
+
+        return redirect()->back()->with('success', $count > 1 ? "Kudos sent to {$count} colleagues! 🎉" : 'Kudos sent! 🎉');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  React / Reply — feed-scoped aliases onto the shared kudos path     */
+    /* ------------------------------------------------------------------ */
+
+    public function react(Request $request, HrKudos $kudos)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+
+        $validated = $request->validate([
+            'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
+        ]);
+
+        $this->feedService->toggleReaction($kudos, $user->id, $validated['emoji']);
+
+        return redirect()->back()->with('success', 'Reaction updated.');
+    }
+
+    public function reply(Request $request, HrKudos $kudos)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
+
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $this->feedService->addReply($kudos, $user->id, $validated['body']);
+
+        return redirect()->back()->with('success', 'Reply posted.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Helpers                                                            */
+    /* ------------------------------------------------------------------ */
+
+    private function transformPost($post, int $viewerId): array
+    {
+        $kudos = $post->kudos;
+
+        return [
+            'id' => $post->id,
+            'post_type' => $post->post_type,
+            'content' => $post->content,
+            'is_pinned' => $post->is_pinned,
+            'user' => $post->user ? [
+                'id' => $post->user->id,
+                'name' => $post->user->name,
+            ] : null,
+            'kudos' => $kudos ? [
+                'id' => $kudos->id,
+                'category' => $kudos->category,
+                'impact' => $kudos->impact ?? FeedService::DEFAULT_IMPACT,
+                'from_user' => $kudos->fromUser ? [
+                    'id' => $kudos->fromUser->id,
+                    'name' => $kudos->fromUser->name,
+                ] : null,
+                'to_user' => $kudos->toUser ? [
+                    'id' => $kudos->toUser->id,
+                    'name' => $kudos->toUser->name,
+                ] : null,
+                'reactions' => $this->summariseReactions($kudos, $viewerId),
+                'replies' => $kudos->replies->map(fn ($reply) => [
+                    'id' => $reply->id,
+                    'user_name' => $reply->user?->name ?? 'Unknown',
+                    'body' => $reply->body,
+                    'created_at' => $reply->created_at?->diffForHumans(),
+                ])->values()->all(),
+                'can_reply' => in_array($viewerId, [$kudos->from_user_id, $kudos->to_user_id], true),
+            ] : null,
+            'created_at' => $post->created_at?->diffForHumans(),
+            'created_at_date' => $post->created_at?->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Per-emoji reaction counts plus the emojis the viewer has reacted with.
+     *
+     * @return array{counts: array<string,int>, mine: array<int,string>}
+     */
+    private function summariseReactions(HrKudos $kudos, int $viewerId): array
+    {
+        $counts = array_fill_keys(FeedService::REACTION_EMOJIS, 0);
+        $mine = [];
+
+        foreach ($kudos->reactions as $reaction) {
+            if (array_key_exists($reaction->emoji, $counts)) {
+                $counts[$reaction->emoji]++;
+            }
+            if ($reaction->user_id === $viewerId) {
+                $mine[] = $reaction->emoji;
+            }
+        }
+
+        return [
+            'counts' => $counts,
+            'mine' => array_values(array_unique($mine)),
+        ];
+    }
+
+    /**
+     * Tenant-scoped employee picker source (fixes the cross-tenant user leak).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function tenantEmployees(int $tenantId): array
+    {
+        return HrEmployeeProfile::forTenant($tenantId)
+            ->active()
+            ->whereNotNull('user_id')
+            ->with(['user:id,name', 'primarySite:id,name'])
+            ->get()
+            ->map(fn ($profile) => [
+                'id' => $profile->user_id,
+                'name' => $profile->user?->name ?? 'Unknown',
+                'role' => $profile->position_title,
+                'site' => $profile->primarySite?->name,
+            ])
+            ->filter(fn ($e) => $e['name'] !== 'Unknown')
+            ->sortBy('name')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{id:int, name:string}>
+     */
+    private function tenantSites(int $tenantId): array
+    {
+        return Site::query()
+            ->where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($site) => [
+                'id' => $site->id,
+                'name' => $site->name,
+            ])
+            ->all();
     }
 }
