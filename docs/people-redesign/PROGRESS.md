@@ -121,9 +121,19 @@ per-move, keep reports-to picker fallback).
       canManage- + non-empty-gated (no dead control). `OrgChartReassignTest` extended (server-side cycle
       rejection + move-to-top-level). tsc/lint(0)/build/php-l green. Commit `d877fd92`.
 
-### Phase 6 — "Needs attention" triage modal  ⬜ NOT STARTED
-Add-Client shell modal from hero chips: Compliance / Probation / Invites rails w/ live counts +
-per-row actions; footer deep-links.
+### Phase 6 — "Needs attention" triage modal  ✅ COMPLETE (merged → origin/main)
+Drill-down modal from the hero chips (no tab — it's a cross-cutting action queue, per the IA note).
+- [x] 6 — `needs-triage-dialog.tsx` (master-detail Dialog, tokens only): left rail Compliance /
+      Probation / Invites with live counts; body lists the actual people with per-row actions
+      (View profile; **Send invite** for the invites rail); footer deep-links to the owning surface.
+      Wired so the hero needs-chips + Compliance stat + Invite quick-action open it at the right rail.
+      Backend (`EmployeeProfileController`): `buildTriage()` (expired/expiring compliance ordered
+      expired-first; staff within probation; pending invites = active staff w/ `last_login_at` null),
+      `summary.pending_invites`, `triage` payload, and **`resendInvite()`** (`POST /hr/people/{profile}/invite`,
+      manage-gated, mirrors the intake reset-link path — also delivers the deferred resend-invite).
+      `NeedsTriageTest` (payload + probation surfacing + manage-gated invite notification). Triage
+      queries validated via tinker (invites rail = 15 real rows locally). tsc/eslint(0)/build/php-l green.
+      Commit `b9d916ff`.
 
 ## Log
 - 2026-06-22: Kickoff. Extracted drop, audited current state (Explore agent), read kit + prototype
@@ -151,6 +161,13 @@ per-row actions; footer deep-links.
 - 2026-06-22: Phase 5 complete (5a richer nodes/colour card `9d024b21`, 5b drag-to-reassign Build modal
   `d877fd92`). **Merged Phase 5 → origin/main** (FF `85e5fd6d..d877fd92`, no divergence) → deploy
   triggered (~5-8min). tsc 0 / eslint 0 / vite build 0 / php -l clean. Pending: Chrome-verify the org-chart
-  view (colour-coded cards + photos) + the Build-org-chart drag modal on .com. **Next: Phase 6 (FINAL) —
-  needs-attention triage modal.** ⚠️OrgChart tests committed-not-run (shared local test DB → would wipe
-  dev data); backend is the existing proven `orgchart.update` endpoint — new tests are additive coverage.
+  view (colour-coded cards + photos) + the Build-org-chart drag modal on .com. ⚠️OrgChart tests
+  committed-not-run (shared local test DB → would wipe dev data); backend is the existing proven
+  `orgchart.update` endpoint — new tests are additive coverage.
+- 2026-06-22: **Phase 6 (FINAL) complete** (`b9d916ff`) — needs-attention triage modal + resendInvite.
+  **Merged → origin/main** (FF `1fb31ec9..b9d916ff`, no divergence) → deploy triggered. tsc/eslint(0)/build/
+  php-l green; triage queries tinker-validated. **ALL 6 PHASES NOW BUILT + MERGED.** Remaining: one
+  consolidated Chrome-verify pass on .com covering Phases 4–6 (departments View modal; org-chart colour
+  cards + Build drag modal; needs-attention triage modal incl. live Send-invite) once the deploy lands,
+  then run the committed Pest suite from the parent against a throwaway DB. ⚠️Chrome-verify needs the
+  USER logged into .com (I never enter passwords).
