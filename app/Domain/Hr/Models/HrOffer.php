@@ -18,6 +18,7 @@ class HrOffer extends Model
         'template_id',
         'position_title',
         'position_role',
+        'position_id',
         'proposed_start_date',
         'employment_type',
         'hours_per_week',
@@ -70,6 +71,11 @@ class HrOffer extends Model
     public function primarySite(): BelongsTo
     {
         return $this->belongsTo(Site::class, 'primary_site_id');
+    }
+
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(HrPosition::class, 'position_id');
     }
 
     public function approvedBy(): BelongsTo

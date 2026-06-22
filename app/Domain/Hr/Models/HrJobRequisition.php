@@ -19,6 +19,7 @@ class HrJobRequisition extends Model
         'title',
         'slug',
         'position_role',
+        'position_id',
         'site_id',
         'employment_type',
         'openings',
@@ -54,6 +55,11 @@ class HrJobRequisition extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class, 'site_id');
+    }
+
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(HrPosition::class, 'position_id');
     }
 
     public function defaultInterviewKit(): BelongsTo

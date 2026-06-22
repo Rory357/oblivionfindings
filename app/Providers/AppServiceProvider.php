@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
@@ -59,6 +60,7 @@ use App\Observers\ClientNoteObserver;
 use App\Observers\DeviceEventObserver;
 use App\Observers\EmergencyDrillObserver;
 use App\Observers\FirstAidObserver;
+use App\Observers\HrEmployeeProfileObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
 use App\Observers\FleetWorkOrderObserver;
@@ -210,6 +212,7 @@ class AppServiceProvider extends ServiceProvider
         RestraintEvent::observe(RestraintEventObserver::class);
         EmergencyDrill::observe(EmergencyDrillObserver::class);
         FirstAidRecord::observe(FirstAidObserver::class);
+        HrEmployeeProfile::observe(HrEmployeeProfileObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);

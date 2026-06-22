@@ -237,6 +237,7 @@ class RecruitmentService
                 email: $workEmail,
                 roleName: $roleName,
                 profileAttributes: [
+                    'position_id' => $offer->position_id,
                     'position_title' => $offer->position_title,
                     'position_role' => $roleName,
                     'employment_type' => $offer->employment_type,

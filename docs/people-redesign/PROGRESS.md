@@ -57,10 +57,22 @@ Audit: `docs/employee-intake-audit.md` (signed off — autonomous).
       callout (shows on the email conflict; button → "Link & add"). Posts all new fields to the
       unified endpoint. tsc/lint(0)/build green.
 
-### Phase 3 — Positions → recruitment automation (audit-first)  ⬜ NOT STARTED
-`docs/positions-recruitment-audit.md` → `HrJobRequisition.position_id` FK; vacancy =
-budget−current−open_req_openings; Job Description fields; scheduled understaffed check + alerts;
-New-Position auto-open-requisition toggle; close-loop headcount sync.
+### Phase 3 — Positions → recruitment automation (audit-first)  🔄 IN PROGRESS
+Audit: `docs/positions-recruitment-audit.md` (signed off — autonomous).
+- [x] 3a (data foundation) — additive migration `2026_06_22_000002` (`hr_job_requisitions.position_id`
+      + `hr_offers.position_id` FKs + `hr_positions.summary`/`responsibilities` JD parity); model
+      fillable/relations (`HrPosition::requisitions()`, `HrJobRequisition::position()`,
+      `HrOffer::position()`); `HrPosition` accessors `open_requisition_openings` /
+      `actionable_vacancies` (budget−current−openReq) / `is_understaffed`; **`HrEmployeeProfileObserver`
+      keeps `current_headcount` synced** on hire/transfer/deactivate (registered in AppServiceProvider);
+      `convertToEmployee` now sets `position_id` from the offer. Migration ran clean locally; tinker
+      end-to-end proved observer sync + accessors (current 0→1 on hire, actionable 1→0 with a 1-opening
+      req). `PositionVacancyTest` (run post-merge). php -l clean. ⚠️mass updates (bulk bar) bypass the
+      observer → daily job (3b) reconciles.
+- [ ] 3b — `hr:check-vacancies` scheduled command (syncAllHeadcounts + flag understaffed) + surface
+      understaffed (positions-pane badge + People hero needs-attention chip).
+- [ ] 3c — New Position modal: JD step + gap-detection auto-open-requisition toggle (prefill → jobs.store).
+- [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events.
 
 ### Phase 4 — Departments feature-complete (audit-first)  ⬜ NOT STARTED
 `docs/departments-audit.md` → cost_centre (+ site link?); cycle-safe parent (store+update);

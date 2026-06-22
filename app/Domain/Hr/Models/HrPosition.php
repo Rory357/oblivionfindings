@@ -27,6 +27,8 @@ class HrPosition extends Model
         'team',
         'description',
         'requirements',
+        'summary',
+        'responsibilities',
         'employment_type',
         'fte',
         'headcount_budget',
@@ -58,6 +60,11 @@ class HrPosition extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(HrEmployeeProfile::class, 'position_id');
+    }
+
+    public function requisitions(): HasMany
+    {
+        return $this->hasMany(HrJobRequisition::class, 'position_id');
     }
 
     public function creator(): BelongsTo
@@ -93,5 +100,36 @@ class HrPosition extends Model
     {
         if ($this->headcount_budget === 0) return 0;
         return round(($this->current_headcount / $this->headcount_budget) * 100, 1);
+    }
+
+    /**
+     * Openings already being recruited for via linked, non-closed requisitions —
+     * so a seat that's actively in recruitment isn't double-counted as a gap.
+     */
+    public function getOpenRequisitionOpeningsAttribute(): int
+    {
+        if ($this->relationLoaded('requisitions')) {
+            return (int) $this->requisitions
+                ->whereNotIn('status', ['closed'])
+                ->sum('openings');
+        }
+
+        return (int) $this->requisitions()
+            ->whereNotIn('status', ['closed'])
+            ->sum('openings');
+    }
+
+    /** Vacancies that still need action: budget − filled − openings already in recruitment. */
+    public function getActionableVacanciesAttribute(): int
+    {
+        return max(
+            0,
+            $this->headcount_budget - $this->current_headcount - $this->open_requisition_openings,
+        );
+    }
+
+    public function getIsUnderstaffedAttribute(): bool
+    {
+        return $this->actionable_vacancies > 0;
     }
 }
