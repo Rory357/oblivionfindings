@@ -104,18 +104,22 @@ Audit: `docs/departments-audit.md` (signed off — autonomous; cost_centre=strin
       linked-positions list + Edit). departments-pane: cost-centre column + **row-click → View**
       (manage-gated; action buttons stopPropagation). tsc/lint(0)/build green.
 
-### Phase 5 — Org chart view + builder modal (research-first)  🔄 IN PROGRESS
+### Phase 5 — Org chart view + builder modal (research-first)  ✅ COMPLETE (merged → origin/main)
 Audit+research: `docs/org-chart-research.md` (signed off — autonomous; @dnd-kit available, save-live
 per-move, keep reports-to picker fallback).
 - [x] 5a (backend + view) — `OrgChartService::buildNode` widened (+ `site`, `manager_user_id`,
       resolved `photo_url` via Storage public disk — fixes raw-path bug); `orgPeople` + `manager_user_id`.
       `org-chart-pane` node card rebuilt to the prototype: **colour-coded title bar** (role, hashed per
       department) + square photo-left + name (italic) + site; toolbar Print (window.print). Existing
-      per-person ReassignManagerDialog kept. tsc/lint(0)/build green; php -l clean.
-- [ ] 5b (builder modal) — `org-chart-builder-dialog.tsx`: @dnd-kit drag-to-reassign (useDraggable
-      cards + useDroppable manager/root targets, client cycle pre-check) writing live via
-      `orgchart.update`; reports-to picker fallback; wire "Build org chart" toolbar button. Extend
-      `OrgChartReassignTest`. Then merge Phase 5 + deploy + Chrome-verify.
+      per-person ReassignManagerDialog kept. tsc/lint(0)/build green; php -l clean. Commit `9d024b21`.
+- [x] 5b (builder modal) — `org-chart-builder-dialog.tsx`: @dnd-kit `DndContext` indented draggable
+      tree — drag a person (by the grip) onto another to set their manager, or onto the **"Top level"**
+      drop zone to clear it; each drop writes live via `PUT /hr/orgchart/{profile}` (preserveState so
+      the open modal re-renders with the result). **Cycle double-guard:** client disables drops onto the
+      dragged node's own descendants + server `wouldCreateCycle` authoritative. Per-person reports-to
+      picker (ReassignManagerDialog) retained as the fallback. "Build org chart" toolbar button is
+      canManage- + non-empty-gated (no dead control). `OrgChartReassignTest` extended (server-side cycle
+      rejection + move-to-top-level). tsc/lint(0)/build/php-l green. Commit `d877fd92`.
 
 ### Phase 6 — "Needs attention" triage modal  ⬜ NOT STARTED
 Add-Client shell modal from hero chips: Compliance / Probation / Invites rails w/ live counts +
@@ -144,3 +148,9 @@ per-row actions; footer deep-links.
   cost-centre, cycle-safe hierarchy + roll-up, View modal, wizard. **Merged Phase 4 → origin/main**
   (FF `6ad28387..85e5fd6d`) → deploy triggered. Pending: Chrome-verify departments. Next: Phase 5
   (org-chart builder, research-first), then Phase 6 (needs-attention triage).
+- 2026-06-22: Phase 5 complete (5a richer nodes/colour card `9d024b21`, 5b drag-to-reassign Build modal
+  `d877fd92`). **Merged Phase 5 → origin/main** (FF `85e5fd6d..d877fd92`, no divergence) → deploy
+  triggered (~5-8min). tsc 0 / eslint 0 / vite build 0 / php -l clean. Pending: Chrome-verify the org-chart
+  view (colour-coded cards + photos) + the Build-org-chart drag modal on .com. **Next: Phase 6 (FINAL) —
+  needs-attention triage modal.** ⚠️OrgChart tests committed-not-run (shared local test DB → would wipe
+  dev data); backend is the existing proven `orgchart.update` endpoint — new tests are additive coverage.
