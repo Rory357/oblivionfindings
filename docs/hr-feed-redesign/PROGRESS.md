@@ -193,11 +193,18 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
       tenant IDOR guard. ComposeWizard gains a `FileDropzone`/`StagedFileCard` photo
       field (Inertia auto-multipart); UpdateCard shows the inline image. +3 Pest
       (upload+serve, mime reject, cross-tenant 404).
-- [ ] **Iter 6 — #2 per-post audience scoping + #3 tenant-scoped recipients.** ⚠️ both
-      lower-value: audience targeting arguably belongs to Announcements (community feed
-      is intentionally org-wide); #3 is dormant (single-tenant, no live leak) + needs
-      churning the pre-existing kudos tests. Will implement per the directive but these
-      are the marginal-value tail.
+- [~] **Iter 6 (final):**
+  - #3 tenant-scoped recipients ✅ DONE: `rejectForeignTenantRecipient` closure on
+    `ResolvesHrTenant` applied to both `FeedController` + `MyHrController` sendKudos —
+    rejects a recipient whose employee profile is in a *different* tenant, while bare
+    users + same-tenant employees pass (so the pre-existing kudos tests stay green, no
+    churn). +1 Pest. Backend-only (no migration/frontend).
+  - #2 per-post audience scoping — **DECIDED NOT TO BUILD** (recommendation to user):
+    a *community* feed is intentionally org-wide; per-post visibility scoping would
+    fragment the wall and duplicate the Announcements module, which already does
+    audience targeting (all/site/dept/role). Building it would add a column + composer
+    picker + a wall visibility-filter that works against the feature's purpose. Left
+    as a deliberate non-implementation; trivial to add later if the product wants it.
 NOTE: ⚠️ live Chrome-verify BLOCKED — .com session logged out; I won't re-authenticate.
 Relying on Pest/tsc/eslint/build (all green). User can re-auth to resume live checks.
 

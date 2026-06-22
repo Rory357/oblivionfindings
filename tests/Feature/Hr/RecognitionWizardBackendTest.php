@@ -215,6 +215,22 @@ test('a non-image post attachment is rejected', function () {
         ->assertSessionHasErrors('attachment');
 });
 
+test('kudos cannot be sent to a colleague in a different tenant', function () {
+    HrEmployeeProfile::factory()->create(['user_id' => $this->hr->id, 'tenant_id' => 1, 'is_active' => true]);
+    $otherTenantUser = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create(['user_id' => $otherTenantUser->id, 'tenant_id' => 2, 'is_active' => true]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/feed/kudos', [
+            'to_user_id' => $otherTenantUser->id,
+            'category' => 'teamwork',
+            'message' => 'Cross-tenant attempt',
+        ])
+        ->assertSessionHasErrors('to_user_id');
+
+    expect(HrKudos::count())->toBe(0);
+});
+
 test('a cross-tenant feed attachment is not served', function () {
     $post = HrFeedPost::create([
         'tenant_id' => 2,

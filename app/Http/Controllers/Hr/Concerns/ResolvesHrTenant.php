@@ -58,4 +58,25 @@ trait ResolvesHrTenant
             ->values()
             ->all();
     }
+
+    /**
+     * A validation closure that rejects a recipient whose employee profile is in a
+     * different tenant. Bare users (no profile) and same-tenant employees pass — so
+     * it closes the cross-tenant-employee gap without restricting the (single-tenant)
+     * happy path or the recipient-has-no-profile case.
+     */
+    protected function rejectForeignTenantRecipient(int $tenantId): \Closure
+    {
+        return function ($attribute, $value, $fail) use ($tenantId) {
+            $inOtherTenant = HrEmployeeProfile::query()
+                ->where('user_id', (int) $value)
+                ->whereNotNull('tenant_id')
+                ->where('tenant_id', '!=', $tenantId)
+                ->exists();
+
+            if ($inOtherTenant) {
+                $fail('That colleague is in a different organisation.');
+            }
+        };
+    }
 }

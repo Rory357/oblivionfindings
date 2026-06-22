@@ -112,11 +112,12 @@ class FeedController extends Controller
         abort_unless($user, 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
+        $notForeignTenant = $this->rejectForeignTenantRecipient($tenantId);
 
         $validated = $request->validate([
-            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id'],
+            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $notForeignTenant],
             'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
-            'to_user_ids.*' => ['integer', 'exists:users,id'],
+            'to_user_ids.*' => ['integer', 'exists:users,id', $notForeignTenant],
             'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
             'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
             'message' => ['required', 'string', 'max:2000'],
