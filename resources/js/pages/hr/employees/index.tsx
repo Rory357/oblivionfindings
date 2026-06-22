@@ -449,7 +449,10 @@ export default function EmployeesIndex({
             ) : null}
 
             {can.manage ? (
+                // key remounts the wizard per target so useForm re-initialises
+                // from the selected row (else editing shows stale/empty fields).
                 <PositionDialog
+                    key={editingPosition?.id ?? 'new'}
                     open={posDialogOpen}
                     onClose={() => setPosDialogOpen(false)}
                     position={editingPosition}
@@ -461,6 +464,7 @@ export default function EmployeesIndex({
 
             {canDept ? (
                 <DepartmentDialog
+                    key={editingDept?.id ?? 'new'}
                     open={deptDialogOpen}
                     onClose={() => setDeptDialogOpen(false)}
                     department={editingDept}
