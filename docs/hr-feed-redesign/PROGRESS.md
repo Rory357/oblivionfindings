@@ -171,9 +171,15 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
       untouched, zero regression). New `toggleFeedReaction`/`addFeedReply` +
       summary/thread loaders; `reactFeed`/`replyFeed` endpoints (`/hr/feed/react`,
       `/reply`) with cross-tenant subject guard. Frontend: extracted shared
-      `<ReactionBar>` reused by Kudos/Announcement/Update cards. +4 Pest. Verify →
-      merge → deploy → Chrome-verify (iter 1 + 2 together).
-- [ ] **Iter 3 — #6 server-side wall search** (across all posts, not just loaded page).
+      `<ReactionBar>` reused by Kudos/Announcement/Update cards. +4 Pest. ✅ MERGED
+      `ae723cfd` (clean merge w/ more People-hub work) + deploying. **20 Pest pass /
+      79 assert.** tsc0/eslint0/vite0/php-l0. Chrome-verify iter 1+2 once deploy lands.
+- [~] **Iter 3 — #6 server-side wall search**: `getFeed`/`getFeedAnnouncements` take
+      `?search` (posts → content + author + kudos-recipient; announcements →
+      title + content); `index` reads `?search`, threads it, `withQueryString()` on
+      pagination. Frontend: debounced (350ms) `router.get` replacing the client-only
+      filter; `filters.search` round-trips. +1 Pest. ⚠️ live Chrome-verify paused
+      (.com session expired; I won't auth) — relying on Pest/tsc/build.
 - [ ] **Iter 4 — #7 insights trends-over-time** (kudos/participation by week).
 - [ ] **Iter 5 — #2 compose attachments + per-post audience scoping.**
 - [ ] **Iter 6 — #3 tenant-scoped recipient validation** (+ update existing tests to use

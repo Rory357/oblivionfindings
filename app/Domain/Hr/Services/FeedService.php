@@ -297,10 +297,18 @@ class FeedService
      * kudos parties plus their reactions and reply threads so the wall can render
      * the social row without N+1 queries.
      */
-    public function getFeed(?int $tenantId, ?string $type, int $perPage = 20): LengthAwarePaginator
+    public function getFeed(?int $tenantId, ?string $type, ?string $search = null, int $perPage = 20): LengthAwarePaginator
     {
         return HrFeedPost::forTenant($tenantId)
             ->when($type, fn ($q) => $q->where('post_type', $type))
+            ->when($search, function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('content', 'like', $term)
+                        ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $term))
+                        ->orWhereHas('kudos.toUser', fn ($u) => $u->where('name', 'like', $term));
+                });
+            })
             ->with([
                 'user:id,name',
                 'kudos.toUser:id,name',
@@ -310,7 +318,8 @@ class FeedService
             ])
             ->orderByDesc('is_pinned')
             ->orderByDesc('created_at')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**
@@ -370,10 +379,14 @@ class FeedService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getFeedAnnouncements(?int $tenantId, int $viewerId): array
+    public function getFeedAnnouncements(?int $tenantId, int $viewerId, ?string $search = null): array
     {
         $announcements = HrAnnouncement::forTenant($tenantId)
             ->active()
+            ->when($search, function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $q->where(fn ($sub) => $sub->where('title', 'like', $term)->orWhere('content', 'like', $term));
+            })
             ->withCount('acknowledgements')
             ->with('creator:id,name')
             ->orderByDesc('is_pinned')

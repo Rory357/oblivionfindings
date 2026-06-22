@@ -273,3 +273,25 @@ test('an unknown feed subject type is rejected', function () {
         ->post('/hr/feed/react', ['subject_type' => 'kudos', 'subject_id' => 1, 'emoji' => 'heart'])
         ->assertSessionHasErrors('subject_type');
 });
+
+test('the wall search filters posts server-side', function () {
+    HrFeedPost::create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'Quarterly roster zebra update',
+    ]);
+    HrFeedPost::create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'An unrelated kai note',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/hr/feed?search=zebra')
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/feed/index')
+            ->where('filters.search', 'zebra')
+            ->has('posts.data', 1));
+});
