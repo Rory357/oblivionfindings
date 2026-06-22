@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPosition;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -114,4 +115,46 @@ test('store persists a cost centre', function () {
         ->assertRedirect();
 
     expect(HrDepartment::query()->where('name', 'Finance Ops')->value('cost_centre'))->toBe('CC-4100');
+});
+
+test('a department can be linked to sites and the View returns them', function () {
+    $siteA = Site::factory()->create(['tenant_id' => 1, 'type' => 'house', 'name' => 'Kauri House']);
+    $siteB = Site::factory()->create(['tenant_id' => 1, 'type' => 'house', 'name' => 'Rata House']);
+
+    $this->actingAs($this->actor)
+        ->post('/hr/departments', [
+            'name' => 'Care Services',
+            'site_ids' => [$siteA->id, $siteB->id],
+        ])
+        ->assertRedirect();
+
+    $dept = HrDepartment::query()->where('name', 'Care Services')->firstOrFail();
+
+    expect($dept->sites()->pluck('sites.id')->all())
+        ->toEqualCanonicalizing([$siteA->id, $siteB->id]);
+
+    $json = $this->actingAs($this->actor)
+        ->getJson("/hr/departments/{$dept->id}")
+        ->assertOk()
+        ->json();
+
+    expect(collect($json['sites'])->pluck('name'))
+        ->toContain('Kauri House')
+        ->toContain('Rata House');
+});
+
+test('updating a department re-syncs its sites', function () {
+    $siteA = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+    $siteB = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+    $dept = makeDept('Clinical');
+    $dept->sites()->sync([$siteA->id]);
+
+    $this->actingAs($this->actor)
+        ->put("/hr/departments/{$dept->id}", [
+            'name' => 'Clinical',
+            'site_ids' => [$siteB->id],
+        ])
+        ->assertRedirect();
+
+    expect($dept->sites()->pluck('sites.id')->all())->toBe([$siteB->id]);
 });

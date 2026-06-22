@@ -34,6 +34,7 @@ export interface Department {
     employees_count: number;
     manager?: { id: number; name: string } | null;
     parent?: { id: number; name: string } | null;
+    sites?: Array<{ id: number; name: string }>;
 }
 
 const STEPS: readonly WizardStep[] = [
@@ -49,12 +50,14 @@ export function DepartmentDialog({
     department,
     managers,
     parentOptions,
+    siteOptions = [],
 }: {
     open: boolean;
     onClose: () => void;
     department: Department | null;
     managers: Array<{ id: number; name: string }>;
     parentOptions: Array<{ id: number; name: string }>;
+    siteOptions?: Array<{ id: number; name: string }>;
 }) {
     const isEdit = !!department;
     const wizard = useWizard(STEPS.length);
@@ -70,7 +73,15 @@ export function DepartmentDialog({
         parent_id: department?.parent_id ? String(department.parent_id) : '',
         sort_order: department ? String(department.sort_order) : '0',
         is_active: department?.is_active ?? true,
+        site_ids: department?.sites?.map((s) => s.id) ?? [],
     });
+
+    const toggleSite = (id: number) => {
+        const next = form.data.site_ids.includes(id)
+            ? form.data.site_ids.filter((s) => s !== id)
+            : [...form.data.site_ids, id];
+        form.setData('site_ids', next);
+    };
 
     const close = () => {
         form.reset();
@@ -109,6 +120,9 @@ export function DepartmentDialog({
     const managerLabel =
         managers.find((m) => String(m.id) === form.data.manager_user_id)?.name ??
         '—';
+    const siteLabels = siteOptions
+        .filter((s) => form.data.site_ids.includes(s.id))
+        .map((s) => s.name);
 
     const parentChoices = parentOptions
         .filter((p) => !department || p.id !== department.id)
@@ -286,6 +300,38 @@ export function DepartmentDialog({
                                 }
                             />
                         </Field>
+                        {siteOptions.length > 0 && (
+                            <Field
+                                label="Sites"
+                                hint="where this department operates"
+                                span
+                                error={form.errors.site_ids}
+                            >
+                                <div className="flex flex-wrap gap-2">
+                                    {siteOptions.map((s) => {
+                                        const on = form.data.site_ids.includes(
+                                            s.id,
+                                        );
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                type="button"
+                                                onClick={() => toggleSite(s.id)}
+                                                aria-pressed={on}
+                                                className={cn(
+                                                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                                                    on
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border text-muted-foreground hover:bg-muted',
+                                                )}
+                                            >
+                                                {s.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </Field>
+                        )}
                         {isEdit && (
                             <Field label="Status">
                                 <Segmented
@@ -345,6 +391,14 @@ export function DepartmentDialog({
                         >
                             <ReviewRow label="Parent" value={parentLabel} />
                             <ReviewRow label="Head" value={managerLabel} />
+                            <ReviewRow
+                                label="Sites"
+                                value={
+                                    siteLabels.length
+                                        ? siteLabels.join(', ')
+                                        : '—'
+                                }
+                            />
                             <ReviewRow
                                 label="Sort order"
                                 value={form.data.sort_order}

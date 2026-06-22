@@ -2,9 +2,11 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrDepartment extends Model
@@ -57,6 +59,14 @@ class HrDepartment extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(HrEmployeeProfile::class, 'department_id');
+    }
+
+    /** Sites this department operates across (organisational footprint). */
+    public function sites(): BelongsToMany
+    {
+        return $this->belongsToMany(Site::class, 'hr_department_site')
+            ->withTimestamps()
+            ->orderBy('sites.name');
     }
 
     /* ------------------------------------------------------------------ */

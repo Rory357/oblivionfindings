@@ -1,7 +1,14 @@
 /* eslint-disable no-restricted-syntax -- This read-only detail modal uses
  * compact custom layout surfaces (stat tiles, detail rows, chips) rather than
  * shadcn Card primitives. All colours are semantic design tokens. */
-import { Briefcase, Building2, GitBranch, Pencil, Users } from 'lucide-react';
+import {
+    Briefcase,
+    Building2,
+    GitBranch,
+    MapPin,
+    Pencil,
+    Users,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -26,6 +33,7 @@ interface DepartmentDetail {
     parent: { id: number; name: string } | null;
     direct_employee_count: number;
     rolled_up_employee_count: number;
+    sites: Array<{ id: number; name: string }>;
     children: Array<{
         id: number;
         name: string;
@@ -134,6 +142,23 @@ export function DepartmentViewDialog({
                             <Row label="Parent department" value={data.parent?.name} />
                             <Row label="Description" value={data.description} />
                         </div>
+
+                        {/* Sites */}
+                        {data.sites.length > 0 ? (
+                            <Section title="Sites">
+                                <div className="flex flex-wrap gap-2">
+                                    {data.sites.map((s) => (
+                                        <span
+                                            key={s.id}
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-xs font-medium"
+                                        >
+                                            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                            {s.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </Section>
+                        ) : null}
 
                         {/* Children */}
                         {data.children.length > 0 ? (

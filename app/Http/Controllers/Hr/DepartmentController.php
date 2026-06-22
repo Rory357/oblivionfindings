@@ -53,13 +53,20 @@ class DepartmentController extends Controller
             'manager_user_id' => ['nullable', 'exists:users,id'],
             'parent_id' => ['nullable', 'exists:hr_departments,id'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'site_ids' => ['nullable', 'array'],
+            'site_ids.*' => ['integer', 'exists:sites,id'],
         ]);
 
-        HrDepartment::create([
+        $siteIds = $validated['site_ids'] ?? [];
+        unset($validated['site_ids']);
+
+        $department = HrDepartment::create([
             ...$validated,
             'tenant_id' => $tenantId,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
+
+        $department->sites()->sync($siteIds);
 
         return redirect()->back()->with('success', 'Department created successfully.');
     }
@@ -105,6 +112,10 @@ class DepartmentController extends Controller
                 : null,
             'direct_employee_count' => $department->employees()->where('is_active', true)->count(),
             'rolled_up_employee_count' => $department->rolledUpEmployeeCount(),
+            'sites' => $department->sites()->get()->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+            ])->values(),
             'children' => $children->map(fn ($c) => [
                 'id' => $c->id,
                 'name' => $c->name,
@@ -139,6 +150,8 @@ class DepartmentController extends Controller
             'parent_id' => ['nullable', 'exists:hr_departments,id'],
             'is_active' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'site_ids' => ['nullable', 'array'],
+            'site_ids.*' => ['integer', 'exists:sites,id'],
         ]);
 
         // Cycle-safe parent: reject self-parent or any parent that is a descendant.
@@ -149,7 +162,14 @@ class DepartmentController extends Controller
             ]);
         }
 
+        unset($validated['site_ids']);
         $department->update($validated);
+
+        // Only re-sync the site footprint when the form actually submitted it,
+        // so unrelated updates don't silently clear it.
+        if ($request->has('site_ids')) {
+            $department->sites()->sync($request->input('site_ids', []));
+        }
 
         return redirect()->back()->with('success', 'Department updated successfully.');
     }
