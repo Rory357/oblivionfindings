@@ -217,18 +217,11 @@ class RecruitmentService
             $candidate->loadMissing('documents');
             $workEmail = $offer->work_email ?: $candidate->personal_email;
             $roleName = $offer->position_role ?: 'support_worker';
-            $user = User::query()->firstOrCreate(
-                ['email' => $workEmail],
-                [
-                    'name' => $candidate->full_name,
-                    'role' => $roleName,
-                    'password' => bcrypt(Str::random(40)),
-                    'approved_at' => now(),
-                    'approved_by' => $convertedBy,
-                ]
-            );
 
-            $existingProfile = HrEmployeeProfile::query()->where('user_id', $user->id)->first();
+            // Guard: never hijack a profile already linked to a *different* candidate.
+            $existingProfile = HrEmployeeProfile::query()
+                ->whereHas('user', fn ($q) => $q->where('email', $workEmail))
+                ->first();
             if (
                 $existingProfile
                 && $existingProfile->candidate_id
@@ -237,30 +230,15 @@ class RecruitmentService
                 throw new \LogicException('This email is already linked to another converted candidate.');
             }
 
-            $updates = [];
-            if (! $user->role) {
-                $updates['role'] = $roleName;
-            }
-            if (! $user->approved_at) {
-                $updates['approved_at'] = now();
-                $updates['approved_by'] = $convertedBy;
-            }
-            if ($updates !== []) {
-                $user->forceFill($updates)->save();
-            }
-
-            $role = Role::query()->where('name', $roleName)->first();
-            if ($role) {
-                $user->roles()->syncWithoutDetaching([$role->id]);
-            }
-
-            $profile = HrEmployeeProfile::query()->updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'tenant_id' => $candidate->tenant_id,
-                    'employee_number' => $this->generateEmployeeNumber(),
+            // Single source of truth for the User + profile write (+ role,
+            // onboarding, invite, event). Recruitment is just one door into it.
+            $profile = app(EmployeeIntakeService::class)->intake(
+                name: $candidate->full_name,
+                email: $workEmail,
+                roleName: $roleName,
+                profileAttributes: [
                     'position_title' => $offer->position_title,
-                    'position_role' => $offer->position_role ?: 'support_worker',
+                    'position_role' => $roleName,
                     'employment_type' => $offer->employment_type,
                     'hours_per_week' => $offer->hours_per_week,
                     'hourly_rate' => $offer->hourly_rate,
@@ -270,23 +248,20 @@ class RecruitmentService
                     'personal_email' => $candidate->personal_email,
                     'personal_phone' => $candidate->personal_phone,
                     'work_email' => $workEmail,
-                    'is_active' => true,
                     'offer_id' => $offer->id,
                     'candidate_id' => $candidate->id,
-                    'created_by' => $convertedBy,
-                    'updated_by' => $convertedBy,
-                ]
+                ],
+                actorId: $convertedBy,
+                tenantId: (int) $candidate->tenant_id,
+                startOnboarding: true,
+                sendInvite: true,
+                source: 'recruitment',
             );
 
+            // Recruitment-specific follow-through (candidate lifecycle + docs).
             $this->advanceStage($candidate, 'hired', $convertedBy);
             $offer->application()->update(['status' => 'hired']);
-
-            // Copy candidate documents to employee documents
             $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
-
-            $this->maybeGenerateOnboardingChecklist($profile, $convertedBy);
-
-            Password::broker()->sendResetLink(['email' => $user->email]);
 
             return $profile->fresh();
         });

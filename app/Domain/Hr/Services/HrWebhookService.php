@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class HrWebhookService
 {
     public const SUPPORTED_EVENTS = [
+        'employee.created',
         'leave.request.submitted',
         'leave.request.approved',
         'leave.request.declined',

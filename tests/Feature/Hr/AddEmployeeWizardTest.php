@@ -56,11 +56,59 @@ test('a non-manager cannot add an employee', function () {
     expect(User::query()->where('email', 'blocked@example.test')->exists())->toBeFalse();
 });
 
-test('a duplicate email is rejected', function () {
-    User::factory()->create(['email' => 'dupe@example.test']);
+test('adding an email that exists without a profile links to that user', function () {
+    $existing = User::factory()->create([
+        'email' => 'candidate@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
 
     $this->actingAs($this->hr)->post('/hr/people', [
-        'name' => 'Dupe Person',
-        'email' => 'dupe@example.test',
+        'name' => 'Candidate Hire',
+        'email' => 'candidate@example.test',
+        'role' => 'support_worker',
+    ])->assertRedirect();
+
+    // Linked, not duplicated: still one user, now with a profile.
+    expect(User::query()->where('email', 'candidate@example.test')->count())->toBe(1);
+    expect(
+        HrEmployeeProfile::query()->where('user_id', $existing->id)->exists()
+    )->toBeTrue();
+});
+
+test('adding an email already used by a staff member needs link confirmation', function () {
+    $existing = User::factory()->create([
+        'email' => 'staffer@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $existing->id,
+        'employee_number' => 'EMP-EXIST',
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    // Without link_existing → rejected with a validation error.
+    $this->actingAs($this->hr)->post('/hr/people', [
+        'name' => 'Staffer Again',
+        'email' => 'staffer@example.test',
+        'role' => 'support_worker',
     ])->assertSessionHasErrors('email');
+
+    // With link_existing → updates the existing profile in place (no duplicate).
+    $this->actingAs($this->hr)->post('/hr/people', [
+        'name' => 'Staffer Again',
+        'email' => 'staffer@example.test',
+        'role' => 'support_worker',
+        'position_title' => 'Senior Support Worker',
+        'link_existing' => true,
+    ])->assertRedirect();
+
+    expect(HrEmployeeProfile::query()->where('user_id', $existing->id)->count())->toBe(1);
+    expect($existing->fresh()->hrEmployeeProfile->position_title)->toBe('Senior Support Worker');
 });

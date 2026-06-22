@@ -25,6 +25,7 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OrgChartService;
 use App\Models\Role;
 use App\Models\Site;
@@ -349,7 +350,7 @@ class EmployeeProfileController extends Controller
     /*  Store — create a new employee (User + profile + role)               */
     /* ------------------------------------------------------------------ */
 
-    public function store(StoreEmployeeRequest $request)
+    public function store(StoreEmployeeRequest $request, EmployeeIntakeService $intake)
     {
         $actor = $request->user();
         $data = $request->validated();
@@ -360,28 +361,24 @@ class EmployeeProfileController extends Controller
             $positionTitle = HrPosition::find($data['position_id'])?->title;
         }
 
-        $profile = DB::transaction(function () use ($data, $actor, $roleName, $positionTitle) {
-            $newUser = User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'role' => $roleName,
-                'password' => bcrypt(Str::random(40)),
-                'approved_at' => now(),
-                'approved_by' => $actor->id,
-            ]);
+        // Dedupe gate: if this email already belongs to a staff member who has a
+        // profile, require explicit confirmation before linking/overwriting it
+        // (the modal's "Link to existing record" callout). A user without a
+        // profile (e.g. a candidate-created account) links silently.
+        $existingUser = User::where('email', $data['email'])->first();
+        if ($existingUser?->hrEmployeeProfile && ! $request->boolean('link_existing')) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'email' => 'A staff member already uses this email. Enable “Link to existing record” to update their profile.',
+                ]);
+        }
 
-            $role = Role::where('name', $roleName)->first();
-            if ($role) {
-                $newUser->roles()->syncWithoutDetaching([$role->id]);
-            }
-
-            // hr_employee_profiles requires position_title / position_role /
-            // employment_type / start_date (NOT NULL). Quick-add fills sensible
-            // defaults the user can refine on the profile.
-            return HrEmployeeProfile::create([
-                'tenant_id' => $actor->tenant_id ?? 1,
-                'user_id' => $newUser->id,
-                'employee_number' => $this->generateEmployeeNumber(),
+        $profile = $intake->intake(
+            name: $data['name'],
+            email: $data['email'],
+            roleName: $roleName,
+            profileAttributes: [
                 'preferred_name' => $data['preferred_name'] ?? null,
                 'position_id' => $data['position_id'] ?? null,
                 'position_title' => $positionTitle ?: 'New starter',
@@ -391,24 +388,22 @@ class EmployeeProfileController extends Controller
                 'primary_site_id' => $data['primary_site_id'] ?? null,
                 'manager_user_id' => $data['manager_user_id'] ?? null,
                 'start_date' => $data['start_date'] ?? now()->toDateString(),
-                'work_email' => $data['email'],
                 'work_phone' => $data['work_phone'] ?? null,
-                'is_active' => true,
-                'created_by' => $actor->id,
-                'updated_by' => $actor->id,
-            ]);
-        });
+                'work_rights_status' => $data['work_rights_status'] ?? null,
+                'visa_type' => $data['visa_type'] ?? null,
+                'visa_expires_at' => $data['visa_expires_at'] ?? null,
+                'emergency_contacts' => $data['emergency_contacts'] ?? null,
+            ],
+            actorId: $actor->id,
+            tenantId: $this->resolveHrTenantIdForUser($actor),
+            startOnboarding: $request->boolean('start_onboarding', true),
+            sendInvite: $request->boolean('send_invite', false),
+            source: 'manual',
+        );
 
         return redirect()
             ->route('hr.people.show', $profile->id)
             ->with('success', "{$data['name']} has been added to your team.");
-    }
-
-    private function generateEmployeeNumber(): string
-    {
-        $next = (int) (HrEmployeeProfile::withTrashed()->max('id') ?? 0) + 1;
-
-        return 'EMP-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     /* ------------------------------------------------------------------ */
