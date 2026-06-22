@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import {
     ChevronDown,
     ChevronRight,
+    Network,
     Printer,
     Search,
     UserCog,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { OrgChartBuilderDialog } from '@/components/hr/people/org-chart-builder-dialog';
 import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -353,6 +355,7 @@ export function OrgChartPane({
     canManage: boolean;
 }) {
     const [searchQuery, setSearchQuery] = useState('');
+    const [builderOpen, setBuilderOpen] = useState(false);
 
     const matchingIds = useMemo(
         () => findMatchingIds(hierarchy, searchQuery),
@@ -371,18 +374,38 @@ export function OrgChartPane({
                         className="pl-9"
                     />
                 </div>
-                {hierarchy.length > 0 ? (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.print()}
-                        className="gap-1.5"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                    {canManage && hierarchy.length > 0 ? (
+                        <Button
+                            size="sm"
+                            onClick={() => setBuilderOpen(true)}
+                            className="gap-1.5"
+                        >
+                            <Network className="h-4 w-4" />
+                            Build org chart
+                        </Button>
+                    ) : null}
+                    {hierarchy.length > 0 ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.print()}
+                            className="gap-1.5"
+                        >
+                            <Printer className="h-4 w-4" />
+                            Print
+                        </Button>
+                    ) : null}
+                </div>
             </div>
+
+            {canManage && (
+                <OrgChartBuilderDialog
+                    open={builderOpen}
+                    onClose={() => setBuilderOpen(false)}
+                    hierarchy={hierarchy}
+                />
+            )}
 
             <div className="overflow-x-auto pb-4">
                 {hierarchy.length === 0 ? (

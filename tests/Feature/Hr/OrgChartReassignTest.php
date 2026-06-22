@@ -75,3 +75,36 @@ test('an employee cannot be set to report to themselves', function () {
 
     expect($emp->fresh()->manager_user_id)->toBeNull();
 });
+
+test('a reporting loop is rejected server-side (drag onto own subordinate)', function () {
+    // mgr ← emp (emp reports to mgr). The builder must not let mgr be dropped
+    // onto emp; even if it tries, the server's wouldCreateCycle guard blocks it.
+    $mgrUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $mgr = orgChartProfile($mgrUser, ['employee_number' => 'EMP-MGR']);
+
+    $empUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $emp = orgChartProfile($empUser, ['manager_user_id' => $mgrUser->id]);
+
+    expect($emp->fresh()->manager_user_id)->toBe($mgrUser->id);
+
+    // Attempt to make the manager report to their own report → loop.
+    $this->actingAs($this->hr)
+        ->put("/hr/orgchart/{$mgr->id}", ['manager_user_id' => $empUser->id])
+        ->assertSessionHas('error');
+
+    expect($mgr->fresh()->manager_user_id)->toBeNull();
+});
+
+test('an employee can be dragged to the top level (manager cleared)', function () {
+    $mgrUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    orgChartProfile($mgrUser, ['employee_number' => 'EMP-MGR']);
+
+    $empUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $emp = orgChartProfile($empUser, ['manager_user_id' => $mgrUser->id]);
+
+    $this->actingAs($this->hr)
+        ->put("/hr/orgchart/{$emp->id}", ['manager_user_id' => null])
+        ->assertRedirect();
+
+    expect($emp->fresh()->manager_user_id)->toBeNull();
+});
