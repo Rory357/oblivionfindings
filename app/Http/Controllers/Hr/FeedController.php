@@ -33,8 +33,10 @@ class FeedController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $type = $request->query('type');
+        $search = trim((string) $request->query('search', ''));
+        $search = $search !== '' ? $search : null;
 
-        $posts = $this->feedService->getFeed($tenantId, $type);
+        $posts = $this->feedService->getFeed($tenantId, $type, $search);
         // Polymorphic reactions/replies for the non-kudos posts on this page
         // (kudos carry their own kudos-keyed reactions). Loaded in two queries.
         $nonKudosIds = $posts->getCollection()
@@ -47,13 +49,15 @@ class FeedController extends Controller
 
         return Inertia::render('hr/feed/index', [
             'posts' => $posts,
-            'announcements' => $this->feedService->getFeedAnnouncements($tenantId, $user->id),
+            'announcements' => $this->feedService->getFeedAnnouncements($tenantId, $user->id, $search),
             'metrics' => $this->feedService->getMetrics($tenantId),
             'valueBreakdown' => $this->feedService->getValueBreakdown($tenantId),
+            'kudosTrend' => $this->feedService->getKudosTrend($tenantId),
             'milestones' => $this->feedService->getMilestones($tenantId),
             'leaderboard' => $this->feedService->getKudosLeaderboard($tenantId),
             'filters' => [
                 'type' => $type,
+                'search' => $search,
             ],
             'kudosCategories' => FeedService::KUDOS_CATEGORIES,
             'kudosImpacts' => FeedService::KUDOS_IMPACTS,

@@ -15,7 +15,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Heart, Megaphone, Search, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
     AnnouncementCard,
@@ -45,7 +45,8 @@ type Props = {
     };
     leaderboard: LeaderboardEntry[];
     valueBreakdown: Array<{ key: string; label: string; count: number }>;
-    filters: { type: string | null };
+    kudosTrend: Array<{ label: string; count: number }>;
+    filters: { type: string | null; search: string | null };
     kudosCategories: Record<string, string>;
     kudosImpacts: Record<string, string>;
     reactionEmojis: string[];
@@ -81,6 +82,7 @@ export default function FeedIndex({
     milestones,
     leaderboard,
     valueBreakdown,
+    kudosTrend,
     filters,
     kudosCategories,
     kudosImpacts,
@@ -93,7 +95,7 @@ export default function FeedIndex({
     const [composeOpen, setComposeOpen] = useState(false);
     const [announceOpen, setAnnounceOpen] = useState(false);
     const [insightsOpen, setInsightsOpen] = useState(false);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(filters.search ?? '');
 
     const activeTab =
         filters.type === 'update'
@@ -150,9 +152,33 @@ export default function FeedIndex({
         return items;
     }, [milestones]);
 
-    const onFilter = (type: string | null) => {
-        router.get('/hr/feed', type ? { type } : {}, { preserveState: true, preserveScroll: true });
+    const query = (type: string | null, searchTerm: string) => {
+        const params: Record<string, string> = {};
+        if (type) params.type = type;
+        if (searchTerm.trim()) params.search = searchTerm.trim();
+        return params;
     };
+
+    const onFilter = (type: string | null) => {
+        router.get('/hr/feed', query(type, search), { preserveState: true, preserveScroll: true });
+    };
+
+    // Debounced server-side wall search (across all posts + announcements, not
+    // just the loaded page). Re-queries when the input settles and differs from
+    // what the server last searched.
+    useEffect(() => {
+        const current = filters.search ?? '';
+        if (search === current) return;
+        const handle = setTimeout(() => {
+            router.get('/hr/feed', query(filters.type, search), {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 350);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search, filters.search, filters.type]);
 
     const openRecognition = (defaults?: RecognitionDefaults) => {
         setRecogDefaults(defaults);
@@ -167,30 +193,12 @@ export default function FeedIndex({
         });
     };
 
-    const q = search.trim().toLowerCase();
-    const visiblePosts = useMemo(
-        () =>
-            posts.data.filter((p) => {
-                if (!q) return true;
-                return (
-                    p.content.toLowerCase().includes(q) ||
-                    (p.user?.name.toLowerCase().includes(q) ?? false) ||
-                    (p.kudos?.to_user?.name?.toLowerCase().includes(q) ?? false)
-                );
-            }),
-        [posts.data, q],
-    );
-    const visibleAnnouncements = useMemo(
-        () =>
-            showAnnouncements
-                ? announcements.filter(
-                      (a) => !q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q),
-                  )
-                : [],
-        [announcements, q, showAnnouncements],
-    );
-
+    // Posts + announcements arrive already filtered by the server (type + search);
+    // only the tab-driven announcements/posts split stays client-side.
+    const visiblePosts = posts.data;
+    const visibleAnnouncements = showAnnouncements ? announcements : [];
     const wallEmpty = visiblePosts.length === 0 && visibleAnnouncements.length === 0;
+    const isSearching = (filters.search ?? '') !== '';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -302,7 +310,7 @@ export default function FeedIndex({
                         {wallEmpty ? (
                             <FeedEmpty
                                 label={
-                                    q
+                                    isSearching
                                         ? 'No posts match your search.'
                                         : 'Nothing here yet — be the first to share or recognise a colleague!'
                                 }
@@ -338,6 +346,7 @@ export default function FeedIndex({
                 onClose={() => setInsightsOpen(false)}
                 metrics={metrics}
                 valueBreakdown={valueBreakdown}
+                kudosTrend={kudosTrend}
                 leaderboard={leaderboard}
             />
         </AppLayout>

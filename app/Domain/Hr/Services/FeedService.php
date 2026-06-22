@@ -297,10 +297,18 @@ class FeedService
      * kudos parties plus their reactions and reply threads so the wall can render
      * the social row without N+1 queries.
      */
-    public function getFeed(?int $tenantId, ?string $type, int $perPage = 20): LengthAwarePaginator
+    public function getFeed(?int $tenantId, ?string $type, ?string $search = null, int $perPage = 20): LengthAwarePaginator
     {
         return HrFeedPost::forTenant($tenantId)
             ->when($type, fn ($q) => $q->where('post_type', $type))
+            ->when($search, function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('content', 'like', $term)
+                        ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $term))
+                        ->orWhereHas('kudos.toUser', fn ($u) => $u->where('name', 'like', $term));
+                });
+            })
             ->with([
                 'user:id,name',
                 'kudos.toUser:id,name',
@@ -310,7 +318,8 @@ class FeedService
             ])
             ->orderByDesc('is_pinned')
             ->orderByDesc('created_at')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**
@@ -370,10 +379,14 @@ class FeedService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getFeedAnnouncements(?int $tenantId, int $viewerId): array
+    public function getFeedAnnouncements(?int $tenantId, int $viewerId, ?string $search = null): array
     {
         $announcements = HrAnnouncement::forTenant($tenantId)
             ->active()
+            ->when($search, function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $q->where(fn ($sub) => $sub->where('title', 'like', $term)->orWhere('content', 'like', $term));
+            })
             ->withCount('acknowledgements')
             ->with('creator:id,name')
             ->orderByDesc('is_pinned')
@@ -601,6 +614,34 @@ class FeedService
             ->sortByDesc('count')
             ->values()
             ->all();
+    }
+
+    /**
+     * Kudos volume per week for the last N weeks (oldest-first) — the insights
+     * modal's trend sparkline.
+     *
+     * @return array<int, array{label:string, count:int}>
+     */
+    public function getKudosTrend(?int $tenantId, int $weeks = 8): array
+    {
+        $firstWeek = now()->startOfWeek()->subWeeks($weeks - 1);
+
+        $byWeek = HrKudos::forTenant($tenantId)
+            ->where('created_at', '>=', $firstWeek)
+            ->get(['created_at'])
+            ->groupBy(fn ($kudos) => $kudos->created_at->copy()->startOfWeek()->format('Y-m-d'));
+
+        $trend = [];
+        for ($i = 0; $i < $weeks; $i++) {
+            $weekStart = $firstWeek->copy()->addWeeks($i);
+            $key = $weekStart->format('Y-m-d');
+            $trend[] = [
+                'label' => $weekStart->format('j M'),
+                'count' => isset($byWeek[$key]) ? $byWeek[$key]->count() : 0,
+            ];
+        }
+
+        return $trend;
     }
 
     private function normaliseImpact(?string $impact): string

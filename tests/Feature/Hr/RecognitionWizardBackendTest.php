@@ -161,8 +161,24 @@ test('the feed index exposes the recognition payload shape', function () {
             ->has('announcements')
             ->has('leaderboard')
             ->has('valueBreakdown')
+            ->has('kudosTrend', 8)
             ->has('kudosImpacts')
             ->has('sites'));
+});
+
+test('the insights trend buckets kudos into the current week', function () {
+    $this->actingAs($this->hr)->post('/hr/feed/kudos', [
+        'to_user_id' => $this->r1->id,
+        'category' => 'teamwork',
+        'message' => 'Great work this week.',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/hr/feed')
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/feed/index')
+            ->has('kudosTrend', 8)
+            ->where('kudosTrend.7.count', 1));
 });
 
 test('self-service /hr/my/kudos accepts multiple recipients and an impact', function () {
@@ -272,4 +288,26 @@ test('an unknown feed subject type is rejected', function () {
     $this->actingAs($this->hr)
         ->post('/hr/feed/react', ['subject_type' => 'kudos', 'subject_id' => 1, 'emoji' => 'heart'])
         ->assertSessionHasErrors('subject_type');
+});
+
+test('the wall search filters posts server-side', function () {
+    HrFeedPost::create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'Quarterly roster zebra update',
+    ]);
+    HrFeedPost::create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'An unrelated kai note',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/hr/feed?search=zebra')
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/feed/index')
+            ->where('filters.search', 'zebra')
+            ->has('posts.data', 1));
 });
