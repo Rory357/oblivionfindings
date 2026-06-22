@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrKudos;
@@ -201,4 +202,74 @@ test('an unknown composer kind is rejected', function () {
             'kind' => 'rant',
         ])
         ->assertSessionHasErrors('kind');
+});
+
+test('reacting to an announcement toggles the polymorphic feed reaction', function () {
+    $announcement = HrAnnouncement::create([
+        'tenant_id' => 1,
+        'title' => 'All-hands Friday',
+        'content' => 'See you there.',
+        'priority' => 'normal',
+        'target_audience' => 'all',
+        'published_at' => now(),
+        'created_by' => $this->hr->id,
+    ]);
+
+    $payload = ['subject_type' => 'announcement', 'subject_id' => $announcement->id, 'emoji' => 'party'];
+
+    $this->actingAs($this->hr)->post('/hr/feed/react', $payload)->assertRedirect();
+    $this->assertDatabaseHas('hr_feed_reactions', [
+        'subject_type' => 'announcement',
+        'subject_id' => $announcement->id,
+        'user_id' => $this->hr->id,
+        'emoji' => 'party',
+    ]);
+
+    // Toggling the same emoji removes it.
+    $this->actingAs($this->hr)->post('/hr/feed/react', $payload)->assertRedirect();
+    $this->assertDatabaseMissing('hr_feed_reactions', [
+        'subject_type' => 'announcement',
+        'subject_id' => $announcement->id,
+        'user_id' => $this->hr->id,
+        'emoji' => 'party',
+    ]);
+});
+
+test('replying to a non-kudos post stores a polymorphic feed reply', function () {
+    $post = HrFeedPost::create([
+        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'Team update of the week.',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/feed/reply', ['subject_type' => 'post', 'subject_id' => $post->id, 'body' => 'Love this!'])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('hr_feed_replies', [
+        'subject_type' => 'post',
+        'subject_id' => $post->id,
+        'user_id' => $this->hr->id,
+        'body' => 'Love this!',
+    ]);
+});
+
+test('a cross-tenant feed reaction subject is rejected', function () {
+    $otherTenantPost = HrFeedPost::create([
+        'tenant_id' => 2,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'Another org.',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/feed/react', ['subject_type' => 'post', 'subject_id' => $otherTenantPost->id, 'emoji' => 'heart'])
+        ->assertNotFound();
+});
+
+test('an unknown feed subject type is rejected', function () {
+    $this->actingAs($this->hr)
+        ->post('/hr/feed/react', ['subject_type' => 'kudos', 'subject_id' => 1, 'emoji' => 'heart'])
+        ->assertSessionHasErrors('subject_type');
 });

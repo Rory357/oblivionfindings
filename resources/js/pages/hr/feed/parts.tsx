@@ -58,6 +58,9 @@ export type FeedPost = {
     is_pinned: boolean;
     user: FeedUser | null;
     kudos: KudosData | null;
+    // Non-kudos posts carry polymorphic reactions/replies (null for kudos posts).
+    reactions: ReactionSummary | null;
+    replies: KudosReply[] | null;
     created_at: string | null;
     created_at_date: string | null;
 };
@@ -75,6 +78,8 @@ export type FeedAnnouncement = {
     acknowledged_count: number;
     audience_count: number;
     viewer_acknowledged: boolean;
+    reactions: ReactionSummary;
+    replies: KudosReply[];
     created_at: string | null;
 };
 
@@ -160,6 +165,117 @@ function AuthorMeta({ employee }: { employee?: FeedEmployee }) {
     return bits ? <span className="text-xs text-muted-foreground">{bits}</span> : null;
 }
 
+/**
+ * The shared social row — heart/party/hands reaction toggles, a reply count, the
+ * reply thread, and an inline reply box. Reused by every wall card (kudos,
+ * announcements, updates); the card supplies the react/reply callbacks so the
+ * same UI drives both the kudos-keyed and the polymorphic endpoints.
+ */
+function ReactionBar({
+    reactions,
+    replies,
+    canReply,
+    onReact,
+    onReply,
+    replyDisabledNote,
+}: {
+    reactions: ReactionSummary;
+    replies: KudosReply[];
+    canReply: boolean;
+    onReact: (emoji: string) => void;
+    onReply: (body: string, done: () => void) => void;
+    replyDisabledNote?: string;
+}) {
+    const [showReply, setShowReply] = useState(false);
+    const [replyBody, setReplyBody] = useState('');
+    const [posting, setPosting] = useState(false);
+
+    const submit = () => {
+        if (!replyBody.trim()) return;
+        setPosting(true);
+        onReply(replyBody, () => {
+            setReplyBody('');
+            setShowReply(false);
+            setPosting(false);
+        });
+    };
+
+    return (
+        <>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+                {REACTION_ORDER.map((emoji) => {
+                    const count = reactions.counts[emoji] ?? 0;
+                    const mine = reactions.mine.includes(emoji);
+                    return (
+                        <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => onReact(emoji)}
+                            aria-pressed={mine}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors',
+                                mine
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                            )}
+                        >
+                            <span aria-hidden>{REACTION_GLYPH[emoji]}</span>
+                            {count}
+                        </button>
+                    );
+                })}
+                <button
+                    type="button"
+                    onClick={() => setShowReply((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    {replies.length}
+                </button>
+            </div>
+
+            {replies.length > 0 ? (
+                <ul className="mt-3 space-y-2 border-l-2 border-border pl-3">
+                    {replies.map((reply) => (
+                        <li key={reply.id} className="text-sm">
+                            <span className="font-semibold">{reply.user_name}</span>{' '}
+                            <span className="text-xs text-muted-foreground">{reply.created_at}</span>
+                            <p className="whitespace-pre-wrap text-muted-foreground">{reply.body}</p>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+
+            {showReply && canReply ? (
+                <div className="mt-3 flex items-end gap-2">
+                    <Textarea
+                        rows={2}
+                        value={replyBody}
+                        onChange={(e) => setReplyBody(e.target.value)}
+                        placeholder="Write a reply…"
+                        maxLength={2000}
+                        className="flex-1"
+                    />
+                    <button
+                        type="button"
+                        onClick={submit}
+                        disabled={posting || !replyBody.trim()}
+                        className={cn(
+                            'inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground',
+                            (posting || !replyBody.trim()) && 'cursor-not-allowed opacity-50',
+                        )}
+                    >
+                        <Send className="h-3.5 w-3.5" />
+                        Reply
+                    </button>
+                </div>
+            ) : showReply && replyDisabledNote ? (
+                <p className="mt-2 text-xs text-muted-foreground">{replyDisabledNote}</p>
+            ) : null}
+        </>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Kudos card — value + impact badges, reactions, reply thread        */
 /* ------------------------------------------------------------------ */
@@ -177,36 +293,6 @@ export function KudosCard({
 }) {
     const kudos = post.kudos!;
     const author = post.user;
-    const [showReply, setShowReply] = useState(false);
-    const [replyBody, setReplyBody] = useState('');
-    const [posting, setPosting] = useState(false);
-
-    const react = (emoji: string) => {
-        router.post(
-            `/hr/feed/kudos/${kudos.id}/react`,
-            { emoji },
-            { preserveScroll: true, preserveState: true, only: ['posts'] },
-        );
-    };
-
-    const submitReply = () => {
-        if (!replyBody.trim()) return;
-        setPosting(true);
-        router.post(
-            `/hr/feed/kudos/${kudos.id}/reply`,
-            { body: replyBody },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['posts'],
-                onSuccess: () => {
-                    setReplyBody('');
-                    setShowReply(false);
-                },
-                onFinish: () => setPosting(false),
-            },
-        );
-    };
 
     return (
         <Card>
@@ -236,81 +322,26 @@ export function KudosCard({
 
                         <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
 
-                        {/* reactions + reply toggle */}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                            {REACTION_ORDER.map((emoji) => {
-                                const count = kudos.reactions.counts[emoji] ?? 0;
-                                const mine = kudos.reactions.mine.includes(emoji);
-                                return (
-                                    <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => react(emoji)}
-                                        aria-pressed={mine}
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors',
-                                            mine
-                                                ? 'border-primary bg-primary/10 text-primary'
-                                                : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                                        )}
-                                    >
-                                        <span aria-hidden>{REACTION_GLYPH[emoji]}</span>
-                                        {count}
-                                    </button>
-                                );
-                            })}
-                            <button
-                                type="button"
-                                onClick={() => setShowReply((v) => !v)}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                            >
-                                <MessageCircle className="h-3.5 w-3.5" />
-                                {kudos.replies.length}
-                            </button>
-                        </div>
-
-                        {/* reply thread */}
-                        {kudos.replies.length > 0 ? (
-                            <ul className="mt-3 space-y-2 border-l-2 border-border pl-3">
-                                {kudos.replies.map((reply) => (
-                                    <li key={reply.id} className="text-sm">
-                                        <span className="font-semibold">{reply.user_name}</span>{' '}
-                                        <span className="text-xs text-muted-foreground">{reply.created_at}</span>
-                                        <p className="whitespace-pre-wrap text-muted-foreground">{reply.body}</p>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : null}
-
-                        {showReply && kudos.can_reply ? (
-                            <div className="mt-3 flex items-end gap-2">
-                                <Textarea
-                                    rows={2}
-                                    value={replyBody}
-                                    onChange={(e) => setReplyBody(e.target.value)}
-                                    placeholder="Write a reply…"
-                                    maxLength={2000}
-                                    className="flex-1"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={submitReply}
-                                    disabled={posting || !replyBody.trim()}
-                                    className={cn(
-                                        'inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground',
-                                        (posting || !replyBody.trim()) && 'cursor-not-allowed opacity-50',
-                                    )}
-                                >
-                                    <Send className="h-3.5 w-3.5" />
-                                    Reply
-                                </button>
-                            </div>
-                        ) : showReply && !kudos.can_reply ? (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                Only {kudos.from_user?.name ?? 'the sender'} and{' '}
-                                {kudos.to_user?.name ?? 'the recipient'} can reply to this thread.
-                            </p>
-                        ) : null}
+                        <ReactionBar
+                            reactions={kudos.reactions}
+                            replies={kudos.replies}
+                            canReply={kudos.can_reply}
+                            onReact={(emoji) =>
+                                router.post(
+                                    `/hr/feed/kudos/${kudos.id}/react`,
+                                    { emoji },
+                                    { preserveScroll: true, preserveState: true, only: ['posts'] },
+                                )
+                            }
+                            onReply={(body, done) =>
+                                router.post(
+                                    `/hr/feed/kudos/${kudos.id}/reply`,
+                                    { body },
+                                    { preserveScroll: true, preserveState: true, only: ['posts'], onSuccess: done },
+                                )
+                            }
+                            replyDisabledNote={`Only ${kudos.from_user?.name ?? 'the sender'} and ${kudos.to_user?.name ?? 'the recipient'} can reply to this thread.`}
+                        />
                     </div>
                 </div>
             </CardContent>
@@ -395,6 +426,26 @@ export function AnnouncementCard({
                                 </div>
                             </div>
                         ) : null}
+
+                        <ReactionBar
+                            reactions={a.reactions}
+                            replies={a.replies}
+                            canReply
+                            onReact={(emoji) =>
+                                router.post(
+                                    '/hr/feed/react',
+                                    { subject_type: 'announcement', subject_id: a.id, emoji },
+                                    { preserveScroll: true, preserveState: true, only: ['announcements'] },
+                                )
+                            }
+                            onReply={(body, done) =>
+                                router.post(
+                                    '/hr/feed/reply',
+                                    { subject_type: 'announcement', subject_id: a.id, body },
+                                    { preserveScroll: true, preserveState: true, only: ['announcements'], onSuccess: done },
+                                )
+                            }
+                        />
                     </div>
                 </div>
             </CardContent>
@@ -436,6 +487,28 @@ export function UpdateCard({
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>
                         </div>
                         <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
+
+                        {post.reactions ? (
+                            <ReactionBar
+                                reactions={post.reactions}
+                                replies={post.replies ?? []}
+                                canReply
+                                onReact={(emoji) =>
+                                    router.post(
+                                        '/hr/feed/react',
+                                        { subject_type: 'post', subject_id: post.id, emoji },
+                                        { preserveScroll: true, preserveState: true, only: ['posts'] },
+                                    )
+                                }
+                                onReply={(body, done) =>
+                                    router.post(
+                                        '/hr/feed/reply',
+                                        { subject_type: 'post', subject_id: post.id, body },
+                                        { preserveScroll: true, preserveState: true, only: ['posts'], onSuccess: done },
+                                    )
+                                }
+                            />
+                        ) : null}
                     </div>
                 </div>
             </CardContent>

@@ -165,8 +165,14 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
   - #4 audience-scoped announcement progress: `audience_count` now per-announcement
     (target all/site/dept/role) not whole-tenant headcount.
   - Tests: +2 (kind stored / rejected). Verify → merge → deploy → Chrome-verify.
-- [ ] **Iter 2 — #1 polymorphic reactions/replies on all wall items** (announcements +
-      updates, not just kudos). The big one — unify onto one reaction/reply store.
+- [~] **Iter 2 — #1 reactions/replies on all wall items** (announcements + non-kudos
+      posts): polymorphic `hr_feed_reactions`/`hr_feed_replies` (mig `…000005`,
+      subject = post | announcement) — kudos keep their own tables (shoutouts
+      untouched, zero regression). New `toggleFeedReaction`/`addFeedReply` +
+      summary/thread loaders; `reactFeed`/`replyFeed` endpoints (`/hr/feed/react`,
+      `/reply`) with cross-tenant subject guard. Frontend: extracted shared
+      `<ReactionBar>` reused by Kudos/Announcement/Update cards. +4 Pest. Verify →
+      merge → deploy → Chrome-verify (iter 1 + 2 together).
 - [ ] **Iter 3 — #6 server-side wall search** (across all posts, not just loaded page).
 - [ ] **Iter 4 — #7 insights trends-over-time** (kudos/participation by week).
 - [ ] **Iter 5 — #2 compose attachments + per-post audience scoping.**
