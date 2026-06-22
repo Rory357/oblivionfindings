@@ -303,6 +303,7 @@ class EmployeeProfileController extends Controller
                 'user_id' => $p->user_id,
                 'name' => $p->user?->name ?? 'Unknown',
                 'position_title' => $p->position_title,
+                'manager_user_id' => $p->manager_user_id,
             ])
             ->values();
         $canOrgManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');

@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import {
     ChevronDown,
     ChevronRight,
+    Printer,
     Search,
     UserCog,
     Users,
@@ -24,11 +25,13 @@ import { Input } from '@/components/ui/input';
 export interface OrgNode {
     id: number;
     user_id: number;
+    manager_user_id: number | null;
     name: string;
     email: string | null;
     position_title: string;
     department: string | null;
-    profile_photo_path: string | null;
+    site: string | null;
+    photo_url: string | null;
     children: OrgNode[];
 }
 
@@ -36,6 +39,7 @@ export interface OrgPerson {
     user_id: number;
     name: string;
     position_title: string | null;
+    manager_user_id?: number | null;
 }
 
 function getInitials(name: string): string {
@@ -45,6 +49,22 @@ function getInitials(name: string): string {
         .join('')
         .toUpperCase()
         .slice(0, 2);
+}
+
+/** Title-bar colour keyed to the department branch (stable hash → token palette). */
+const BAR_COLORS = [
+    'bg-status-info text-white',
+    'bg-status-success text-white',
+    'bg-status-warning text-white',
+    'bg-primary text-primary-foreground',
+    'bg-status-critical text-white',
+];
+
+function deptBar(dept: string | null): string {
+    if (!dept) return 'bg-muted text-muted-foreground';
+    let h = 0;
+    for (let i = 0; i < dept.length; i++) h = (h * 31 + dept.charCodeAt(i)) >>> 0;
+    return BAR_COLORS[h % BAR_COLORS.length];
 }
 
 export function flattenNodes(nodes: OrgNode[]): OrgNode[] {
@@ -190,49 +210,53 @@ function OrgNodeCard({
     return (
         <div className="flex flex-col items-center">
             <div
-                className={`relative flex w-56 items-center gap-3 rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md ${
-                    isSelfMatch ? 'ring-2 ring-primary/50' : ''
+                className={`relative w-56 overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md ${
+                    isSelfMatch ? 'ring-2 ring-primary/60' : ''
                 }`}
             >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {node.profile_photo_path ? (
-                        <img
-                            src={node.profile_photo_path}
-                            alt={node.name}
-                            className="h-10 w-10 rounded-full object-cover"
-                        />
-                    ) : (
-                        getInitials(node.name)
-                    )}
+                {/* colour-coded title bar — the role, keyed to the department branch */}
+                <div
+                    className={`truncate px-3 py-1.5 text-[11px] font-bold tracking-wide uppercase ${deptBar(node.department)}`}
+                >
+                    {node.position_title || 'No position'}
                 </div>
 
-                <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm leading-tight font-medium">
-                        {node.name}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                        {node.position_title || 'No position'}
-                    </p>
-                    {node.department && (
-                        <p className="truncate text-xs text-muted-foreground/70">
-                            {node.department}
+                <div className="flex items-center gap-3 p-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md bg-primary/10 text-sm font-semibold text-primary">
+                        {node.photo_url ? (
+                            <img
+                                src={node.photo_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            getInitials(node.name)
+                        )}
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm leading-tight font-semibold italic">
+                            {node.name}
                         </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                            {node.site || node.department || '—'}
+                        </p>
+                    </div>
+
+                    {canManage && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setReassignOpen(true)}
+                            title="Change reporting line"
+                            aria-label={`Change reporting line for ${node.name}`}
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
+                        >
+                            <UserCog className="h-4 w-4" />
+                        </Button>
                     )}
                 </div>
-
-                {canManage && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setReassignOpen(true)}
-                        title="Change reporting line"
-                        aria-label={`Change reporting line for ${node.name}`}
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
-                    >
-                        <UserCog className="h-4 w-4" />
-                    </Button>
-                )}
 
                 {hasChildren && !isFilterActive && (
                     <Button
@@ -337,14 +361,27 @@ export function OrgChartPane({
 
     return (
         <div className="space-y-4">
-            <div className="relative w-full max-w-sm">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    placeholder="Search by name, position, department…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative w-full max-w-sm">
+                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by name, position, department…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                    />
+                </div>
+                {hierarchy.length > 0 ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.print()}
+                        className="gap-1.5"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
+                ) : null}
             </div>
 
             <div className="overflow-x-auto pb-4">

@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class OrgChartService
 {
@@ -11,7 +12,7 @@ class OrgChartService
     {
         $employees = HrEmployeeProfile::forTenant($tenantId)
             ->active()
-            ->with('user:id,name,email', 'position:id,title,code')
+            ->with('user:id,name,email', 'position:id,title,code', 'primarySite:id,name')
             ->get();
 
         $roots = $employees->whereNull('manager_user_id');
@@ -90,12 +91,24 @@ class OrgChartService
         return [
             'id' => $employee->id,
             'user_id' => $employee->user_id,
+            'manager_user_id' => $employee->manager_user_id,
             'name' => $employee->user?->name ?? 'Unknown',
             'email' => $employee->user?->email,
             'position_title' => $employee->position_title,
             'department' => $employee->departmentRelation?->name ?? $employee->department,
-            'profile_photo_path' => $employee->profile_photo_path ?? null,
+            'site' => $employee->primarySite?->name,
+            'photo_url' => $this->photoUrl($employee->profile_photo_path),
             'children' => $reports->map(fn ($r) => $this->buildNode($r, $all))->values()->all(),
         ];
+    }
+
+    /** Resolve a stored profile photo path to a browser URL (public disk). */
+    private function photoUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        return str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path);
     }
 }
