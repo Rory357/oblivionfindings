@@ -60,24 +60,32 @@ class MyHrController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'to_user_id' => ['required', 'integer', 'exists:users,id'],
+            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id'],
+            'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
+            'to_user_ids.*' => ['integer', 'exists:users,id'],
             'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
+            'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
+        $recipientIds = $validated['to_user_ids'] ?? [$validated['to_user_id']];
+
         try {
-            $this->feedService->sendKudos(
+            $this->feedService->sendKudosToMany(
                 $user,
-                $validated['to_user_id'],
+                $recipientIds,
                 $validated['category'],
                 $validated['message'],
                 $tenantId,
+                $validated['impact'] ?? null,
             );
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Kudos sent! 🎉');
+        $count = count($recipientIds);
+
+        return redirect()->back()->with('success', $count > 1 ? "Kudos sent to {$count} colleagues! 🎉" : 'Kudos sent! 🎉');
     }
 
     /**

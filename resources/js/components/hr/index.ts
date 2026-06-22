@@ -16,7 +16,6 @@ export * from './my-hr-calendar';
 export * from './my-hr-clock-card';
 export * from './my-hr-esign-dialog';
 export * from './my-hr-hero';
-export * from './my-hr-kudos-wizard';
 export * from './my-hr-leave-wizard';
 export * from './my-hr-one-modal';
 export * from './my-hr-shell';

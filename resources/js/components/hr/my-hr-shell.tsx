@@ -5,8 +5,9 @@ import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
+import { RecognitionWizard } from '@/components/recognition';
+
 import { MyHrHero, type MyHrHeroHandlers } from './my-hr-hero';
-import { MyHrKudosWizard } from './my-hr-kudos-wizard';
 import { MyHrTabs, type MyHrTab } from './my-hr-tabs';
 import type { MyHrShellData } from './my-hr-types';
 
@@ -68,10 +69,13 @@ export function MyHrShell({
                     {children}
                 </PageLayout>
             </MyHrKudosContext.Provider>
-            <MyHrKudosWizard
+            <RecognitionWizard
                 open={kudosOpen}
                 onClose={() => setKudosOpen(false)}
-                teammates={myHr.teammates}
+                employees={myHr.teammates}
+                kudosCategories={myHr.kudosCategories}
+                kudosImpacts={myHr.kudosImpacts}
+                endpoint="/hr/my/kudos"
             />
         </AppLayout>
     );

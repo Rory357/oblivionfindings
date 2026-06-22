@@ -1,5 +1,13 @@
 import type { MyHrActiveClock } from './my-hr-clock-card';
-import type { KudosTeammate } from './my-hr-kudos-wizard';
+
+/** A teammate in the shell-hosted "Give recognition" wizard directory. */
+export type KudosTeammate = {
+    id: number;
+    name: string;
+    initials: string;
+    role: string | null;
+    site: string | null;
+};
 
 /** One day-cell event in the hero footer calendar (shift / approved leave /
  *  public holiday). Mirrors the `events` payload from `BuildsMyHrShell`. */
@@ -93,6 +101,10 @@ export const MY_HR_KUDOS_LABELS: Record<string, string> = {
  *  merged into every `/hr/my/*` Inertia page under the `myHr` prop. */
 export type MyHrShellData = {
     teammates: KudosTeammate[];
+    /** Kudos value + impact maps (FeedService consts) for the shared recognition
+     *  wizard hosted by the shell. */
+    kudosCategories: Record<string, string>;
+    kudosImpacts: Record<string, string>;
     profile: {
         name: string;
         first_name: string;

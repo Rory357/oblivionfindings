@@ -100,10 +100,17 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
       wayfinder codegen plugin — needs php/vendor — then reverting; routes present
       via junction). "View insights" → `/hr/analytics` for now (P5 may add a modal).
 
-### Phase 4 — Cross-module reuse
-- [ ] `/hr/my` hero "Send kudos" + `/hr/my/shoutouts` → `RecognitionWizard`
-      (retire `my-hr-kudos-wizard.tsx`; update `useSendKudos`).
-- [ ] Retire `recognition-dialog.tsx` → `RecognitionWizard` (feed call site).
+### Phase 4 — Cross-module reuse ✅ (commit pending)
+- [x] `my-hr-shell.tsx` now mounts `RecognitionWizard` (employees=teammates,
+      kudosCategories/kudosImpacts from shell, `endpoint="/hr/my/kudos"`) — so
+      `/hr/my`, `/hr/my/shoutouts` and any `useSendKudos()` caller get the shared
+      wizard for free. No regression: `/hr/my/kudos` stays ungated.
+- [x] `MyHrController::sendKudos` extended for `to_user_ids[]` + `impact`
+      (`sendKudosToMany`). `BuildsMyHrShell` threads `kudosCategories`+`kudosImpacts`
+      into `MyHrShellData`; `KudosTeammate` type relocated to `my-hr-types.ts`.
+- [x] `RecognitionWizard` gained optional `endpoint` prop (default `/hr/feed/kudos`).
+- [x] Retired `recognition-dialog.tsx` + `my-hr-kudos-wizard.tsx` (deleted; barrel
+      export removed; no remaining references). tsc 0 · eslint 0 · php -l 0.
 
 ### Phase 5 — Insights
 - [ ] "View insights" → modal (participation, top values, kudos trend, leaderboard).

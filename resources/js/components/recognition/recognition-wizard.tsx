@@ -99,6 +99,7 @@ export function RecognitionWizard({
     kudosCategories,
     kudosImpacts,
     defaults,
+    endpoint = '/hr/feed/kudos',
 }: {
     open: boolean;
     onClose: () => void;
@@ -107,6 +108,10 @@ export function RecognitionWizard({
     kudosCategories: Record<string, string>;
     kudosImpacts: Record<string, string>;
     defaults?: RecognitionDefaults;
+    /** Backend path for the kudos POST. Defaults to the feed endpoint; the My HR
+     *  surfaces pass the ungated self-service `/hr/my/kudos` so any teammate can
+     *  recognise a colleague (it shares the same FeedService path). */
+    endpoint?: string;
 }) {
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
@@ -193,7 +198,7 @@ export function RecognitionWizard({
     };
 
     const submit = (addAnother: boolean) => {
-        form.post('/hr/feed/kudos', {
+        form.post(endpoint, {
             preserveScroll: true,
             onSuccess: () => {
                 onSuccess?.();
