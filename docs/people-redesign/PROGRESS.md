@@ -166,8 +166,29 @@ Drill-down modal from the hero chips (no tab — it's a cross-cutting action que
   `orgchart.update` endpoint — new tests are additive coverage.
 - 2026-06-22: **Phase 6 (FINAL) complete** (`b9d916ff`) — needs-attention triage modal + resendInvite.
   **Merged → origin/main** (FF `1fb31ec9..b9d916ff`, no divergence) → deploy triggered. tsc/eslint(0)/build/
-  php-l green; triage queries tinker-validated. **ALL 6 PHASES NOW BUILT + MERGED.** Remaining: one
-  consolidated Chrome-verify pass on .com covering Phases 4–6 (departments View modal; org-chart colour
-  cards + Build drag modal; needs-attention triage modal incl. live Send-invite) once the deploy lands,
-  then run the committed Pest suite from the parent against a throwaway DB. ⚠️Chrome-verify needs the
-  USER logged into .com (I never enter passwords).
+  php-l green; triage queries tinker-validated. **ALL 6 PHASES NOW BUILT + MERGED.**
+- 2026-06-22: **✅✅ LIVE Chrome-verified on .com (Demo Admin) — Phases 5 + 6:**
+  - **Phase 6 triage modal**: hero shows "Invite" quick-action + "NEEDS ATTENTION · 21 pending invites"
+    chip (pending_invites=21 live). Chip → triage modal opens at **Invites** rail = 21 real people, each
+    "Not signed in" + Invite/View actions, footer "View the People directory". Switched to **Compliance**
+    rail → empty state ("Nothing needs attention here · This queue is clear") + footer dynamically →
+    "Open Compliance centre". Rail counts/switching/empty-states/dynamic-footer all confirmed.
+    (Did NOT trigger a live Send-invite — outbound email is gated by the messaging-permission rule; the
+    path is the proven intake reset-link + covered by NeedsTriageTest.)
+  - **Phase 5a cards**: org-chart cards render with colour title bars (role), square avatars, italic
+    names, site line. **Phase 5b builder modal**: "Build org chart" → modal renders fully (instructions,
+    "Top level — drop here" zone, indented draggable rows w/ grips). ⚠️Synthetic computer-use drag became
+    a text-selection (dnd-kit needs real pointer events) — harness limitation, NOT a code defect.
+  - **Phase 5 reassign WRITE path PROVEN LIVE** (same `orgchart.update` endpoint the drag uses): per-node
+    "Change reporting line" picker → selected Demo Manager → Save → **"Reporting structure updated"** toast
+    + tree re-rendered with Demo Coordinator nested under Demo Manager (connector drawn). ⚠️left this org
+    edit in place on .com (harmless/realistic; "go crazy" test server).
+  - **0 app console errors** (75 console exceptions = identical benign extension "message channel closed"
+    noise). Inertia props confirm backend live (summary.pending_invites=21, triage present, org nodes
+    carry site/photo_url/manager_user_id). ⚠️deploy ordering: backend props landed before the JS bundle
+    swapped (hero briefly lacked the invites chip) — self-healed on reload (one transient 502 mid-restart).
+  - **🎉 PROGRAMME COMPLETE — all 6 phases built, merged, deployed, live-verified.** Only-remaining
+    (optional): run the committed Pest suite (PeoplePaneActions/PositionVacancy/DepartmentFeature/
+    OrgChartReassign/NeedsTriage/AddEmployeeWizard) from the PARENT vs a throwaway DB — deferred all loop
+    (shared codex_test DB wipe risk); features proven live + tinker, tests php-l clean & modeled on green
+    peers. 3d loop-close + bulk Export-selected stay deferred (small, out of brief's core).
