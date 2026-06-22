@@ -26,9 +26,10 @@ class CheckVacanciesCommand extends Command
         }
 
         $totalUnderstaffed = 0;
+        $totalClosed = 0;
 
         foreach ($tenantIds as $tenantId) {
-            $positions->syncAllHeadcounts((int) $tenantId);
+            $totalClosed += $positions->syncAllHeadcounts((int) $tenantId);
 
             $understaffed = $positions->getUnderstaffed((int) $tenantId);
             $totalUnderstaffed += $understaffed->count();
@@ -41,6 +42,10 @@ class CheckVacanciesCommand extends Command
                     $positions->actionableVacancies($position),
                 ));
             }
+        }
+
+        if ($totalClosed > 0) {
+            $this->line("Auto-closed {$totalClosed} filled requisition(s).");
         }
 
         $this->info("Vacancy check complete. {$totalUnderstaffed} understaffed position(s).");

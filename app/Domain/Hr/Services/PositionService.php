@@ -62,9 +62,17 @@ class PositionService
             ->where('is_active', true)
             ->count();
         $position->update(['current_headcount' => $count]);
+
+        // Close the recruitment loop: a freshly-filled seat needs no open req.
+        $this->closeFilledRequisitions($position, $count);
     }
 
-    public function syncAllHeadcounts(?int $tenantId): void
+    /**
+     * Reconcile every position's stored headcount, then close the recruitment
+     * loop on any that are now fully staffed. Returns the number of requisitions
+     * auto-closed (so the scheduled command can report it).
+     */
+    public function syncAllHeadcounts(?int $tenantId): int
     {
         $counts = HrEmployeeProfile::where('is_active', true)
             ->whereNotNull('position_id')
@@ -72,11 +80,52 @@ class PositionService
             ->select('position_id', DB::raw('COUNT(*) as count'))
             ->pluck('count', 'position_id');
 
-        HrPosition::forTenant($tenantId)->each(function (HrPosition $position) use ($counts) {
-            $position->update([
-                'current_headcount' => $counts->get($position->id, 0),
-            ]);
+        $closed = 0;
+        HrPosition::forTenant($tenantId)->each(function (HrPosition $position) use ($counts, &$closed) {
+            $count = (int) $counts->get($position->id, 0);
+            $position->update(['current_headcount' => $count]);
+            $closed += $this->closeFilledRequisitions($position, $count);
         });
+
+        return $closed;
+    }
+
+    /**
+     * Close the recruitment loop: once a position is fully staffed, close any of
+     * its still-open requisitions — the seats they advertised are filled. One-way
+     * (never reopens on later attrition; a new gap raises a fresh requisition).
+     * Returns the number of requisitions closed.
+     */
+    public function closeFilledRequisitions(HrPosition $position, ?int $filled = null): int
+    {
+        if ((int) $position->headcount_budget <= 0) {
+            return 0;
+        }
+
+        $filled ??= HrEmployeeProfile::where('position_id', $position->id)
+            ->where('is_active', true)
+            ->count();
+
+        if ($filled < (int) $position->headcount_budget) {
+            return 0;
+        }
+
+        $closed = $position->requisitions()
+            ->whereNotIn('status', ['closed'])
+            ->update([
+                'status' => 'closed',
+                'closing_at' => now()->toDateString(),
+            ]);
+
+        if ($closed > 0) {
+            \Illuminate\Support\Facades\Log::info('hr.requisition.auto_closed', [
+                'position_id' => $position->id,
+                'position_title' => $position->title,
+                'closed' => $closed,
+            ]);
+        }
+
+        return $closed;
     }
 
     public function getDepartments(?int $tenantId): array

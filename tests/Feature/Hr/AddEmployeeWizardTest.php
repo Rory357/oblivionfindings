@@ -86,6 +86,7 @@ test('adding an email already used by a staff member needs link confirmation', f
         'tenant_id' => 1,
         'user_id' => $existing->id,
         'employee_number' => 'EMP-EXIST',
+        'work_email' => $existing->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
