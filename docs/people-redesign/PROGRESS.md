@@ -83,3 +83,6 @@ per-row actions; footer deep-links.
   render; 0 console errors; server-side sort proven). Fixed default-star bug `d80d1ec9` (ships next
   merge). ⚠️PeoplePaneActionsTest committed but not run (shared local test DB → would wipe dev data).
   Next: Phase 2 — employee intake unification (audit-first).
+- 2026-06-22: Phase 2 complete (2a backend `b2e939b9`, 2b wizard `1aeac54f`). **Merged Phase 1-starfix
+  + Phase 2 → origin/main** (FF `208532d3..1aeac54f`) → deploy triggered. Pending: Chrome-verify the
+  5-step Add-Employee wizard + end-to-end create on .com. Next: Phase 3 (positions automation).
