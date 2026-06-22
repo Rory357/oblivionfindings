@@ -130,3 +130,8 @@ per-row actions; footer deep-links.
   /hr/feed recognition redesign had pushed 10 commits; auto-merged clean). Merged tree tsc/build green
   → deploy triggered. Pending: Chrome-verify understaffed surfacing + New-Position JD/auto-req. 3d
   deferred. Next phase: Departments (Phase 4).
+- 2026-06-22: Phase 3 ✅ Chrome-verified LIVE on .com (created a position via the 3-step wizard + auto-req
+  toggle → "Recruiting" badge; 0 app console errors). Phase 4 complete (4a `6429691a`, 4b `85e5fd6d`):
+  cost-centre, cycle-safe hierarchy + roll-up, View modal, wizard. **Merged Phase 4 → origin/main**
+  (FF `6ad28387..85e5fd6d`) → deploy triggered. Pending: Chrome-verify departments. Next: Phase 5
+  (org-chart builder, research-first), then Phase 6 (needs-attention triage).
