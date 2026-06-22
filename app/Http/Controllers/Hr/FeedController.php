@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Services\FeedService;
 use App\Http\Controllers\Controller;
@@ -33,7 +35,15 @@ class FeedController extends Controller
         $type = $request->query('type');
 
         $posts = $this->feedService->getFeed($tenantId, $type);
-        $posts->through(fn ($post) => $this->transformPost($post, $user->id));
+        // Polymorphic reactions/replies for the non-kudos posts on this page
+        // (kudos carry their own kudos-keyed reactions). Loaded in two queries.
+        $nonKudosIds = $posts->getCollection()
+            ->filter(fn ($post) => $post->post_type !== 'kudos')
+            ->pluck('id')
+            ->all();
+        $postReactions = $this->feedService->feedReactionSummaries('post', $nonKudosIds, $user->id);
+        $postReplies = $this->feedService->feedReplyThreads('post', $nonKudosIds);
+        $posts->through(fn ($post) => $this->transformPost($post, $user->id, $postReactions, $postReplies));
 
         return Inertia::render('hr/feed/index', [
             'posts' => $posts,
@@ -162,12 +172,74 @@ class FeedController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  React / Reply — polymorphic wall items (announcements + posts)      */
+    /* ------------------------------------------------------------------ */
+
+    public function reactFeed(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $validated = $request->validate([
+            'subject_type' => ['required', 'string', Rule::in(FeedService::FEED_SUBJECTS)],
+            'subject_id' => ['required', 'integer'],
+            'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
+        ]);
+
+        $this->assertFeedSubjectInTenant($validated['subject_type'], (int) $validated['subject_id'], $tenantId);
+        $this->feedService->toggleFeedReaction(
+            $validated['subject_type'],
+            (int) $validated['subject_id'],
+            $tenantId,
+            $user->id,
+            $validated['emoji'],
+        );
+
+        return redirect()->back()->with('success', 'Reaction updated.');
+    }
+
+    public function replyFeed(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $validated = $request->validate([
+            'subject_type' => ['required', 'string', Rule::in(FeedService::FEED_SUBJECTS)],
+            'subject_id' => ['required', 'integer'],
+            'body' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $this->assertFeedSubjectInTenant($validated['subject_type'], (int) $validated['subject_id'], $tenantId);
+        $this->feedService->addFeedReply(
+            $validated['subject_type'],
+            (int) $validated['subject_id'],
+            $tenantId,
+            $user->id,
+            $validated['body'],
+        );
+
+        return redirect()->back()->with('success', 'Reply posted.');
+    }
+
+    /** Guard a polymorphic wall reaction/reply against cross-tenant subjects. */
+    private function assertFeedSubjectInTenant(string $type, int $id, int $tenantId): void
+    {
+        $model = $type === 'announcement'
+            ? HrAnnouncement::find($id)
+            : HrFeedPost::find($id);
+
+        abort_unless($model && (int) $model->tenant_id === $tenantId, 404);
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Helpers                                                            */
     /* ------------------------------------------------------------------ */
 
-    private function transformPost($post, int $viewerId): array
+    private function transformPost($post, int $viewerId, array $postReactions = [], array $postReplies = []): array
     {
-        $kudos = $post->kudos;
+        $kudos = $post->post_type === 'kudos' ? $post->kudos : null;
 
         return [
             'id' => $post->id,
@@ -200,9 +272,19 @@ class FeedController extends Controller
                 ])->values()->all(),
                 'can_reply' => in_array($viewerId, [$kudos->from_user_id, $kudos->to_user_id], true),
             ] : null,
+            // Non-kudos posts (update/question/win/milestone) carry polymorphic
+            // feed reactions + an open reply thread.
+            'reactions' => $kudos ? null : ($postReactions[$post->id] ?? $this->emptyReactionSummary()),
+            'replies' => $kudos ? null : ($postReplies[$post->id] ?? []),
             'created_at' => $post->created_at?->diffForHumans(),
             'created_at_date' => $post->created_at?->toDateTimeString(),
         ];
+    }
+
+    /** @return array{counts: array<string,int>, mine: array<int,string>} */
+    private function emptyReactionSummary(): array
+    {
+        return ['counts' => array_fill_keys(FeedService::REACTION_EMOJIS, 0), 'mine' => []];
     }
 
     /**

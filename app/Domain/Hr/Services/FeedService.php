@@ -5,6 +5,8 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedPost;
+use App\Domain\Hr\Models\HrFeedReaction;
+use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
@@ -44,6 +46,12 @@ class FeedService
      * Emoji reactions supported on a kudos card.
      */
     public const REACTION_EMOJIS = ['heart', 'party', 'hands'];
+
+    /**
+     * Polymorphic wall subjects that carry feed reactions/replies (everything
+     * except kudos, which keep their own kudos-keyed reactions).
+     */
+    public const FEED_SUBJECTS = ['post', 'announcement'];
 
     /**
      * Post types supported.
@@ -173,6 +181,118 @@ class FeedService
     }
 
     /**
+     * Toggle a polymorphic feed reaction (announcements + non-kudos posts).
+     * Returns true when now active, false when removed. Authorisation is the
+     * caller's concern.
+     */
+    public function toggleFeedReaction(string $subjectType, int $subjectId, int $tenantId, int $userId, string $emoji): bool
+    {
+        $existing = HrFeedReaction::where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->where('user_id', $userId)
+            ->where('emoji', $emoji)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+
+            return false;
+        }
+
+        try {
+            HrFeedReaction::create([
+                'tenant_id' => $tenantId,
+                'subject_type' => $subjectType,
+                'subject_id' => $subjectId,
+                'user_id' => $userId,
+                'emoji' => $emoji,
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // A concurrent identical reaction won the race — already on. No-op.
+        }
+
+        return true;
+    }
+
+    public function addFeedReply(string $subjectType, int $subjectId, int $tenantId, int $userId, string $body): HrFeedReply
+    {
+        return HrFeedReply::create([
+            'tenant_id' => $tenantId,
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'user_id' => $userId,
+            'body' => $body,
+        ]);
+    }
+
+    /**
+     * Reaction summaries (per-emoji counts + the viewer's own) for a set of
+     * wall subjects, keyed by subject id.
+     *
+     * @param  array<int>  $subjectIds
+     * @return array<int, array{counts: array<string,int>, mine: array<int,string>}>
+     */
+    public function feedReactionSummaries(string $subjectType, array $subjectIds, int $viewerId): array
+    {
+        $out = [];
+        foreach ($subjectIds as $id) {
+            $out[$id] = ['counts' => array_fill_keys(self::REACTION_EMOJIS, 0), 'mine' => []];
+        }
+        if (empty($subjectIds)) {
+            return $out;
+        }
+
+        $rows = HrFeedReaction::where('subject_type', $subjectType)
+            ->whereIn('subject_id', $subjectIds)
+            ->get(['subject_id', 'user_id', 'emoji']);
+
+        foreach ($rows as $row) {
+            if (! isset($out[$row->subject_id])) {
+                continue;
+            }
+            if (array_key_exists($row->emoji, $out[$row->subject_id]['counts'])) {
+                $out[$row->subject_id]['counts'][$row->emoji]++;
+            }
+            if ($row->user_id === $viewerId) {
+                $out[$row->subject_id]['mine'][] = $row->emoji;
+            }
+        }
+
+        foreach ($out as &$entry) {
+            $entry['mine'] = array_values(array_unique($entry['mine']));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Reply threads (oldest-first) for a set of wall subjects, keyed by subject id.
+     *
+     * @param  array<int>  $subjectIds
+     * @return array<int, array<int, array<string,mixed>>>
+     */
+    public function feedReplyThreads(string $subjectType, array $subjectIds): array
+    {
+        if (empty($subjectIds)) {
+            return [];
+        }
+
+        return HrFeedReply::where('subject_type', $subjectType)
+            ->whereIn('subject_id', $subjectIds)
+            ->with('user:id,name')
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('subject_id')
+            ->map(fn ($group) => $group->map(fn ($reply) => [
+                'id' => $reply->id,
+                'user_name' => $reply->user?->name ?? 'Unknown',
+                'body' => $reply->body,
+                'created_at' => $reply->created_at?->diffForHumans(),
+            ])->values()->all())
+            ->all();
+    }
+
+    /**
      * Get paginated community feed, optionally filtered by type. Eager-loads the
      * kudos parties plus their reactions and reply threads so the wall can render
      * the social row without N+1 queries.
@@ -252,15 +372,21 @@ class FeedService
      */
     public function getFeedAnnouncements(?int $tenantId, int $viewerId): array
     {
-        return HrAnnouncement::forTenant($tenantId)
+        $announcements = HrAnnouncement::forTenant($tenantId)
             ->active()
             ->withCount('acknowledgements')
             ->with('creator:id,name')
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
             ->limit(10)
-            ->get()
-            ->map(function (HrAnnouncement $a) use ($tenantId, $viewerId) {
+            ->get();
+
+        $ids = $announcements->pluck('id')->all();
+        $reactions = $this->feedReactionSummaries('announcement', $ids, $viewerId);
+        $replies = $this->feedReplyThreads('announcement', $ids);
+
+        return $announcements
+            ->map(function (HrAnnouncement $a) use ($tenantId, $viewerId, $reactions, $replies) {
                 $acknowledged = $a->acknowledgements()->where('user_id', $viewerId)->exists();
 
                 return [
@@ -279,6 +405,8 @@ class FeedService
                     'acknowledged_count' => $a->acknowledgements_count,
                     'audience_count' => $this->announcementAudienceCount($a, $tenantId),
                     'viewer_acknowledged' => $acknowledged,
+                    'reactions' => $reactions[$a->id] ?? ['counts' => array_fill_keys(self::REACTION_EMOJIS, 0), 'mine' => []],
+                    'replies' => $replies[$a->id] ?? [],
                     'created_at' => $a->published_at?->diffForHumans() ?? $a->created_at?->diffForHumans(),
                 ];
             })

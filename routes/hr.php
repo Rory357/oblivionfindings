@@ -822,6 +822,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             // Feed-scoped react/reply aliases onto the shared HrKudos path.
             Route::post('/kudos/{kudos}/react', [FeedController::class, 'react'])->name('kudos.react');
             Route::post('/kudos/{kudos}/reply', [FeedController::class, 'reply'])->name('kudos.reply');
+            // Polymorphic react/reply for the wall's non-kudos items (posts + announcements).
+            Route::post('/react', [FeedController::class, 'reactFeed'])->name('react');
+            Route::post('/reply', [FeedController::class, 'replyFeed'])->name('reply');
         });
     });
 
