@@ -27,6 +27,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OrgChartService;
+use App\Domain\Hr\Services\PositionService;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
@@ -230,6 +231,7 @@ class EmployeeProfileController extends Controller
                     ->orWhere('department', 'like', "%{$posSearch}%");
             }))
             ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->withSum(['requisitions as open_req_openings' => fn ($q) => $q->whereNotIn('status', ['closed'])], 'openings')
             ->orderBy('department')
             ->orderBy('title')
             ->paginate(20, ['*'], 'pos_page')
@@ -246,6 +248,9 @@ class EmployeeProfileController extends Controller
             'headcount_budget' => $pos->headcount_budget,
             'current_headcount' => $pos->employees_count,
             'vacancies' => max(0, $pos->headcount_budget - $pos->employees_count),
+            'open_requisition_openings' => (int) ($pos->open_req_openings ?? 0),
+            'actionable_vacancies' => max(0, $pos->headcount_budget - $pos->employees_count - (int) ($pos->open_req_openings ?? 0)),
+            'is_understaffed' => max(0, $pos->headcount_budget - $pos->employees_count - (int) ($pos->open_req_openings ?? 0)) > 0,
             'is_active' => (bool) $pos->is_active,
             'description' => $pos->description,
             'requirements' => $pos->requirements,
@@ -256,6 +261,8 @@ class EmployeeProfileController extends Controller
             ->where('is_active', true)
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
+
+        $understaffedCount = app(PositionService::class)->getUnderstaffed($tenantId)->count();
 
         // --- Departments tab (folds /hr/departments; own filters + paginator) ---
         $deptSearch = trim((string) $request->query('dept_q', ''));
@@ -339,6 +346,7 @@ class EmployeeProfileController extends Controller
                 'on_probation' => $onProbation,
                 'compliance_alerts' => $complianceAlerts,
                 'type_counts' => $typeCounts,
+                'understaffed_positions' => $understaffedCount,
             ],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),

@@ -20,6 +20,9 @@ import type { PositionRow } from './position-dialog';
 export interface PositionListRow extends PositionRow {
     current_headcount: number;
     vacancies: number;
+    open_requisition_openings: number;
+    actionable_vacancies: number;
+    is_understaffed: boolean;
 }
 
 export interface PaginatedPositions {
@@ -177,7 +180,6 @@ export function PositionsPane({
                                 </thead>
                                 <tbody className="divide-y">
                                     {positions.data.map((p) => {
-                                        const vacancies = p.vacancies;
                                         return (
                                             <tr
                                                 key={p.id}
@@ -202,11 +204,19 @@ export function PositionsPane({
                                                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
                                                         {p.current_headcount}/
                                                         {p.headcount_budget}
-                                                        {vacancies > 0 ? (
+                                                        {p.actionable_vacancies > 0 ? (
                                                             <StatusBadge
-                                                                status="open"
+                                                                status="action_required"
+                                                                tone="warning"
+                                                                label={`${p.actionable_vacancies} to hire`}
+                                                                className="ml-1"
+                                                            />
+                                                        ) : p.open_requisition_openings > 0 &&
+                                                          p.vacancies > 0 ? (
+                                                            <StatusBadge
+                                                                status="recruiting"
                                                                 tone="info"
-                                                                label={`${vacancies} open`}
+                                                                label="Recruiting"
                                                                 className="ml-1"
                                                             />
                                                         ) : null}

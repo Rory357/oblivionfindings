@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
@@ -137,4 +138,16 @@ test('converting an offer with a position fills that position', function () {
 
     expect((int) $profile->position_id)->toBe($pos->id)
         ->and($pos->fresh()->current_headcount)->toBe(1);
+});
+
+test('hr:check-vacancies reconciles stored headcount drift', function () {
+    $pos = makePosition(2);
+    hireInto($pos, $this->actor->id); // observer sets current_headcount = 1
+
+    // Simulate a mass update that bypassed the observer.
+    DB::table('hr_positions')->where('id', $pos->id)->update(['current_headcount' => 99]);
+
+    $this->artisan('hr:check-vacancies')->assertExitCode(0);
+
+    expect($pos->fresh()->current_headcount)->toBe(1);
 });

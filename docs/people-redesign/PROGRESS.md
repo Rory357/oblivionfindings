@@ -69,8 +69,13 @@ Audit: `docs/positions-recruitment-audit.md` (signed off — autonomous).
       end-to-end proved observer sync + accessors (current 0→1 on hire, actionable 1→0 with a 1-opening
       req). `PositionVacancyTest` (run post-merge). php -l clean. ⚠️mass updates (bulk bar) bypass the
       observer → daily job (3b) reconciles.
-- [ ] 3b — `hr:check-vacancies` scheduled command (syncAllHeadcounts + flag understaffed) + surface
-      understaffed (positions-pane badge + People hero needs-attention chip).
+- [x] 3b — `hr:check-vacancies` command (`CheckVacanciesCommand`, daily 06:30 NZ in routes/console.php):
+      syncAllHeadcounts (reconcile backstop for bulk-update drift) + reports understaffed. New
+      `PositionService::getUnderstaffed` / `actionableVacancies`. Positions payload carries
+      `open_requisition_openings`/`actionable_vacancies`/`is_understaffed`; positions-pane shows a
+      warning **"N to hire"** badge (or "Recruiting" when covered by an open req). People hero
+      **needs-attention chip** "N understaffed positions" → ?tab=positions (summary.understaffed_positions).
+      Command live-verified (found "Tour Guide — 1 to hire"); tsc/lint/build green; test added.
 - [ ] 3c — New Position modal: JD step + gap-detection auto-open-requisition toggle (prefill → jobs.store).
 - [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events.
 

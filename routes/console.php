@@ -284,6 +284,13 @@ app(Schedule::class)
     ->dailyAt('08:00')
     ->withoutOverlapping();
 
+// Vacancy check: reconcile position headcounts + report understaffed positions: daily 06:30
+app(Schedule::class)
+    ->command('hr:check-vacancies')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:30')
+    ->withoutOverlapping();
+
 // Engagement action plan reminders and overdue escalations: daily at 07:15
 app(Schedule::class)
     ->job(new SendEngagementActionPlanRemindersJob)

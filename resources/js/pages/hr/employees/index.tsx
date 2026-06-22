@@ -50,6 +50,7 @@ interface Props {
         on_probation: number;
         compliance_alerts: number;
         type_counts: Record<string, number>;
+        understaffed_positions: number;
     };
     formData: AddEmployeeFormData | null;
     positions: PaginatedPositions;
@@ -297,6 +298,12 @@ export default function EmployeesIndex({
             key: 'probation',
             label: `${summary.on_probation} on probation`,
             onClick: () => applyFilter('probation', '1'),
+        });
+    if (summary.understaffed_positions > 0)
+        needs.push({
+            key: 'understaffed',
+            label: `${summary.understaffed_positions} understaffed ${summary.understaffed_positions === 1 ? 'position' : 'positions'}`,
+            onClick: () => router.visit('/hr/people?tab=positions'),
         });
 
     return (
