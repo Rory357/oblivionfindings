@@ -7,6 +7,7 @@ import {
     DepartmentsPane,
     HrTabs,
     type HrTabItem,
+    NeedsTriageDialog,
     type OrgNode,
     type OrgPerson,
     OrgChartPane,
@@ -21,6 +22,8 @@ import {
     PositionDialog,
     type PositionRow,
     PositionsPane,
+    type TriageData,
+    type TriageRail,
     useHrTab,
 } from '@/components/hr';
 import { PageLayout } from '@/components/page';
@@ -49,9 +52,11 @@ interface Props {
         new_hires: number;
         on_probation: number;
         compliance_alerts: number;
+        pending_invites: number;
         type_counts: Record<string, number>;
         understaffed_positions: number;
     };
+    triage: TriageData;
     formData: AddEmployeeFormData | null;
     positions: PaginatedPositions;
     parentPositions: PositionParent[];
@@ -88,6 +93,7 @@ export default function EmployeesIndex({
     departments,
     filters,
     summary,
+    triage,
     formData,
     positions,
     parentPositions,
@@ -103,6 +109,8 @@ export default function EmployeesIndex({
     can,
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
+    const [triageOpen, setTriageOpen] = useState(false);
+    const [triageRail, setTriageRail] = useState<TriageRail>('compliance');
     const [tab, setTab] = useHrTab('people');
     // Fall back to People for unknown/retired tabs (e.g. an old ?tab=directory link).
     const activeTab = KNOWN_TABS.includes(tab) ? tab : 'people';
@@ -286,18 +294,32 @@ export default function EmployeesIndex({
         form.remove();
     }
 
+    const openTriage = (rail: TriageRail) => {
+        setTriageRail(rail);
+        setTriageOpen(true);
+    };
+
+    // "Needs attention" chips → the cross-cutting triage modal (Compliance /
+    // Probation / Invites rails). Understaffed positions live on the Positions
+    // tab, so that chip deep-links there rather than into the triage queue.
     const needs: { key: string; label: string; onClick: () => void }[] = [];
     if (summary.compliance_alerts > 0)
         needs.push({
             key: 'compliance',
             label: `${summary.compliance_alerts} compliance ${summary.compliance_alerts === 1 ? 'alert' : 'alerts'}`,
-            onClick: () => router.visit('/hr/compliance'),
+            onClick: () => openTriage('compliance'),
         });
     if (summary.on_probation > 0)
         needs.push({
             key: 'probation',
             label: `${summary.on_probation} on probation`,
-            onClick: () => applyFilter('probation', '1'),
+            onClick: () => openTriage('probation'),
+        });
+    if (summary.pending_invites > 0)
+        needs.push({
+            key: 'invites',
+            label: `${summary.pending_invites} pending ${summary.pending_invites === 1 ? 'invite' : 'invites'}`,
+            onClick: () => openTriage('invites'),
         });
     if (summary.understaffed_positions > 0)
         needs.push({
@@ -324,11 +346,17 @@ export default function EmployeesIndex({
                                 ? () => router.visit('/hr/import-export')
                                 : undefined,
                             onExport: can.manage ? submitExport : undefined,
+                            onInvite:
+                                can.manage && summary.pending_invites > 0
+                                    ? () => openTriage('invites')
+                                    : undefined,
                             onStatActive: () => applyFilter('status', 'active'),
                             onStatNew: () => applyFilter('joined', '30'),
                             onStatProbation: () => applyFilter('probation', '1'),
-                            onStatCompliance: () =>
-                                router.visit('/hr/compliance'),
+                            onStatCompliance:
+                                summary.compliance_alerts > 0
+                                    ? () => openTriage('compliance')
+                                    : () => router.visit('/hr/compliance'),
                         }}
                     />
                 }
@@ -400,6 +428,15 @@ export default function EmployeesIndex({
                     />
                 )}
             </PageLayout>
+
+            <NeedsTriageDialog
+                open={triageOpen}
+                onClose={() => setTriageOpen(false)}
+                initialRail={triageRail}
+                summary={summary}
+                triage={triage}
+                canManage={can.manage}
+            />
 
             {formData ? (
                 <AddEmployeeDialog

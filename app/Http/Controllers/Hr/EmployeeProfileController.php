@@ -34,6 +34,7 @@ use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -178,6 +179,11 @@ class EmployeeProfileController extends Controller
             ->where('probation_end_date', '>=', now())
             ->count();
         $complianceAlerts = HrStaffComplianceStatus::whereIn('status', ['expired', 'expiring_soon'])->count();
+        // Pending invites — active staff who have never signed in (no login yet).
+        $pendingInvites = User::query()->staff()
+            ->whereNull('last_login_at')
+            ->whereHas('hrEmployeeProfile', fn ($p) => $p->where('is_active', true))
+            ->count();
 
         // Employment type breakdown
         $typeCounts = HrEmployeeProfile::where('is_active', true)
@@ -308,6 +314,9 @@ class EmployeeProfileController extends Controller
             ->values();
         $canOrgManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');
 
+        // --- "Needs attention" triage (drill-down modal from the hero chips) ---
+        $triage = $this->buildTriage($tenantId);
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
@@ -348,14 +357,104 @@ class EmployeeProfileController extends Controller
                 'new_hires' => $newHires,
                 'on_probation' => $onProbation,
                 'compliance_alerts' => $complianceAlerts,
+                'pending_invites' => $pendingInvites,
                 'type_counts' => $typeCounts,
                 'understaffed_positions' => $understaffedCount,
             ],
+            'triage' => $triage,
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
                 'recruit' => $user->canDo('hr.recruitment.manage'),
             ],
         ]);
+    }
+
+    /**
+     * Build the three "needs attention" rails surfaced by the hero chips →
+     * triage modal: expiring/expired compliance, staff still on probation, and
+     * pending login invites. Each list is capped (the rail shows the true total
+     * from `summary`, with the list as the actionable head of the queue).
+     */
+    private function buildTriage(int $tenantId): array
+    {
+        // Compliance — expired first, then expiring soon, soonest expiry up top.
+        $compliance = HrStaffComplianceStatus::query()
+            ->whereIn('status', ['expired', 'expiring_soon'])
+            ->with(['user:id,name', 'requirement:id,name'])
+            ->orderByRaw("FIELD(status, 'expired', 'expiring_soon')")
+            ->orderBy('expires_at')
+            ->limit(50)
+            ->get();
+
+        // Compliance rows are keyed by user — resolve their profile ids so each
+        // row can deep-link to the employee profile.
+        $profileByUser = HrEmployeeProfile::query()
+            ->whereIn('user_id', $compliance->pluck('user_id')->filter()->unique())
+            ->pluck('id', 'user_id');
+
+        $probation = HrEmployeeProfile::query()->forTenant($tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('probation_end_date')
+            ->where('probation_end_date', '>=', now())
+            ->with('user:id,name')
+            ->orderBy('probation_end_date')
+            ->limit(50)
+            ->get();
+
+        $invites = User::query()->staff()
+            ->whereNull('last_login_at')
+            ->whereHas('hrEmployeeProfile', fn ($p) => $p->where('is_active', true))
+            ->with('hrEmployeeProfile:id,user_id,position_title')
+            ->orderBy('name')
+            ->limit(50)
+            ->get();
+
+        return [
+            'compliance' => $compliance->map(fn ($s) => [
+                'id' => 'comp-' . $s->id,
+                'profile_id' => $profileByUser[$s->user_id] ?? null,
+                'name' => $s->user?->name ?? 'Unknown',
+                'detail' => $s->requirement?->name ?? 'Compliance requirement',
+                'status' => $s->status,
+                'date' => $s->expires_at?->toDateString(),
+            ])->values(),
+            'probation' => $probation->map(fn ($p) => [
+                'id' => 'prob-' . $p->id,
+                'profile_id' => $p->id,
+                'name' => $p->user?->name ?? 'Unknown',
+                'detail' => $p->position_title ?: 'Employee',
+                'status' => 'probation',
+                'date' => $p->probation_end_date?->toDateString(),
+            ])->values(),
+            'invites' => $invites->map(fn ($u) => [
+                'id' => 'inv-' . $u->id,
+                'profile_id' => $u->hrEmployeeProfile?->id,
+                'name' => $u->name,
+                'detail' => $u->hrEmployeeProfile?->position_title ?: $u->email,
+                'status' => 'pending',
+                'date' => null,
+            ])->values(),
+        ];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  resendInvite — (re)send a login invite from the triage modal        */
+    /* ------------------------------------------------------------------ */
+
+    public function resendInvite(Request $request, HrEmployeeProfile $profile)
+    {
+        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+
+        $account = $profile->user;
+        if (! $account) {
+            return back()->with('error', 'This employee has no login account to invite.');
+        }
+
+        // Same path the intake service uses — the reset link doubles as the
+        // "set your password" invite.
+        Password::broker()->sendResetLink(['email' => $account->email]);
+
+        return back()->with('success', "Login invite sent to {$account->name}.");
     }
 
     /* ------------------------------------------------------------------ */
