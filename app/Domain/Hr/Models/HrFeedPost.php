@@ -16,6 +16,7 @@ class HrFeedPost extends Model
         'tenant_id',
         'user_id',
         'post_type',
+        'kind',
         'content',
         'is_pinned',
     ];

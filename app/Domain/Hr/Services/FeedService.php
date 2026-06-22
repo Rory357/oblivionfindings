@@ -51,6 +51,12 @@ class FeedService
     public const POST_TYPES = ['update', 'milestone', 'kudos', 'announcement'];
 
     /**
+     * Composer "kinds" — the three Post-update flavours. All persist with
+     * post_type=update; `kind` only drives the wall badge + composer prompt.
+     */
+    public const POST_KINDS = ['update', 'question', 'win'];
+
+    /**
      * Create a new feed post.
      */
     public function createPost(User $user, array $data, ?int $tenantId = null): HrFeedPost
@@ -60,6 +66,7 @@ class FeedService
                 'tenant_id' => $tenantId ?? $user->tenant_id,
                 'user_id' => $user->id,
                 'post_type' => $data['post_type'] ?? 'update',
+                'kind' => in_array($data['kind'] ?? null, self::POST_KINDS, true) ? $data['kind'] : null,
                 'content' => $data['content'],
                 'is_pinned' => $data['is_pinned'] ?? false,
             ]);
@@ -245,11 +252,6 @@ class FeedService
      */
     public function getFeedAnnouncements(?int $tenantId, int $viewerId): array
     {
-        $headcount = max(
-            1,
-            HrEmployeeProfile::forTenant($tenantId)->active()->whereNotNull('user_id')->count(),
-        );
-
         return HrAnnouncement::forTenant($tenantId)
             ->active()
             ->withCount('acknowledgements')
@@ -258,7 +260,7 @@ class FeedService
             ->orderByDesc('published_at')
             ->limit(10)
             ->get()
-            ->map(function (HrAnnouncement $a) use ($headcount, $viewerId) {
+            ->map(function (HrAnnouncement $a) use ($tenantId, $viewerId) {
                 $acknowledged = $a->acknowledgements()->where('user_id', $viewerId)->exists();
 
                 return [
@@ -275,12 +277,48 @@ class FeedService
                         'name' => $a->creator->name,
                     ] : null,
                     'acknowledged_count' => $a->acknowledgements_count,
-                    'audience_count' => $headcount,
+                    'audience_count' => $this->announcementAudienceCount($a, $tenantId),
                     'viewer_acknowledged' => $acknowledged,
                     'created_at' => $a->published_at?->diffForHumans() ?? $a->created_at?->diffForHumans(),
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Active employees expected to acknowledge an announcement, scoped to its
+     * target audience (all / department / site / role) — the denominator for the
+     * "X of Y acknowledged" progress. Mirrors AnnouncementController's recipient
+     * resolution. Floored at 1 so the progress bar never divides by zero.
+     */
+    private function announcementAudienceCount(HrAnnouncement $announcement, ?int $tenantId): int
+    {
+        $targetValue = trim((string) $announcement->target_value);
+
+        return max(1, HrEmployeeProfile::forTenant($tenantId)
+            ->active()
+            ->whereNotNull('user_id')
+            ->when($announcement->target_audience === 'department' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where('department', $targetValue);
+            })
+            ->when($announcement->target_audience === 'site' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where(function ($siteQuery) use ($targetValue) {
+                    if (is_numeric($targetValue)) {
+                        $siteQuery->where('primary_site_id', (int) $targetValue)
+                            ->orWhereJsonContains('secondary_site_ids', (int) $targetValue);
+                    } else {
+                        $siteQuery->whereRaw('1 = 0');
+                    }
+                });
+            })
+            ->when($announcement->target_audience === 'role' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where(function ($roleQuery) use ($targetValue) {
+                    $roleQuery->where('position_role', $targetValue)
+                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('role', $targetValue))
+                        ->orWhereHas('user.roles', fn ($rolePivotQuery) => $rolePivotQuery->where('name', $targetValue));
+                });
+            })
+            ->count());
     }
 
     /**

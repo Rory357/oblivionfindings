@@ -53,6 +53,7 @@ export type KudosData = {
 export type FeedPost = {
     id: number;
     post_type: string;
+    kind: string | null;
     content: string;
     is_pinned: boolean;
     user: FeedUser | null;
@@ -130,6 +131,15 @@ const PRIORITY_CLASS: Record<string, string> = {
     normal: 'border-status-info/30 bg-status-info-bg text-status-info',
     high: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
     urgent: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+};
+
+// Update / Question / Win / Milestone wall badge (post_type=milestone, else the
+// composer `kind`). All three update kinds share post_type=update.
+const POST_BADGE: Record<string, { label: string; className: string }> = {
+    milestone: { label: 'Milestone', className: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
+    question: { label: 'Question', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
+    win: { label: 'Win', className: 'border-status-success/30 bg-status-success-bg text-status-success' },
+    update: { label: 'Update', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
 };
 
 function Avatar({ name, className }: { name: string; className?: string }) {
@@ -403,7 +413,13 @@ export function UpdateCard({
     post: FeedPost;
     employeeById: Map<number, FeedEmployee>;
 }) {
-    const isMilestone = post.post_type === 'milestone';
+    const badgeKey =
+        post.post_type === 'milestone'
+            ? 'milestone'
+            : post.kind && post.kind !== 'update'
+              ? post.kind
+              : 'update';
+    const badge = POST_BADGE[badgeKey] ?? POST_BADGE.update;
     return (
         <Card>
             <CardContent className="pt-6">
@@ -413,15 +429,8 @@ export function UpdateCard({
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="font-semibold">{post.user?.name ?? 'Unknown'}</span>
                             {post.user ? <AuthorMeta employee={employeeById.get(post.user.id)} /> : null}
-                            <Badge
-                                variant="outline"
-                                className={
-                                    isMilestone
-                                        ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                        : 'border-status-info/30 bg-status-info-bg text-status-info'
-                                }
-                            >
-                                {isMilestone ? 'Milestone' : 'Update'}
+                            <Badge variant="outline" className={badge.className}>
+                                {badge.label}
                             </Badge>
                             {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>

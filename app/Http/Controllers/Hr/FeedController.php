@@ -70,6 +70,7 @@ class FeedController extends Controller
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
             'post_type' => ['required', 'string', Rule::in(['update', 'announcement'])],
+            'kind' => ['nullable', 'string', Rule::in(FeedService::POST_KINDS)],
         ]);
 
         try {
@@ -171,6 +172,7 @@ class FeedController extends Controller
         return [
             'id' => $post->id,
             'post_type' => $post->post_type,
+            'kind' => $post->kind,
             'content' => $post->content,
             'is_pinned' => $post->is_pinned,
             'user' => $post->user ? [
