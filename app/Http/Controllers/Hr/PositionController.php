@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDepartment;
+use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Services\PositionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -73,23 +75,52 @@ class PositionController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'requirements' => ['nullable', 'string', 'max:5000'],
+            'summary' => ['nullable', 'string', 'max:5000'],
+            'responsibilities' => ['nullable', 'string', 'max:20000'],
+            'requirements' => ['nullable', 'string', 'max:20000'],
+            'description' => ['nullable', 'string', 'max:20000'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term'])],
             'fte' => ['required', 'numeric', 'min:0.01', 'max:1.00'],
             'headcount_budget' => ['required', 'integer', 'min:1', 'max:999'],
             'reports_to_position_id' => ['nullable', 'exists:hr_positions,id'],
+            'open_requisition' => ['nullable', 'boolean'],
         ]);
 
-        $this->positionService->createPosition([
-            ...$validated,
+        $positionData = $validated;
+        unset($positionData['open_requisition']);
+
+        $position = $this->positionService->createPosition([
+            ...$positionData,
             'tenant_id' => $tenantId,
             'created_by' => $user->id,
         ]);
 
+        $message = 'Position created.';
+
+        // Optional one-step recruitment: a new position is empty (current 0), so
+        // its whole budget is the gap. Mirrors the onboarding/invite toggle pattern.
+        if ($request->boolean('open_requisition') && $user->canDo('hr.recruitment.manage')) {
+            HrJobRequisition::create([
+                'tenant_id' => $tenantId,
+                'title' => $position->title,
+                'slug' => Str::slug($position->title) . '-' . strtolower(Str::random(5)),
+                'position_id' => $position->id,
+                'employment_type' => $position->employment_type,
+                'openings' => max(1, (int) $position->headcount_budget),
+                'status' => 'draft',
+                'summary' => $position->summary,
+                'description' => $position->description ?: ($position->summary ?: $position->title),
+                'requirements' => $position->requirements,
+                'responsibilities' => $position->responsibilities,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+            $message = "Position created with a draft requisition for {$position->headcount_budget} opening(s).";
+        }
+
         // back() so the modal closes onto the hub Positions tab it was opened from
         // (falls back to the standalone create page when used directly).
-        return redirect()->back()->with('success', 'Position created.');
+        return redirect()->back()->with('success', $message);
     }
 
     public function show(Request $request, HrPosition $position)
@@ -182,8 +213,10 @@ class PositionController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)->ignore($position->id)],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'requirements' => ['nullable', 'string', 'max:5000'],
+            'summary' => ['nullable', 'string', 'max:5000'],
+            'responsibilities' => ['nullable', 'string', 'max:20000'],
+            'requirements' => ['nullable', 'string', 'max:20000'],
+            'description' => ['nullable', 'string', 'max:20000'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term'])],
             'fte' => ['required', 'numeric', 'min:0.01', 'max:1.00'],
             'headcount_budget' => ['required', 'integer', 'min:1', 'max:999'],

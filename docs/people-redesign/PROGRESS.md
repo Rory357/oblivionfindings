@@ -76,8 +76,16 @@ Audit: `docs/positions-recruitment-audit.md` (signed off — autonomous).
       warning **"N to hire"** badge (or "Recruiting" when covered by an open req). People hero
       **needs-attention chip** "N understaffed positions" → ?tab=positions (summary.understaffed_positions).
       Command live-verified (found "Tour Guide — 1 to hire"); tsc/lint/build green; test added.
-- [ ] 3c — New Position modal: JD step + gap-detection auto-open-requisition toggle (prefill → jobs.store).
-- [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events.
+- [x] 3c — New/Edit Position modal rebuilt to 3 steps (Role → **Job description** → Structure &
+      recruitment). JD step = Role summary (summary) / Key responsibilities (responsibilities) /
+      Essential criteria (requirements) / Preferred (description). Structure step has the
+      **"Open a job requisition for N vacancies" toggle** (create-only, shown when `can.recruit`).
+      `PositionController@store` validates JD + `open_requisition`; on toggle (and recruitment.manage)
+      creates a linked draft `HrJobRequisition` prefilled from the position. `update()` persists JD.
+      `can.recruit` + position payload `summary`/`responsibilities` added. Tests: auto-requisition
+      create (+negative). tsc/lint/build green; php -l clean.
+- [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events. **(deferred — small;
+      may fold into a later pass. Core automation 3a-3c covers the brief's primary loop.)**
 
 ### Phase 4 — Departments feature-complete (audit-first)  ⬜ NOT STARTED
 `docs/departments-audit.md` → cost_centre (+ site link?); cycle-safe parent (store+update);

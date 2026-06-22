@@ -1,14 +1,17 @@
-/* eslint-disable no-restricted-syntax -- The wizard footer uses native <button>
- * elements to match the Add-Client modal chrome (see components/wizard/shell.tsx). */
+/* eslint-disable no-restricted-syntax -- The wizard footer + the recruitment
+ * toggle row use native <button>/<label> to match the Add-Client modal chrome
+ * (see components/wizard/shell.tsx). All colours are semantic design tokens. */
 import { useForm } from '@inertiajs/react';
-import { Briefcase, ClipboardList } from 'lucide-react';
+import { Briefcase, ClipboardList, FileText, GitBranch } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 import {
     Field,
+    InfoCard,
     Segmented,
     SelectInput,
     StepHead,
@@ -36,16 +39,24 @@ export interface PositionRow {
     is_active: boolean;
     description?: string | null;
     requirements?: string | null;
+    summary?: string | null;
+    responsibilities?: string | null;
     reports_to_position_id?: number | null;
 }
 
 const STEPS: readonly WizardStep[] = [
     { key: 'role', label: 'Role', blurb: 'Title, code & type', icon: Briefcase },
     {
-        key: 'details',
-        label: 'Details',
-        blurb: 'Description & reporting',
-        icon: ClipboardList,
+        key: 'jd',
+        label: 'Job description',
+        blurb: 'Summary & criteria',
+        icon: FileText,
+    },
+    {
+        key: 'structure',
+        label: 'Structure',
+        blurb: 'Reporting & recruitment',
+        icon: GitBranch,
     },
 ];
 
@@ -62,12 +73,14 @@ export function PositionDialog({
     position,
     parentPositions,
     departments,
+    canRecruit = false,
 }: {
     open: boolean;
     onClose: () => void;
     position: PositionRow | null;
     parentPositions: PositionParent[];
     departments: { id: number; name: string }[];
+    canRecruit?: boolean;
 }) {
     const isEdit = !!position;
     const wizard = useWizard(STEPS.length);
@@ -77,8 +90,10 @@ export function PositionDialog({
         code: position?.code ?? '',
         department: position?.department ?? '',
         team: position?.team ?? '',
-        description: position?.description ?? '',
+        summary: position?.summary ?? '',
+        responsibilities: position?.responsibilities ?? '',
         requirements: position?.requirements ?? '',
+        description: position?.description ?? '',
         employment_type: position?.employment_type ?? 'full_time',
         fte: position ? String(position.fte) : '1.00',
         headcount_budget: position ? String(position.headcount_budget) : '1',
@@ -86,6 +101,7 @@ export function PositionDialog({
             ? String(position.reports_to_position_id)
             : '',
         is_active: position?.is_active ?? true,
+        open_requisition: false,
     });
 
     const close = () => {
@@ -108,8 +124,15 @@ export function PositionDialog({
                     form.errors.headcount_budget
                 ) {
                     wizard.goTo(0);
-                } else {
+                } else if (
+                    form.errors.summary ||
+                    form.errors.responsibilities ||
+                    form.errors.requirements ||
+                    form.errors.description
+                ) {
                     wizard.goTo(1);
+                } else {
+                    wizard.goTo(2);
                 }
             },
         };
@@ -125,12 +148,15 @@ export function PositionDialog({
         .filter((p) => !position || p.id !== position.id)
         .map((p) => ({ value: String(p.id), label: `${p.title} (${p.code})` }));
 
+    const budgetN = Math.max(1, parseInt(form.data.headcount_budget, 10) || 1);
+    const showRecruitToggle = !isEdit && canRecruit;
+
     return (
         <WizardShell
             open={open}
             onClose={close}
             title={isEdit ? 'Edit position' : 'New position'}
-            description="Define a job position, headcount budget and reporting line."
+            description="Define a job position, its job description, headcount budget and reporting line."
             railIcon={Briefcase}
             railTitle={isEdit ? 'Edit position' : 'New position'}
             railSub="Org structure"
@@ -296,27 +322,44 @@ export function PositionDialog({
             {wizard.index === 1 && (
                 <WizardStepPane>
                     <StepHead
-                        icon={ClipboardList}
-                        title="Details & reporting"
-                        blurb="Describe the role and set where it sits in the structure."
+                        icon={FileText}
+                        title="Job description"
+                        blurb="The canonical description for this role — it flows into any requisition and public posting."
                     />
                     <div className="grid gap-4">
                         <Field
-                            label="Description"
+                            label="Role summary"
                             hint="optional"
-                            error={form.errors.description}
+                            error={form.errors.summary}
                         >
                             <Textarea
-                                rows={4}
-                                value={form.data.description}
+                                rows={3}
+                                value={form.data.summary}
                                 onChange={(e) =>
-                                    form.setData('description', e.target.value)
+                                    form.setData('summary', e.target.value)
                                 }
-                                placeholder="Describe the role and responsibilities…"
+                                placeholder="A short overview of the role and its purpose…"
                             />
                         </Field>
                         <Field
-                            label="Requirements"
+                            label="Key responsibilities"
+                            hint="optional"
+                            error={form.errors.responsibilities}
+                        >
+                            <Textarea
+                                rows={4}
+                                value={form.data.responsibilities}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'responsibilities',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="What this role is accountable for, one per line…"
+                            />
+                        </Field>
+                        <Field
+                            label="Essential criteria"
                             hint="optional"
                             error={form.errors.requirements}
                         >
@@ -326,9 +369,35 @@ export function PositionDialog({
                                 onChange={(e) =>
                                     form.setData('requirements', e.target.value)
                                 }
-                                placeholder="Qualifications, experience and skills required…"
+                                placeholder="Required qualifications, experience, vetting, right-to-work…"
                             />
                         </Field>
+                        <Field
+                            label="Preferred"
+                            hint="optional"
+                            error={form.errors.description}
+                        >
+                            <Textarea
+                                rows={3}
+                                value={form.data.description}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
+                                placeholder="Nice-to-have skills or experience…"
+                            />
+                        </Field>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 2 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={GitBranch}
+                        title="Structure & recruitment"
+                        blurb="Where this position sits, and whether to start recruiting for it now."
+                    />
+                    <div className="grid gap-4">
                         <Field
                             label="Reports to"
                             hint="optional"
@@ -346,16 +415,51 @@ export function PositionDialog({
                         {isEdit && (
                             <Field label="Status">
                                 <Segmented
-                                    value={form.data.is_active ? 'active' : 'inactive'}
+                                    value={
+                                        form.data.is_active
+                                            ? 'active'
+                                            : 'inactive'
+                                    }
                                     onChange={(v) =>
-                                        form.setData('is_active', v === 'active')
+                                        form.setData(
+                                            'is_active',
+                                            v === 'active',
+                                        )
                                     }
                                     options={[
                                         { value: 'active', label: 'Active' },
-                                        { value: 'inactive', label: 'Inactive' },
+                                        {
+                                            value: 'inactive',
+                                            label: 'Inactive',
+                                        },
                                     ]}
                                 />
                             </Field>
+                        )}
+                        {showRecruitToggle && (
+                            <InfoCard icon={ClipboardList} tone="info">
+                                <label className="flex cursor-pointer items-center justify-between gap-4">
+                                    <span className="min-w-0">
+                                        <span className="block text-sm font-semibold text-foreground">
+                                            Open a job requisition for{' '}
+                                            {budgetN}{' '}
+                                            {budgetN === 1
+                                                ? 'vacancy'
+                                                : 'vacancies'}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            Creates a draft requisition prefilled
+                                            from this position, ready to publish.
+                                        </span>
+                                    </span>
+                                    <Switch
+                                        checked={form.data.open_requisition}
+                                        onCheckedChange={(v) =>
+                                            form.setData('open_requisition', v)
+                                        }
+                                    />
+                                </label>
+                            </InfoCard>
                         )}
                     </div>
                 </WizardStepPane>

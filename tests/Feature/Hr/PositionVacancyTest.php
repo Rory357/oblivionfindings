@@ -140,6 +140,43 @@ test('converting an offer with a position fills that position', function () {
         ->and($pos->fresh()->current_headcount)->toBe(1);
 });
 
+test('creating a position with open_requisition opens a linked draft requisition', function () {
+    $code = 'NRN-' . fake()->unique()->numerify('####');
+
+    $this->actingAs($this->actor)->post('/hr/positions', [
+        'title' => 'Night RN',
+        'code' => $code,
+        'employment_type' => 'full_time',
+        'fte' => 1.0,
+        'headcount_budget' => 3,
+        'summary' => 'Overnight registered nurse.',
+        'open_requisition' => true,
+    ])->assertRedirect();
+
+    $position = HrPosition::query()->where('code', $code)->firstOrFail();
+    $req = HrJobRequisition::query()->where('position_id', $position->id)->first();
+
+    expect($req)->not->toBeNull()
+        ->and($req->openings)->toBe(3)
+        ->and($req->status)->toBe('draft')
+        ->and($req->title)->toBe('Night RN');
+});
+
+test('creating a position without the toggle opens no requisition', function () {
+    $code = 'DRN-' . fake()->unique()->numerify('####');
+
+    $this->actingAs($this->actor)->post('/hr/positions', [
+        'title' => 'Day RN',
+        'code' => $code,
+        'employment_type' => 'full_time',
+        'fte' => 1.0,
+        'headcount_budget' => 2,
+    ])->assertRedirect();
+
+    $position = HrPosition::query()->where('code', $code)->firstOrFail();
+    expect(HrJobRequisition::query()->where('position_id', $position->id)->exists())->toBeFalse();
+});
+
 test('hr:check-vacancies reconciles stored headcount drift', function () {
     $pos = makePosition(2);
     hireInto($pos, $this->actor->id); // observer sets current_headcount = 1

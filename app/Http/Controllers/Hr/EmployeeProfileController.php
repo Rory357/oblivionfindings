@@ -254,6 +254,8 @@ class EmployeeProfileController extends Controller
             'is_active' => (bool) $pos->is_active,
             'description' => $pos->description,
             'requirements' => $pos->requirements,
+            'summary' => $pos->summary,
+            'responsibilities' => $pos->responsibilities,
             'reports_to_position_id' => $pos->reports_to_position_id,
         ]);
 
@@ -350,6 +352,7 @@ class EmployeeProfileController extends Controller
             ],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
+                'recruit' => $user->canDo('hr.recruitment.manage'),
             ],
         ]);
     }

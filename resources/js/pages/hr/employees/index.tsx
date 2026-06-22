@@ -64,7 +64,7 @@ interface Props {
     orgHierarchy: OrgNode[];
     orgPeople: OrgPerson[];
     canOrgManage: boolean;
-    can: { manage: boolean };
+    can: { manage: boolean; recruit: boolean };
 }
 
 /* ------------------------------------------------------------------ */
@@ -418,6 +418,7 @@ export default function EmployeesIndex({
                     position={editingPosition}
                     parentPositions={parentPositions}
                     departments={departments}
+                    canRecruit={can.recruit}
                 />
             ) : null}
 
