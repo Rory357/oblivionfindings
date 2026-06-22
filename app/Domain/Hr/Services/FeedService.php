@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedAttachment;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrFeedReaction;
 use App\Domain\Hr\Models\HrFeedReply;
@@ -12,6 +13,7 @@ use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +56,15 @@ class FeedService
     public const FEED_SUBJECTS = ['post', 'announcement'];
 
     /**
+     * Composer image attachment allowlist + size cap (defence-in-depth against
+     * stored-XSS; images are served inline from the private disk with a locked-down
+     * CSP). Images only for now.
+     */
+    public const ATTACHMENT_MIMES = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+    public const ATTACHMENT_MAX_KB = 10240;
+
+    /**
      * Post types supported.
      */
     public const POST_TYPES = ['update', 'milestone', 'kudos', 'announcement'];
@@ -79,6 +90,26 @@ class FeedService
                 'is_pinned' => $data['is_pinned'] ?? false,
             ]);
         });
+    }
+
+    /**
+     * Store an image attachment for a post on the private disk. Mime/size are the
+     * caller's validation responsibility; this only persists.
+     */
+    public function attachToPost(HrFeedPost $post, UploadedFile $file, int $userId): HrFeedAttachment
+    {
+        $path = $file->store('hr/feed/'.$post->tenant_id, 'private');
+
+        return HrFeedAttachment::create([
+            'tenant_id' => $post->tenant_id,
+            'feed_post_id' => $post->id,
+            'uploaded_by' => $userId,
+            'disk' => 'private',
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime' => $file->getMimeType(),
+            'size' => $file->getSize(),
+        ]);
     }
 
     /**
@@ -311,6 +342,7 @@ class FeedService
             })
             ->with([
                 'user:id,name',
+                'attachment',
                 'kudos.toUser:id,name',
                 'kudos.fromUser:id,name',
                 'kudos.reactions:id,kudos_id,user_id,emoji',

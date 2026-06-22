@@ -61,6 +61,7 @@ export type FeedPost = {
     // Non-kudos posts carry polymorphic reactions/replies (null for kudos posts).
     reactions: ReactionSummary | null;
     replies: KudosReply[] | null;
+    attachment: { id: number; name: string; is_image: boolean; url: string } | null;
     created_at: string | null;
     created_at_date: string | null;
 };
@@ -487,6 +488,29 @@ export function UpdateCard({
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>
                         </div>
                         <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
+
+                        {post.attachment?.is_image ? (
+                            <a
+                                href={post.attachment.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 block w-fit"
+                            >
+                                <img
+                                    src={post.attachment.url}
+                                    alt={post.attachment.name}
+                                    loading="lazy"
+                                    className="max-h-80 w-auto rounded-lg border border-border object-cover"
+                                />
+                            </a>
+                        ) : post.attachment ? (
+                            <a
+                                href={post.attachment.url}
+                                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:border-primary/40"
+                            >
+                                {post.attachment.name}
+                            </a>
+                        ) : null}
 
                         {post.reactions ? (
                             <ReactionBar

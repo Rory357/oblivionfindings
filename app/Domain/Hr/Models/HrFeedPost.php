@@ -39,6 +39,11 @@ class HrFeedPost extends Model
         return $this->hasOne(HrKudos::class, 'feed_post_id');
     }
 
+    public function attachment(): HasOne
+    {
+        return $this->hasOne(HrFeedAttachment::class, 'feed_post_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

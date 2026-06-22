@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
@@ -65,10 +66,16 @@ export function ComposeWizard({
 }) {
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
-    const form = useForm<{ content: string; post_type: string; kind: ComposeKind }>({
+    const form = useForm<{
+        content: string;
+        post_type: string;
+        kind: ComposeKind;
+        attachment: File | null;
+    }>({
         content: '',
         post_type: 'update',
         kind: 'update',
+        attachment: null,
     });
     const { setData, reset, clearErrors } = form;
     const kind = form.data.kind;
@@ -229,6 +236,26 @@ export function ComposeWizard({
                             maxLength={5000}
                         />
                     </Field>
+                    <Field
+                        label="Photo"
+                        hint="Optional — JPG, PNG, GIF or WebP, up to 10MB"
+                        error={form.errors.attachment}
+                    >
+                        {form.data.attachment ? (
+                            <StagedFileCard
+                                file={form.data.attachment}
+                                onRemove={() => setData('attachment', null)}
+                            />
+                        ) : (
+                            <FileDropzone
+                                onFiles={(files) => setData('attachment', files[0] ?? null)}
+                                accept="image/*"
+                                multiple={false}
+                                title="Add a photo"
+                                hint="JPG, PNG, GIF, WebP"
+                            />
+                        )}
+                    </Field>
                 </WizardStepPane>
             )}
 
@@ -242,6 +269,7 @@ export function ComposeWizard({
                     <ReviewCard icon={MessageSquarePlus} title="Update" onEdit={() => wizard.goTo(1)}>
                         <ReviewRow label="Type" value={kindLabel} />
                         <ReviewRow label="Message" value={form.data.content} />
+                        <ReviewRow label="Photo" value={form.data.attachment?.name} />
                     </ReviewCard>
                 </WizardStepPane>
             )}
