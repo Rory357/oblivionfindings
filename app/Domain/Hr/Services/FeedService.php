@@ -616,6 +616,34 @@ class FeedService
             ->all();
     }
 
+    /**
+     * Kudos volume per week for the last N weeks (oldest-first) — the insights
+     * modal's trend sparkline.
+     *
+     * @return array<int, array{label:string, count:int}>
+     */
+    public function getKudosTrend(?int $tenantId, int $weeks = 8): array
+    {
+        $firstWeek = now()->startOfWeek()->subWeeks($weeks - 1);
+
+        $byWeek = HrKudos::forTenant($tenantId)
+            ->where('created_at', '>=', $firstWeek)
+            ->get(['created_at'])
+            ->groupBy(fn ($kudos) => $kudos->created_at->copy()->startOfWeek()->format('Y-m-d'));
+
+        $trend = [];
+        for ($i = 0; $i < $weeks; $i++) {
+            $weekStart = $firstWeek->copy()->addWeeks($i);
+            $key = $weekStart->format('Y-m-d');
+            $trend[] = [
+                'label' => $weekStart->format('j M'),
+                'count' => isset($byWeek[$key]) ? $byWeek[$key]->count() : 0,
+            ];
+        }
+
+        return $trend;
+    }
+
     private function normaliseImpact(?string $impact): string
     {
         return array_key_exists($impact, self::KUDOS_IMPACTS) ? $impact : self::DEFAULT_IMPACT;

@@ -45,6 +45,7 @@ type Props = {
     };
     leaderboard: LeaderboardEntry[];
     valueBreakdown: Array<{ key: string; label: string; count: number }>;
+    kudosTrend: Array<{ label: string; count: number }>;
     filters: { type: string | null; search: string | null };
     kudosCategories: Record<string, string>;
     kudosImpacts: Record<string, string>;
@@ -81,6 +82,7 @@ export default function FeedIndex({
     milestones,
     leaderboard,
     valueBreakdown,
+    kudosTrend,
     filters,
     kudosCategories,
     kudosImpacts,
@@ -344,6 +346,7 @@ export default function FeedIndex({
                 onClose={() => setInsightsOpen(false)}
                 metrics={metrics}
                 valueBreakdown={valueBreakdown}
+                kudosTrend={kudosTrend}
                 leaderboard={leaderboard}
             />
         </AppLayout>

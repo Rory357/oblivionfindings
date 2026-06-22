@@ -180,7 +180,11 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
       pagination. Frontend: debounced (350ms) `router.get` replacing the client-only
       filter; `filters.search` round-trips. +1 Pest. ⚠️ live Chrome-verify paused
       (.com session expired; I won't auth) — relying on Pest/tsc/build.
-- [ ] **Iter 4 — #7 insights trends-over-time** (kudos/participation by week).
+- [~] **Iter 4 — #7 insights trends-over-time**: `getKudosTrend` (kudos per week, last
+      8 weeks) → `kudosTrend` prop; the insights modal renders an 8-week bar sparkline
+      under the value bars. +2 Pest. ⚠️ git stash is SHARED across worktrees in this
+      repo — a stray `git stash pop` grabbed another session's stash (~130 conflicts);
+      recovered via `git reset --hard HEAD` (stash stack untouched). NEVER stash here.
 - [ ] **Iter 5 — #2 compose attachments + per-post audience scoping.**
 - [ ] **Iter 6 — #3 tenant-scoped recipient validation** (+ update existing tests to use
       real employee profiles).

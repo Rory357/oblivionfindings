@@ -20,6 +20,7 @@ export type InsightsMetrics = {
 
 export type InsightsValue = { key: string; label: string; count: number };
 export type InsightsLeader = { user_id: number; user_name: string; kudos_count: number };
+export type InsightsTrend = { label: string; count: number };
 
 function initials(name: string): string {
     return (
@@ -43,16 +44,20 @@ export function RecognitionInsightsDialog({
     onClose,
     metrics,
     valueBreakdown,
+    kudosTrend,
     leaderboard,
 }: {
     open: boolean;
     onClose: () => void;
     metrics: InsightsMetrics;
     valueBreakdown: InsightsValue[];
+    kudosTrend: InsightsTrend[];
     leaderboard: InsightsLeader[];
 }) {
     const maxValue = Math.max(1, ...valueBreakdown.map((v) => v.count));
     const hasValues = valueBreakdown.some((v) => v.count > 0);
+    const trendMax = Math.max(1, ...kudosTrend.map((w) => w.count));
+    const hasTrend = kudosTrend.some((w) => w.count > 0);
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -97,6 +102,32 @@ export function RecognitionInsightsDialog({
                         </ul>
                     ) : (
                         <p className="text-sm text-muted-foreground">No kudos given yet this month.</p>
+                    )}
+                </section>
+
+                {/* Kudos trend — last 8 weeks */}
+                <section className="mt-2">
+                    <h3 className="mb-2 text-sm font-semibold">Kudos over the last 8 weeks</h3>
+                    {hasTrend ? (
+                        <div className="flex h-20 items-end gap-1.5">
+                            {kudosTrend.map((w, i) => (
+                                <div
+                                    key={i}
+                                    className="flex flex-1 flex-col items-center gap-1"
+                                    title={`${w.label}: ${w.count} kudos`}
+                                >
+                                    <div className="flex w-full flex-1 items-end">
+                                        <div
+                                            className="w-full rounded-t-sm bg-primary/80 transition-[height] duration-500"
+                                            style={{ height: `${(w.count / trendMax) * 100}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-[9px] text-muted-foreground">{w.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">No kudos in the last 8 weeks.</p>
                     )}
                 </section>
 

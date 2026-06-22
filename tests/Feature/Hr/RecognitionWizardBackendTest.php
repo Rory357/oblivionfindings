@@ -161,8 +161,24 @@ test('the feed index exposes the recognition payload shape', function () {
             ->has('announcements')
             ->has('leaderboard')
             ->has('valueBreakdown')
+            ->has('kudosTrend', 8)
             ->has('kudosImpacts')
             ->has('sites'));
+});
+
+test('the insights trend buckets kudos into the current week', function () {
+    $this->actingAs($this->hr)->post('/hr/feed/kudos', [
+        'to_user_id' => $this->r1->id,
+        'category' => 'teamwork',
+        'message' => 'Great work this week.',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/hr/feed')
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/feed/index')
+            ->has('kudosTrend', 8)
+            ->where('kudosTrend.7.count', 1));
 });
 
 test('self-service /hr/my/kudos accepts multiple recipients and an impact', function () {
