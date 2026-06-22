@@ -87,11 +87,18 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
       (store now `redirect()->back()` so it works from the feed too).
 - [x] `index.ts` barrel. tsc 0 · eslint 0 on the new dir.
 
-### Phase 3 — Feed page redesign
-- [ ] `feed-hero.tsx` (golden band) + celebrations strip.
-- [ ] Rewrite `pages/hr/feed/index.tsx` — composer, tabs, announcement/kudos/update
-      cards, reactions+replies, right sidebar, search.
-- [ ] Wire 3 wizards to hero actions + composer + tab CTAs.
+### Phase 3 — Feed page redesign ✅ (commit pending)
+- [x] `components/hr/feed-hero.tsx` (golden brand-gradient band) — te-reo eyebrow,
+      4 KPIs, 4 quick actions, this-week celebrations strip (congratulate → wizard).
+- [x] `pages/hr/feed/parts.tsx` — KudosCard (value+impact badges, reactions toggle,
+      reply thread), AnnouncementCard (acknowledge + progress), UpdateCard,
+      TopRecognised, CelebrationsCard, FeedEmpty + shared types/helpers.
+- [x] Rewrite `pages/hr/feed/index.tsx` — hero + composer bar + filter tabs
+      (All/Updates/Kudos/Notices) + wall (announcements + posts) + search + sidebar.
+- [x] Wired all 3 wizards (hero actions, composer icons, congratulate pre-fill).
+- [x] tsc 0 · eslint 0 · vite build 0 (verified by temporarily disabling the
+      wayfinder codegen plugin — needs php/vendor — then reverting; routes present
+      via junction). "View insights" → `/hr/analytics` for now (P5 may add a modal).
 
 ### Phase 4 — Cross-module reuse
 - [ ] `/hr/my` hero "Send kudos" + `/hr/my/shoutouts` → `RecognitionWizard`
