@@ -143,6 +143,15 @@ test('a department can be linked to sites and the View returns them', function (
         ->toContain('Rata House');
 });
 
+test('the people page keys the edit dialogs so they re-init per target', function () {
+    // Regression: the always-mounted wizard kept its initial (empty) useForm
+    // values, so Edit never prefilled. A per-target key forces a remount.
+    $src = file_get_contents(resource_path('js/pages/hr/employees/index.tsx'));
+
+    expect($src)->toContain("key={editingDept?.id ?? 'new'}")
+        ->and($src)->toContain("key={editingPosition?.id ?? 'new'}");
+});
+
 test('updating a department re-syncs its sites', function () {
     $siteA = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
     $siteB = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
