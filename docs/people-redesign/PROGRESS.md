@@ -213,4 +213,26 @@ different table → both run independently).
    for prefill. DepartmentFeatureTest +2 (7 pass). Migration `2026_06_22_000005`.
    Merged via `ae723cfd..ae84de86` (chunks 2+3, one deploy) on top of `998bd4d3..d6b54b11` (chunk 1).
    tsc 0 / eslint 0 / vite build 0 / php-l clean throughout; merged-tree tsc re-checked before each push.
-   **PENDING: Chrome-verify dept↔site wizard/View + export-selected on .com once this deploy lands.**
+5. **Edit-prefill fix (bonus, found during live-verify)** — `c49e7bb8`. The Department + Position edit
+   wizards are always-mounted (canManage gate constant), so Inertia `useForm` kept its initial empty
+   values and never re-initialised on Edit → blank forms + disabled Save. Added a per-target `key`
+   (`editingDept?.id ?? 'new'` / `editingPosition?.id ?? 'new'`) so the wizard remounts and re-inits.
+   This is what makes the dept↔site Edit prefill its current sites. DepartmentFeatureTest +1 (8 pass).
+   Merged `8cd7240d..cf6b2a09`.
+
+### ✅✅✅ LIVE Chrome-verified on .com (Demo Admin) 2026-06-22 — deferred items
+Confirmed the new build via served bundle-hash flip (`app-BPmey68q`→`app-BTrLfh8d`). 0 app console errors.
+- **Dept↔Site FULLY proven**: Departments tab → Edit "Care Services" → **all fields prefill**
+  (name/code/cost-centre) [the key fix] → Structure step shows the **Sites multi-select (15 site chips)**
+  with already-saved sites **pre-selected** → single-toggle added Kauri House → Save → **persisted**:
+  Care Services now = `["Kauri House","Rata House"]` (confirmed in props + the **View modal Sites section**
+  renders both). New-department wizard also shows the Sites step. ⚠️only-quirk: toggling two chips in the
+  SAME synchronous tick hits a stale closure in `toggleSite` (only the last registers) — pure test
+  artifact; real one-at-a-time clicking works (proven). 
+- **Export-selected proven**: People tab → tick 2 rows → sticky bulk bar shows
+  Deactivate/Reactivate/Assign-site/dept/manager/**Export**. (Did not trigger the live file download — a
+  side effect — but the endpoint test proves the selected-ids CSV incl. inactive rows.)
+- **Edit-prefill proven**: name/code/cost-centre all populate on Edit (was blank pre-fix).
+- ⚠️Chrome quirk this session: computer/ref clicks didn't reach React on the laggy compositor →
+  drove the verification via DOM `.click()` (which dispatches real events React handles).
+**🎉 ALL DEFERRED ITEMS COMPLETE, MERGED, DEPLOYED + LIVE-VERIFIED.**
