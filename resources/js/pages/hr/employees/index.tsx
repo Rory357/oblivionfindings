@@ -466,6 +466,7 @@ export default function EmployeesIndex({
                     department={editingDept}
                     managers={departmentManagers}
                     parentOptions={departmentParents}
+                    siteOptions={sites}
                 />
             ) : null}
 

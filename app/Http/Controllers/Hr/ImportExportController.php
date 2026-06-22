@@ -37,7 +37,15 @@ class ImportExportController extends Controller
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
-        $csv = $this->service->exportToCsv($tenantId);
+
+        // Optional "export selected" — the People table's multi-select posts the
+        // chosen user ids; absent, we export all active employees as before.
+        $ids = $request->input('ids');
+        $userIds = is_array($ids) && count($ids) > 0
+            ? array_values(array_filter(array_map('intval', $ids)))
+            : null;
+
+        $csv = $this->service->exportToCsv($tenantId, $userIds);
         $filename = 'employees_'.date('Y-m-d_His').'.csv';
 
         return response()->streamDownload(function () use ($csv) {

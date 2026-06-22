@@ -192,3 +192,25 @@ Drill-down modal from the hero chips (no tab — it's a cross-cutting action que
     OrgChartReassign/NeedsTriage/AddEmployeeWizard) from the PARENT vs a throwaway DB — deferred all loop
     (shared codex_test DB wipe risk); features proven live + tinker, tests php-l clean & modeled on green
     peers. 3d loop-close + bulk Export-selected stay deferred (small, out of brief's core).
+
+## Deferred-items follow-up (2026-06-22) — ALL CLOSED
+User asked to complete every deferred item, merge, test, repeat. Built an **isolated test harness**
+(`phpunit.people-loop.xml` → throwaway `people_loop_test` DB, force-overridden, safety-probed so it can
+NEVER touch the shared `codex_test`; both kept local via git exclude). Ran each chunk green there, then
+reconcile-merged to origin/main (a concurrent feed/recognition loop pushed throughout — every push was
+divergence-checked + clean-merged; their migration shared my `2026_06_22_000005` prefix but is a
+different table → both run independently).
+1. **Ran the committed suite green** — `c25d4604`. 36/36 (155 assert). Fixes it surfaced (all
+   test-data, never-run before): missing Spatie role attach (Dept/Position 403s), hard-coded
+   `created_by=1` FK, missing `work_email`, wrong candidate status; **+1 real fix:** `HrEmployeeProfile.
+   department_id` wasn't fillable → model-level dept assignment silently dropped (now fillable).
+2. **3d requisition loop-close** — `c25d4604`. `PositionService::closeFilledRequisitions()` auto-closes
+   open reqs when a position is fully staffed (per-hire via observer + daily reconcile, one-way). +4 tests.
+3. **Bulk Export-selected** — `2402017a`. Multi-select bulk-bar Export → CSV of ticked rows (incl.
+   inactive when selected); `exportToCsv($tenantId, $userIds)`. PeopleExportTest +2 (4 pass).
+4. **Department ↔ Site (m2m)** — `e472d352`. `hr_department_site` pivot + `sites()` relation; controller
+   sync; wizard Structure-step Sites multi-select + review row; View-modal Sites section; list eager-loads
+   for prefill. DepartmentFeatureTest +2 (7 pass). Migration `2026_06_22_000005`.
+   Merged via `ae723cfd..ae84de86` (chunks 2+3, one deploy) on top of `998bd4d3..d6b54b11` (chunk 1).
+   tsc 0 / eslint 0 / vite build 0 / php-l clean throughout; merged-tree tsc re-checked before each push.
+   **PENDING: Chrome-verify dept↔site wizard/View + export-selected on .com once this deploy lands.**

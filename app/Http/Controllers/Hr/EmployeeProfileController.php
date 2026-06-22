@@ -278,7 +278,7 @@ class EmployeeProfileController extends Controller
 
         $departmentsPane = HrDepartment::query()
             ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->with(['manager:id,name', 'parent:id,name'])
+            ->with(['manager:id,name', 'parent:id,name', 'sites:id,name'])
             ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
             ->when($deptSearch !== '', fn ($q) => $q->where(fn ($i) => $i
                 ->where('name', 'like', "%{$deptSearch}%")
