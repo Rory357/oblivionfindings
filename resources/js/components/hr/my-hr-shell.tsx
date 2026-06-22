@@ -63,8 +63,8 @@ export function MyHrShell({
                             handlers={{ onSendKudos: openKudos, ...heroHandlers }}
                         />
                     }
+                    tabs={<MyHrTabs active={active} badges={badges} />}
                 >
-                    <MyHrTabs active={active} badges={badges} />
                     {children}
                 </PageLayout>
             </MyHrKudosContext.Provider>
