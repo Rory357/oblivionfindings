@@ -136,11 +136,25 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
 - [x] Merged → origin/main: clean fast-forward `836ebd83..6666c2a7` (re-fetched first;
       many concurrent loops active but none had pushed). Deploy webhook fired.
 - [x] Parent `main` FF-updated to `6666c2a7`; additive migration applied to dev DB.
-- [~] Pest suite running against an **isolated throwaway DB**
+- [x] Pest suite **14 passed / 66 assertions** (my 9 + RecognitionDialogFlow 2 +
+      FeedRecognitionSecurity 3) against an **isolated throwaway DB**
       (`oblivion_findings_loop_test`) — ⚠️ phpunit's `DB_DATABASE` == the dev DB
-      (`oblivion_findings_codex_test`), so a naive run would wipe dev data; used an
-      env override (probe-verified read-only first). Result pending.
-- [ ] Chrome-verify on oblivionfindings.com once the deploy lands.
+      (`oblivion_findings_codex_test`), so a naive run would wipe dev data; used a
+      probe-verified env override.
+- [x] **Chrome-verified LIVE on oblivionfindings.com as Demo Admin**: page renders
+      (hero/KPIs/celebrations/composer/tabs/announcements w/ Acknowledge+progress/
+      kudos card w/ Good-Job impact + Teamwork value + ❤️1 reaction + reply thread/
+      sidebar); **Recognition insights modal** opens (KPIs + value bars + leaderboard);
+      **Give recognition wizard** opens (Add-Client shell: rail, 3 steps, completeness,
+      multi-recipient picker). **0 app console errors** (only benign extension noise).
+- [x] **Caught a live bug** → fixed `5da84f7b`: Carbon-3 signed-float `diff` made the
+      celebrations strip show fractional years + list every 1yr+ employee as
+      "this week". Whole-day sign-safe `getMilestones`.
+- [x] **Re-deploy re-verified LIVE**: CELEBRATIONS 17→**1**, this-week strip shows only
+      the genuine new hire, **no fractional years**. Still 0 app console errors.
+
+## ✅ LOOP COMPLETE — `/hr/feed` is the Community & Recognition gold standard, merged
+(`5da84f7b`), deployed, 14 Pest green, Chrome-verified live on .com. Nothing user-gated.
 
 ## Deferred / follow-ups
 - Polymorphic reactions on every post type (currently kudos-only per reuse doc).
