@@ -116,9 +116,11 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
 - [ ] "View insights" → modal (participation, top values, kudos trend, leaderboard).
 
 ### Phase 6 — Verify
-- [ ] tsc 0 (vs baseline) · eslint 0 · vite build · pint/`php -l`.
-- [ ] PHP tests (FeedController multi+impact, react/reply, tenant-scope) — run from
-      PARENT post-merge.
+- [x] tsc 0 (vs baseline) · eslint 0 · vite build 0 · `php -l` clean (all phases).
+- [x] PHP tests written `tests/Feature/Hr/RecognitionWizardBackendTest.php` (10
+      tests: multi-recipient, impact default/reject, react toggle/reject, reply
+      authz, tenant-scoped picker, payload shape, self-service multi). php -l clean.
+      ⚠️ Run from PARENT post-merge (worktree has no vendor/DB).
 - [ ] Adversarial review pass.
 
 ### Phase 7 — Ship
