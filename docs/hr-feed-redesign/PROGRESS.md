@@ -185,9 +185,21 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
       under the value bars. +2 Pest. ⚠️ git stash is SHARED across worktrees in this
       repo — a stray `git stash pop` grabbed another session's stash (~130 conflicts);
       recovered via `git reset --hard HEAD` (stash stack untouched). NEVER stash here.
-- [ ] **Iter 5 — #2 compose attachments + per-post audience scoping.**
-- [ ] **Iter 6 — #3 tenant-scoped recipient validation** (+ update existing tests to use
-      real employee profiles).
+- [x] **Iter 4 MERGED `8cd7240d`. 22 Pest pass / 107 assert.**
+- [~] **Iter 5 — #2 compose attachments** (single optional image per post): new
+      `hr_feed_attachments` (mig `…000006`) + `HrFeedAttachment` + `HrFeedPost.attachment`;
+      `store()` validates image mime allowlist + 10MB; private-disk store; serve route
+      `/hr/feed/attachments/{id}` via `ServesPrivateAttachments` (hardened CSP) +
+      tenant IDOR guard. ComposeWizard gains a `FileDropzone`/`StagedFileCard` photo
+      field (Inertia auto-multipart); UpdateCard shows the inline image. +3 Pest
+      (upload+serve, mime reject, cross-tenant 404).
+- [ ] **Iter 6 — #2 per-post audience scoping + #3 tenant-scoped recipients.** ⚠️ both
+      lower-value: audience targeting arguably belongs to Announcements (community feed
+      is intentionally org-wide); #3 is dormant (single-tenant, no live leak) + needs
+      churning the pre-existing kudos tests. Will implement per the directive but these
+      are the marginal-value tail.
+NOTE: ⚠️ live Chrome-verify BLOCKED — .com session logged out; I won't re-authenticate.
+Relying on Pest/tsc/eslint/build (all green). User can re-auth to resume live checks.
 
 ## Deferred / follow-ups (original)
 - Polymorphic reactions on every post type (currently kudos-only per reuse doc).

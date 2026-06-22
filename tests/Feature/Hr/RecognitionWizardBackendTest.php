@@ -2,12 +2,15 @@
 
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedAttachment;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrKudos;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -179,6 +182,60 @@ test('the insights trend buckets kudos into the current week', function () {
             ->component('hr/feed/index')
             ->has('kudosTrend', 8)
             ->where('kudosTrend.7.count', 1));
+});
+
+test('a post can carry an image attachment served from the private disk', function () {
+    Storage::fake('private');
+
+    $this->actingAs($this->hr)
+        ->post('/hr/feed', [
+            'content' => 'Team photo from the offsite',
+            'post_type' => 'update',
+            'attachment' => UploadedFile::fake()->image('offsite.jpg', 400, 300),
+        ])
+        ->assertRedirect();
+
+    $attachment = HrFeedAttachment::firstOrFail();
+    expect($attachment->original_name)->toBe('offsite.jpg');
+    expect($attachment->disk)->toBe('private');
+    Storage::disk('private')->assertExists($attachment->path);
+
+    $this->actingAs($this->hr)
+        ->get("/hr/feed/attachments/{$attachment->id}")
+        ->assertOk();
+});
+
+test('a non-image post attachment is rejected', function () {
+    $this->actingAs($this->hr)
+        ->post('/hr/feed', [
+            'content' => 'Notes',
+            'post_type' => 'update',
+            'attachment' => UploadedFile::fake()->create('notes.txt', 10, 'text/plain'),
+        ])
+        ->assertSessionHasErrors('attachment');
+});
+
+test('a cross-tenant feed attachment is not served', function () {
+    $post = HrFeedPost::create([
+        'tenant_id' => 2,
+        'user_id' => $this->hr->id,
+        'post_type' => 'update',
+        'content' => 'Another org post',
+    ]);
+    $attachment = HrFeedAttachment::create([
+        'tenant_id' => 2,
+        'feed_post_id' => $post->id,
+        'uploaded_by' => $this->hr->id,
+        'disk' => 'private',
+        'original_name' => 'secret.jpg',
+        'path' => 'hr/feed/2/secret.jpg',
+        'mime' => 'image/jpeg',
+        'size' => 100,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get("/hr/feed/attachments/{$attachment->id}")
+        ->assertNotFound();
 });
 
 test('self-service /hr/my/kudos accepts multiple recipients and an impact', function () {

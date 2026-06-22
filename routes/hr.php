@@ -815,6 +815,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/', [FeedController::class, 'index'])
             ->middleware('permission:hr.recognition.view')->name('index');
 
+        // Post image attachments — viewable by anyone who can read the feed.
+        Route::get('/attachments/{attachment}', [FeedController::class, 'downloadAttachment'])
+            ->middleware('permission:hr.recognition.view')->name('attachments.show');
+
         // Mutations require the give permission (was previously ungated).
         Route::middleware('permission:hr.recognition.give')->group(function () {
             Route::post('/', [FeedController::class, 'store'])->name('store');

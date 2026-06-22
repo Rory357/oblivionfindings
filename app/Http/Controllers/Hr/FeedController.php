@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedAttachment;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Services\FeedService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
@@ -16,7 +18,7 @@ use Inertia\Inertia;
 
 class FeedController extends Controller
 {
-    use ResolvesHrTenant;
+    use ResolvesHrTenant, ServesPrivateAttachments;
 
     public function __construct(
         private readonly FeedService $feedService,
@@ -85,10 +87,14 @@ class FeedController extends Controller
             'content' => ['required', 'string', 'max:5000'],
             'post_type' => ['required', 'string', Rule::in(['update', 'announcement'])],
             'kind' => ['nullable', 'string', Rule::in(FeedService::POST_KINDS)],
+            'attachment' => ['nullable', 'file', 'image', 'mimes:'.implode(',', FeedService::ATTACHMENT_MIMES), 'max:'.FeedService::ATTACHMENT_MAX_KB],
         ]);
 
         try {
-            $this->feedService->createPost($user, $validated, $this->resolveHrTenantIdForUser($user));
+            $post = $this->feedService->createPost($user, $validated, $this->resolveHrTenantIdForUser($user));
+            if ($request->hasFile('attachment')) {
+                $this->feedService->attachToPost($post, $request->file('attachment'), $user->id);
+            }
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -227,6 +233,27 @@ class FeedController extends Controller
         return redirect()->back()->with('success', 'Reply posted.');
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Attachment download — hardened private-disk stream                 */
+    /* ------------------------------------------------------------------ */
+
+    public function downloadAttachment(Request $request, HrFeedAttachment $attachment)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $attachment->tenant_id);
+
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+            $attachment->isImage() ? 'inline' : 'attachment',
+        );
+    }
+
     /** Guard a polymorphic wall reaction/reply against cross-tenant subjects. */
     private function assertFeedSubjectInTenant(string $type, int $id, int $tenantId): void
     {
@@ -280,6 +307,12 @@ class FeedController extends Controller
             // feed reactions + an open reply thread.
             'reactions' => $kudos ? null : ($postReactions[$post->id] ?? $this->emptyReactionSummary()),
             'replies' => $kudos ? null : ($postReplies[$post->id] ?? []),
+            'attachment' => $post->attachment ? [
+                'id' => $post->attachment->id,
+                'name' => $post->attachment->original_name,
+                'is_image' => $post->attachment->isImage(),
+                'url' => '/hr/feed/attachments/'.$post->attachment->id,
+            ] : null,
             'created_at' => $post->created_at?->diffForHumans(),
             'created_at_date' => $post->created_at?->toDateTimeString(),
         ];
