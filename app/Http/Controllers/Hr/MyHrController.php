@@ -10,8 +10,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrKudos;
-use App\Domain\Hr\Models\HrKudosReaction;
-use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayslip;
@@ -112,24 +110,10 @@ class MyHrController extends Controller
         $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
 
         $validated = $request->validate([
-            'emoji' => ['required', 'string', Rule::in(['heart', 'party', 'hands'])],
+            'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
         ]);
 
-        $existing = HrKudosReaction::where('kudos_id', $kudos->id)
-            ->where('user_id', $user->id)
-            ->where('emoji', $validated['emoji'])
-            ->first();
-
-        if ($existing) {
-            $existing->delete();
-        } else {
-            HrKudosReaction::create([
-                'tenant_id' => $kudos->tenant_id,
-                'kudos_id' => $kudos->id,
-                'user_id' => $user->id,
-                'emoji' => $validated['emoji'],
-            ]);
-        }
+        $this->feedService->toggleReaction($kudos, $user->id, $validated['emoji']);
 
         return redirect()->back()->with('success', 'Reaction updated.');
     }
@@ -150,12 +134,7 @@ class MyHrController extends Controller
             'body' => ['required', 'string', 'max:2000'],
         ]);
 
-        HrKudosReply::create([
-            'tenant_id' => $kudos->tenant_id,
-            'kudos_id' => $kudos->id,
-            'user_id' => $user->id,
-            'body' => $validated['body'],
-        ]);
+        $this->feedService->addReply($kudos, $user->id, $validated['body']);
 
         return redirect()->back()->with('success', 'Reply posted.');
     }
