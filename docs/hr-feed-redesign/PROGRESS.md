@@ -156,7 +156,24 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
 ## ✅ LOOP COMPLETE — `/hr/feed` is the Community & Recognition gold standard, merged
 (`5da84f7b`), deployed, 14 Pest green, Chrome-verified live on .com. Nothing user-gated.
 
-## Deferred / follow-ups
+## Phase 8 — Deferred completion (user asked: complete all, merge+test, rinse & repeat)
+Re-based onto latest main (FF to `debc9010` — clean merge w/ the concurrent People-hub
+loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
+- [~] **Iter 1 — feed-content fidelity (#4 + #5):**
+  - #5 distinct composer kinds: `kind` col on hr_feed_posts (mig `…000004`), Update/
+    Question/Win badges on the wall (post_type stays `update`). ComposeWizard sends `kind`.
+  - #4 audience-scoped announcement progress: `audience_count` now per-announcement
+    (target all/site/dept/role) not whole-tenant headcount.
+  - Tests: +2 (kind stored / rejected). Verify → merge → deploy → Chrome-verify.
+- [ ] **Iter 2 — #1 polymorphic reactions/replies on all wall items** (announcements +
+      updates, not just kudos). The big one — unify onto one reaction/reply store.
+- [ ] **Iter 3 — #6 server-side wall search** (across all posts, not just loaded page).
+- [ ] **Iter 4 — #7 insights trends-over-time** (kudos/participation by week).
+- [ ] **Iter 5 — #2 compose attachments + per-post audience scoping.**
+- [ ] **Iter 6 — #3 tenant-scoped recipient validation** (+ update existing tests to use
+      real employee profiles).
+
+## Deferred / follow-ups (original)
 - Polymorphic reactions on every post type (currently kudos-only per reuse doc).
 - Compose attachments + per-post audience scoping (reuse doc marks these optional).
 

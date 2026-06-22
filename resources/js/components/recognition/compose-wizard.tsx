@@ -65,18 +65,18 @@ export function ComposeWizard({
 }) {
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
-    const [kind, setKind] = useState<ComposeKind>('update');
-    const form = useForm<{ content: string; post_type: string }>({
+    const form = useForm<{ content: string; post_type: string; kind: ComposeKind }>({
         content: '',
         post_type: 'update',
+        kind: 'update',
     });
     const { setData, reset, clearErrors } = form;
+    const kind = form.data.kind;
 
     useEffect(() => {
         if (!open) return;
         reset();
         clearErrors();
-        setKind('update');
         setDone(false);
         wizard.goTo(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -205,7 +205,7 @@ export function ComposeWizard({
                     <Field label="Type">
                         <TilePicker
                             value={kind}
-                            onChange={(v) => setKind(v as ComposeKind)}
+                            onChange={(v) => setData('kind', v as ComposeKind)}
                             options={KIND_TILES}
                             cols={3}
                         />

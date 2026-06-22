@@ -176,3 +176,29 @@ test('self-service /hr/my/kudos accepts multiple recipients and an impact', func
 
     expect(HrKudos::where('impact', 'exceptional')->count())->toBe(2);
 });
+
+test('a feed post records the composer kind (update / question / win)', function () {
+    $this->actingAs($this->hr)
+        ->post('/hr/feed', [
+            'content' => 'We shipped the new roster system! 🎉',
+            'post_type' => 'update',
+            'kind' => 'win',
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('hr_feed_posts', [
+        'post_type' => 'update',
+        'kind' => 'win',
+        'content' => 'We shipped the new roster system! 🎉',
+    ]);
+});
+
+test('an unknown composer kind is rejected', function () {
+    $this->actingAs($this->hr)
+        ->post('/hr/feed', [
+            'content' => 'Hi team',
+            'post_type' => 'update',
+            'kind' => 'rant',
+        ])
+        ->assertSessionHasErrors('kind');
+});
