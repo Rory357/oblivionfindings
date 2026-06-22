@@ -87,7 +87,7 @@ Audit: `docs/positions-recruitment-audit.md` (signed off — autonomous).
 - [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events. **(deferred — small;
       may fold into a later pass. Core automation 3a-3c covers the brief's primary loop.)**
 
-### Phase 4 — Departments feature-complete (audit-first)  🔄 IN PROGRESS
+### Phase 4 — Departments feature-complete (audit-first)  ✅ COMPLETE (ready to merge)
 Audit: `docs/departments-audit.md` (signed off — autonomous; cost_centre=string, sites deferred).
 - [x] 4a (backend) — migration `2026_06_22_000003` (`hr_departments.cost_centre`); model
       `cost_centre` fillable + cycle-safe `descendantIds()` / `rolledUpEmployeeCount()` /
@@ -97,9 +97,12 @@ Audit: `docs/departments-audit.md` (signed off — autonomous; cost_centre=strin
       tenant via `resolveHrTenantIdForUser`. New `GET /hr/departments/{department}` (departments.show).
       Migration ran clean; tinker proved descendantIds + cycle checks. `DepartmentFeatureTest` (cycle,
       reparent, block-on-employees, show roll-up, cost_centre). php -l clean.
-- [ ] 4b (frontend) — DepartmentDialog → WizardShell (Details[name/code/cost_centre/description] →
-      Structure[parent/head/sort/status] → Review); Department **View modal** (fetches show JSON);
-      departments-pane row→View + cost-centre column.
+- [x] 4b (frontend) — DepartmentDialog rebuilt on **WizardShell** (Details[name/code/cost_centre/
+      description] → Structure[parent/head/sort/status] → Review) + cost_centre. New
+      **`DepartmentViewDialog`** (read-only modal; fetches `GET /hr/departments/{id}` JSON → stat tiles
+      [direct/rolled-up staff, sub-depts, linked positions] + head/parent/description + child chips +
+      linked-positions list + Edit). departments-pane: cost-centre column + **row-click → View**
+      (manage-gated; action buttons stopPropagation). tsc/lint(0)/build green.
 
 ### Phase 5 — Org chart view + builder modal (research-first)  ⬜ NOT STARTED
 `docs/org-chart-research.md` → rebuild `org-chart-pane.tsx` to connected top-down tree (colour-coded

@@ -6,6 +6,7 @@ export * from './my-hr-shoutout-spotlight';
 export * from './compensation-tabs';
 export * from './compliance-tabs';
 export * from './department-dialog';
+export * from './department-view-dialog';
 export * from './departments-pane';
 export * from './documents-tabs';
 export * from './hr-hero';

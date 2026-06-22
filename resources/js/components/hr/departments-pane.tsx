@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 
 import type { Department } from './department-dialog';
+import { DepartmentViewDialog } from './department-view-dialog';
 import { StatusBadge } from './status-badge';
 
 export interface PaginatedDepartments {
@@ -55,6 +56,7 @@ export function DepartmentsPane({
 }) {
     const [search, setSearch] = useState(filters.q ?? '');
     const [deactivating, setDeactivating] = useState<Department | null>(null);
+    const [viewingId, setViewingId] = useState<number | null>(null);
 
     const apply = (next: Partial<DepartmentFilters>) => {
         router.get(
@@ -152,6 +154,9 @@ export function DepartmentsPane({
                                     <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase sm:table-cell">
                                         Code
                                     </th>
+                                    <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase xl:table-cell">
+                                        Cost centre
+                                    </th>
                                     <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase md:table-cell">
                                         Manager
                                     </th>
@@ -173,7 +178,12 @@ export function DepartmentsPane({
                                 {departments.data.map((dept) => (
                                     <tr
                                         key={dept.id}
-                                        className="transition-colors hover:bg-muted/40"
+                                        onClick={
+                                            canManage
+                                                ? () => setViewingId(dept.id)
+                                                : undefined
+                                        }
+                                        className={`transition-colors hover:bg-muted/40 ${canManage ? 'cursor-pointer' : ''}`}
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
@@ -194,6 +204,9 @@ export function DepartmentsPane({
                                         </td>
                                         <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground sm:table-cell">
                                             {dept.code || '—'}
+                                        </td>
+                                        <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground xl:table-cell">
+                                            {dept.cost_centre || '—'}
                                         </td>
                                         <td className="hidden px-4 py-3 text-sm text-muted-foreground md:table-cell">
                                             {dept.manager?.name || '—'}
@@ -222,9 +235,10 @@ export function DepartmentsPane({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() =>
-                                                            onEdit(dept)
-                                                        }
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEdit(dept);
+                                                        }}
                                                         className="h-8 w-8 p-0"
                                                     >
                                                         <Pencil className="h-3.5 w-3.5" />
@@ -233,11 +247,12 @@ export function DepartmentsPane({
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() =>
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
                                                                 setDeactivating(
                                                                     dept,
-                                                                )
-                                                            }
+                                                                );
+                                                            }}
                                                             className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
                                                         >
                                                             <Trash2 className="h-3.5 w-3.5" />
@@ -251,7 +266,7 @@ export function DepartmentsPane({
                                 {departments.data.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={8}
                                             className="px-4 py-16 text-center"
                                         >
                                             <Briefcase className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -295,6 +310,22 @@ export function DepartmentsPane({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {viewingId !== null ? (
+                <DepartmentViewDialog
+                    open={viewingId !== null}
+                    departmentId={viewingId}
+                    onClose={() => setViewingId(null)}
+                    canManage={canManage}
+                    onEdit={() => {
+                        const dept = departments.data.find(
+                            (d) => d.id === viewingId,
+                        );
+                        setViewingId(null);
+                        if (dept) onEdit(dept);
+                    }}
+                />
+            ) : null}
         </div>
     );
 }
