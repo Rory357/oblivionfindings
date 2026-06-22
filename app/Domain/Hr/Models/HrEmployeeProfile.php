@@ -63,6 +63,7 @@ class HrEmployeeProfile extends Model
         'position_id',
         'manager_user_id',
         'department',
+        'department_id',
         'team',
         'reporting_level',
         'offer_id',

@@ -18,6 +18,11 @@ beforeEach(function () {
     Notification::fake();
     $this->seed(RbacSeeder::class);
     $this->actor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+    // canDo() resolves via the Spatie role relation, not the role string column.
+    $adminRole = Role::query()->where('name', 'admin')->first();
+    if ($adminRole) {
+        $this->actor->roles()->syncWithoutDetaching([$adminRole->id]);
+    }
 });
 
 function makePosition(int $budget = 2): HrPosition
@@ -31,7 +36,9 @@ function makePosition(int $budget = 2): HrPosition
         'headcount_budget' => $budget,
         'current_headcount' => 0,
         'is_active' => true,
-        'created_by' => 1,
+        // created_by has a FK to users; use a real one (the seeded/actor user)
+        // rather than a hard-coded id that may not exist in a fresh DB.
+        'created_by' => User::query()->value('id'),
     ]);
 }
 
@@ -110,7 +117,7 @@ test('converting an offer with a position fills that position', function () {
     $candidate = HrCandidate::factory()->create([
         'tenant_id' => 1,
         'personal_email' => fake()->unique()->safeEmail(),
-        'status' => 'offer_sent',
+        'status' => 'offer_accepted', // convertToEmployee requires accepted/onboarding
         'created_by' => $this->actor->id,
     ]);
     $application = HrApplication::factory()->create([
@@ -187,4 +194,86 @@ test('hr:check-vacancies reconciles stored headcount drift', function () {
     $this->artisan('hr:check-vacancies')->assertExitCode(0);
 
     expect($pos->fresh()->current_headcount)->toBe(1);
+});
+
+/* --- 3d: recruitment loop-close ----------------------------------------- */
+
+function openReqFor(HrPosition $pos, int $openings, int $actorId, string $status = 'published'): HrJobRequisition
+{
+    return HrJobRequisition::query()->create([
+        'tenant_id' => 1,
+        'title' => 'Req ' . fake()->unique()->numerify('###'),
+        'slug' => 'req-' . fake()->unique()->numerify('#####'),
+        'position_id' => $pos->id,
+        'employment_type' => 'full_time',
+        'openings' => $openings,
+        'status' => $status,
+        'description' => 'x',
+        'created_by' => $actorId,
+        'updated_by' => $actorId,
+    ]);
+}
+
+test('filling a position auto-closes its open requisition (loop close)', function () {
+    $pos = makePosition(1);
+    $req = openReqFor($pos, 1, $this->actor->id);
+
+    hireInto($pos, $this->actor->id); // fills the only seat → observer → close loop
+
+    expect($pos->fresh()->current_headcount)->toBe(1)
+        ->and($req->fresh()->status)->toBe('closed')
+        ->and($req->fresh()->closing_at)->not->toBeNull();
+});
+
+test('a part-filled position keeps its requisition open', function () {
+    $pos = makePosition(2);
+    $req = openReqFor($pos, 2, $this->actor->id);
+
+    hireInto($pos, $this->actor->id); // 1 of 2 — gap remains
+
+    expect($pos->fresh()->current_headcount)->toBe(1)
+        ->and($req->fresh()->status)->toBe('published');
+});
+
+test('attrition below budget does not reopen a closed requisition', function () {
+    $pos = makePosition(1);
+    $req = openReqFor($pos, 1, $this->actor->id);
+    hireInto($pos, $this->actor->id);
+    expect($req->fresh()->status)->toBe('closed');
+
+    // Deactivate the only employee → position understaffed again.
+    $pos->employees()->update(['is_active' => false]);
+    app(\App\Domain\Hr\Services\PositionService::class)->syncHeadcount($pos->id);
+
+    expect($pos->fresh()->current_headcount)->toBe(0)
+        ->and($req->fresh()->status)->toBe('closed'); // one-way: stays closed
+});
+
+test('hr:check-vacancies closes requisitions for positions filled via bulk paths', function () {
+    $pos = makePosition(1);
+    $req = openReqFor($pos, 1, $this->actor->id);
+
+    // Fill the seat WITHOUT firing the observer (mimics a mass bulk update).
+    $u = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    \App\Domain\Hr\Models\HrEmployeeProfile::withoutEvents(function () use ($u, $pos) {
+        \App\Domain\Hr\Models\HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $u->id,
+            'employee_number' => 'EMP-' . $u->id,
+            'work_email' => $u->email,
+            'position_id' => $pos->id,
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+        ]);
+    });
+
+    expect($req->fresh()->status)->toBe('published'); // observer bypassed
+
+    $this->artisan('hr:check-vacancies')->assertExitCode(0);
+
+    expect($pos->fresh()->current_headcount)->toBe(1)
+        ->and($req->fresh()->status)->toBe('closed');
 });

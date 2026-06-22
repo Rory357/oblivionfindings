@@ -3,12 +3,18 @@
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPosition;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->actor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+    // canDo() resolves via the Spatie role relation, not the role string column.
+    $adminRole = Role::query()->where('name', 'admin')->first();
+    if ($adminRole) {
+        $this->actor->roles()->syncWithoutDetaching([$adminRole->id]);
+    }
 });
 
 function makeDept(string $name, ?int $parentId = null): HrDepartment
