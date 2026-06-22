@@ -199,12 +199,14 @@ loop; both reused `2026_06_22_000002` prefix, different tables, harmless).
     rejects a recipient whose employee profile is in a *different* tenant, while bare
     users + same-tenant employees pass (so the pre-existing kudos tests stay green, no
     churn). +1 Pest. Backend-only (no migration/frontend).
-  - #2 per-post audience scoping — **DECIDED NOT TO BUILD** (recommendation to user):
-    a *community* feed is intentionally org-wide; per-post visibility scoping would
-    fragment the wall and duplicate the Announcements module, which already does
-    audience targeting (all/site/dept/role). Building it would add a column + composer
-    picker + a wall visibility-filter that works against the feature's purpose. Left
-    as a deliberate non-implementation; trivial to add later if the product wants it.
+  - #2 per-post audience scoping — initially recommended against, but **BUILT** after the
+    user re-ran /loop (taking up the "I'll do it if you want it" offer). Iter 7:
+    `hr_feed_posts.target_audience`/`target_value` (mig `…000007`, default `all`); store()
+    validates `all|site` + the site belongs to the tenant; `getFeed` filters posts to
+    org-wide + the viewer's own + posts targeting a site the viewer belongs to (primary
+    + secondary). Kudos stay org-wide. ComposeWizard gains an Audience `Segmented`
+    (All sites / per-site); UpdateCard shows a 📍 site chip. +1 Pest (site-scoped post
+    hidden from out-of-site viewers).
 NOTE: ⚠️ live Chrome-verify BLOCKED — .com session logged out; I won't re-authenticate.
 Relying on Pest/tsc/eslint/build (all green). User can re-auth to resume live checks.
 

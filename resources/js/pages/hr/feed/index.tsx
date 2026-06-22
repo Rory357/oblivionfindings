@@ -112,6 +112,11 @@ export default function FeedIndex({
         [employees],
     );
 
+    const siteNameById = useMemo(
+        () => new Map(sites.map((s) => [s.id, s.name])),
+        [sites],
+    );
+
     const allMilestones = useMemo<Milestone[]>(
         () => [...milestones.anniversaries, ...milestones.birthdays, ...milestones.new_hires],
         [milestones],
@@ -303,7 +308,12 @@ export default function FeedIndex({
                                     employeeById={employeeById}
                                 />
                             ) : (
-                                <UpdateCard key={`p-${post.id}`} post={post} employeeById={employeeById} />
+                                <UpdateCard
+                                    key={`p-${post.id}`}
+                                    post={post}
+                                    employeeById={employeeById}
+                                    siteNameById={siteNameById}
+                                />
                             ),
                         )}
 
@@ -339,7 +349,7 @@ export default function FeedIndex({
                 kudosImpacts={kudosImpacts}
                 defaults={recogDefaults}
             />
-            <ComposeWizard open={composeOpen} onClose={() => setComposeOpen(false)} />
+            <ComposeWizard open={composeOpen} onClose={() => setComposeOpen(false)} sites={sites} />
             <AnnounceWizard open={announceOpen} onClose={() => setAnnounceOpen(false)} sites={sites} />
             <RecognitionInsightsDialog
                 open={insightsOpen}

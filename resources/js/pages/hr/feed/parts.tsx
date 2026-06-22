@@ -6,6 +6,7 @@ import {
     CheckCircle2,
     Gift,
     Heart,
+    MapPin,
     MessageCircle,
     Megaphone,
     PartyPopper,
@@ -62,6 +63,7 @@ export type FeedPost = {
     reactions: ReactionSummary | null;
     replies: KudosReply[] | null;
     attachment: { id: number; name: string; is_image: boolean; url: string } | null;
+    audience: { scope: string; site_id: number } | null;
     created_at: string | null;
     created_at_date: string | null;
 };
@@ -461,9 +463,11 @@ export function AnnouncementCard({
 export function UpdateCard({
     post,
     employeeById,
+    siteNameById,
 }: {
     post: FeedPost;
     employeeById: Map<number, FeedEmployee>;
+    siteNameById?: Map<number, string>;
 }) {
     const badgeKey =
         post.post_type === 'milestone'
@@ -484,6 +488,12 @@ export function UpdateCard({
                             <Badge variant="outline" className={badge.className}>
                                 {badge.label}
                             </Badge>
+                            {post.audience ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                    <MapPin className="h-3 w-3" />
+                                    {siteNameById?.get(post.audience.site_id) ?? 'Site only'}
+                                </span>
+                            ) : null}
                             {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>
                         </div>

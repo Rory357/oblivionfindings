@@ -81,11 +81,15 @@ class FeedService
     public function createPost(User $user, array $data, ?int $tenantId = null): HrFeedPost
     {
         return DB::transaction(function () use ($user, $data, $tenantId) {
+            $targetsSite = ($data['target_audience'] ?? 'all') === 'site' && ! empty($data['target_value']);
+
             return HrFeedPost::create([
                 'tenant_id' => $tenantId ?? $user->tenant_id,
                 'user_id' => $user->id,
                 'post_type' => $data['post_type'] ?? 'update',
                 'kind' => in_array($data['kind'] ?? null, self::POST_KINDS, true) ? $data['kind'] : null,
+                'target_audience' => $targetsSite ? 'site' : 'all',
+                'target_value' => $targetsSite ? (string) $data['target_value'] : null,
                 'content' => $data['content'],
                 'is_pinned' => $data['is_pinned'] ?? false,
             ]);
@@ -328,10 +332,23 @@ class FeedService
      * kudos parties plus their reactions and reply threads so the wall can render
      * the social row without N+1 queries.
      */
-    public function getFeed(?int $tenantId, ?string $type, ?string $search = null, int $perPage = 20): LengthAwarePaginator
+    /**
+     * @param  array<int>  $viewerSiteIds  Site ids the viewer belongs to (for audience scoping).
+     */
+    public function getFeed(?int $tenantId, ?string $type, ?string $search, int $viewerId, array $viewerSiteIds = [], int $perPage = 20): LengthAwarePaginator
     {
+        $siteValues = array_values(array_unique(array_map('strval', $viewerSiteIds)));
+
         return HrFeedPost::forTenant($tenantId)
             ->when($type, fn ($q) => $q->where('post_type', $type))
+            // Audience scoping: org-wide posts + the viewer's own posts + posts
+            // targeting a site the viewer belongs to.
+            ->where(function ($q) use ($viewerId, $siteValues) {
+                $q->where('target_audience', 'all')->orWhere('user_id', $viewerId);
+                if (! empty($siteValues)) {
+                    $q->orWhere(fn ($sub) => $sub->where('target_audience', 'site')->whereIn('target_value', $siteValues));
+                }
+            })
             ->when($search, function ($q) use ($search) {
                 $term = '%'.$search.'%';
                 $q->where(function ($sub) use ($term) {

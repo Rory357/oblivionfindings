@@ -38,7 +38,7 @@ class FeedController extends Controller
         $search = trim((string) $request->query('search', ''));
         $search = $search !== '' ? $search : null;
 
-        $posts = $this->feedService->getFeed($tenantId, $type, $search);
+        $posts = $this->feedService->getFeed($tenantId, $type, $search, $user->id, $this->viewerSiteIds($tenantId, $user->id));
         // Polymorphic reactions/replies for the non-kudos posts on this page
         // (kudos carry their own kudos-keyed reactions). Loaded in two queries.
         $nonKudosIds = $posts->getCollection()
@@ -83,15 +83,19 @@ class FeedController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
             'post_type' => ['required', 'string', Rule::in(['update', 'announcement'])],
             'kind' => ['nullable', 'string', Rule::in(FeedService::POST_KINDS)],
+            'target_audience' => ['nullable', 'string', Rule::in(['all', 'site'])],
+            'target_value' => ['nullable', 'string', 'required_if:target_audience,site', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
             'attachment' => ['nullable', 'file', 'image', 'mimes:'.implode(',', FeedService::ATTACHMENT_MIMES), 'max:'.FeedService::ATTACHMENT_MAX_KB],
         ]);
 
         try {
-            $post = $this->feedService->createPost($user, $validated, $this->resolveHrTenantIdForUser($user));
+            $post = $this->feedService->createPost($user, $validated, $tenantId);
             if ($request->hasFile('attachment')) {
                 $this->feedService->attachToPost($post, $request->file('attachment'), $user->id);
             }
@@ -314,6 +318,10 @@ class FeedController extends Controller
                 'is_image' => $post->attachment->isImage(),
                 'url' => '/hr/feed/attachments/'.$post->attachment->id,
             ] : null,
+            'audience' => $post->target_audience === 'site' && $post->target_value ? [
+                'scope' => 'site',
+                'site_id' => (int) $post->target_value,
+            ] : null,
             'created_at' => $post->created_at?->diffForHumans(),
             'created_at_date' => $post->created_at?->toDateTimeString(),
         ];
@@ -388,5 +396,34 @@ class FeedController extends Controller
                 'name' => $site->name,
             ])
             ->all();
+    }
+
+    /**
+     * The site ids the viewer belongs to (primary + secondary) — used to scope
+     * which site-targeted posts they see. Empty when they have no profile.
+     *
+     * @return array<int, int>
+     */
+    private function viewerSiteIds(int $tenantId, int $userId): array
+    {
+        $profile = HrEmployeeProfile::forTenant($tenantId)
+            ->where('user_id', $userId)
+            ->first(['primary_site_id', 'secondary_site_ids']);
+
+        if (! $profile) {
+            return [];
+        }
+
+        $ids = [];
+        if ($profile->primary_site_id) {
+            $ids[] = (int) $profile->primary_site_id;
+        }
+        foreach ((array) $profile->secondary_site_ids as $siteId) {
+            if (is_numeric($siteId)) {
+                $ids[] = (int) $siteId;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 }

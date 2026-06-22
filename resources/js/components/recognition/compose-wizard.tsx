@@ -19,6 +19,7 @@ import {
     Field,
     ReviewCard,
     ReviewRow,
+    Segmented,
     StepHead,
     TilePicker,
     useWizard,
@@ -28,6 +29,8 @@ import {
     type IconType,
     type WizardStep,
 } from '@/components/hr/wizard';
+
+const ALL_SITES = 'all';
 
 const STEPS: readonly WizardStep[] = [
     { key: 'type', label: 'Type', blurb: 'What kind of update', icon: MessageSquarePlus },
@@ -59,13 +62,17 @@ export function ComposeWizard({
     open,
     onClose,
     onSuccess,
+    sites = [],
 }: {
     open: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    sites?: Array<{ id: number; name: string }>;
 }) {
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
+    // Single audience token: 'all' or a site id (string).
+    const [audience, setAudience] = useState<string>(ALL_SITES);
     const form = useForm<{
         content: string;
         post_type: string;
@@ -80,10 +87,19 @@ export function ComposeWizard({
     const { setData, reset, clearErrors } = form;
     const kind = form.data.kind;
 
+    const audienceOptions = useMemo(
+        () => [
+            { value: ALL_SITES, label: 'All sites' },
+            ...sites.map((s) => ({ value: String(s.id), label: s.name })),
+        ],
+        [sites],
+    );
+
     useEffect(() => {
         if (!open) return;
         reset();
         clearErrors();
+        setAudience(ALL_SITES);
         setDone(false);
         wizard.goTo(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,6 +125,12 @@ export function ComposeWizard({
     };
 
     const submit = () => {
+        const isAll = audience === ALL_SITES;
+        form.transform((data) => ({
+            ...data,
+            target_audience: isAll ? 'all' : 'site',
+            target_value: isAll ? null : audience,
+        }));
         form.post('/hr/feed', {
             preserveScroll: true,
             onSuccess: () => {
@@ -256,6 +278,11 @@ export function ComposeWizard({
                             />
                         )}
                     </Field>
+                    {sites.length > 0 ? (
+                        <Field label="Audience" hint="Who sees this — the whole org or a single site.">
+                            <Segmented value={audience} onChange={setAudience} options={audienceOptions} />
+                        </Field>
+                    ) : null}
                 </WizardStepPane>
             )}
 
@@ -270,6 +297,10 @@ export function ComposeWizard({
                         <ReviewRow label="Type" value={kindLabel} />
                         <ReviewRow label="Message" value={form.data.content} />
                         <ReviewRow label="Photo" value={form.data.attachment?.name} />
+                        <ReviewRow
+                            label="Audience"
+                            value={audienceOptions.find((o) => o.value === audience)?.label}
+                        />
                     </ReviewCard>
                 </WizardStepPane>
             )}

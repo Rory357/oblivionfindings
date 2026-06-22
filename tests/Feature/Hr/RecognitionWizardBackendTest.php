@@ -384,3 +384,32 @@ test('the wall search filters posts server-side', function () {
             ->where('filters.search', 'zebra')
             ->has('posts.data', 1));
 });
+
+test('a site-scoped post is hidden from viewers outside that site', function () {
+    $siteA = \App\Models\Site::factory()->create(['tenant_id' => 1]);
+    $siteB = \App\Models\Site::factory()->create(['tenant_id' => 1]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'tenant_id' => 1,
+        'is_active' => true,
+        'primary_site_id' => $siteA->id,
+    ]);
+
+    // r1 (not the viewer) posts one update to site B, then one to site A.
+    HrFeedPost::create([
+        'tenant_id' => 1, 'user_id' => $this->r1->id, 'post_type' => 'update',
+        'target_audience' => 'site', 'target_value' => (string) $siteB->id, 'content' => 'Site B only update',
+    ]);
+    HrFeedPost::create([
+        'tenant_id' => 1, 'user_id' => $this->r1->id, 'post_type' => 'update',
+        'target_audience' => 'site', 'target_value' => (string) $siteA->id, 'content' => 'Site A only update',
+    ]);
+
+    // The viewer is in site A, so only the site-A post is visible.
+    $this->actingAs($this->hr)
+        ->get('/hr/feed')
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/feed/index')
+            ->has('posts.data', 1)
+            ->where('posts.data.0.content', 'Site A only update'));
+});

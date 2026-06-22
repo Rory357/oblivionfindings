@@ -17,6 +17,8 @@ class HrFeedPost extends Model
         'user_id',
         'post_type',
         'kind',
+        'target_audience',
+        'target_value',
         'content',
         'is_pinned',
     ];
