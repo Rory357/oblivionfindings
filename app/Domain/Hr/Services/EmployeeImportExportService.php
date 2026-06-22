@@ -28,11 +28,19 @@ class EmployeeImportExportService
     /**
      * Export all active employees to CSV string.
      */
-    public function exportToCsv(?int $tenantId): string
+    /**
+     * Export employees to CSV. With no $userIds, exports all active employees;
+     * with $userIds (the People table's multi-select), exports exactly those
+     * people regardless of active state — "export selected".
+     *
+     * @param  array<int, int>|null  $userIds
+     */
+    public function exportToCsv(?int $tenantId, ?array $userIds = null): string
     {
         $profiles = HrEmployeeProfile::with('user')
             ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
+            ->when($userIds === null, fn ($q) => $q->where('is_active', true))
+            ->when($userIds !== null, fn ($q) => $q->whereIn('user_id', $userIds))
             ->orderBy('employee_number')
             ->get();
 

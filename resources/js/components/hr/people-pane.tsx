@@ -9,6 +9,7 @@ import {
     Building2,
     ChevronsUpDown,
     Columns3,
+    Download,
     Eye,
     MapPin,
     MoreHorizontal,
@@ -322,6 +323,34 @@ export function PeoplePane({
                 onSuccess: () => setSelected(new Set()),
             },
         );
+    };
+
+    // Export the selected rows as CSV. A file download can't go through Inertia,
+    // so submit a native hidden form (carrying the ids[] + CSRF token) that the
+    // browser handles as a download.
+    const exportSelected = () => {
+        const token =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+                ?.content ?? '';
+        const form = document.createElement('form');
+        form.action = '/hr/import-export/export';
+        form.method = 'POST';
+        form.style.display = 'none';
+
+        const addField = (name: string, value: string) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        };
+
+        addField('_token', token);
+        Array.from(selected).forEach((id) => addField('ids[]', String(id)));
+
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
     };
 
     const rowItems = (row: PeopleRow): ShiftCtxItem[] => {
@@ -639,6 +668,12 @@ export function PeoplePane({
                                 manager_user_id: id,
                             })
                         }
+                    />
+                    <span className="h-5 w-px bg-primary-foreground/25" />
+                    <BulkButton
+                        icon={Download}
+                        label="Export"
+                        onClick={exportSelected}
                     />
                     <button
                         type="button"

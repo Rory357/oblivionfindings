@@ -17,7 +17,9 @@ test('people index export button submits to the existing exporter', function () 
     expect($source)->toContain('function submitExport')
         ->and($source)->toContain("form.action = '/hr/import-export/export'")
         ->and($source)->toContain("form.method = 'POST'")
-        ->and($source)->toContain('onClick={submitExport}');
+        // Phase-1 redesign: the export action moved into PeopleHero's quick-action
+        // (passed as onExport) rather than a bare onClick button.
+        ->and($source)->toContain('onExport: can.manage ? submitExport');
 });
 
 test('employee export endpoint downloads a csv for people managers', function () {
@@ -52,4 +54,61 @@ test('employee export endpoint downloads a csv for people managers', function ()
 
     expect($response->streamedContent())->toContain('employee_number,name,email')
         ->and($response->streamedContent())->toContain('EMP-100,"Aroha Worker",aroha.worker@example.test');
+});
+
+test('the people table bulk bar wires an export-selected action', function () {
+    $source = file_get_contents(resource_path('js/components/hr/people-pane.tsx'));
+
+    expect($source)->toContain('const exportSelected')
+        ->and($source)->toContain("form.action = '/hr/import-export/export'")
+        ->and($source)->toContain("addField('ids[]', String(id))")
+        ->and($source)->toContain('onClick={exportSelected}');
+});
+
+test('export with selected ids returns only those people (incl. inactive)', function () {
+    $manager = User::factory()->create(['approved_at' => now()]);
+    $manager->roles()->sync([Role::where('name', 'hr')->firstOrFail()->id]);
+
+    $selected = User::factory()->create([
+        'name' => 'Selected One',
+        'email' => 'sel.one@example.test',
+        'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'tenant_id' => 1,
+        'user_id' => $selected->id,
+        'employee_number' => 'EMP-SEL',
+        'work_email' => 'sel.one@example.test',
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'start_date' => '2026-01-01',
+        'created_by' => $manager->id,
+        'is_active' => false, // inactive — must still export when explicitly selected
+    ]);
+
+    $other = User::factory()->create([
+        'name' => 'Other Two',
+        'email' => 'other.two@example.test',
+        'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'tenant_id' => 1,
+        'user_id' => $other->id,
+        'employee_number' => 'EMP-OTH',
+        'work_email' => 'other.two@example.test',
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'start_date' => '2026-01-01',
+        'created_by' => $manager->id,
+        'is_active' => true,
+    ]);
+
+    $response = $this->actingAs($manager)
+        ->post('/hr/import-export/export', ['ids' => [$selected->id]]);
+
+    $response->assertOk();
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('EMP-SEL')      // selected (despite inactive)
+        ->and($content)->not->toContain('EMP-OTH'); // not selected
 });
