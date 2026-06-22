@@ -111,3 +111,9 @@ per-row actions; footer deep-links.
 - 2026-06-22: Phase 2 complete (2a backend `b2e939b9`, 2b wizard `1aeac54f`). **Merged Phase 1-starfix
   + Phase 2 → origin/main** (FF `208532d3..1aeac54f`) → deploy triggered. Pending: Chrome-verify the
   5-step Add-Employee wizard + end-to-end create on .com. Next: Phase 3 (positions automation).
+- 2026-06-22: Phase 2 re-verified LIVE (create 200 → /hr/people/45) after an intake 500 fix
+  (`76e5850b`: side-effects best-effort post-commit). Phase 3 core complete (3a `9093ec75`,
+  3b `a8d44027`, 3c `e0349eda`); **merged → origin/main** via reconcile-merge `6ad28387` (a concurrent
+  /hr/feed recognition redesign had pushed 10 commits; auto-merged clean). Merged tree tsc/build green
+  → deploy triggered. Pending: Chrome-verify understaffed surfacing + New-Position JD/auto-req. 3d
+  deferred. Next phase: Departments (Phase 4).
