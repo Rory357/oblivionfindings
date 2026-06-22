@@ -13,6 +13,7 @@ class HrDepartment extends Model
         'tenant_id',
         'name',
         'code',
+        'cost_centre',
         'description',
         'manager_user_id',
         'parent_id',
@@ -56,5 +57,75 @@ class HrDepartment extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(HrEmployeeProfile::class, 'department_id');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Hierarchy helpers (cycle-safe)                                     */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * IDs of all descendant departments (excludes self). Iterative with a
+     * visited-set so a pre-existing bad cycle can never infinite-loop.
+     *
+     * @return array<int, int>
+     */
+    public function descendantIds(): array
+    {
+        $ids = [];
+        $visited = [$this->id => true];
+        $stack = static::query()->where('parent_id', $this->id)->pluck('id')->all();
+
+        while ($stack !== []) {
+            $id = (int) array_pop($stack);
+            if (isset($visited[$id])) {
+                continue;
+            }
+            $visited[$id] = true;
+            $ids[] = $id;
+            foreach (static::query()->where('parent_id', $id)->pluck('id')->all() as $childId) {
+                $stack[] = (int) $childId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /** Active employees in this department and all its sub-departments. */
+    public function rolledUpEmployeeCount(): int
+    {
+        return HrEmployeeProfile::query()
+            ->whereIn('department_id', array_merge([$this->id], $this->descendantIds()))
+            ->where('is_active', true)
+            ->count();
+    }
+
+    /**
+     * Would setting this department's parent to $parentId create a cycle?
+     * Walks the proposed parent's ancestor chain (visited-set guarded).
+     */
+    public function wouldCreateCycle(?int $parentId): bool
+    {
+        if ($parentId === null) {
+            return false;
+        }
+        if ($parentId === $this->id) {
+            return true;
+        }
+
+        $seen = [];
+        $cursor = $parentId;
+        while ($cursor !== null) {
+            if ($cursor === $this->id) {
+                return true;
+            }
+            if (isset($seen[$cursor])) {
+                break; // pre-existing cycle in the data — stop, no new cycle from us
+            }
+            $seen[$cursor] = true;
+            $next = static::query()->where('id', $cursor)->value('parent_id');
+            $cursor = $next !== null ? (int) $next : null;
+        }
+
+        return false;
     }
 }

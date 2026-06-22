@@ -87,9 +87,19 @@ Audit: `docs/positions-recruitment-audit.md` (signed off — autonomous).
 - [ ] 3d — loop-close: auto-close/prompt linked requisition when filled; events. **(deferred — small;
       may fold into a later pass. Core automation 3a-3c covers the brief's primary loop.)**
 
-### Phase 4 — Departments feature-complete (audit-first)  ⬜ NOT STARTED
-`docs/departments-audit.md` → cost_centre (+ site link?); cycle-safe parent (store+update);
-New/Edit/View Department wizard; headcount roll-up incl children; deactivate/delete semantics.
+### Phase 4 — Departments feature-complete (audit-first)  🔄 IN PROGRESS
+Audit: `docs/departments-audit.md` (signed off — autonomous; cost_centre=string, sites deferred).
+- [x] 4a (backend) — migration `2026_06_22_000003` (`hr_departments.cost_centre`); model
+      `cost_centre` fillable + cycle-safe `descendantIds()` / `rolledUpEmployeeCount()` /
+      `wouldCreateCycle()`; controller: cost_centre in store/update, **cycle-safe parent on update**
+      (rejects self/descendant), **reparent children → parent on deactivate** (no dangling), new
+      **`show()` JSON** (head/parent/children/direct+rolled-up headcount/linked positions by name),
+      tenant via `resolveHrTenantIdForUser`. New `GET /hr/departments/{department}` (departments.show).
+      Migration ran clean; tinker proved descendantIds + cycle checks. `DepartmentFeatureTest` (cycle,
+      reparent, block-on-employees, show roll-up, cost_centre). php -l clean.
+- [ ] 4b (frontend) — DepartmentDialog → WizardShell (Details[name/code/cost_centre/description] →
+      Structure[parent/head/sort/status] → Review); Department **View modal** (fetches show JSON);
+      departments-pane row→View + cost-centre column.
 
 ### Phase 5 — Org chart view + builder modal (research-first)  ⬜ NOT STARTED
 `docs/org-chart-research.md` → rebuild `org-chart-pane.tsx` to connected top-down tree (colour-coded

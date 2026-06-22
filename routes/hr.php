@@ -1010,6 +1010,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.settings.manage|hr.employees.manage')->group(function () {
         Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::get('/departments/{department}', [DepartmentController::class, 'show'])->name('departments.show');
         Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
         Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
         Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
