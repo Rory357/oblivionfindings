@@ -7,3 +7,4 @@ export type { RecognitionPerson, RecognitionDefaults } from './recognition-wizar
 export { ComposeWizard } from './compose-wizard';
 export { AnnounceWizard } from './announce-wizard';
 export type { AnnouncementSite } from './announce-wizard';
+export { RecognitionInsightsDialog } from './recognition-insights-dialog';

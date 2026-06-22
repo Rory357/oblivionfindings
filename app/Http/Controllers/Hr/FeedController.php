@@ -39,6 +39,7 @@ class FeedController extends Controller
             'posts' => $posts,
             'announcements' => $this->feedService->getFeedAnnouncements($tenantId, $user->id),
             'metrics' => $this->feedService->getMetrics($tenantId),
+            'valueBreakdown' => $this->feedService->getValueBreakdown($tenantId),
             'milestones' => $this->feedService->getMilestones($tenantId),
             'leaderboard' => $this->feedService->getKudosLeaderboard($tenantId),
             'filters' => [

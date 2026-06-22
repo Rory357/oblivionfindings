@@ -112,8 +112,11 @@ Worktree: `.claude/worktrees/nervous-rubin-e1cc1e` · branch `claude/nervous-rub
 - [x] Retired `recognition-dialog.tsx` + `my-hr-kudos-wizard.tsx` (deleted; barrel
       export removed; no remaining references). tsc 0 · eslint 0 · php -l 0.
 
-### Phase 5 — Insights
-- [ ] "View insights" → modal (participation, top values, kudos trend, leaderboard).
+### Phase 5 — Insights ✅ (commit pending)
+- [x] `RecognitionInsightsDialog` (read-only modal): 4 KPIs + most-recognised-values
+      bars + leaderboard. `FeedService::getValueBreakdown` + `valueBreakdown` prop.
+- [x] Hero "View insights" opens the modal (was `/hr/analytics` — which 403s for
+      feed-viewers without `hr.analytics.view`; modal needs no extra permission).
 
 ### Phase 6 — Verify
 - [x] tsc 0 (vs baseline) · eslint 0 · vite build 0 · `php -l` clean (all phases).

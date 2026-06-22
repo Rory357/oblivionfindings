@@ -407,6 +407,31 @@ class FeedService
             ]);
     }
 
+    /**
+     * Most-recognised values this month — every category with its kudos count,
+     * highest first. Powers the "Recognition insights" modal.
+     *
+     * @return array<int, array{key:string, label:string, count:int}>
+     */
+    public function getValueBreakdown(?int $tenantId): array
+    {
+        $counts = HrKudos::forTenant($tenantId)
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->select('category', DB::raw('COUNT(*) as total'))
+            ->groupBy('category')
+            ->pluck('total', 'category');
+
+        return collect(self::KUDOS_CATEGORIES)
+            ->map(fn (string $label, string $key) => [
+                'key' => $key,
+                'label' => $label,
+                'count' => (int) ($counts[$key] ?? 0),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
     private function normaliseImpact(?string $impact): string
     {
         return array_key_exists($impact, self::KUDOS_IMPACTS) ? $impact : self::DEFAULT_IMPACT;

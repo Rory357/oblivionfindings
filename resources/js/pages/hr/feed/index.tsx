@@ -1,6 +1,11 @@
 /* eslint-disable no-restricted-syntax -- The composer bar + filter tabs are
  * bespoke on-page surfaces (raw <button>/<input>) styled with semantic tokens. */
-import { AnnounceWizard, ComposeWizard, RecognitionWizard } from '@/components/recognition';
+import {
+    AnnounceWizard,
+    ComposeWizard,
+    RecognitionInsightsDialog,
+    RecognitionWizard,
+} from '@/components/recognition';
 import { type RecognitionDefaults } from '@/components/recognition/recognition-wizard';
 import { FeedHero, type FeedCelebration, type FeedMetrics } from '@/components/hr/feed-hero';
 import { PageLayout } from '@/components/page';
@@ -39,6 +44,7 @@ type Props = {
         new_hires: Milestone[];
     };
     leaderboard: LeaderboardEntry[];
+    valueBreakdown: Array<{ key: string; label: string; count: number }>;
     filters: { type: string | null };
     kudosCategories: Record<string, string>;
     kudosImpacts: Record<string, string>;
@@ -74,6 +80,7 @@ export default function FeedIndex({
     metrics,
     milestones,
     leaderboard,
+    valueBreakdown,
     filters,
     kudosCategories,
     kudosImpacts,
@@ -85,6 +92,7 @@ export default function FeedIndex({
     const [recogDefaults, setRecogDefaults] = useState<RecognitionDefaults | undefined>(undefined);
     const [composeOpen, setComposeOpen] = useState(false);
     const [announceOpen, setAnnounceOpen] = useState(false);
+    const [insightsOpen, setInsightsOpen] = useState(false);
     const [search, setSearch] = useState('');
 
     const activeTab =
@@ -196,7 +204,7 @@ export default function FeedIndex({
                         onGiveRecognition={() => openRecognition(undefined)}
                         onPostUpdate={() => setComposeOpen(true)}
                         onMakeAnnouncement={() => setAnnounceOpen(true)}
-                        onViewInsights={() => router.visit('/hr/analytics')}
+                        onViewInsights={() => setInsightsOpen(true)}
                         onCongratulate={(c) => congratulate(c.user_id, c.kind)}
                     />
                 }
@@ -325,6 +333,13 @@ export default function FeedIndex({
             />
             <ComposeWizard open={composeOpen} onClose={() => setComposeOpen(false)} />
             <AnnounceWizard open={announceOpen} onClose={() => setAnnounceOpen(false)} sites={sites} />
+            <RecognitionInsightsDialog
+                open={insightsOpen}
+                onClose={() => setInsightsOpen(false)}
+                metrics={metrics}
+                valueBreakdown={valueBreakdown}
+                leaderboard={leaderboard}
+            />
         </AppLayout>
     );
 }

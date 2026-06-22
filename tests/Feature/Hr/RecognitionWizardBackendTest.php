@@ -159,6 +159,7 @@ test('the feed index exposes the recognition payload shape', function () {
             ->has('metrics')
             ->has('announcements')
             ->has('leaderboard')
+            ->has('valueBreakdown')
             ->has('kudosImpacts')
             ->has('sites'));
 });
