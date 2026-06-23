@@ -70,6 +70,14 @@ class HrLeaveRequest extends Model
         return $this->belongsTo(User::class, 'escalated_to');
     }
 
+    /**
+     * The roster-side projection of this request once approved.
+     */
+    public function timeOff(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\StaffTimeOff::class, 'time_off_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

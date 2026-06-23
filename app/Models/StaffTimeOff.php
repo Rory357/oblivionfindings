@@ -12,10 +12,13 @@ class StaffTimeOff extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'tenant_id',
+        'hr_leave_request_id',
         'user_id',
         'starts_at',
         'ends_at',
         'type',
+        'period',
         'label',
         'notes',
         'created_by',
@@ -26,6 +29,10 @@ class StaffTimeOff extends Model
         'ends_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'period' => 'full_day',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -34,5 +41,18 @@ class StaffTimeOff extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The HR leave request this projection was created from (when type === 'leave').
+     */
+    public function leaveRequest()
+    {
+        return $this->belongsTo(\App\Domain\Hr\Models\HrLeaveRequest::class, 'hr_leave_request_id');
+    }
+
+    public function scopeForTenant($query, ?int $tenantId)
+    {
+        return $query->where('tenant_id', $tenantId);
     }
 }

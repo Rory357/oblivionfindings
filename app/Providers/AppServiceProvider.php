@@ -213,6 +213,7 @@ class AppServiceProvider extends ServiceProvider
         EmergencyDrill::observe(EmergencyDrillObserver::class);
         FirstAidRecord::observe(FirstAidObserver::class);
         HrEmployeeProfile::observe(HrEmployeeProfileObserver::class);
+        \App\Domain\Hr\Models\HrLeaveRequest::observe(\App\Observers\HrLeaveRequestObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);

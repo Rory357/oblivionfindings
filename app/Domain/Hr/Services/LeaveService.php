@@ -187,10 +187,13 @@ class LeaveService
             $before = $this->snapshotBalance($balance);
 
             $timeOff = StaffTimeOff::create([
+                'tenant_id' => $request->tenant_id,
+                'hr_leave_request_id' => $request->id,
                 'user_id' => $request->user_id,
                 'type' => $request->leave_type,
                 'starts_at' => $request->starts_at,
                 'ends_at' => $request->ends_at,
+                'period' => $request->period ?: 'full_day',
                 'label' => ucfirst(str_replace('_', ' ', (string) $request->leave_type)),
                 'notes' => $reviewNotes,
                 'created_by' => $reviewer->id,
@@ -384,6 +387,50 @@ class LeaveService
 
             return $request->fresh();
         });
+    }
+
+    /**
+     * Roster → HR (Direction B): a roster manager entering `leave` time off creates a
+     * real, auto-approved HrLeaveRequest so the balance/ledger/tenant are written and the
+     * StaffTimeOff projection is linked — instead of a bare, HR-invisible row.
+     *
+     * `unavailable` / `training` stay roster-only and never reach here.
+     */
+    public function createRosterLeave(User $target, array $data, User $actor): HrLeaveRequest
+    {
+        return DB::transaction(function () use ($target, $data, $actor) {
+            $request = $this->submitRequest($target, [
+                'leave_type' => $data['leave_type'] ?? 'annual',
+                'starts_at' => $data['starts_at'],
+                'ends_at' => $data['ends_at'],
+                'reason' => $data['label'] ?? $data['notes'] ?? 'Entered via roster',
+                'created_by' => $actor->id,
+            ]);
+
+            return $this->approveRequest($request, $actor, $data['notes'] ?? 'Auto-approved — entered via roster.');
+        });
+    }
+
+    /**
+     * HR → roster (Direction A, edit re-sync): keep the StaffTimeOff projection of an
+     * already-approved request faithful when its dates / type / period change. Invoked by
+     * HrLeaveRequestObserver; safe to call directly. (Does not re-run balance math —
+     * hours changes on an approved request remain an explicit cancel + re-request.)
+     */
+    public function syncApprovedProjection(HrLeaveRequest $request): void
+    {
+        if ($request->status !== 'approved' || ! $request->time_off_id) {
+            return;
+        }
+
+        StaffTimeOff::whereKey($request->time_off_id)->update([
+            'tenant_id' => $request->tenant_id,
+            'type' => $request->leave_type,
+            'starts_at' => $request->starts_at,
+            'ends_at' => $request->ends_at,
+            'period' => $request->period ?: 'full_day',
+            'label' => ucfirst(str_replace('_', ' ', (string) $request->leave_type)),
+        ]);
     }
 
     /**
