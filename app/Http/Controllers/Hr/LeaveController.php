@@ -79,28 +79,39 @@ class LeaveController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        // Cross-page, SLA-ordered segmented approvals inbox (handover §3.1).
+        $inboxRaw = $this->leaveService->pendingInbox($tenantId, $user, $canViewAllQueue);
+
+        // Batch-annotate the page rows + every inbox item with roster-conflict / balance
+        // impact in one pass (handover §3.2) — no N+1.
+        $pageModels = collect($requests->items());
+        $inboxModels = collect($inboxRaw)->flatMap(fn ($seg) => $seg['items']);
+        $context = $this->leaveService->annotateRequestsContext(
+            $pageModels->merge($inboxModels)->unique('id')->values()
+        );
+
         // Transform paginated data to match frontend LeaveRequest shape
-        $requests->through(fn ($req) => [
-            'id'          => $req->id,
-            'staff_name'  => $req->user?->name ?? 'Unknown',
-            'staff_id'    => $req->user_id,
-            'leave_type'  => $req->leave_type,
-            'start_date'  => $req->starts_at?->toDateString(),
-            'end_date'    => $req->ends_at?->toDateString(),
-            'hours'       => (float) $req->hours_requested,
-            'status'      => $req->status,
-            'reason'      => $req->reason,
-            'reviewed_by' => $req->reviewer?->name,
-            'approval_due_at' => $req->approval_due_at?->toDateTimeString(),
-            'is_overdue' => $req->status === 'pending' && $req->approval_due_at?->isPast(),
-            'due_within_24h' => $req->status === 'pending' && $req->approval_due_at?->between(now(), now()->copy()->addDay()),
-            ]);
+        $requests->through(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? []));
+
+        $inbox = collect($inboxRaw)->map(fn ($seg) => [
+            'count' => $seg['count'],
+            'items' => $seg['items']->map(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? []))->values(),
+        ])->all();
 
         $sla = $this->leaveService->approvalSlaSummary(
             tenantId: $tenantId,
             viewerUserId: $user->id,
             canManage: $canViewAllQueue,
         );
+
+        // Calendar feed is built only when the Calendar tab is active (lazy, per §6.3).
+        $calendar = $request->query('tab') === 'calendar'
+            ? $this->leaveService->calendarFeed(
+                $tenantId,
+                (string) $request->query('month', now()->format('Y-m')),
+                ['site_id' => $request->query('site_id')],
+            )
+            : null;
 
         $pendingAging = HrLeaveRequest::forTenant($tenantId)
             ->where('status', 'pending')
@@ -232,6 +243,8 @@ class LeaveController extends Controller
                 'sla' => $slaWindow !== '' ? $slaWindow : null,
             ],
             'sla' => $sla,
+            'inbox' => $inbox,
+            'calendar' => $calendar,
             'pendingAging' => $pendingAging,
             'dashboardData' => [
                 'monthlyTrend' => $monthlyTrend,
@@ -251,6 +264,43 @@ class LeaveController extends Controller
                 'create'  => $user->canDo('hr.leave.manage'),
             ],
         ]);
+    }
+
+    /**
+     * Shared row shape for the requests list AND the approvals inbox segments,
+     * enriched with the per-request roster-conflict / balance-impact context.
+     *
+     * @param  array{rosterConflict?: array, balanceImpact?: array|null}  $ctx
+     */
+    private function transformLeaveRow(HrLeaveRequest $req, array $ctx): array
+    {
+        $isPending = $req->status === 'pending';
+
+        return [
+            'id'             => $req->id,
+            'staff_name'     => $req->user?->name ?? 'Unknown',
+            'staff_id'       => $req->user_id,
+            'leave_type'     => $req->leave_type,
+            'period'         => $req->period ?: 'full_day',
+            'start_date'     => $req->starts_at?->toDateString(),
+            'end_date'       => $req->ends_at?->toDateString(),
+            'hours'          => (float) $req->hours_requested,
+            'status'         => $req->status,
+            'reason'         => $req->reason,
+            'has_doc'        => ! empty($req->supporting_doc_path),
+            'reviewed_by'    => $req->reviewer?->name,
+            'reviewed_at'    => $req->reviewed_at?->toDateTimeString(),
+            'submitted_at'   => $req->submitted_at?->toDateTimeString(),
+            'hours_waiting'  => $req->submitted_at ? round($req->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
+            'approval_due_at' => $req->approval_due_at?->toDateTimeString(),
+            'is_overdue'     => $isPending && (bool) $req->approval_due_at?->isPast(),
+            'due_within_24h' => $isPending && (bool) $req->approval_due_at?->between(now(), now()->copy()->addDay()),
+            'escalation_level' => (int) ($req->escalation_level ?? 1),
+            'escalated'      => (int) ($req->escalation_level ?? 1) > 1,
+            'escalated_from' => $req->escalatedTo?->name,
+            'roster_conflict' => $ctx['rosterConflict'] ?? ['has_conflict' => false, 'count' => 0, 'shifts' => []],
+            'balance_impact' => $ctx['balanceImpact'] ?? null,
+        ];
     }
 
     /** Staff selectable in the leave-request form (tenant-scoped). */
@@ -328,6 +378,225 @@ class LeaveController extends Controller
                 'manage' => $canManage,
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Preview — read-only computed hours/balance/conflict/approver       */
+    /* ------------------------------------------------------------------ */
+
+    public function previewLeave(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'user_id'    => ['nullable', 'integer', 'exists:users,id'],
+            'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
+            'period'     => ['nullable', Rule::in(['full_day', 'half_day_am', 'half_day_pm'])],
+            'starts_at'  => ['required', 'date'],
+            'ends_at'    => ['required', 'date'],
+        ]);
+
+        $target = $user;
+        if (! empty($validated['user_id']) && (int) $validated['user_id'] !== (int) $user->id) {
+            abort_unless($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage'), 403);
+            $target = User::query()->findOrFail((int) $validated['user_id']);
+        }
+
+        try {
+            $preview = $this->leaveService->previewRequest($target, array_merge($validated, ['tenant_id' => $tenantId]));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json($preview);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Balance adjustment + immutable ledger read                         */
+    /* ------------------------------------------------------------------ */
+
+    public function adjustBalance(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'user_id'    => ['required', 'integer', 'exists:users,id'],
+            'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
+            'year'       => ['nullable', 'integer', 'min:2020', 'max:2100'],
+            'mode'       => ['required', Rule::in(['credit', 'debit', 'set_opening'])],
+            'hours'      => ['required', 'numeric', 'min:0', 'max:9999'],
+            'reason'     => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $target = User::query()->findOrFail((int) $validated['user_id']);
+        $profileTenantId = HrEmployeeProfile::query()->where('user_id', $target->id)->value('tenant_id');
+        if (is_numeric($profileTenantId) && (int) $profileTenantId !== $tenantId) {
+            abort(404);
+        }
+
+        try {
+            $this->leaveService->adjustBalance(
+                target: $target,
+                leaveType: $validated['leave_type'],
+                year: (int) ($validated['year'] ?? now()->year),
+                mode: $validated['mode'],
+                hours: (float) $validated['hours'],
+                reason: $validated['reason'] ?? null,
+                actor: $user,
+                tenantId: $tenantId,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->withErrors(['adjust' => $e->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Balance adjusted — ledger entry recorded.');
+    }
+
+    public function ledger(Request $request, User $user)
+    {
+        $actor = $request->user();
+        abort_unless($actor && $actor->canDo('hr.leave.viewAny'), 403);
+        if (! $actor->canDo('hr.leave.manage') && $user->id !== $actor->id) {
+            abort(403);
+        }
+
+        $year = (int) $request->query('year', now()->year);
+        $leaveType = $request->query('leave_type');
+        $rows = $this->leaveService->balanceLedger($user->id, $leaveType, $year);
+
+        $actorNames = User::query()
+            ->whereIn('id', $rows->pluck('created_by')->filter()->unique()->all())
+            ->pluck('name', 'id');
+
+        return response()->json([
+            'user' => ['id' => $user->id, 'name' => $user->name],
+            'year' => $year,
+            'entries' => $rows->map(fn ($e) => [
+                'id' => $e->id,
+                'leave_type' => $e->leave_type,
+                'entry_type' => $e->entry_type,
+                'hours_delta' => (float) $e->hours_delta,
+                'balance_after' => (float) $e->balance_hours_after,
+                'used_after' => (float) $e->used_hours_after,
+                'pending_after' => (float) $e->pending_hours_after,
+                'notes' => $e->notes,
+                'created_by' => $actorNames[$e->created_by] ?? null,
+                'created_at' => $e->created_at?->toDateTimeString(),
+            ])->values(),
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Export — requests / balances (CSV · Excel-openable · PDF)          */
+    /* ------------------------------------------------------------------ */
+
+    public function export(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $rows = HrLeaveRequest::forTenant($tenantId)
+            ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($request->query('leave_type'), fn ($q, $t) => $q->where('leave_type', $t))
+            ->with(['user:id,name', 'reviewer:id,name'])
+            ->orderByDesc('submitted_at')
+            ->get();
+
+        $headers = ['Staff', 'Leave type', 'Period', 'Start', 'End', 'Hours', 'Status', 'Submitted', 'Reviewed by', 'Reason'];
+        $records = $rows->map(fn (HrLeaveRequest $r) => [
+            $r->user?->name ?? 'Unknown',
+            ucwords(str_replace('_', ' ', (string) $r->leave_type)),
+            str_replace('_', ' ', (string) ($r->period ?: 'full_day')),
+            $r->starts_at?->toDateString(),
+            $r->ends_at?->toDateString(),
+            (float) $r->hours_requested,
+            $r->status,
+            $r->submitted_at?->toDateString(),
+            $r->reviewer?->name,
+            $r->reason,
+        ])->all();
+
+        return $this->streamLeaveExport(
+            (string) $request->query('format', 'csv'),
+            'leave-requests-'.now()->format('Y-m-d'),
+            'Leave requests',
+            $headers,
+            $records,
+        );
+    }
+
+    public function exportBalances(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $year = (int) $request->query('year', now()->year);
+
+        $rows = HrLeaveBalance::query()
+            ->where('tenant_id', $tenantId)
+            ->where('year', $year)
+            ->with('user:id,name')
+            ->orderBy('leave_type')
+            ->get();
+
+        $headers = ['Staff', 'Leave type', 'Year', 'Entitlement', 'Taken', 'Pending', 'Remaining'];
+        $records = $rows->map(fn (HrLeaveBalance $b) => [
+            $b->user?->name ?? 'Unknown',
+            ucwords(str_replace('_', ' ', (string) $b->leave_type)),
+            $b->year,
+            (float) $b->balance_hours,
+            (float) $b->used_hours,
+            (float) $b->pending_hours,
+            round((float) $b->balance_hours - (float) $b->used_hours - (float) $b->pending_hours, 2),
+        ])->all();
+
+        return $this->streamLeaveExport(
+            (string) $request->query('format', 'csv'),
+            'leave-balances-'.$year,
+            "Leave balances {$year}",
+            $headers,
+            $records,
+        );
+    }
+
+    /**
+     * CSV (also opens in Excel) or PDF stream. Free-text cells are neutralised against
+     * spreadsheet formula injection.
+     *
+     * @param  array<int, array<int, mixed>>  $records
+     */
+    private function streamLeaveExport(string $format, string $filename, string $title, array $headers, array $records)
+    {
+        if (strtolower($format) === 'pdf') {
+            $head = collect($headers)->map(fn ($h) => '<th style="text-align:left;border:1px solid #ccc;padding:4px;background:#f3f3f3">'.e($h).'</th>')->implode('');
+            $body = collect($records)->map(fn ($rec) => '<tr>'.collect($rec)->map(fn ($c) => '<td style="border:1px solid #ccc;padding:4px">'.e((string) $c).'</td>')->implode('').'</tr>')->implode('');
+            $html = '<h2 style="font-family:sans-serif">'.e($title).'</h2>'
+                .'<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:11px"><thead><tr>'.$head.'</tr></thead><tbody>'.$body.'</tbody></table>';
+
+            return \Barryvdh\DomPDF\Facade\Pdf::loadHtml($html)->download($filename.'.pdf');
+        }
+
+        return response()->streamDownload(function () use ($headers, $records) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $headers);
+            foreach ($records as $rec) {
+                fputcsv($out, array_map(fn ($c) => $this->csvCell(is_string($c) ? $c : (string) $c), $rec));
+            }
+            fclose($out);
+        }, $filename.'.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    /** Neutralise spreadsheet formula injection (=,+,-,@,tab,CR) in a free-text CSV cell. */
+    private function csvCell(?string $value): string
+    {
+        $v = (string) $value;
+
+        return $v !== '' && in_array($v[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$v : $v;
     }
 
     /* ------------------------------------------------------------------ */

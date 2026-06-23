@@ -83,6 +83,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/', [MyHrController::class, 'index'])->name('index');
         Route::get('/calendar', [MyHrController::class, 'calendar'])->name('calendar');
         Route::get('/leave', [MyHrController::class, 'leave'])->name('leave');
+        Route::get('/leave/preview', [MyHrController::class, 'previewLeave'])->name('leave.preview');
         Route::post('/leave', [MyHrController::class, 'submitLeave'])->name('leave.store');
         Route::delete('/leave/{leaveRequest}', [MyHrController::class, 'cancelLeave'])->name('leave.cancel');
         Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
@@ -297,13 +298,19 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.leave.viewAny')->group(function () {
         Route::get('/leave', [LeaveController::class, 'index'])->name('leave.index');
+        Route::get('/leave/preview', [LeaveController::class, 'previewLeave'])->name('leave.preview');
         Route::get('/leave/balances', [LeaveController::class, 'balances'])->name('leave.balances');
+        Route::get('/leave/balances/{user}/ledger', [LeaveController::class, 'ledger'])->name('leave.balances.ledger');
         Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
         Route::get('/leave/holidays', [PublicHolidayController::class, 'index'])->name('leave.holidays.index');
 
         Route::middleware('permission:hr.leave.manage')->group(function () {
             Route::get('/leave/create', [LeaveController::class, 'create'])->name('leave.create');
             Route::post('/leave', [LeaveController::class, 'store'])->name('leave.store');
+            Route::post('/leave/balances/adjust', [LeaveController::class, 'adjustBalance'])->name('leave.balances.adjust');
+            Route::get('/leave/export', [LeaveController::class, 'export'])->name('leave.export');
+            Route::get('/leave/balances/export', [LeaveController::class, 'exportBalances'])->name('leave.balances.export');
+            Route::get('/leave/reports/export', [LeaveReportController::class, 'export'])->name('leave.reports.export');
             Route::post('/leave/holidays', [PublicHolidayController::class, 'store'])->name('leave.holidays.store');
             Route::put('/leave/holidays/{holiday}', [PublicHolidayController::class, 'update'])->name('leave.holidays.update');
             Route::delete('/leave/holidays/{holiday}', [PublicHolidayController::class, 'destroy'])->name('leave.holidays.destroy');

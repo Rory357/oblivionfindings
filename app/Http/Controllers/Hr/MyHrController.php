@@ -366,12 +366,18 @@ class MyHrController extends Controller
 
         $validated = $request->validate([
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
+            'period' => ['nullable', Rule::in(['full_day', 'half_day_am', 'half_day_pm'])],
             'starts_at' => ['required', 'date', 'after_or_equal:today'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
             'hours_requested' => ['nullable', 'numeric', 'min:0.5', 'max:999'],
             'reason' => ['nullable', 'string', 'max:2000'],
             'supporting_doc' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
         ]);
+
+        if (in_array($validated['period'] ?? null, ['half_day_am', 'half_day_pm'], true)
+            && $validated['starts_at'] !== $validated['ends_at']) {
+            return redirect()->back()->with('error', 'A half-day can only be requested for a single day.');
+        }
 
         $data = $validated;
 
@@ -387,6 +393,29 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Leave request submitted.');
+    }
+
+    /**
+     * Read-only preview for the self-service request modal review step (handover §5.3).
+     */
+    public function previewLeave(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
+            'period' => ['nullable', Rule::in(['full_day', 'half_day_am', 'half_day_pm'])],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date'],
+        ]);
+
+        try {
+            $preview = $this->leaveService->previewRequest($user, $validated);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json($preview);
     }
 
     public function expenses(Request $request)

@@ -36,26 +36,26 @@
 - [x] 2.1 Migration `2026_06_24_000001` (M1 tenant_id + M2 hr_leave_request_id FK + M3 time_off_id→FK + M4 period) with backfill (orphans nulled before FK add); `StaffTimeOff` fillable+`leaveRequest()`+`scopeForTenant`+period default; `HrLeaveRequest::timeOff()`; `approveRequest` stamps tenant_id+hr_leave_request_id+period
 - [x] 2.2 `HrLeaveRequestObserver` (edit re-sync of approved→projection via `LeaveService::syncApprovedProjection`); roster `StaffTimeOffController::store(type=leave)` → `LeaveService::createRosterLeave` (auto-approved, reserves balance, visible to HR); `unavailable`/`training` tenant-stamped; `destroy()` of a linked projection blocked. Test: `tests/Feature/Hr/LeaveProjectionSyncTest.php`
 
-### PHASE 3 — Inbox query + conflict/balance payload ⬜
-- [ ] 3.1 `LeaveService::pendingInbox()` — cross-page, SLA-ordered, 4 segments (Awaiting my decision / Escalated to me / All pending / Recently decided); `inbox` prop
-- [ ] 3.2 Per-request `rosterConflict` + `balanceImpact` in list payload (batch-loaded, no N+1)
+### PHASE 3 — Inbox query + conflict/balance payload ✅ DONE (3 Pest green, 46 assert)
+- [x] 3.1 `LeaveService::pendingInbox()` — cross-page, SLA-ordered, 4 segments; `inbox` prop. Verified bulk-select sees all 22 pending, not just page 1.
+- [x] 3.2 `annotateRequestsContext()` batch (no N+1) → per-request `roster_conflict` + `balance_impact`; shared `transformLeaveRow()`. Test: `LeaveInboxTest.php`
 
-### PHASE 4 — PH-aware hours + part-day [M4] ⬜
-- [ ] 4.1 `calculateRequestedHours` skips `HrPublicHoliday` (tenant+region) via `PublicHolidayCalendar`
-- [ ] 4.2 Wire `period` (half_day_am/pm) through request rules → hours calc → projection (M4) → calendar
+### PHASE 4 — PH-aware hours + part-day [M4] ✅ DONE (3 Pest green)
+- [x] 4.1 `calculateRequestedHours` injects `PublicHolidayCalendar`, skips stat days (national default, region-aware)
+- [x] 4.2 `period` wired through form rules (+multi-day half-day rejection) → submitRequest → hours calc → projection. Test: `LeaveHoursCalculationTest.php`
 
-### PHASE 5 — Shared modal consolidation + self-service preview ⬜
-- [ ] 5.1 Add `mode='self'|'manager'` to `LeaveRequestDialog`; replace both `MyHrLeaveWizard` mounts; delete `my-hr-leave-wizard.tsx`
-- [ ] 5.2 Enrich modal: PH-aware computed hours, part-day, insufficient soft-warn, shift-conflict, approver+SLA (server preview, no days×8)
-- [ ] 5.3 `LeaveService::previewRequest()` + `GET /hr/my/leave/preview` → `MyHrController::previewLeave`
+### PHASE 5 — Shared modal consolidation + self-service preview ◐ (5.3 backend done; 5.1/5.2 frontend pending)
+- [ ] 5.1 Add `mode='self'|'manager'` to `LeaveRequestDialog`; replace both `MyHrLeaveWizard` mounts; delete `my-hr-leave-wizard.tsx`  ← FRONTEND
+- [ ] 5.2 Enrich modal: PH-aware hours, part-day, insufficient soft-warn, shift-conflict, approver+SLA (server preview)  ← FRONTEND
+- [x] 5.3 `LeaveService::previewRequest()` + `GET /hr/leave/preview` (manager) + `GET /hr/my/leave/preview` (self). Test: `LeaveBalanceAdjustTest.php`
 
-### PHASE 6 — Adjust/ledger + export + calendar feed + pending signal + collapse reads ⬜
-- [ ] 6.1 `POST /hr/leave/balances/adjust` + `GET /hr/leave/balances/{user}/ledger` (gated manage); `LeaveService::adjustBalance()`
-- [ ] 6.2 Export CSV/Excel(=CSV)/PDF for requests/balances/reports (reuse `streamDownload` + dompdf; CSV-injection guard)
-- [ ] 6.3 On-page Calendar feed (`LeaveService::calendarFeed()`, lazy prop when `?tab=calendar`)
-- [ ] 6.4 Eligibility pending-leave WARNING (`checkPendingLeave`, overrideable) — gated on Phase 2
-- [ ] 6.5 Collapse duplicate eligibility leave reads — GATED on Phase 2 landing (test-first interim)
-- [ ] 6.6 Site-scoped escalation fallback + surface assigned approver
+### PHASE 6 — Adjust/ledger + export + calendar feed + pending signal + collapse reads ◐
+- [x] 6.1 `POST /hr/leave/balances/adjust` (credit/debit/set_opening) + `GET /hr/leave/balances/{user}/ledger`; `LeaveService::adjustBalance()`+`balanceLedger()` (no migration — entry_type is plain string). Test: `LeaveBalanceAdjustTest.php`
+- [x] 6.2 Export CSV/Excel(=CSV)/PDF for requests/balances/reports (streamDownload + dompdf; formula-injection guard). Test: `LeaveExportTest.php`
+- [x] 6.3 On-page Calendar feed (`LeaveService::calendarFeed()` — approved+pending entries, grouped people, PH shading; lazy `calendar` prop only when `?tab=calendar`). Test: `LeaveCalendarFeedTest.php`
+- [ ] 6.4 Eligibility pending-leave WARNING (`checkPendingLeave`, overrideable) — roster subsystem; pending OVERLAY already on roster (`RosteringController`). DEFERRED to post-frontend backend cleanup (low priority, not user-facing leave feature)
+- [ ] 6.5 Collapse duplicate eligibility leave reads — audit says risky; SAFE interim = consistency test only, no read removal. DEFERRED to post-frontend cleanup
+- [x] 6.6 Site-scoped escalation fallback (`getEscalationTarget` prefers same-`primary_site_id` approver, closest role first, before global). Assigned approver already surfaced via 3.1 awaiting-my-decision segment. (Dormant in single-site demo.)
 
 ### PHASE 7 — Frontend hub redesign (5-tab) ⬜
 - [ ] 7.1 Real in-page tabbed hub (Overview/Requests/Approvals/Calendar/Balances/Reports) via `?tab=`; fold balances/reports; keep Holidays behind "More" overflow (NOT delete)

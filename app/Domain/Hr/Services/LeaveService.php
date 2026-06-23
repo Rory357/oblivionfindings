@@ -7,6 +7,8 @@ use App\Domain\Hr\Models\HrLeaveApprovalChain;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveBalanceLedger;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Models\Site;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Models\Shift;
@@ -36,6 +38,10 @@ class LeaveService
         'toil',
         'other',
     ];
+
+    public function __construct(
+        private readonly PublicHolidayCalendar $holidays = new PublicHolidayCalendar,
+    ) {}
 
     /**
      * Submit a leave request with balance validation.
@@ -69,9 +75,12 @@ class LeaveService
             throw new \InvalidArgumentException('Leave end date must be after the start date.');
         }
 
+        $period = $this->normalisePeriod($data['period'] ?? null);
+        $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
+
         $hoursRequested = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
             ? (float) $data['hours_requested']
-            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt);
+            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $tenantId, $period);
 
         if ($hoursRequested <= 0) {
             throw new \InvalidArgumentException('Requested leave hours must be greater than zero.');
@@ -90,9 +99,8 @@ class LeaveService
             throw new \InvalidArgumentException('Leave request overlaps with an existing pending or approved leave request.');
         }
 
-        return DB::transaction(function () use ($user, $data, $leaveType, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
+        return DB::transaction(function () use ($user, $data, $leaveType, $period, $tenantId, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
             $year = $localStartsAt->year;
-            $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
             $balance = $this->ensureBalanceRecord($user, $leaveType, $year, false, $tenantId);
             $before = $this->snapshotBalance($balance);
 
@@ -113,6 +121,7 @@ class LeaveService
                 'tenant_id' => $tenantId,
                 'user_id' => $user->id,
                 'leave_type' => $leaveType,
+                'period' => $period,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'hours_requested' => $hoursRequested,
@@ -156,6 +165,76 @@ class LeaveService
 
             return $request->fresh();
         });
+    }
+
+    /**
+     * Read-only preview of a request for the modal review step (handover §5.3) — engine
+     * hours (PH-aware + part-day), balance impact, roster conflict, assigned approver + SLA.
+     * No persistence, no balance creation.
+     *
+     * @return array{hours: float, period: string, available_before: float, projected_remaining: float, insufficient: bool, has_roster_conflict: bool, approver: ?string, approval_due_at: ?string}
+     */
+    public function previewRequest(User $user, array $data): array
+    {
+        $leaveType = strtolower((string) ($data['leave_type'] ?? ''));
+        if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
+            throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
+        }
+
+        try {
+            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+            $localStartsAt = Carbon::parse($data['starts_at'], $timezone)->startOfDay();
+            $localEndsAt = Carbon::parse($data['ends_at'], $timezone)->endOfDay();
+            $startsAt = $localStartsAt->copy()->utc();
+            $endsAt = $localEndsAt->copy()->utc();
+        } catch (\Throwable) {
+            throw new \InvalidArgumentException('Leave dates are invalid.');
+        }
+
+        if ($startsAt->greaterThan($endsAt)) {
+            throw new \InvalidArgumentException('Leave end date must be after the start date.');
+        }
+
+        $period = $this->normalisePeriod($data['period'] ?? null);
+        $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
+
+        $hours = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
+            ? (float) $data['hours_requested']
+            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $tenantId, $period);
+
+        $year = $localStartsAt->year;
+        $balance = HrLeaveBalance::query()
+            ->where('user_id', $user->id)
+            ->where('leave_type', $leaveType)
+            ->where('year', $year)
+            ->first();
+
+        if ($balance) {
+            $availableBefore = $this->calculateAvailableHours(
+                (float) $balance->balance_hours,
+                (float) $balance->used_hours,
+                (float) $balance->pending_hours,
+            );
+            $rawAfter = round((float) $balance->balance_hours - (float) $balance->used_hours - (float) $balance->pending_hours - $hours, 2);
+        } else {
+            $entitlement = (float) (config('hr.leave.default_entitlements', [])[$leaveType] ?? 0);
+            $availableBefore = $entitlement;
+            $rawAfter = round($entitlement - $hours, 2);
+        }
+
+        $route = $this->resolveApprovalRoute($user, 1);
+        $approver = $route['approver_user_id'] ? User::find($route['approver_user_id']) : null;
+
+        return [
+            'hours' => round($hours, 2),
+            'period' => $period,
+            'available_before' => round((float) $availableBefore, 2),
+            'projected_remaining' => $rawAfter,
+            'insufficient' => $rawAfter < 0,
+            'has_roster_conflict' => $this->hasRosterConflict($user->id, $startsAt, $endsAt),
+            'approver' => $approver?->name,
+            'approval_due_at' => now()->addHours((int) $route['escalation_after_hours'])->toDateTimeString(),
+        ];
     }
 
     /**
@@ -332,6 +411,86 @@ class LeaveService
     }
 
     /**
+     * Manual balance adjustment / opening balance (handover §3.3). Writes an immutable
+     * ledger row so the audit trail stays complete.
+     *
+     * @param  string  $mode  credit | debit | set_opening
+     */
+    public function adjustBalance(
+        User $target,
+        string $leaveType,
+        int $year,
+        string $mode,
+        float $hours,
+        ?string $reason,
+        User $actor,
+        ?int $tenantId = null,
+    ): HrLeaveBalance {
+        $leaveType = strtolower($leaveType);
+        if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
+            throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
+        }
+        if (! in_array($mode, ['credit', 'debit', 'set_opening'], true)) {
+            throw new \InvalidArgumentException("Unsupported adjustment mode '{$mode}'.");
+        }
+        if ($hours < 0) {
+            throw new \InvalidArgumentException('Adjustment hours cannot be negative.');
+        }
+
+        return DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor, $tenantId) {
+            $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true, $tenantId);
+            $before = $this->snapshotBalance($balance);
+
+            $entryType = 'adjustment';
+            if ($mode === 'credit') {
+                $delta = round($hours, 2);
+                $balance->balance_hours = round((float) $balance->balance_hours + $hours, 2);
+                $balance->accrued_hours = round((float) $balance->accrued_hours + $hours, 2);
+            } elseif ($mode === 'debit') {
+                $delta = round(-min($hours, (float) $balance->balance_hours), 2);
+                $balance->balance_hours = round(max((float) $balance->balance_hours - $hours, 0), 2);
+            } else { // set_opening
+                $delta = round($hours - (float) $balance->balance_hours, 2);
+                $balance->balance_hours = round($hours, 2);
+                $balance->accrued_hours = round($hours, 2);
+                $entryType = 'opening';
+            }
+
+            $balance->last_synced_at = now();
+            $balance->updated_by = $actor->id;
+            $balance->save();
+
+            $this->recordBalanceLedger(
+                balance: $balance,
+                before: $before,
+                entryType: $entryType,
+                hoursDelta: $delta,
+                source: null,
+                createdBy: $actor->id,
+                notes: $reason,
+            );
+
+            return $balance->fresh();
+        });
+    }
+
+    /**
+     * Immutable ledger rows for a person's leave balance (handover §3.3 read side).
+     *
+     * @return Collection<int, HrLeaveBalanceLedger>
+     */
+    public function balanceLedger(int $userId, ?string $leaveType, int $year, int $limit = 200): Collection
+    {
+        return HrLeaveBalanceLedger::query()
+            ->where('user_id', $userId)
+            ->where('year', $year)
+            ->when($leaveType, fn ($q) => $q->where('leave_type', $leaveType))
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * Cancel a pending or approved leave request.
      *
      * @param  int  $cancelledBy  User ID
@@ -450,10 +609,37 @@ class LeaveService
             return $chain->delegate_user_id ?: $chain->approver_user_id;
         }
 
+        $approverRoles = ['admin', 'hr', 'provider_manager', 'team_lead'];
+
+        // Prefer an approver who shares the requester's primary site (closest first) before
+        // the global fallback — so a multi-site org routes to local management.
+        $requesterSiteId = HrEmployeeProfile::query()->where('user_id', $user->id)->value('primary_site_id');
+        if ($requesterSiteId) {
+            $sameSiteUserIds = HrEmployeeProfile::query()
+                ->where('primary_site_id', $requesterSiteId)
+                ->where('user_id', '!=', $user->id)
+                ->pluck('user_id');
+
+            if ($sameSiteUserIds->isNotEmpty()) {
+                $sameSite = User::query()
+                    ->whereIn('id', $sameSiteUserIds->all())
+                    ->where(function ($query) use ($approverRoles) {
+                        $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', $approverRoles))
+                            ->orWhereIn('role', $approverRoles);
+                    })
+                    ->orderByRaw("CASE WHEN role = 'team_lead' THEN 0 WHEN role = 'provider_manager' THEN 1 WHEN role = 'hr' THEN 2 ELSE 3 END")
+                    ->first();
+
+                if ($sameSite) {
+                    return $sameSite->id;
+                }
+            }
+        }
+
         $fallback = User::query()
-            ->where(function ($query) {
-                $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', ['admin', 'hr', 'provider_manager', 'team_lead']))
-                    ->orWhereIn('role', ['admin', 'hr', 'provider_manager', 'team_lead']);
+            ->where(function ($query) use ($approverRoles) {
+                $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', $approverRoles))
+                    ->orWhereIn('role', $approverRoles);
             })
             ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'hr' THEN 1 ELSE 2 END")
             ->first();
@@ -592,6 +778,219 @@ class LeaveService
     }
 
     /**
+     * Server-driven, cross-page, SLA-ordered pending approvals queue with segments.
+     * Replaces the page-bound `requests.data.filter(status==='pending')` so a manager's
+     * bulk actions can reach pending requests that aren't on page 1.
+     *
+     * Segments: awaiting_my_decision · escalated_to_me · all_pending · recently_decided.
+     * Each ordered overdue → due-within-24h → oldest. Capped per segment (full count kept).
+     *
+     * @return array<string, array{count: int, items: Collection<int, HrLeaveRequest>}>
+     */
+    public function pendingInbox(?int $tenantId, User $viewer, bool $canManage, int $cap = 200): array
+    {
+        $base = fn () => HrLeaveRequest::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->with(['user:id,name,email', 'reviewer:id,name', 'escalatedTo:id,name']);
+
+        // SLA urgency: nulls last, soonest due first, then oldest submitted.
+        $slaOrder = fn ($q) => $q
+            ->orderByRaw('approval_due_at IS NULL')
+            ->orderBy('approval_due_at')
+            ->orderBy('submitted_at');
+
+        $pendingScope = fn () => $base()->where('status', 'pending')
+            ->when(! $canManage, fn ($q) => $q->where('user_id', $viewer->id));
+
+        $segment = function ($query) use ($slaOrder, $cap): array {
+            $count = (clone $query)->count();
+            $items = $slaOrder($query)->limit($cap)->get();
+
+            return ['count' => $count, 'items' => $items];
+        };
+
+        return [
+            'awaiting_my_decision' => $segment(
+                $pendingScope()->where('escalated_to', $viewer->id)
+            ),
+            'escalated_to_me' => $segment(
+                $pendingScope()->where('escalated_to', $viewer->id)->where('escalation_level', '>', 1)
+            ),
+            'all_pending' => $segment($pendingScope()),
+            'recently_decided' => $segment(
+                $base()->whereIn('status', ['approved', 'declined', 'cancelled'])
+                    ->when(! $canManage, fn ($q) => $q->where('user_id', $viewer->id))
+                    ->whereNotNull('reviewed_at')
+                    ->where('reviewed_at', '>=', now()->subDays(7))
+                    ->reorder()->orderByDesc('reviewed_at')
+            ),
+        ];
+    }
+
+    /**
+     * Batch-compute per-request roster-conflict + balance-impact context for a set of
+     * requests (no N+1). Keyed by request id. Surfaces what the engine already knows so the
+     * inbox/list rows can render conflict + balance badges.
+     *
+     * @param  Collection<int, HrLeaveRequest>  $requests
+     * @return array<int, array{rosterConflict: array, balanceImpact: array|null}>
+     */
+    public function annotateRequestsContext(Collection $requests): array
+    {
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $requests->pluck('user_id')->filter()->unique()->values();
+        if ($userIds->isEmpty()) {
+            return [];
+        }
+
+        $minStart = $requests->min(fn ($r) => $r->starts_at);
+        $maxEnd = $requests->max(fn ($r) => $r->ends_at);
+
+        $shifts = Shift::query()
+            ->whereIn('user_id', $userIds->all())
+            ->whereNotIn('status', ['cancelled'])
+            ->where('starts_at', '<=', $maxEnd)
+            ->where('ends_at', '>=', $minStart)
+            ->with('site:id,name')
+            ->get(['id', 'user_id', 'site_id', 'starts_at', 'ends_at', 'status']);
+
+        $years = $requests->map(fn ($r) => Carbon::parse($r->starts_at)->year)->unique();
+        $balances = HrLeaveBalance::query()
+            ->whereIn('user_id', $userIds->all())
+            ->whereIn('year', $years->all())
+            ->get()
+            ->keyBy(fn (HrLeaveBalance $b) => $b->user_id.'|'.$b->leave_type.'|'.$b->year);
+
+        $out = [];
+        foreach ($requests as $req) {
+            $year = Carbon::parse($req->starts_at)->year;
+
+            $overlapping = $shifts->filter(fn (Shift $s) => $s->user_id === $req->user_id
+                && $s->starts_at <= $req->ends_at
+                && $s->ends_at >= $req->starts_at
+            )->values();
+
+            $conflictShifts = $overlapping->take(3)->map(fn (Shift $s) => [
+                'site_id' => $s->site_id,
+                'site_name' => $s->site?->name,
+                'date' => optional($s->starts_at)->toDateString(),
+                'am_pm' => ($s->starts_at && $s->starts_at->hour < 12) ? 'AM' : 'PM',
+            ])->all();
+
+            $balanceImpact = null;
+            $bal = $balances->get($req->user_id.'|'.$req->leave_type.'|'.$year);
+            $active = in_array($req->status, ['pending', 'approved'], true);
+            if ($bal) {
+                $committed = (float) $bal->used_hours + (float) $bal->pending_hours;
+                $hours = (float) $req->hours_requested;
+                $after = round((float) $bal->balance_hours - $committed, 2);
+                $before = round($after + ($active ? $hours : 0), 2);
+                $balanceImpact = [
+                    'remaining_before' => $before,
+                    'projected_after' => $after,
+                    'insufficient' => $active && $after < 0,
+                ];
+            }
+
+            $out[$req->id] = [
+                'rosterConflict' => [
+                    'has_conflict' => $overlapping->isNotEmpty(),
+                    'count' => $overlapping->count(),
+                    'shifts' => $conflictShifts,
+                ],
+                'balanceImpact' => $balanceImpact,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * On-hub calendar feed (handover §3.5/§6.3): approved (solid) + pending (dashed) leave
+     * overlapping the month, grouped by person, plus public-holiday shading. Built lazily
+     * (only when the Calendar tab is active) to avoid loading it on every hub render.
+     *
+     * @param  array{site_id?: int|string|null}  $filters
+     */
+    public function calendarFeed(?int $tenantId, string $month, array $filters = []): array
+    {
+        try {
+            $start = Carbon::parse($month.'-01')->startOfMonth();
+        } catch (\Throwable) {
+            $start = now()->startOfMonth();
+        }
+        $end = $start->copy()->endOfMonth();
+
+        $requests = HrLeaveRequest::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('status', ['approved', 'pending'])
+            ->where('starts_at', '<=', $end)
+            ->where('ends_at', '>=', $start)
+            ->when(! empty($filters['site_id']), function ($q) use ($filters) {
+                $userIds = HrEmployeeProfile::query()
+                    ->where('primary_site_id', $filters['site_id'])
+                    ->pluck('user_id');
+                $q->whereIn('user_id', $userIds);
+            })
+            ->with(['user:id,name'])
+            ->orderBy('starts_at')
+            ->get();
+
+        $userIds = $requests->pluck('user_id')->filter()->unique();
+        $profiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $userIds->all())
+            ->get(['user_id', 'primary_site_id'])
+            ->keyBy('user_id');
+        $siteNames = Site::query()
+            ->whereIn('id', $profiles->pluck('primary_site_id')->filter()->unique()->all())
+            ->pluck('name', 'id');
+        $siteFor = fn ($userId) => ($sid = $profiles->get($userId)?->primary_site_id) ? ($siteNames[$sid] ?? null) : null;
+
+        $entries = $requests->map(fn (HrLeaveRequest $r) => [
+            'id' => $r->id,
+            'user_id' => $r->user_id,
+            'user_name' => $r->user?->name ?? 'Unknown',
+            'site' => $siteFor($r->user_id),
+            'leave_type' => $r->leave_type,
+            'period' => $r->period ?: 'full_day',
+            'status' => $r->status,
+            'start' => $r->starts_at?->toDateString(),
+            'end' => $r->ends_at?->toDateString(),
+        ])->values();
+
+        $people = $entries->groupBy('user_id')->map(fn ($grp) => [
+            'user_id' => $grp->first()['user_id'],
+            'name' => $grp->first()['user_name'],
+            'site' => $grp->first()['site'],
+        ])->values();
+
+        $holidays = HrPublicHoliday::query()
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->orderBy('date')
+            ->get()
+            ->groupBy(fn (HrPublicHoliday $h) => $h->date->toDateString())
+            ->map(fn ($grp) => [
+                'name' => $grp->first()->name,
+                'is_national' => (bool) $grp->first()->is_national,
+                'region' => $grp->first()->region,
+            ]);
+
+        return [
+            'month' => $start->format('Y-m'),
+            'month_label' => $start->format('F Y'),
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
+            'entries' => $entries,
+            'people' => $people,
+            'public_holidays' => $holidays,
+        ];
+    }
+
+    /**
      * @return array{approver_user_id: int|null, escalation_after_hours: int}
      */
     protected function resolveApprovalRoute(User $user, int $level): array
@@ -717,8 +1116,19 @@ class LeaveService
         return (int) ($fallbackTenantId ?? 1);
     }
 
-    protected function calculateRequestedHours(User $user, Carbon $startsAt, Carbon $endsAt): float
-    {
+    /**
+     * Working hours for a leave range, excluding weekends AND public holidays (a stat day
+     * inside the range is not charged to the balance — Holidays Act 2003). A single-day
+     * request with a half-day period charges half the contracted day.
+     */
+    protected function calculateRequestedHours(
+        User $user,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        ?int $tenantId = null,
+        ?string $period = null,
+        ?string $region = null,
+    ): float {
         $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
             ->first();
@@ -729,13 +1139,23 @@ class LeaveService
         $day = $startsAt->copy()->startOfDay();
         $businessDays = 0;
         while ($day->lessThanOrEqualTo($endsAt)) {
-            if (! $day->isWeekend()) {
+            if (! $day->isWeekend() && ! $this->holidays->isPublicHoliday($day, $tenantId, $region)) {
                 $businessDays++;
             }
             $day->addDay();
         }
 
+        // Part-day only applies to a single charged day (validated upstream).
+        if ($businessDays === 1 && in_array($period, ['half_day_am', 'half_day_pm'], true)) {
+            return round($hoursPerDay / 2, 2);
+        }
+
         return round($businessDays * $hoursPerDay, 2);
+    }
+
+    private function normalisePeriod(?string $period): string
+    {
+        return in_array($period, ['half_day_am', 'half_day_pm'], true) ? $period : 'full_day';
     }
 
     protected function hasRosterConflict(int $userId, Carbon $startsAt, Carbon $endsAt): bool
