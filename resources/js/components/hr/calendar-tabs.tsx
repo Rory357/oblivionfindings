@@ -49,6 +49,7 @@ export function CalendarTabs({ active }: { active: CalendarTab }) {
             }}
             items={items}
             ariaLabel="Calendar views"
+            className="mb-6"
         />
     );
 }

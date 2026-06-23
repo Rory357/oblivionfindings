@@ -60,6 +60,7 @@ export function DocumentsTabs({ active }: { active: DocumentsTab }) {
             }}
             items={items}
             ariaLabel="Documents views"
+            className="mb-6"
         />
     );
 }

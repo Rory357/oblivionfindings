@@ -39,6 +39,7 @@ export function SettingsTabs({ active }: { active: SettingsTab }) {
             }}
             items={ITEMS}
             ariaLabel="Settings views"
+            className="mb-6"
         />
     );
 }

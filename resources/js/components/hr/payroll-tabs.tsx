@@ -50,6 +50,7 @@ export function PayrollTabs({ active }: { active: PayrollTab }) {
             }}
             items={items}
             ariaLabel="Payroll views"
+            className="mb-6"
         />
     );
 }

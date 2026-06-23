@@ -40,6 +40,7 @@ export function RecruitmentTabs({ active }: { active: RecruitmentTab }) {
             }}
             items={ITEMS}
             ariaLabel="Recruitment views"
+            className="mb-6"
         />
     );
 }

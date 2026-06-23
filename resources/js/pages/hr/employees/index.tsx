@@ -366,6 +366,7 @@ export default function EmployeesIndex({
                     onChange={setTab}
                     items={orderedTabs}
                     ariaLabel="People views"
+                    className="mb-6"
                     decorations={tabDecorations}
                     onItemContextMenu={openTabMenu}
                     trailing={

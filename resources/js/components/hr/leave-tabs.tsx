@@ -60,6 +60,7 @@ export function LeaveTabs({ active }: { active: LeaveTab }) {
             }}
             items={items}
             ariaLabel="Leave views"
+            className="mb-6"
         />
     );
 }

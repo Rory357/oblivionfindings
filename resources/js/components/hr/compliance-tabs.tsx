@@ -77,6 +77,7 @@ export function ComplianceTabs({ active }: { active: ComplianceTab }) {
             }}
             items={items}
             ariaLabel="Compliance views"
+            className="mb-6"
         />
     );
 }

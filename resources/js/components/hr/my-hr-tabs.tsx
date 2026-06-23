@@ -99,6 +99,9 @@ export function MyHrTabs({
         return badge ? { ...item, badge } : item;
     });
 
+    // No mb-6 here (unlike the other HR section tab strips): the My HR shell
+    // renders this via PageLayout's `tabs` slot, which already supplies the gap
+    // below the strip. Adding mb-6 would double the spacing.
     return (
         <HrTabs
             value={active}

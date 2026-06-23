@@ -54,6 +54,7 @@ export function OnboardingTabs({ active }: { active: OnboardingTab }) {
             }}
             items={items}
             ariaLabel="Onboarding views"
+            className="mb-6"
         />
     );
 }

@@ -66,6 +66,7 @@ export function ReportsTabs({ active }: { active: ReportsTab }) {
             }}
             items={items}
             ariaLabel="Reports views"
+            className="mb-6"
         />
     );
 }

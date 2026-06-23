@@ -71,6 +71,7 @@ export function CompensationTabs({ active }: { active: CompensationTab }) {
             }}
             items={items}
             ariaLabel="Compensation views"
+            className="mb-6"
         />
     );
 }

@@ -59,6 +59,7 @@ export function PerformanceTabs({ active }: { active: PerformanceTab }) {
             }}
             items={ITEMS}
             ariaLabel="Performance views"
+            className="mb-6"
         />
     );
 }

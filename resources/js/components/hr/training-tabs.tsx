@@ -50,6 +50,7 @@ export function TrainingTabs({ active }: { active: TrainingTab }) {
             }}
             items={items}
             ariaLabel="Training views"
+            className="mb-6"
         />
     );
 }
