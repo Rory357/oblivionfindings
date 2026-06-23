@@ -309,7 +309,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::delete('/leave/holidays/{holiday}', [PublicHolidayController::class, 'destroy'])->name('leave.holidays.destroy');
         });
 
-        Route::middleware('permission:hr.leave.approve')->group(function () {
+        Route::middleware('permission:hr.leave.approve|hr.leave.manage')->group(function () {
             Route::get('/leave/{leaveRequest}', [LeaveController::class, 'show'])->name('leave.show');
             Route::post('/leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
             Route::post('/leave/{leaveRequest}/decline', [LeaveController::class, 'decline'])->name('leave.decline');
