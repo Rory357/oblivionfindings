@@ -236,7 +236,7 @@ export function isIconActive(
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
-            group.items.some((sub) => matchScore(currentUrl, sub.href) > 0),
+            (group?.items ?? []).some((sub) => matchScore(currentUrl, sub.href) > 0),
         );
     }
     return false;
@@ -2444,12 +2444,12 @@ function SubPanel({
 
             {/* Panel groups */}
             <div className="py-2">
-                {groups.map((group) => (
+                {groups.filter(Boolean).map((group) => (
                     <div key={group.label} className="mb-1">
                         <div className="px-4 py-1.5 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
                             {group.label}
                         </div>
-                        {group.items.map((item) => {
+                        {(group.items ?? []).map((item) => {
                             const active = isSubItemActive(
                                 currentUrl,
                                 item.href,
@@ -3045,7 +3045,7 @@ export function AppSidebarMobile({
                                         />
                                     </Button>
                                     {isExpanded &&
-                                        groups?.map((group) => (
+                                        (groups ?? []).filter(Boolean).map((group) => (
                                             <div
                                                 key={group.label}
                                                 className="ml-4"
@@ -3053,7 +3053,7 @@ export function AppSidebarMobile({
                                                 <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
                                                     {group.label}
                                                 </div>
-                                                {group.items.map((sub) => (
+                                                {(group.items ?? []).map((sub) => (
                                                     <Link
                                                         key={resolveUrl(
                                                             sub.href,
@@ -3206,7 +3206,7 @@ export function buildNavSearchCatalog(ctx: {
         if (icon.subPanel) {
             const groups = subPanelMap[icon.id] ?? [];
             for (const group of groups) {
-                for (const sub of group.items) {
+                for (const sub of group?.items ?? []) {
                     const href = resolveUrl(sub.href);
                     const clean = sub.title.includes(' > ')
                         ? (sub.title.split(' > ').pop() ?? sub.title)
