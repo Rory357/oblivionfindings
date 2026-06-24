@@ -38,6 +38,7 @@ import {
 import { LeaveTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -76,20 +77,78 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+type RosterConflict = {
+    has_conflict: boolean;
+    count: number;
+    shifts: Array<{
+        site_id: number | null;
+        site_name: string | null;
+        date: string | null;
+        am_pm: string;
+    }>;
+};
+
+type BalanceImpact = {
+    remaining_before: number;
+    projected_after: number;
+    insufficient: boolean;
+} | null;
+
 type LeaveRequest = {
     id: number;
     staff_name: string;
     staff_id: number;
     leave_type: string;
+    period?: string;
     start_date: string;
     end_date: string;
     hours: number;
     status: 'pending' | 'approved' | 'declined' | 'cancelled';
     reason?: string | null;
+    has_doc?: boolean;
     reviewed_by?: string | null;
+    reviewed_at?: string | null;
+    submitted_at?: string | null;
+    hours_waiting?: number;
     approval_due_at?: string | null;
     is_overdue?: boolean;
     due_within_24h?: boolean;
+    escalation_level?: number;
+    escalated?: boolean;
+    escalated_from?: string | null;
+    roster_conflict?: RosterConflict;
+    balance_impact?: BalanceImpact;
+};
+
+type InboxSegment = { count: number; items: LeaveRequest[] };
+type Inbox = {
+    awaiting_my_decision: InboxSegment;
+    escalated_to_me: InboxSegment;
+    all_pending: InboxSegment;
+    recently_decided: InboxSegment;
+};
+
+type CalendarFeed = {
+    month: string;
+    month_label: string;
+    start: string;
+    end: string;
+    entries: Array<{
+        id: number;
+        user_id: number;
+        user_name: string;
+        site: string | null;
+        leave_type: string;
+        period: string;
+        status: string;
+        start: string;
+        end: string;
+    }>;
+    people: Array<{ user_id: number; name: string; site: string | null }>;
+    public_holidays: Record<
+        string,
+        { name: string; is_national: boolean; region: string | null }
+    >;
 };
 
 type PaginatedRequests = {
@@ -130,6 +189,8 @@ type DashboardData = {
 
 type Props = {
     requests: PaginatedRequests;
+    inbox: Inbox;
+    calendar?: CalendarFeed | null;
     filters: { status?: string; leave_type?: string; sla?: string | null };
     sla: {
         pending_total: number;
@@ -243,8 +304,16 @@ function SlaBadge({ request }: { request: LeaveRequest }) {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
+const INBOX_SEGMENTS: Array<{ key: keyof Inbox; label: string }> = [
+    { key: 'awaiting_my_decision', label: 'Awaiting my decision' },
+    { key: 'escalated_to_me', label: 'Escalated to me' },
+    { key: 'all_pending', label: 'All pending' },
+    { key: 'recently_decided', label: 'Recently decided' },
+];
+
 export default function LeaveIndex({
     requests,
+    inbox,
     filters,
     sla,
     pendingAging,
@@ -254,7 +323,12 @@ export default function LeaveIndex({
     can,
 }: Props) {
     const [requestOpen, setRequestOpen] = useState(false);
-    const pendingRequests = requests.data.filter((r) => r.status === 'pending');
+    const [segment, setSegment] = useState<keyof Inbox>('all_pending');
+    // Cross-page, SLA-ordered pending queue (handover §3.1) — bulk actions can now reach
+    // every pending request, not just page 1.
+    const pendingRequests = inbox.all_pending.items;
+    const segmentItems = inbox[segment].items;
+    const segmentIsPending = segment !== 'recently_decided';
     const allRequests = requests.data;
     const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
     const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
@@ -305,7 +379,7 @@ export default function LeaveIndex({
         );
     }
     function toggleSelectAllPending(checked: boolean) {
-        setSelectedRequestIds(checked ? pendingRequests.map((r) => r.id) : []);
+        setSelectedRequestIds(checked ? segmentItems.map((r) => r.id) : []);
     }
     function handleBulkApprove() {
         if (selectedPendingIds.length > 0) setBulkApproveDialogOpen(true);
@@ -846,44 +920,76 @@ export default function LeaveIndex({
 
                     {/* ===== Requests ===== */}
                     {/* Pending Approval Section */}
-                        {can.approve && pendingRequests.length > 0 && (
+                        {can.approve && (
                             <Card className="border-status-warning/20 bg-status-warning-bg">
-                                <CardHeader>
+                                <CardHeader className="space-y-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <CardTitle className="flex items-center gap-2">
                                             <Clock className="h-5 w-5 text-status-warning" />{' '}
-                                            Pending Approval (
-                                            {pendingRequests.length})
+                                            Approvals
+                                            <span className="text-xs font-normal text-muted-foreground">
+                                                · sorted by SLA urgency
+                                            </span>
                                         </CardTitle>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleBulkApprove}
-                                                disabled={
-                                                    selectedPendingIds.length ===
-                                                        0 || processing
-                                                }
+                                        {segmentIsPending && (
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleBulkApprove}
+                                                    disabled={
+                                                        selectedPendingIds.length ===
+                                                            0 || processing
+                                                    }
+                                                >
+                                                    {processing ? (
+                                                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                                    ) : null}
+                                                    Approve Selected (
+                                                    {selectedPendingIds.length})
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                                                    onClick={handleBulkDecline}
+                                                    disabled={
+                                                        selectedPendingIds.length ===
+                                                            0 || processing
+                                                    }
+                                                >
+                                                    Decline Selected
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {INBOX_SEGMENTS.map((s) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- segment chips are custom-styled selector buttons, not standard form buttons
+                                            <button
+                                                key={s.key}
+                                                type="button"
+                                                onClick={() => setSegment(s.key)}
+                                                className={cn(
+                                                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    segment === s.key
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'bg-card text-muted-foreground hover:bg-muted',
+                                                )}
                                             >
-                                                {processing ? (
-                                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                                ) : null}
-                                                Approve Selected (
-                                                {selectedPendingIds.length})
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                                onClick={handleBulkDecline}
-                                                disabled={
-                                                    selectedPendingIds.length ===
-                                                        0 || processing
-                                                }
-                                            >
-                                                Decline Selected
-                                            </Button>
-                                        </div>
+                                                {s.label}
+                                                <span
+                                                    className={cn(
+                                                        'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
+                                                        segment === s.key
+                                                            ? 'bg-primary-foreground/20'
+                                                            : 'bg-muted',
+                                                    )}
+                                                >
+                                                    {inbox[s.key].count}
+                                                </span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -892,23 +998,25 @@ export default function LeaveIndex({
                                             <thead className="border-b bg-muted/50">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left font-medium">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={
-                                                                pendingRequests.length >
-                                                                    0 &&
-                                                                selectedPendingIds.length ===
-                                                                    pendingRequests.length
-                                                            }
-                                                            onChange={(e) =>
-                                                                toggleSelectAllPending(
-                                                                    e.target
-                                                                        .checked,
-                                                                )
-                                                            }
-                                                            aria-label="Select all pending requests"
-                                                            className="h-4 w-4 rounded"
-                                                        />
+                                                        {segmentIsPending ? (
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={
+                                                                    segmentItems.length >
+                                                                        0 &&
+                                                                    selectedPendingIds.length ===
+                                                                        segmentItems.length
+                                                                }
+                                                                onChange={(e) =>
+                                                                    toggleSelectAllPending(
+                                                                        e.target
+                                                                            .checked,
+                                                                    )
+                                                                }
+                                                                aria-label="Select all pending requests"
+                                                                className="h-4 w-4 rounded"
+                                                            />
+                                                        ) : null}
                                                     </th>
                                                     <th className="px-4 py-3 text-left font-medium">
                                                         Staff
@@ -931,99 +1039,175 @@ export default function LeaveIndex({
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {pendingRequests.map((r) => (
+                                                {segmentItems.length === 0 ? (
+                                                    <tr>
+                                                        <td
+                                                            colSpan={7}
+                                                            className="px-4 py-10 text-center text-sm text-muted-foreground"
+                                                        >
+                                                            Nothing waiting in this view.
+                                                        </td>
+                                                    </tr>
+                                                ) : null}
+                                                {segmentItems.map((r) => (
                                                     <tr
                                                         key={r.id}
                                                         className="border-b last:border-b-0 hover:bg-muted/50"
                                                     >
                                                         <td className="px-4 py-3">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedPendingIds.includes(
-                                                                    r.id,
-                                                                )}
-                                                                onChange={(e) =>
-                                                                    toggleRequestSelection(
+                                                            {segmentIsPending ? (
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedPendingIds.includes(
                                                                         r.id,
-                                                                        e.target
-                                                                            .checked,
-                                                                    )
-                                                                }
-                                                                aria-label={`Select leave request for ${r.staff_name}`}
-                                                                className="h-4 w-4 rounded"
-                                                            />
+                                                                    )}
+                                                                    onChange={(e) =>
+                                                                        toggleRequestSelection(
+                                                                            r.id,
+                                                                            e.target
+                                                                                .checked,
+                                                                        )
+                                                                    }
+                                                                    aria-label={`Select leave request for ${r.staff_name}`}
+                                                                    className="h-4 w-4 rounded"
+                                                                />
+                                                            ) : null}
                                                         </td>
                                                         <td className="px-4 py-3 font-medium">
-                                                            {r.staff_name}
+                                                            <div>{r.staff_name}</div>
+                                                            {r.roster_conflict
+                                                                ?.has_conflict ? (
+                                                                <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-status-warning">
+                                                                    <AlertTriangle className="h-3 w-3" />
+                                                                    Roster conflict
+                                                                    {r.roster_conflict
+                                                                        .shifts[0]
+                                                                        ? ` · ${r.roster_conflict.shifts[0].am_pm} ${r.roster_conflict.shifts[0].site_name ?? ''}`.trim()
+                                                                        : ''}
+                                                                </div>
+                                                            ) : null}
+                                                            {r.escalated ? (
+                                                                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                                                                    Escalated
+                                                                    {r.escalated_from
+                                                                        ? ` from ${r.escalated_from}`
+                                                                        : ''}
+                                                                </div>
+                                                            ) : null}
                                                         </td>
                                                         <td className="px-4 py-3 text-muted-foreground capitalize">
                                                             {r.leave_type.replace(
                                                                 '_',
                                                                 ' ',
                                                             )}
+                                                            {r.has_doc ? (
+                                                                <span className="ml-1 text-[11px]">
+                                                                    📎
+                                                                </span>
+                                                            ) : null}
                                                         </td>
                                                         <td className="px-4 py-3 text-muted-foreground">
                                                             {r.start_date} -{' '}
                                                             {r.end_date}
                                                         </td>
                                                         <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.hours}h
+                                                            <div>{r.hours}h</div>
+                                                            {r.balance_impact ? (
+                                                                <div
+                                                                    className={cn(
+                                                                        'text-[11px]',
+                                                                        r.balance_impact
+                                                                            .insufficient
+                                                                            ? 'font-semibold text-status-critical'
+                                                                            : 'text-muted-foreground',
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        r.balance_impact
+                                                                            .remaining_before
+                                                                    }
+                                                                    h →{' '}
+                                                                    {
+                                                                        r.balance_impact
+                                                                            .projected_after
+                                                                    }
+                                                                    h
+                                                                    {r.balance_impact
+                                                                        .insufficient
+                                                                        ? ' ⚠'
+                                                                        : ''}
+                                                                </div>
+                                                            ) : null}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <SlaBadge
-                                                                request={r}
-                                                            />
+                                                            {segmentIsPending ? (
+                                                                <SlaBadge request={r} />
+                                                            ) : (
+                                                                <StatusBadge
+                                                                    status={r.status}
+                                                                />
+                                                            )}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-1">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-7 border-status-success/30 text-status-success hover:bg-status-success-bg"
-                                                                    onClick={() =>
-                                                                        handleApprove(
-                                                                            r.id,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
-                                                                    Approve
-                                                                </Button>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                                                    onClick={() =>
-                                                                        handleDecline(
-                                                                            r.id,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                                    Decline
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-7"
-                                                                    onClick={() =>
-                                                                        extendSlaByHours(
-                                                                            r.id,
-                                                                            24,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    +24h
-                                                                </Button>
+                                                                {segmentIsPending ? (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-7 border-status-success/30 text-status-success hover:bg-status-success-bg"
+                                                                            onClick={() =>
+                                                                                handleApprove(
+                                                                                    r.id,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                processing
+                                                                            }
+                                                                        >
+                                                                            <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
+                                                                            Approve
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                                                                            onClick={() =>
+                                                                                handleDecline(
+                                                                                    r.id,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                processing
+                                                                            }
+                                                                        >
+                                                                            <XCircle className="mr-1 h-3 w-3" />{' '}
+                                                                            Decline
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-7"
+                                                                            onClick={() =>
+                                                                                extendSlaByHours(
+                                                                                    r.id,
+                                                                                    24,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                processing
+                                                                            }
+                                                                        >
+                                                                            +24h
+                                                                        </Button>
+                                                                    </>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {r.reviewed_by
+                                                                            ? `by ${r.reviewed_by}`
+                                                                            : '—'}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>

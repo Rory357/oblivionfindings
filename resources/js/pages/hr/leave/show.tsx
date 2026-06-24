@@ -1,4 +1,14 @@
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +19,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle, FileText, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface LeaveRequest {
     id: number;
@@ -48,6 +59,10 @@ const statusColors: Record<string, string> = {
 
 export default function ShowLeave({ request, can }: Props) {
     const [reviewNotes, setReviewNotes] = useState('');
+    const [confirmAction, setConfirmAction] = useState<'approve' | 'decline' | null>(
+        null,
+    );
+    const [processing, setProcessing] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
@@ -55,24 +70,30 @@ export default function ShowLeave({ request, can }: Props) {
         { title: `Request #${request.id}`, href: `/hr/leave/${request.id}` },
     ];
 
-    const handleApprove = () => {
-        if (confirm('Approve this leave request?')) {
-            router.post(`/hr/leave/${request.id}/approve`, {
-                review_notes: reviewNotes,
-            });
-        }
-    };
+    const handleApprove = () => setConfirmAction('approve');
 
     const handleDecline = () => {
         if (!reviewNotes.trim()) {
-            alert('Please provide a reason for declining.');
+            toast.error('A reason is required to decline — the staff member will see it.');
             return;
         }
-        if (confirm('Decline this leave request?')) {
-            router.post(`/hr/leave/${request.id}/decline`, {
-                review_notes: reviewNotes,
-            });
-        }
+        setConfirmAction('decline');
+    };
+
+    const runAction = () => {
+        if (!confirmAction) return;
+        setProcessing(true);
+        router.post(
+            `/hr/leave/${request.id}/${confirmAction}`,
+            { review_notes: reviewNotes },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setProcessing(false);
+                    setConfirmAction(null);
+                },
+            },
+        );
     };
 
     return (
@@ -273,6 +294,44 @@ export default function ShowLeave({ request, can }: Props) {
                 )}
                 </div>
             </PageLayout>
+
+            <AlertDialog
+                open={confirmAction !== null}
+                onOpenChange={(o) => !o && setConfirmAction(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {confirmAction === 'approve'
+                                ? 'Approve this leave request?'
+                                : 'Decline this leave request?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {confirmAction === 'approve'
+                                ? 'The balance will be updated and the roster projection synced.'
+                                : 'The staff member will see your reason. This cannot be undone.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={processing}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={runAction}
+                            disabled={processing}
+                            className={
+                                confirmAction === 'decline'
+                                    ? 'bg-status-critical hover:bg-status-critical'
+                                    : undefined
+                            }
+                        >
+                            {processing
+                                ? 'Working…'
+                                : confirmAction === 'approve'
+                                  ? 'Approve'
+                                  : 'Decline request'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

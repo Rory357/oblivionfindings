@@ -44,9 +44,9 @@
 - [x] 4.1 `calculateRequestedHours` injects `PublicHolidayCalendar`, skips stat days (national default, region-aware)
 - [x] 4.2 `period` wired through form rules (+multi-day half-day rejection) → submitRequest → hours calc → projection. Test: `LeaveHoursCalculationTest.php`
 
-### PHASE 5 — Shared modal consolidation + self-service preview ◐ (5.3 backend done; 5.1/5.2 frontend pending)
-- [ ] 5.1 Add `mode='self'|'manager'` to `LeaveRequestDialog`; replace both `MyHrLeaveWizard` mounts; delete `my-hr-leave-wizard.tsx`  ← FRONTEND
-- [ ] 5.2 Enrich modal: PH-aware hours, part-day, insufficient soft-warn, shift-conflict, approver+SLA (server preview)  ← FRONTEND
+### PHASE 5 — Shared modal consolidation + self-service preview ◐
+- [x] 5.2 `LeaveRequestDialog` enriched: `mode='self'|'manager'`, part-day `period` (single-day), server-driven review preview (engine hours, balance before→after, insufficient soft-warn, roster conflict, approver+SLA), confetti on self-submit. tsc clean.
+- [ ] 5.1 Swap both `MyHrLeaveWizard` mounts (`pages/hr/my/index.tsx`, `pages/hr/my/leave.tsx`) to `<LeaveRequestDialog mode="self">` + `MyHrController` ship `leaveTypes` {value,label} + currentUser; delete `my-hr-leave-wizard.tsx` (carry `initial`/duplicate seed)  ← FRONTEND remaining
 - [x] 5.3 `LeaveService::previewRequest()` + `GET /hr/leave/preview` (manager) + `GET /hr/my/leave/preview` (self). Test: `LeaveBalanceAdjustTest.php`
 
 ### PHASE 6 — Adjust/ledger + export + calendar feed + pending signal + collapse reads ◐
@@ -57,18 +57,18 @@
 - [ ] 6.5 Collapse duplicate eligibility leave reads — audit says risky; SAFE interim = consistency test only, no read removal. DEFERRED to post-frontend cleanup
 - [x] 6.6 Site-scoped escalation fallback (`getEscalationTarget` prefers same-`primary_site_id` approver, closest role first, before global). Assigned approver already surfaced via 3.1 awaiting-my-decision segment. (Dormant in single-site demo.)
 
-### PHASE 7 — Frontend hub redesign (5-tab) ⬜
-- [ ] 7.1 Real in-page tabbed hub (Overview/Requests/Approvals/Calendar/Balances/Reports) via `?tab=`; fold balances/reports; keep Holidays behind "More" overflow (NOT delete)
-- [ ] 7.2 Approvals tab: segmented cross-page queue + conflict/balance/SLA badges + bulk bar + right-click ctx menu
+### PHASE 7 — Frontend hub redesign (5-tab) ◐
+- [ ] 7.1 Real in-page tabbed hub (Overview/Requests/Approvals/Calendar/Balances/Reports) via `?tab=`; fold balances/reports; keep Holidays behind "More" overflow (NOT delete)  ← still uses LeaveTabs separate-page nav
+- [x] 7.2 Approvals section rebuilt as the segmented **cross-page** inbox (Awaiting my decision/Escalated to me/All pending/Recently decided) sourced from `inbox` prop — bulk-select now reaches every pending request; per-row roster-conflict + balance-impact (before→after, ⚠ insufficient) + doc 📎 + escalated-from + SLA/status badges + empty states. (right-click ctx menu = follow-up)
 - [ ] 7.3 Calendar tab pane (PH shading, pending dashed bars, site filters, coverage banner, week/day toggle)
-- [ ] 7.4 Balances tab: row → immutable ledger drawer + Adjust button
+- [x] 7.4 Balances: clickable rows → immutable **ledger drawer** (fetches `/balances/{user}/ledger`) + **Adjust / opening balance** modal (credit/debit/set_opening → `/balances/adjust`) + **Export** button. tsc/eslint clean.
 - [ ] 7.5 Reports tab: export split-button, by-site utilisation, relocate type donut
 - [ ] 7.6 Hero quick-actions + "Needs you" chips + on-leave Mix/Rate donut rail (shared `PageHero`)
-- [ ] 7.7 Wizard/modals/confetti/toaster (adjust modal, ledger drawer, ctx menus, confetti on approve)
+- [~] 7.7 Adjust modal + ledger drawer done (in 7.4); ctx menus + confetti-on-approve = follow-up
 
-### PHASE 8 — Replace native dialogs + retire legacy surfaces ⬜
-- [ ] 8.1 Replace `show.tsx` native `confirm()/alert()` with AlertDialog + required-reason Decline dialog
-- [ ] 8.2 Delete dead `create.tsx`; convert Requests "View" → in-hub detail modal (keep `show.tsx` as deep-link fallback)
+### PHASE 8 — Replace native dialogs + retire legacy surfaces ◐
+- [x] 8.1 `show.tsx` native `confirm()/alert()` replaced with an AlertDialog confirm (approve/decline) + toast for the required decline reason. tsc/eslint clean.
+- [ ] 8.2 Delete dead `create.tsx` (route already redirects to hub); convert Requests "View" → in-hub detail modal (keep `show.tsx` as deep-link fallback)
 
 ---
 
