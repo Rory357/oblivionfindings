@@ -6,14 +6,15 @@
 # safe to re-run on every deploy.
 #
 # Steps:
-#   1. composer install --no-dev
-#   2. npm ci && npm run build
-#   3. php artisan migrate --force
-#   4. php artisan storage:link
-#   5. php artisan optimize:clear
-#   6. optional Nominatim install or geocoder health check
-#   7. php artisan queclink:install   (refreshes + restarts listener)
-#   8. php artisan queue:restart
+#   1. git fetch + fast-forward pull from origin/main
+#   2. composer install --no-dev
+#   3. npm ci && npm run build
+#   4. php artisan migrate --force
+#   5. php artisan storage:link
+#   6. php artisan optimize:clear
+#   7. optional Nominatim install or geocoder health check
+#   8. php artisan queclink:install   (refreshes + restarts listener)
+#   9. php artisan queue:restart
 #
 # Requires: bash, php, composer, node + npm, MySQL credentials in .env.
 # If running on a server with sudo available the queclink:install step
@@ -25,12 +26,14 @@ set -euo pipefail
 SKIP_QUECLINK=0
 INSTALL_NOMINATIM=0
 SKIP_NOMINATIM=0
+SKIP_GIT_UPDATE=0
 for arg in "$@"; do
     case "$arg" in
+        --skip-git-update) SKIP_GIT_UPDATE=1 ;;
         --skip-queclink) SKIP_QUECLINK=1 ;;
         --install-nominatim) INSTALL_NOMINATIM=1 ;;
         --skip-nominatim) SKIP_NOMINATIM=1 ;;
-        --help|-h) echo "Usage: $0 [--skip-queclink] [--install-nominatim] [--skip-nominatim]"; exit 0 ;;
+        --help|-h) echo "Usage: $0 [--skip-git-update] [--skip-queclink] [--install-nominatim] [--skip-nominatim]"; exit 0 ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
@@ -49,6 +52,20 @@ run_app() {
         "$@"
     fi
 }
+
+if [ "$SKIP_GIT_UPDATE" -eq 1 ]; then
+    echo "▶ skipping git update (--skip-git-update)"
+elif [ ! -d .git ]; then
+    echo "✗ git update requested, but $(pwd) is not a Git checkout."
+    echo "  Re-run from the app root or pass --skip-git-update for artifact-only deployments."
+    exit 1
+else
+    echo "▶ git fetch --prune origin"
+    run_app git fetch --prune origin
+
+    echo "▶ git pull --ff-only origin main"
+    run_app git pull --ff-only origin main
+fi
 
 echo "▶ composer install"
 run_app composer install --no-dev --optimize-autoloader --no-interaction
