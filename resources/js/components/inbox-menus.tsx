@@ -129,15 +129,18 @@ export default function InboxMenus() {
     const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(null);
 
     const openNotification = useMemo(
-        () => inbox?.notifications.items.find((n) => n.id === openNotifId) ?? null,
-        [inbox?.notifications.items, openNotifId],
+        () => inbox?.notifications?.items?.find((n) => n.id === openNotifId) ?? null,
+        [inbox?.notifications?.items, openNotifId],
     );
     const openAnnouncement = useMemo(
-        () => inbox?.announcements.items.find((a) => a.id === openAnnouncementId) ?? null,
-        [inbox?.announcements.items, openAnnouncementId],
+        () => inbox?.announcements?.items?.find((a) => a.id === openAnnouncementId) ?? null,
+        [inbox?.announcements?.items, openAnnouncementId],
     );
 
-    if (!inbox) return null;
+    // Bail unless this is the real notifications inbox. A page-level `inbox` prop
+    // (e.g. the leave approvals queue) can shadow the global shared one in usePage().props;
+    // treat any unexpected shape as "no inbox" rather than crashing the whole layout.
+    if (!inbox || !inbox.notifications || !inbox.announcements) return null;
 
     const mustAckBeforeClose = !!openNotification?.data?.must_ack_before_close && !!openNotification?.data?.ack_required && !openNotification?.acknowledged_at;
 

@@ -46,7 +46,7 @@ test('the inbox is a cross-page queue: all_pending count reflects the true total
     $response = $this->actingAs($this->hr)->get('/hr/leave');
     $response->assertOk();
 
-    $inbox = $response->inertiaProps('inbox');
+    $inbox = $response->inertiaProps('approvalInbox');
     expect($inbox)->toHaveKeys(['awaiting_my_decision', 'escalated_to_me', 'all_pending', 'recently_decided']);
 
     // The paginated list is page-bound (20), but the inbox sees ALL 22 pending.
@@ -65,7 +65,7 @@ test('inbox rows carry balance_impact with an insufficient flag', function () {
     $req = makePending($this->staff, $this->hr, 3, ['hours_requested' => 32]);
 
     $response = $this->actingAs($this->hr)->get('/hr/leave');
-    $row = collect($response->inertiaProps('inbox.all_pending.items'))->firstWhere('id', $req->id);
+    $row = collect($response->inertiaProps('approvalInbox.all_pending.items'))->firstWhere('id', $req->id);
 
     expect($row['balance_impact'])->not->toBeNull();
     expect($row['balance_impact']['insufficient'])->toBeTrue();
@@ -83,7 +83,7 @@ test('inbox rows surface a roster conflict when an overlapping shift exists', fu
     ]);
 
     $response = $this->actingAs($this->hr)->get('/hr/leave');
-    $row = collect($response->inertiaProps('inbox.all_pending.items'))->firstWhere('id', $req->id);
+    $row = collect($response->inertiaProps('approvalInbox.all_pending.items'))->firstWhere('id', $req->id);
 
     expect($row['roster_conflict']['has_conflict'])->toBeTrue();
     expect($row['roster_conflict']['count'])->toBeGreaterThan(0);

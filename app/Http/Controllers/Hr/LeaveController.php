@@ -243,7 +243,7 @@ class LeaveController extends Controller
                 'sla' => $slaWindow !== '' ? $slaWindow : null,
             ],
             'sla' => $sla,
-            'inbox' => $inbox,
+            'approvalInbox' => $inbox,
             'calendar' => $calendar,
             'pendingAging' => $pendingAging,
             'dashboardData' => [

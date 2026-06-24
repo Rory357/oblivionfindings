@@ -189,7 +189,7 @@ type DashboardData = {
 
 type Props = {
     requests: PaginatedRequests;
-    inbox: Inbox;
+    approvalInbox: Inbox;
     calendar?: CalendarFeed | null;
     filters: { status?: string; leave_type?: string; sla?: string | null };
     sla: {
@@ -313,7 +313,7 @@ const INBOX_SEGMENTS: Array<{ key: keyof Inbox; label: string }> = [
 
 export default function LeaveIndex({
     requests,
-    inbox,
+    approvalInbox: inbox,
     filters,
     sla,
     pendingAging,
