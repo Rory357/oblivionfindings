@@ -10,10 +10,8 @@ use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreLeaveRequestFormRequest;
-use App\Models\Shift;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -118,150 +116,19 @@ class LeaveController extends Controller
             )
             : null;
 
-        $pendingAging = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'pending')
-            ->when(! $canViewAllQueue, fn ($query) => $query->where('user_id', $user->id))
-            ->with('user:id,name')
-            ->orderBy('submitted_at')
-            ->limit(10)
-            ->get()
-            ->map(fn (HrLeaveRequest $req) => [
-                'id' => $req->id,
-                'staff_name' => $req->user?->name ?? 'Unknown',
-                'leave_type' => $req->leave_type,
-                'submitted_at' => optional($req->submitted_at)->toDateTimeString(),
-                'approval_due_at' => optional($req->approval_due_at)->toDateTimeString(),
-                'hours_waiting' => $req->submitted_at ? round($req->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
-            ])
-            ->values();
-
-        // --- Dashboard Analytics ---
-
-        // Monthly leave trend (last 6 months)
-        $monthlyTrend = HrLeaveRequest::forTenant($tenantId)
-            ->where('submitted_at', '>=', now()->subMonths(6)->startOfMonth())
-            ->selectRaw("DATE_FORMAT(submitted_at, '%Y-%m') as month")
-            ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved")
-            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
-            ->selectRaw("SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) as declined")
-            ->selectRaw('SUM(hours_requested) as total_hours')
-            ->groupByRaw("DATE_FORMAT(submitted_at, '%Y-%m')")
-            ->orderBy('month')
-            ->get()
-            ->map(fn ($row) => [
-                'month' => Carbon::parse($row->month.'-01')->format('M'),
-                'approved' => (int) $row->approved,
-                'pending' => (int) $row->pending,
-                'declined' => (int) $row->declined,
-                'total_hours' => round((float) $row->total_hours, 1),
-            ]);
-
-        // Leave type breakdown (current year)
-        $typeBreakdown = HrLeaveRequest::forTenant($tenantId)
-            ->whereIn('status', ['approved', 'pending'])
-            ->whereYear('submitted_at', now()->year)
-            ->selectRaw('leave_type, COUNT(*) as count')
-            ->groupBy('leave_type')
-            ->get()
-            ->map(fn ($row) => [
-                'type' => ucwords(str_replace('_', ' ', $row->leave_type)),
-                'value' => (int) $row->count,
-            ]);
-
-        // Top 5 absentees (sick leave this year)
-        $topAbsentees = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'approved')
-            ->where('leave_type', 'sick')
-            ->whereYear('starts_at', now()->year)
-            ->with('user:id,name')
-            ->selectRaw('user_id, SUM(hours_requested) as total_hours, COUNT(*) as occurrences')
-            ->groupBy('user_id')
-            ->orderByDesc('total_hours')
-            ->limit(5)
-            ->get()
-            ->map(fn ($row) => [
-                'name' => $row->user?->name ?? 'Unknown',
-                'hours' => round((float) $row->total_hours, 1),
-                'occurrences' => (int) $row->occurrences,
-            ]);
-
-        // Staff on leave today
-        $onLeaveToday = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'approved')
-            ->where('starts_at', '<=', now())
-            ->where('ends_at', '>=', now())
-            ->with('user:id,name')
-            ->get()
-            ->map(fn ($req) => [
-                'id' => $req->id,
-                'name' => $req->user?->name ?? 'Unknown',
-                'leave_type' => $req->leave_type,
-                'end_date' => $req->ends_at?->toDateString(),
-            ]);
-
-        // Upcoming leave this week
-        $upcomingLeaveThisWeek = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'approved')
-            ->where('starts_at', '>', now())
-            ->where('starts_at', '<=', now()->endOfWeek())
-            ->with('user:id,name')
-            ->orderBy('starts_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($req) => [
-                'id' => $req->id,
-                'name' => $req->user?->name ?? 'Unknown',
-                'leave_type' => $req->leave_type,
-                'start_date' => $req->starts_at?->toDateString(),
-            ]);
-
-        // Leave utilisation overview
-        $totalActiveStaff = HrEmployeeProfile::where('tenant_id', $tenantId)->where('is_active', true)->count();
-
-        // Absence rate (last 30 days)
-        $sickDaysLast30 = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'approved')
-            ->where('leave_type', 'sick')
-            ->where('starts_at', '>=', now()->subDays(30))
-            ->sum('hours_requested');
-        $possibleHours = max(1, $totalActiveStaff * 160); // ~20 working days × 8h
-        $absenceRate = round(((float) $sickDaysLast30 / $possibleHours) * 100, 1);
-
-        // Roster impact: shifts affected by pending leave
-        $pendingLeaveUserIds = HrLeaveRequest::forTenant($tenantId)
-            ->where('status', 'pending')
-            ->pluck('user_id')
-            ->unique();
-        $rosterImpact = 0;
-        if ($pendingLeaveUserIds->isNotEmpty()) {
-            $rosterImpact = Shift::whereIn('user_id', $pendingLeaveUserIds)
-                ->whereIn('status', ['scheduled', 'draft'])
-                ->where('starts_at', '>=', now())
-                ->count();
-        }
-
         return Inertia::render('hr/leave/index', [
             'requests' => $requests,
             'filters' => [
                 'status' => $status,
                 'leave_type' => $leaveType,
                 'sla' => $slaWindow !== '' ? $slaWindow : null,
+                'q' => $search !== '' ? $search : null,
             ],
             'sla' => $sla,
+            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canViewAllQueue),
             'tab' => $activeTab,
             'approvalInbox' => $inbox,
             'calendar' => $calendar,
-            'pendingAging' => $pendingAging,
-            'dashboardData' => [
-                'monthlyTrend' => $monthlyTrend,
-                'typeBreakdown' => $typeBreakdown,
-                'topAbsentees' => $topAbsentees,
-                'onLeaveToday' => $onLeaveToday,
-                'upcomingLeaveThisWeek' => $upcomingLeaveThisWeek,
-                'absenceRate' => $absenceRate,
-                'totalActiveStaff' => $totalActiveStaff,
-                'rosterImpact' => $rosterImpact,
-            ],
             'staff' => $this->leaveFormStaff($tenantId),
             'leaveTypes' => $this->leaveTypeOptions(),
             'can' => [
@@ -340,9 +207,13 @@ class LeaveController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.leave.manage');
+        $canApprove = $user->canDo('hr.leave.approve') || $canManage;
         $year = (int) $request->query('year', now()->year);
         $search = trim((string) $request->query('q', ''));
 
+        // Pivot to one row per staff member (Annual · Sick · Alt/lieu · Pending)
+        // — the design's balances grid. Hours-based; a row opens the combined
+        // immutable ledger.
         $balances = HrLeaveBalance::query()
             ->where('tenant_id', $tenantId)
             ->where('year', $year)
@@ -350,30 +221,38 @@ class LeaveController extends Controller
             ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->with('user:id,name,email')
-            ->orderBy('leave_type')
-            ->paginate(50)
-            ->withQueryString();
+            ->get()
+            ->groupBy('user_id')
+            ->map(function ($group) {
+                $member = $group->first()->user;
+                $forType = function (string $type) use ($group) {
+                    $row = $group->firstWhere('leave_type', $type);
 
-        // The page reads entitlement/taken/remaining; the model stores
-        // balance/used/pending. Map so the columns aren't blank.
-        $balances->through(fn (HrLeaveBalance $b) => [
-            'id' => $b->id,
-            'user' => [
-                'id' => $b->user?->id,
-                'name' => $b->user?->name ?? 'Unknown',
-                'email' => $b->user?->email,
-            ],
-            'leave_type' => $b->leave_type,
-            'year' => $b->year,
-            'entitlement_hours' => (float) $b->balance_hours,
-            'taken_hours' => (float) $b->used_hours,
-            'pending_hours' => (float) $b->pending_hours,
-            'remaining_hours' => (float) ($b->balance_hours - $b->used_hours - $b->pending_hours),
-        ]);
+                    return [
+                        'remaining' => $row ? round((float) ($row->balance_hours - $row->used_hours - $row->pending_hours), 1) : 0.0,
+                        'entitlement' => $row ? round((float) $row->balance_hours, 1) : 0.0,
+                    ];
+                };
+                $annual = $forType('annual');
+
+                return [
+                    'user_id' => $member?->id,
+                    'name' => $member?->name ?? 'Unknown',
+                    'email' => $member?->email,
+                    'annual' => $annual,
+                    'sick' => $forType('sick'),
+                    'alternative' => $forType('alternative'),
+                    'pending' => round((float) $group->sum('pending_hours'), 1),
+                    'low' => $annual['entitlement'] > 0 && $annual['remaining'] <= $annual['entitlement'] * 0.10,
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
         return Inertia::render('hr/leave/balances', [
             'balances' => $balances,
             'year' => $year,
+            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canApprove),
             'leaveTypes' => LeaveService::LEAVE_TYPES,
             'filters' => [
                 'year' => $year,
@@ -381,6 +260,8 @@ class LeaveController extends Controller
             ],
             'can' => [
                 'manage' => $canManage,
+                'approve' => $canApprove,
+                'create' => $canManage,
             ],
         ]);
     }
