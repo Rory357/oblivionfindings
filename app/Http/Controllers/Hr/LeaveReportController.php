@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\LeaveReportService;
+use App\Domain\Hr\Services\LeaveService;
+use App\Http\Controllers\Controller;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,6 +16,7 @@ class LeaveReportController extends Controller
 
     public function __construct(
         private LeaveReportService $reportService,
+        private LeaveService $leaveService,
     ) {}
 
     /**
@@ -32,13 +35,32 @@ class LeaveReportController extends Controller
         $bradfordFactor = $this->reportService->getBradfordFactor($tenantId, $year);
         $utilization = $this->reportService->getLeaveUtilizationReport($tenantId, $year);
 
+        // Leave-by-type breakdown for the donut (approved + pending, this year).
+        $typeBreakdown = HrLeaveRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['approved', 'pending'])
+            ->whereYear('starts_at', $year)
+            ->selectRaw('leave_type, COUNT(*) as count')
+            ->groupBy('leave_type')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($row) => ['type' => (string) $row->leave_type, 'value' => (int) $row->count])
+            ->all();
+
+        $canManage = $user->canDo('hr.leave.manage');
+        $canApprove = $user->canDo('hr.leave.approve') || $canManage;
+
         return Inertia::render('hr/leave/reports', [
             'absenteeism' => $absenteeism,
             'bradfordFactor' => $bradfordFactor,
             'utilization' => $utilization,
+            'typeBreakdown' => $typeBreakdown,
             'year' => $year,
+            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canApprove),
             'can' => [
-                'manage' => $user->canDo('hr.leave.manage'),
+                'manage' => $canManage,
+                'approve' => $canApprove,
+                'create' => $canManage,
             ],
         ]);
     }

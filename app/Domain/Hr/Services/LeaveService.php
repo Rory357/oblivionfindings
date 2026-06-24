@@ -730,6 +730,103 @@ class LeaveService
      *   pending_by_type: array<string, int>
      * }
      */
+    /**
+     * Hero command-band payload shared by every leave hub surface (index,
+     * balances, reports) so the brand band reads identically across tabs.
+     * Counts only — cheap, no N+1.
+     *
+     * @return array{
+     *   site_count: int,
+     *   awaiting_my_decision: int,
+     *   on_leave_today: int,
+     *   upcoming_7d: int,
+     *   absence_rate: float,
+     *   overdue_count: int,
+     *   roster_conflicts: int,
+     *   mix: array<int, array{type: string, count: int}>
+     * }
+     */
+    public function hubHeroData(?int $tenantId, User $viewer, bool $canViewAllQueue): array
+    {
+        $scoped = fn ($query) => $query
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->when(! $canViewAllQueue, fn ($q) => $q->where('user_id', $viewer->id));
+
+        // Assigned to me (awaiting my decision) — pending requests routed to the viewer.
+        $awaiting = HrLeaveRequest::query()
+            ->where('status', 'pending')
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('escalated_to', $viewer->id)
+            ->count();
+
+        $onLeaveToday = $scoped(
+            HrLeaveRequest::query()
+                ->where('status', 'approved')
+                ->where('starts_at', '<=', now())
+                ->where('ends_at', '>=', now())
+        )->count();
+
+        $upcoming7d = $scoped(
+            HrLeaveRequest::query()
+                ->where('status', 'approved')
+                ->where('starts_at', '>', now())
+                ->where('starts_at', '<=', now()->copy()->addDays(7))
+        )->count();
+
+        // On-leave mix (active today or starting within 7 days) by type — donut.
+        $mix = $scoped(
+            HrLeaveRequest::query()
+                ->where('status', 'approved')
+                ->where('ends_at', '>=', now()->copy()->startOfDay())
+                ->where('starts_at', '<=', now()->copy()->addDays(7))
+        )
+            ->selectRaw('leave_type, COUNT(*) as count')
+            ->groupBy('leave_type')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($row) => ['type' => (string) $row->leave_type, 'count' => (int) $row->count])
+            ->all();
+
+        // Absence rate (sick hours / schedulable hours, last 30 days).
+        $totalActiveStaff = HrEmployeeProfile::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('is_active', true)
+            ->count();
+        $sickHours = $scoped(
+            HrLeaveRequest::query()
+                ->where('status', 'approved')
+                ->where('leave_type', 'sick')
+                ->where('starts_at', '>=', now()->copy()->subDays(30))
+        )->sum('hours_requested');
+        $absenceRate = round(((float) $sickHours / max(1, $totalActiveStaff * 160)) * 100, 1);
+
+        $sla = $this->approvalSlaSummary($tenantId, $viewer->id, $canViewAllQueue);
+
+        // Roster conflicts — shifts overlapping a pending leave request.
+        $pendingUserIds = $scoped(
+            HrLeaveRequest::query()->where('status', 'pending')
+        )->pluck('user_id')->unique();
+        $rosterConflicts = 0;
+        if ($pendingUserIds->isNotEmpty()) {
+            $rosterConflicts = Shift::query()
+                ->whereIn('user_id', $pendingUserIds)
+                ->whereIn('status', ['scheduled', 'draft'])
+                ->where('starts_at', '>=', now())
+                ->count();
+        }
+
+        return [
+            'site_count' => Site::query()->count(),
+            'awaiting_my_decision' => $awaiting,
+            'on_leave_today' => $onLeaveToday,
+            'upcoming_7d' => $upcoming7d,
+            'absence_rate' => $absenceRate,
+            'overdue_count' => (int) $sla['overdue_count'],
+            'roster_conflicts' => $rosterConflicts,
+            'mix' => $mix,
+        ];
+    }
+
     public function approvalSlaSummary(?int $tenantId, ?int $viewerUserId, bool $canManage): array
     {
         $pending = HrLeaveRequest::query()

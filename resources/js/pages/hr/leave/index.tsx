@@ -1,5 +1,20 @@
+import {
+    ApprovalCard,
+    LeaveAvatar,
+    LeaveCalendarPane,
+    LeaveHubHero,
+    LeaveHubTabs,
+    LeaveRequestDialog,
+    LeaveSlaChip,
+    LeaveStatusChip,
+    LeaveTypeChip,
+    useLeaveContextMenu,
+    type HubHero,
+    type LeaveCtxItem,
+    type LeaveStaff,
+    type LeaveTypeOption,
+} from '@/components/hr';
 import PageShell from '@/components/page-shell';
-import { KpiCard } from '@/components/recruitment/kpi-card';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,9 +25,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -30,48 +43,24 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    LeaveRequestDialog,
-    type LeaveStaff,
-    type LeaveTypeOption,
-} from '@/components/hr/leave-request-dialog';
-import { LeaveCalendarPane, LeaveHubTabs } from '@/components/hr';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    BarChart3,
-    Calendar,
+    ArrowUpCircle,
     CalendarDays,
-    CalendarOff,
     CheckCircle2,
     Clock,
+    ExternalLink,
+    Link2,
     Loader2,
-    MapPin,
-    Plus,
-    Timer,
-    TrendingDown,
-    Users,
+    Search,
+    Wallet,
+    X,
     XCircle,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import {
-    Area,
-    AreaChart,
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -160,39 +149,18 @@ type PaginatedRequests = {
     links: Array<{ url: string | null; label: string; active: boolean }>;
 };
 
-type DashboardData = {
-    monthlyTrend: Array<{
-        month: string;
-        approved: number;
-        pending: number;
-        declined: number;
-        total_hours: number;
-    }>;
-    typeBreakdown: Array<{ type: string; value: number }>;
-    topAbsentees: Array<{ name: string; hours: number; occurrences: number }>;
-    onLeaveToday: Array<{
-        id: number;
-        name: string;
-        leave_type: string;
-        end_date: string;
-    }>;
-    upcomingLeaveThisWeek: Array<{
-        id: number;
-        name: string;
-        leave_type: string;
-        start_date: string;
-    }>;
-    absenceRate: number;
-    totalActiveStaff: number;
-    rosterImpact: number;
-};
-
 type Props = {
     requests: PaginatedRequests;
     tab: 'overview' | 'approvals' | 'calendar';
     approvalInbox: Inbox;
     calendar?: CalendarFeed | null;
-    filters: { status?: string; leave_type?: string; sla?: string | null };
+    hero: HubHero;
+    filters: {
+        status?: string;
+        leave_type?: string;
+        sla?: string | null;
+        q?: string;
+    };
     sla: {
         pending_total: number;
         overdue_count: number;
@@ -201,15 +169,6 @@ type Props = {
         avg_decision_hours_30d: number;
         pending_by_type: Record<string, number>;
     };
-    pendingAging: Array<{
-        id: number;
-        staff_name: string;
-        leave_type: string;
-        submitted_at: string | null;
-        approval_due_at: string | null;
-        hours_waiting: number;
-    }>;
-    dashboardData: DashboardData;
     staff: LeaveStaff[];
     leaveTypes: LeaveTypeOption[];
     can: { approve?: boolean; manage?: boolean; create?: boolean };
@@ -224,87 +183,6 @@ const breadcrumbs = [
     { title: 'Leave', href: '/hr/leave' },
 ];
 
-type StatusVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const statusConfig: Record<
-    string,
-    { variant: StatusVariant; className: string; label: string }
-> = {
-    pending: {
-        variant: 'outline',
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Pending',
-    },
-    approved: {
-        variant: 'outline',
-        className:
-            'border-status-success/30 text-status-success bg-status-success-bg',
-        label: 'Approved',
-    },
-    declined: { variant: 'destructive', className: '', label: 'Declined' },
-    cancelled: { variant: 'secondary', className: '', label: 'Cancelled' },
-};
-
-const leaveTypeColors: Record<string, string> = {
-    Annual: '#3b82f6',
-    Sick: '#ef4444',
-    Bereavement: '#8b5cf6',
-    Parental: '#f59e0b',
-    'Public Holiday': '#10b981',
-    Unpaid: '#94a3b8',
-    Toil: '#06b6d4',
-    Other: '#64748b',
-};
-
-const CHART_COLORS = [
-    '#3b82f6',
-    '#ef4444',
-    '#8b5cf6',
-    '#f59e0b',
-    '#10b981',
-    '#94a3b8',
-    '#06b6d4',
-    '#64748b',
-];
-
-function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] || statusConfig.pending;
-    return (
-        <Badge
-            variant={config.variant}
-            className={config.className || undefined}
-        >
-            {config.label}
-        </Badge>
-    );
-}
-
-function SlaBadge({ request }: { request: LeaveRequest }) {
-    if (request.is_overdue) {
-        return (
-            <Badge variant="destructive" className="ml-2 gap-1">
-                <AlertTriangle className="h-3 w-3" /> Overdue
-            </Badge>
-        );
-    }
-    if (request.due_within_24h) {
-        return (
-            <Badge
-                variant="outline"
-                className="ml-2 gap-1 border-status-warning/30 bg-status-warning-bg text-status-warning"
-            >
-                <Clock className="h-3 w-3" /> Due in 24h
-            </Badge>
-        );
-    }
-    return null;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-
 const INBOX_SEGMENTS: Array<{ key: keyof Inbox; label: string }> = [
     { key: 'awaiting_my_decision', label: 'Awaiting my decision' },
     { key: 'escalated_to_me', label: 'Escalated to me' },
@@ -312,26 +190,50 @@ const INBOX_SEGMENTS: Array<{ key: keyof Inbox; label: string }> = [
     { key: 'recently_decided', label: 'Recently decided' },
 ];
 
+const SEG_FROM_QUERY: Record<string, keyof Inbox> = {
+    mine: 'awaiting_my_decision',
+    escalated: 'escalated_to_me',
+    all: 'all_pending',
+    decided: 'recently_decided',
+};
+
+const STATUS_FILTERS = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'declined', label: 'Declined' },
+    { value: 'cancelled', label: 'Cancelled' },
+];
+
+function initialSegment(): keyof Inbox {
+    if (typeof window === 'undefined') return 'all_pending';
+    const seg = new URLSearchParams(window.location.search).get('seg');
+    return (seg && SEG_FROM_QUERY[seg]) || 'all_pending';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function LeaveIndex({
     requests,
     tab,
     approvalInbox: inbox,
     calendar,
+    hero,
     filters,
     sla,
-    pendingAging,
-    dashboardData,
     staff,
     leaveTypes,
     can,
 }: Props) {
+    const { open: openCtx, element: ctxElement } = useLeaveContextMenu();
     const [requestOpen, setRequestOpen] = useState(false);
-    const [segment, setSegment] = useState<keyof Inbox>('all_pending');
-    // Cross-page, SLA-ordered pending queue (handover §3.1) — bulk actions can now reach
-    // every pending request, not just page 1.
-    const pendingRequests = inbox.all_pending.items;
+    const [segment, setSegment] = useState<keyof Inbox>(initialSegment);
+    const [searchTerm, setSearchTerm] = useState(filters.q ?? '');
     const segmentItems = inbox[segment].items;
     const segmentIsPending = segment !== 'recently_decided';
+    const pendingRequests = inbox.all_pending.items;
     const allRequests = requests.data;
     const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
     const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
@@ -349,19 +251,33 @@ export default function LeaveIndex({
         [selectedRequestIds, pendingRequests],
     );
 
+    // Open the request wizard when arrived via the hero "Request leave" deep-link.
+    useEffect(() => {
+        if (
+            can.create &&
+            new URLSearchParams(window.location.search).get('new') === '1'
+        ) {
+            setRequestOpen(true);
+        }
+    }, [can.create]);
+
     const updateFilter = (key: string, value: string | null) => {
         const newFilters: Record<string, string | null> = {
             ...filters,
-            tab, // keep the active pane (filters live on the Approvals tab)
+            tab,
             [key]: value,
         };
-        if (value === null || value === 'all')
-            delete newFilters[key];
+        if (value === null || value === 'all') delete newFilters[key];
         router.get('/hr/leave', newFilters, {
             preserveState: true,
             replace: true,
         });
     };
+
+    function submitSearch(e: React.FormEvent) {
+        e.preventDefault();
+        updateFilter('q', searchTerm.trim() || null);
+    }
 
     function handleApprove(requestId: number) {
         setProcessing(true);
@@ -384,9 +300,6 @@ export default function LeaveIndex({
                     : [...current, requestId]
                 : current.filter((id) => id !== requestId),
         );
-    }
-    function toggleSelectAllPending(checked: boolean) {
-        setSelectedRequestIds(checked ? segmentItems.map((r) => r.id) : []);
     }
     function handleBulkApprove() {
         if (selectedPendingIds.length > 0) setBulkApproveDialogOpen(true);
@@ -442,567 +355,327 @@ export default function LeaveIndex({
             );
         }
     }
+    function openDetail(requestId: number) {
+        router.visit(`/hr/leave/${requestId}`);
+    }
     function extendSlaByHours(requestId: number, hours: number) {
         router.post(
             `/hr/leave/${requestId}/sla-due`,
             { hours },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success(`SLA extended by ${hours}h`),
+            },
         );
     }
     function escalateNow() {
-        router.post('/hr/leave/escalate-now', {}, { preserveScroll: true });
+        router.post(
+            '/hr/leave/escalate-now',
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Overdue approvals escalated'),
+            },
+        );
+    }
+    function copyRequestLink(requestId: number) {
+        const url = `${window.location.origin}/hr/leave/${requestId}`;
+        void navigator.clipboard?.writeText(url);
+        toast.success('Link copied');
     }
 
-    const dd = dashboardData;
+    // Right-click / ⋯ context menu for a request row or card (handover parity:
+    // approve · decline · open detail · extend SLA · escalate · view balance ·
+    // view on calendar · copy link).
+    function requestMenu(r: LeaveRequest): LeaveCtxItem[] {
+        const pending = r.status === 'pending';
+        const canAct = !!can.approve && pending;
+        const items: LeaveCtxItem[] = [];
+        if (canAct) {
+            items.push({
+                kind: 'item',
+                label: 'Approve',
+                icon: CheckCircle2,
+                tone: 'success',
+                kbd: 'A',
+                onSelect: () => handleApprove(r.id),
+            });
+            items.push({
+                kind: 'item',
+                label: 'Decline…',
+                icon: XCircle,
+                tone: 'critical',
+                onSelect: () => handleDecline(r.id),
+            });
+            items.push({ kind: 'divider' });
+        }
+        items.push({
+            kind: 'item',
+            label: 'Open detail',
+            icon: ExternalLink,
+            onSelect: () => openDetail(r.id),
+        });
+        if (canAct) {
+            items.push({
+                kind: 'item',
+                label: 'Extend SLA +24h',
+                icon: Clock,
+                onSelect: () => extendSlaByHours(r.id, 24),
+            });
+            items.push({
+                kind: 'item',
+                label: 'Escalate now',
+                icon: ArrowUpCircle,
+                onSelect: escalateNow,
+            });
+        }
+        items.push({ kind: 'divider' });
+        items.push({
+            kind: 'item',
+            label: 'View balance',
+            icon: Wallet,
+            onSelect: () =>
+                router.visit(
+                    `/hr/leave/balances?q=${encodeURIComponent(r.staff_name)}`,
+                ),
+        });
+        items.push({
+            kind: 'item',
+            label: 'View on calendar',
+            icon: CalendarDays,
+            onSelect: () => router.visit('/hr/leave?tab=calendar'),
+        });
+        items.push({
+            kind: 'item',
+            label: 'Copy link',
+            icon: Link2,
+            onSelect: () => copyRequestLink(r.id),
+        });
+        return items;
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Leave Management" />
 
             <PageShell>
-                <PageHero category="hr"
-                    icon={CalendarOff}
-                    title="Leave & Absence"
-                    description="Plan cover, approve fast and keep leave balances accurate across every site."
-                    stats={[
-                        { label: 'Pending', value: sla.pending_total },
-                        { label: 'On leave today', value: dd.onLeaveToday.length },
-                        { label: 'Overdue', value: sla.overdue_count },
-                        { label: 'Absence rate', value: `${dd.absenceRate}%` },
-                    ]}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            {can.approve && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={escalateNow}
-                                >
-                                    Escalate Overdue
-                                </Button>
-                            )}
-                            {can.create && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setRequestOpen(true)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" /> New
-                                    Request
-                                </Button>
-                            )}
-                        </div>
-                    }
+                <LeaveHubHero
+                    hero={hero}
+                    can={can}
+                    onRequestLeave={() => setRequestOpen(true)}
                 />
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                    <KpiCard
-                        label="Pending Queue"
-                        value={sla.pending_total}
-                        icon={Clock}
-                        color="bg-status-warning-bg text-status-warning"
-                    />
-                    <KpiCard
-                        label="On Leave Today"
-                        value={dd.onLeaveToday.length}
-                        icon={Users}
-                        description={`of ${dd.totalActiveStaff} staff`}
-                        color="bg-status-info-bg text-status-info"
-                    />
-                    <KpiCard
-                        label="Absence Rate"
-                        value={dd.absenceRate}
-                        icon={TrendingDown}
-                        suffix="%"
-                        decimals={1}
-                        description="Sick leave (30d)"
-                        color="bg-status-critical-bg text-status-critical"
-                    />
-                    <KpiCard
-                        label="Avg Decision"
-                        value={sla.avg_decision_hours_30d}
-                        icon={Timer}
-                        suffix="h"
-                        decimals={1}
-                        description="Last 30 days"
-                        color="bg-primary/10 text-primary"
-                    />
-                    <KpiCard
-                        label="Roster Impact"
-                        value={dd.rosterImpact}
-                        icon={AlertTriangle}
-                        description="Shifts affected"
-                        color="bg-status-warning-bg text-status-warning"
-                    />
-                </div>
-
-                {/* Leave hub tabs — Overview · Approvals · Calendar · Balances · Reports */}
                 <LeaveHubTabs active={tab} pendingCount={sla.pending_total} />
 
                 <div className="space-y-4">
-                    {/* ===== Overview ===== */}
+                    {/* ===== Overview — requests master list ===== */}
                     {tab === 'overview' && (
-                        <div className="grid gap-6 lg:grid-cols-3">
-                            <div className="space-y-4 lg:col-span-2">
-                                {/* Monthly Leave Trend */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            Leave Requests Trend (6 Months)
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {dd.monthlyTrend.length > 0 ? (
-                                            <ResponsiveContainer
-                                                width="100%"
-                                                height={220}
+                        <div className="flex flex-col gap-3.5">
+                            {/* filter toolbar */}
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                <form
+                                    onSubmit={submitSearch}
+                                    className="relative flex items-center"
+                                >
+                                    <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) =>
+                                            setSearchTerm(e.target.value)
+                                        }
+                                        placeholder="Search staff or reason…"
+                                        className="h-9 w-[240px] rounded-[10px] border border-border bg-card pr-3 pl-8 text-sm outline-none focus:border-primary"
+                                    />
+                                </form>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {STATUS_FILTERS.map((f) => {
+                                        const active =
+                                            (filters.status ?? 'all') ===
+                                            f.value;
+                                        return (
+                                            // eslint-disable-next-line no-restricted-syntax -- filter chip: custom selector button, not a form Button
+                                            <button
+                                                key={f.value}
+                                                type="button"
+                                                onClick={() =>
+                                                    updateFilter(
+                                                        'status',
+                                                        f.value === 'all'
+                                                            ? null
+                                                            : f.value,
+                                                    )
+                                                }
+                                                className={cn(
+                                                    'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
+                                                    active
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border text-muted-foreground hover:bg-muted',
+                                                )}
                                             >
-                                                <AreaChart
-                                                    data={dd.monthlyTrend}
+                                                {f.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <Select
+                                        value={filters.leave_type ?? 'all'}
+                                        onValueChange={(v) =>
+                                            updateFilter(
+                                                'leave_type',
+                                                v === 'all' ? null : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="h-9 w-[160px]">
+                                            <SelectValue placeholder="All types" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All types
+                                            </SelectItem>
+                                            {leaveTypes.map((t) => (
+                                                <SelectItem
+                                                    key={t.value}
+                                                    value={t.value}
                                                 >
-                                                    <CartesianGrid
-                                                        strokeDasharray="3 3"
-                                                        className="stroke-muted"
-                                                    />
-                                                    <XAxis
-                                                        dataKey="month"
-                                                        className="text-xs"
-                                                        tick={{ fontSize: 12 }}
-                                                    />
-                                                    <YAxis
-                                                        className="text-xs"
-                                                        tick={{ fontSize: 12 }}
-                                                    />
-                                                    <Tooltip />
-                                                    <Area
-                                                        type="monotone"
-                                                        dataKey="approved"
-                                                        stackId="1"
-                                                        stroke="#10b981"
-                                                        fill="#10b981"
-                                                        fillOpacity={0.3}
-                                                        name="Approved"
-                                                    />
-                                                    <Area
-                                                        type="monotone"
-                                                        dataKey="pending"
-                                                        stackId="1"
-                                                        stroke="#f59e0b"
-                                                        fill="#f59e0b"
-                                                        fillOpacity={0.3}
-                                                        name="Pending"
-                                                    />
-                                                    <Area
-                                                        type="monotone"
-                                                        dataKey="declined"
-                                                        stackId="1"
-                                                        stroke="#ef4444"
-                                                        fill="#ef4444"
-                                                        fillOpacity={0.3}
-                                                        name="Declined"
-                                                    />
-                                                    <Legend />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        ) : (
-                                            <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-                                                No leave data available yet
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Type Breakdown + Top Absentees */}
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base">
-                                                Leave by Type
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {dd.typeBreakdown.length > 0 ? (
-                                                <ResponsiveContainer
-                                                    width="100%"
-                                                    height={200}
-                                                >
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={
-                                                                dd.typeBreakdown
-                                                            }
-                                                            dataKey="value"
-                                                            nameKey="type"
-                                                            cx="50%"
-                                                            cy="50%"
-                                                            outerRadius={70}
-                                                            innerRadius={40}
-                                                            paddingAngle={2}
-                                                        >
-                                                            {dd.typeBreakdown.map(
-                                                                (entry, i) => (
-                                                                    <Cell
-                                                                        key={
-                                                                            entry.type
-                                                                        }
-                                                                        fill={
-                                                                            leaveTypeColors[
-                                                                                entry
-                                                                                    .type
-                                                                            ] ||
-                                                                            CHART_COLORS[
-                                                                                i %
-                                                                                    CHART_COLORS.length
-                                                                            ]
-                                                                        }
-                                                                    />
-                                                                ),
-                                                            )}
-                                                        </Pie>
-                                                        <Tooltip />
-                                                        <Legend />
-                                                    </PieChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-                                                    No leave data
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base">
-                                                Top Absentees (Sick Leave)
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {dd.topAbsentees.length > 0 ? (
-                                                <ResponsiveContainer
-                                                    width="100%"
-                                                    height={200}
-                                                >
-                                                    <BarChart
-                                                        data={dd.topAbsentees}
-                                                        layout="vertical"
-                                                        margin={{
-                                                            left: 0,
-                                                            right: 10,
-                                                        }}
-                                                    >
-                                                        <CartesianGrid
-                                                            strokeDasharray="3 3"
-                                                            className="stroke-muted"
-                                                        />
-                                                        <XAxis
-                                                            type="number"
-                                                            tick={{
-                                                                fontSize: 11,
-                                                            }}
-                                                        />
-                                                        <YAxis
-                                                            dataKey="name"
-                                                            type="category"
-                                                            width={90}
-                                                            tick={{
-                                                                fontSize: 11,
-                                                            }}
-                                                        />
-                                                        <Tooltip
-                                                            formatter={(
-                                                                value?: number,
-                                                            ) =>
-                                                                `${value ?? 0}h`
-                                                            }
-                                                        />
-                                                        <Bar
-                                                            dataKey="hours"
-                                                            fill="#ef4444"
-                                                            radius={[
-                                                                0, 4, 4, 0,
-                                                            ]}
-                                                            name="Sick Hours"
-                                                        />
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-                                                    No sick leave recorded
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {can.manage && (
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            <a href="/hr/leave/export">
+                                                Export
+                                            </a>
+                                        </Button>
+                                    )}
+                                    {can.create && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setRequestOpen(true)}
+                                        >
+                                            New request
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Sidebar */}
-                            <div className="space-y-4">
-                                {/* Staff on Leave Today */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <CalendarDays className="h-4 w-4" />{' '}
-                                            On Leave Today
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {dd.onLeaveToday.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground">
-                                                No staff on leave today.
-                                            </p>
-                                        ) : (
-                                            dd.onLeaveToday.map((person) => (
-                                                <div
-                                                    key={person.id}
-                                                    className="flex items-center justify-between rounded-md border p-2 text-sm"
-                                                >
-                                                    <div>
-                                                        <p className="font-medium">
-                                                            {person.name}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground capitalize">
-                                                            {person.leave_type.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                        </p>
+                            {/* requests table */}
+                            <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+                                <div className="grid grid-cols-[1.6fr_1fr_1.3fr_0.7fr_0.9fr_0.8fr] gap-2 border-b border-border bg-muted px-4 py-2.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                                    <span>Staff</span>
+                                    <span>Type</span>
+                                    <span>Dates</span>
+                                    <span>Hours</span>
+                                    <span>Status</span>
+                                    <span className="text-right">SLA</span>
+                                </div>
+                                {allRequests.length === 0 ? (
+                                    <div className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
+                                        <CalendarDays className="h-10 w-10 opacity-40" />
+                                        No leave requests found.
+                                    </div>
+                                ) : (
+                                    allRequests.map((r) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- dense clickable table row, not a form Button
+                                        <div
+                                            key={r.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => openDetail(r.id)}
+                                            onKeyDown={(e) => {
+                                                if (
+                                                    e.key === 'Enter' ||
+                                                    e.key === ' '
+                                                ) {
+                                                    e.preventDefault();
+                                                    openDetail(r.id);
+                                                }
+                                            }}
+                                            onContextMenu={openCtx(
+                                                requestMenu(r),
+                                            )}
+                                            className="grid cursor-pointer grid-cols-[1.6fr_1fr_1.3fr_0.7fr_0.9fr_0.8fr] items-center gap-2 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 hover:bg-muted"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <LeaveAvatar
+                                                    name={r.staff_name}
+                                                    size={32}
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="truncate font-bold">
+                                                        {r.staff_name}
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Until {person.end_date}
-                                                    </p>
                                                 </div>
-                                            ))
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Upcoming This Week */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Calendar className="h-4 w-4" />{' '}
-                                            Upcoming This Week
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {dd.upcomingLeaveThisWeek.length ===
-                                        0 ? (
-                                            <p className="text-sm text-muted-foreground">
-                                                No upcoming leave this week.
-                                            </p>
-                                        ) : (
-                                            dd.upcomingLeaveThisWeek.map(
-                                                (person) => (
-                                                    <div
-                                                        key={person.id}
-                                                        className="flex items-center justify-between rounded-md border p-2 text-sm"
-                                                    >
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                {person.name}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground capitalize">
-                                                                {person.leave_type.replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            From{' '}
-                                                            {person.start_date}
-                                                        </p>
-                                                    </div>
-                                                ),
-                                            )
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Pending Aging */}
-                                {pendingAging.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Clock className="h-4 w-4 text-status-warning" />{' '}
-                                                Longest Waiting
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-2">
-                                            {pendingAging
-                                                .slice(0, 5)
-                                                .map((row) => (
-                                                    <div
-                                                        key={row.id}
-                                                        className="flex items-center justify-between rounded-md border p-2 text-sm"
-                                                    >
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                {row.staff_name}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground capitalize">
-                                                                {row.leave_type.replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                row.hours_waiting >
-                                                                48
-                                                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
-                                                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                                            }
-                                                        >
-                                                            {row.hours_waiting.toFixed(
-                                                                0,
-                                                            )}
-                                                            h
-                                                        </Badge>
-                                                    </div>
-                                                ))}
-                                        </CardContent>
-                                    </Card>
+                                            </div>
+                                            <LeaveTypeChip
+                                                type={r.leave_type}
+                                            />
+                                            <span className="text-muted-foreground">
+                                                {r.start_date} – {r.end_date}
+                                            </span>
+                                            <span className="font-semibold">
+                                                {r.hours}h
+                                            </span>
+                                            <LeaveStatusChip
+                                                status={r.status}
+                                            />
+                                            <span className="flex justify-end">
+                                                <LeaveSlaChip request={r} />
+                                            </span>
+                                        </div>
+                                    ))
                                 )}
+                            </div>
 
-                                {/* Quick Links */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            Quick Links
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            asChild
-                                        >
-                                            <Link href="/hr/leave/balances">
-                                                <BarChart3 className="mr-2 h-4 w-4" />{' '}
-                                                View All Balances
-                                            </Link>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            asChild
-                                        >
-                                            <Link href="/hr/leave/reports">
-                                                <TrendingDown className="mr-2 h-4 w-4" />{' '}
-                                                Absence Reports
-                                            </Link>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            asChild
-                                        >
-                                            <Link href="/hr/calendar/time-off">
-                                                <CalendarDays className="mr-2 h-4 w-4" />{' '}
-                                                Time-Off Calendar
-                                            </Link>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            asChild
-                                        >
-                                            <Link href="/operations/rostering">
-                                                <MapPin className="mr-2 h-4 w-4" />{' '}
-                                                View Roster
-                                            </Link>
-                                        </Button>
-                                    </CardContent>
-                                </Card>
+                            <div className="flex items-center justify-between text-[11.5px] text-muted-foreground">
+                                <span>
+                                    Showing {allRequests.length} of{' '}
+                                    {requests.total} · click a row to open
+                                </span>
+                                {requests.last_page > 1 && (
+                                    <LaravelPagination links={requests.links} />
+                                )}
                             </div>
                         </div>
                     )}
 
-                    {/* ===== Calendar ===== */}
-                    {tab === 'calendar' && (
-                        <LeaveCalendarPane
-                            calendar={calendar}
-                            currentMonth={new Date()
-                                .toISOString()
-                                .slice(0, 7)}
-                        />
-                    )}
-
-                    {/* ===== Approvals ===== */}
+                    {/* ===== Approvals — segmented card queue ===== */}
                     {tab === 'approvals' && (
-                      <>
-                    {/* Pending Approval Section */}
-                        {can.approve && (
-                            <Card className="border-status-warning/20 bg-status-warning-bg">
-                                <CardHeader className="space-y-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Clock className="h-5 w-5 text-status-warning" />{' '}
-                                            Approvals
-                                            <span className="text-xs font-normal text-muted-foreground">
-                                                · sorted by SLA urgency
-                                            </span>
-                                        </CardTitle>
-                                        {segmentIsPending && (
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleBulkApprove}
-                                                    disabled={
-                                                        selectedPendingIds.length ===
-                                                            0 || processing
-                                                    }
-                                                >
-                                                    {processing ? (
-                                                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                                    ) : null}
-                                                    Approve Selected (
-                                                    {selectedPendingIds.length})
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                                    onClick={handleBulkDecline}
-                                                    disabled={
-                                                        selectedPendingIds.length ===
-                                                            0 || processing
-                                                    }
-                                                >
-                                                    Decline Selected
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {INBOX_SEGMENTS.map((s) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- segment chips are custom-styled selector buttons, not standard form buttons
+                        <div className="flex flex-col gap-3.5">
+                            {/* segments */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="inline-flex gap-0.5 rounded-[11px] border border-border bg-card p-0.5">
+                                    {INBOX_SEGMENTS.map((s) => {
+                                        const active = segment === s.key;
+                                        return (
+                                            // eslint-disable-next-line no-restricted-syntax -- segment selector chip, not a form Button
                                             <button
                                                 key={s.key}
                                                 type="button"
-                                                onClick={() => setSegment(s.key)}
+                                                onClick={() => {
+                                                    setSegment(s.key);
+                                                    setSelectedRequestIds([]);
+                                                }}
                                                 className={cn(
-                                                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
-                                                    segment === s.key
+                                                    'inline-flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
+                                                    active
                                                         ? 'bg-primary text-primary-foreground'
-                                                        : 'bg-card text-muted-foreground hover:bg-muted',
+                                                        : 'text-muted-foreground hover:bg-muted',
                                                 )}
                                             >
                                                 {s.label}
                                                 <span
                                                     className={cn(
-                                                        'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
-                                                        segment === s.key
+                                                        'inline-grid h-[18px] min-w-[18px] place-items-center rounded-full px-1.5 text-[10.5px] font-extrabold',
+                                                        active
                                                             ? 'bg-primary-foreground/20'
                                                             : 'bg-muted',
                                                     )}
@@ -1010,496 +683,110 @@ export default function LeaveIndex({
                                                     {inbox[s.key].count}
                                                 </span>
                                             </button>
-                                        ))}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="overflow-hidden rounded-xl border">
-                                        <table className="w-full text-sm">
-                                            <thead className="border-b bg-muted/50">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        {segmentIsPending ? (
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={
-                                                                    segmentItems.length >
-                                                                        0 &&
-                                                                    selectedPendingIds.length ===
-                                                                        segmentItems.length
-                                                                }
-                                                                onChange={(e) =>
-                                                                    toggleSelectAllPending(
-                                                                        e.target
-                                                                            .checked,
-                                                                    )
-                                                                }
-                                                                aria-label="Select all pending requests"
-                                                                className="h-4 w-4 rounded"
-                                                            />
-                                                        ) : null}
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Staff
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Type
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Dates
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Hours
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        SLA
-                                                    </th>
-                                                    <th className="px-4 py-3 text-right font-medium">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {segmentItems.length === 0 ? (
-                                                    <tr>
-                                                        <td
-                                                            colSpan={7}
-                                                            className="px-4 py-10 text-center text-sm text-muted-foreground"
-                                                        >
-                                                            Nothing waiting in this view.
-                                                        </td>
-                                                    </tr>
-                                                ) : null}
-                                                {segmentItems.map((r) => (
-                                                    <tr
-                                                        key={r.id}
-                                                        className="border-b last:border-b-0 hover:bg-muted/50"
-                                                    >
-                                                        <td className="px-4 py-3">
-                                                            {segmentIsPending ? (
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedPendingIds.includes(
-                                                                        r.id,
-                                                                    )}
-                                                                    onChange={(e) =>
-                                                                        toggleRequestSelection(
-                                                                            r.id,
-                                                                            e.target
-                                                                                .checked,
-                                                                        )
-                                                                    }
-                                                                    aria-label={`Select leave request for ${r.staff_name}`}
-                                                                    className="h-4 w-4 rounded"
-                                                                />
-                                                            ) : null}
-                                                        </td>
-                                                        <td className="px-4 py-3 font-medium">
-                                                            <div>{r.staff_name}</div>
-                                                            {r.roster_conflict
-                                                                ?.has_conflict ? (
-                                                                <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-status-warning">
-                                                                    <AlertTriangle className="h-3 w-3" />
-                                                                    Roster conflict
-                                                                    {r.roster_conflict
-                                                                        .shifts[0]
-                                                                        ? ` · ${r.roster_conflict.shifts[0].am_pm} ${r.roster_conflict.shifts[0].site_name ?? ''}`.trim()
-                                                                        : ''}
-                                                                </div>
-                                                            ) : null}
-                                                            {r.escalated ? (
-                                                                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                                                    Escalated
-                                                                    {r.escalated_from
-                                                                        ? ` from ${r.escalated_from}`
-                                                                        : ''}
-                                                                </div>
-                                                            ) : null}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground capitalize">
-                                                            {r.leave_type.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                            {r.has_doc ? (
-                                                                <span className="ml-1 text-[11px]">
-                                                                    📎
-                                                                </span>
-                                                            ) : null}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.start_date} -{' '}
-                                                            {r.end_date}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            <div>{r.hours}h</div>
-                                                            {r.balance_impact ? (
-                                                                <div
-                                                                    className={cn(
-                                                                        'text-[11px]',
-                                                                        r.balance_impact
-                                                                            .insufficient
-                                                                            ? 'font-semibold text-status-critical'
-                                                                            : 'text-muted-foreground',
-                                                                    )}
-                                                                >
-                                                                    {
-                                                                        r.balance_impact
-                                                                            .remaining_before
-                                                                    }
-                                                                    h →{' '}
-                                                                    {
-                                                                        r.balance_impact
-                                                                            .projected_after
-                                                                    }
-                                                                    h
-                                                                    {r.balance_impact
-                                                                        .insufficient
-                                                                        ? ' ⚠'
-                                                                        : ''}
-                                                                </div>
-                                                            ) : null}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {segmentIsPending ? (
-                                                                <SlaBadge request={r} />
-                                                            ) : (
-                                                                <StatusBadge
-                                                                    status={r.status}
-                                                                />
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                {segmentIsPending ? (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="h-7 border-status-success/30 text-status-success hover:bg-status-success-bg"
-                                                                            onClick={() =>
-                                                                                handleApprove(
-                                                                                    r.id,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                        >
-                                                                            <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
-                                                                            Approve
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                                                            onClick={() =>
-                                                                                handleDecline(
-                                                                                    r.id,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                        >
-                                                                            <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                                            Decline
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className="h-7"
-                                                                            onClick={() =>
-                                                                                extendSlaByHours(
-                                                                                    r.id,
-                                                                                    24,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                        >
-                                                                            +24h
-                                                                        </Button>
-                                                                    </>
-                                                                ) : (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {r.reviewed_by
-                                                                            ? `by ${r.reviewed_by}`
-                                                                            : '—'}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                                <span className="ml-auto text-[11.5px] font-semibold text-muted-foreground">
+                                    Sorted by SLA urgency
+                                </span>
+                            </div>
 
-                        {/* Filters */}
-                        <Card className="flex flex-wrap items-center gap-2 p-3">
-                            <Select
-                                value={filters.status ?? 'all'}
-                                onValueChange={(v) =>
-                                    updateFilter(
-                                        'status',
-                                        v === 'all' ? null : v,
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-[140px]">
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Statuses
-                                    </SelectItem>
-                                    <SelectItem value="pending">
-                                        Pending
-                                    </SelectItem>
-                                    <SelectItem value="approved">
-                                        Approved
-                                    </SelectItem>
-                                    <SelectItem value="declined">
-                                        Declined
-                                    </SelectItem>
-                                    <SelectItem value="cancelled">
-                                        Cancelled
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={filters.leave_type ?? 'all'}
-                                onValueChange={(v) =>
-                                    updateFilter(
-                                        'leave_type',
-                                        v === 'all' ? null : v,
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-[160px]">
-                                    <SelectValue placeholder="All Leave Types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Leave Types
-                                    </SelectItem>
-                                    <SelectItem value="annual">
-                                        Annual
-                                    </SelectItem>
-                                    <SelectItem value="sick">Sick</SelectItem>
-                                    <SelectItem value="bereavement">
-                                        Bereavement
-                                    </SelectItem>
-                                    <SelectItem value="family_violence">
-                                        Family Violence
-                                    </SelectItem>
-                                    <SelectItem value="parental">
-                                        Parental
-                                    </SelectItem>
-                                    <SelectItem value="alternative">
-                                        Alternative Holiday
-                                    </SelectItem>
-                                    <SelectItem value="public_holiday">
-                                        Public Holiday
-                                    </SelectItem>
-                                    <SelectItem value="toil">TOIL</SelectItem>
-                                    <SelectItem value="unpaid">
-                                        Unpaid
-                                    </SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={filters.sla ?? 'all'}
-                                onValueChange={(v) =>
-                                    updateFilter('sla', v === 'all' ? null : v)
-                                }
-                            >
-                                <SelectTrigger className="w-[170px]">
-                                    <SelectValue placeholder="All SLA Windows" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All SLA Windows
-                                    </SelectItem>
-                                    <SelectItem value="overdue">
-                                        Overdue only
-                                    </SelectItem>
-                                    <SelectItem value="due_24h">
-                                        Due within 24h
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                    router.get(
-                                        '/hr/leave',
-                                        {},
-                                        { preserveState: true },
-                                    )
-                                }
-                            >
-                                Clear
-                            </Button>
-                        </Card>
-
-                        {/* All Requests Table */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    All Requests
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                {allRequests.length === 0 ? (
-                                    <div className="py-12 text-center text-muted-foreground">
-                                        <CalendarDays className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                        <p>No leave requests found.</p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-hidden rounded-b-xl">
-                                        <table className="w-full text-sm">
-                                            <thead className="border-b bg-muted/50">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Staff
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Type
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Dates
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Hours
-                                                    </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Status
-                                                    </th>
-                                                    <th className="px-4 py-3 text-right font-medium">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {allRequests.map((r) => (
-                                                    <tr
-                                                        key={r.id}
-                                                        className="border-b last:border-b-0 hover:bg-muted/50"
-                                                    >
-                                                        <td className="px-4 py-3 font-medium">
-                                                            {r.staff_name}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground capitalize">
-                                                            {r.leave_type.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.start_date} -{' '}
-                                                            {r.end_date}
-                                                            <SlaBadge
-                                                                request={r}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.hours}h
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <StatusBadge
-                                                                status={
-                                                                    r.status
-                                                                }
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-7"
-                                                                    asChild
-                                                                >
-                                                                    <Link
-                                                                        href={`/hr/leave/${r.id}`}
-                                                                    >
-                                                                        View
-                                                                    </Link>
-                                                                </Button>
-                                                                {can.approve &&
-                                                                    r.status ===
-                                                                        'pending' && (
-                                                                        <>
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                className="h-7 border-status-success/30 text-status-success"
-                                                                                onClick={() =>
-                                                                                    handleApprove(
-                                                                                        r.id,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    processing
-                                                                                }
-                                                                            >
-                                                                                Approve
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                className="h-7 border-status-critical/30 text-status-critical"
-                                                                                onClick={() =>
-                                                                                    handleDecline(
-                                                                                        r.id,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    processing
-                                                                                }
-                                                                            >
-                                                                                Decline
-                                                                            </Button>
-                                                                        </>
-                                                                    )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                            {/* bulk bar */}
+                            {can.approve &&
+                                segmentIsPending &&
+                                selectedPendingIds.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-2.5 rounded-[13px] border border-primary/30 bg-accent px-3.5 py-2.5">
+                                        <span className="text-[13px] font-bold text-accent-foreground">
+                                            {selectedPendingIds.length} selected
+                                        </span>
+                                        <div className="ml-auto flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                onClick={handleBulkApprove}
+                                                disabled={processing}
+                                            >
+                                                {processing && (
+                                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                                )}
+                                                Approve selected
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                                                onClick={handleBulkDecline}
+                                                disabled={processing}
+                                            >
+                                                Decline selected
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setSelectedRequestIds([])
+                                                }
+                                            >
+                                                Clear
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
-                            </CardContent>
-                        </Card>
 
-                        {requests.total > 0 && requests.last_page > 1 && (
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-muted-foreground">
-                                    Showing{' '}
-                                    {(requests.current_page - 1) *
-                                        requests.per_page +
-                                        1}{' '}
-                                    to{' '}
-                                    {Math.min(
-                                        requests.current_page *
-                                            requests.per_page,
-                                        requests.total,
-                                    )}{' '}
-                                    of {requests.total}
-                                </p>
-                                <LaravelPagination links={requests.links} />
-                            </div>
-                        )}
-                      </>
+                            {/* list */}
+                            {segmentItems.length === 0 ? (
+                                <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center">
+                                    <div className="grid h-[54px] w-[54px] place-items-center rounded-full bg-status-success-bg text-status-success">
+                                        <CheckCircle2 className="h-7 w-7" />
+                                    </div>
+                                    <div className="text-base font-extrabold">
+                                        You&apos;re all caught up ✅
+                                    </div>
+                                    <div className="max-w-[340px] text-[13px] text-muted-foreground">
+                                        Nothing waiting in this view. New
+                                        requests land here the moment staff
+                                        submit.
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2.5">
+                                    {segmentItems.map((r) => (
+                                        <ApprovalCard
+                                            key={r.id}
+                                            request={r}
+                                            selectable={
+                                                !!can.approve &&
+                                                segmentIsPending
+                                            }
+                                            checked={selectedPendingIds.includes(
+                                                r.id,
+                                            )}
+                                            onToggle={(checked) =>
+                                                toggleRequestSelection(
+                                                    r.id,
+                                                    checked,
+                                                )
+                                            }
+                                            onApprove={() =>
+                                                handleApprove(r.id)
+                                            }
+                                            onDecline={() =>
+                                                handleDecline(r.id)
+                                            }
+                                            onMore={openCtx(requestMenu(r))}
+                                            processing={processing}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ===== Calendar ===== */}
+                    {tab === 'calendar' && (
+                        <LeaveCalendarPane
+                            calendar={calendar}
+                            currentMonth={new Date().toISOString().slice(0, 7)}
+                        />
                     )}
                 </div>
             </PageShell>
@@ -1565,7 +852,7 @@ export default function LeaveIndex({
                             onClick={() => setDeclineDialogOpen(false)}
                             disabled={processing}
                         >
-                            Cancel
+                            <X className="mr-1 h-4 w-4" /> Cancel
                         </Button>
                         <Button
                             variant="destructive"
@@ -1589,6 +876,8 @@ export default function LeaveIndex({
                     leaveTypes={leaveTypes}
                 />
             )}
+
+            {ctxElement}
         </AppLayout>
     );
 }
