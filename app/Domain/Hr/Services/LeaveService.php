@@ -8,10 +8,10 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveBalanceLedger;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
-use App\Models\Site;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use Carbon\Carbon;
@@ -751,7 +751,7 @@ class LeaveService
 
         $oldestPendingHours = $pendingRows
             ->filter(fn (HrLeaveRequest $request) => $request->submitted_at !== null)
-            ->map(fn (HrLeaveRequest $request) => round($request->submitted_at->diffInMinutes(now()) / 60, 1))
+            ->map(fn (HrLeaveRequest $request) => round(abs($request->submitted_at->diffInMinutes(now())) / 60, 1))
             ->max() ?? 0.0;
 
         $decisions = HrLeaveRequest::query()
@@ -763,9 +763,11 @@ class LeaveService
             ->when(! $canManage && $viewerUserId !== null, fn ($query) => $query->where('user_id', $viewerUserId))
             ->get(['submitted_at', 'reviewed_at']);
 
+        // Decision latency is a magnitude — guard against signed diffs (Carbon 3)
+        // and any backdated seed data that would render a nonsensical negative.
         $avgDecisionHours = $decisions->isEmpty()
             ? 0.0
-            : round($decisions->avg(fn (HrLeaveRequest $request) => $request->submitted_at->diffInMinutes($request->reviewed_at) / 60), 1);
+            : round($decisions->avg(fn (HrLeaveRequest $request) => abs($request->submitted_at->diffInMinutes($request->reviewed_at)) / 60), 1);
 
         return [
             'pending_total' => $pendingRows->count(),

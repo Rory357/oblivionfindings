@@ -35,7 +35,7 @@ import {
     type LeaveStaff,
     type LeaveTypeOption,
 } from '@/components/hr/leave-request-dialog';
-import { LeaveTabs } from '@/components/hr';
+import { LeaveCalendarPane, LeaveHubTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
@@ -189,6 +189,7 @@ type DashboardData = {
 
 type Props = {
     requests: PaginatedRequests;
+    tab: 'overview' | 'approvals' | 'calendar';
     approvalInbox: Inbox;
     calendar?: CalendarFeed | null;
     filters: { status?: string; leave_type?: string; sla?: string | null };
@@ -313,7 +314,9 @@ const INBOX_SEGMENTS: Array<{ key: keyof Inbox; label: string }> = [
 
 export default function LeaveIndex({
     requests,
+    tab,
     approvalInbox: inbox,
+    calendar,
     filters,
     sla,
     pendingAging,
@@ -347,9 +350,13 @@ export default function LeaveIndex({
     );
 
     const updateFilter = (key: string, value: string | null) => {
-        const newFilters = { ...filters, [key]: value };
+        const newFilters: Record<string, string | null> = {
+            ...filters,
+            tab, // keep the active pane (filters live on the Approvals tab)
+            [key]: value,
+        };
         if (value === null || value === 'all')
-            delete newFilters[key as keyof typeof newFilters];
+            delete newFilters[key];
         router.get('/hr/leave', newFilters, {
             preserveState: true,
             replace: true,
@@ -455,8 +462,8 @@ export default function LeaveIndex({
             <PageShell>
                 <PageHero category="hr"
                     icon={CalendarOff}
-                    title="Leave Management"
-                    description="Manage leave requests, approvals, balances, and absence analytics."
+                    title="Leave & Absence"
+                    description="Plan cover, approve fast and keep leave balances accurate across every site."
                     stats={[
                         { label: 'Pending', value: sla.pending_total },
                         { label: 'On leave today', value: dd.onLeaveToday.length },
@@ -530,11 +537,12 @@ export default function LeaveIndex({
                     />
                 </div>
 
-                {/* Leave & Rosters hub tabs */}
-                <LeaveTabs active="requests" />
+                {/* Leave hub tabs — Overview · Approvals · Calendar · Balances · Reports */}
+                <LeaveHubTabs active={tab} pendingCount={sla.pending_total} />
 
                 <div className="space-y-4">
                     {/* ===== Overview ===== */}
+                    {tab === 'overview' && (
                         <div className="grid gap-6 lg:grid-cols-3">
                             <div className="space-y-4 lg:col-span-2">
                                 {/* Monthly Leave Trend */}
@@ -917,8 +925,21 @@ export default function LeaveIndex({
                                 </Card>
                             </div>
                         </div>
+                    )}
 
-                    {/* ===== Requests ===== */}
+                    {/* ===== Calendar ===== */}
+                    {tab === 'calendar' && (
+                        <LeaveCalendarPane
+                            calendar={calendar}
+                            currentMonth={new Date()
+                                .toISOString()
+                                .slice(0, 7)}
+                        />
+                    )}
+
+                    {/* ===== Approvals ===== */}
+                    {tab === 'approvals' && (
+                      <>
                     {/* Pending Approval Section */}
                         {can.approve && (
                             <Card className="border-status-warning/20 bg-status-warning-bg">
@@ -1478,6 +1499,8 @@ export default function LeaveIndex({
                                 <LaravelPagination links={requests.links} />
                             </div>
                         )}
+                      </>
+                    )}
                 </div>
             </PageShell>
 

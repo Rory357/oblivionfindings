@@ -27,7 +27,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { LeaveTabs } from '@/components/hr';
+import { LeaveHubTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -175,7 +175,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                     />
                 }
             >
-                <LeaveTabs active="balances" />
+                <LeaveHubTabs active="balances" />
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">

@@ -1,4 +1,4 @@
-import { LeaveTabs } from '@/components/hr';
+import { LeaveHubTabs } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,7 +161,7 @@ export default function LeaveReports({
                     />
                 }
             >
-                <LeaveTabs active="reports" />
+                <LeaveHubTabs active="reports" />
 
                 {can.manage && (
                     <div className="flex flex-wrap items-center gap-2">

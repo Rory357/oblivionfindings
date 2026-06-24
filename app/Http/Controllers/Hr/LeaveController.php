@@ -2,21 +2,20 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrWebhookService;
-use App\Domain\Hr\Services\LeaveReportService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreLeaveRequestFormRequest;
 use App\Models\Shift;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -30,7 +29,7 @@ class LeaveController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — leave requests list + approval queue                       */
+    /*  Index — leave requests list + approval queue */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -55,9 +54,9 @@ class LeaveController extends Controller
         $requests = HrLeaveRequest::forTenant($tenantId)
             ->when(! $canViewAllQueue, fn ($q) => $q->where('user_id', $user->id))
             ->when($status, fn ($q) => match ($status) {
-                'pending'  => $q->pending(),
+                'pending' => $q->pending(),
                 'approved' => $q->approved(),
-                default    => $q->where('status', $status),
+                default => $q->where('status', $status),
             })
             ->when($slaWindow === 'overdue', fn ($q) => $q
                 ->where('status', 'pending')
@@ -68,8 +67,7 @@ class LeaveController extends Controller
                 ->whereNotNull('approval_due_at')
                 ->whereBetween('approval_due_at', [now(), now()->copy()->addDay()]))
             ->when($leaveType, fn ($q) => $q->where('leave_type', $leaveType))
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->with([
                 'user:id,name,email',
@@ -104,8 +102,15 @@ class LeaveController extends Controller
             canManage: $canViewAllQueue,
         );
 
+        // Active hub pane. Overview / Approvals / Calendar render in-page; Balances and
+        // Reports are their own routes (re-chromed with the same hub tab strip).
+        $activeTab = (string) $request->query('tab', 'overview');
+        if (! in_array($activeTab, ['overview', 'approvals', 'calendar'], true)) {
+            $activeTab = 'overview';
+        }
+
         // Calendar feed is built only when the Calendar tab is active (lazy, per §6.3).
-        $calendar = $request->query('tab') === 'calendar'
+        $calendar = $activeTab === 'calendar'
             ? $this->leaveService->calendarFeed(
                 $tenantId,
                 (string) $request->query('month', now()->format('Y-m')),
@@ -144,7 +149,7 @@ class LeaveController extends Controller
             ->orderBy('month')
             ->get()
             ->map(fn ($row) => [
-                'month' => Carbon::parse($row->month . '-01')->format('M'),
+                'month' => Carbon::parse($row->month.'-01')->format('M'),
                 'approved' => (int) $row->approved,
                 'pending' => (int) $row->pending,
                 'declined' => (int) $row->declined,
@@ -243,6 +248,7 @@ class LeaveController extends Controller
                 'sla' => $slaWindow !== '' ? $slaWindow : null,
             ],
             'sla' => $sla,
+            'tab' => $activeTab,
             'approvalInbox' => $inbox,
             'calendar' => $calendar,
             'pendingAging' => $pendingAging,
@@ -260,8 +266,8 @@ class LeaveController extends Controller
             'leaveTypes' => $this->leaveTypeOptions(),
             'can' => [
                 'approve' => $canApprove,
-                'manage'  => $canManage,
-                'create'  => $user->canDo('hr.leave.manage'),
+                'manage' => $canManage,
+                'create' => $user->canDo('hr.leave.manage'),
             ],
         ]);
     }
@@ -277,26 +283,26 @@ class LeaveController extends Controller
         $isPending = $req->status === 'pending';
 
         return [
-            'id'             => $req->id,
-            'staff_name'     => $req->user?->name ?? 'Unknown',
-            'staff_id'       => $req->user_id,
-            'leave_type'     => $req->leave_type,
-            'period'         => $req->period ?: 'full_day',
-            'start_date'     => $req->starts_at?->toDateString(),
-            'end_date'       => $req->ends_at?->toDateString(),
-            'hours'          => (float) $req->hours_requested,
-            'status'         => $req->status,
-            'reason'         => $req->reason,
-            'has_doc'        => ! empty($req->supporting_doc_path),
-            'reviewed_by'    => $req->reviewer?->name,
-            'reviewed_at'    => $req->reviewed_at?->toDateTimeString(),
-            'submitted_at'   => $req->submitted_at?->toDateTimeString(),
-            'hours_waiting'  => $req->submitted_at ? round($req->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
+            'id' => $req->id,
+            'staff_name' => $req->user?->name ?? 'Unknown',
+            'staff_id' => $req->user_id,
+            'leave_type' => $req->leave_type,
+            'period' => $req->period ?: 'full_day',
+            'start_date' => $req->starts_at?->toDateString(),
+            'end_date' => $req->ends_at?->toDateString(),
+            'hours' => (float) $req->hours_requested,
+            'status' => $req->status,
+            'reason' => $req->reason,
+            'has_doc' => ! empty($req->supporting_doc_path),
+            'reviewed_by' => $req->reviewer?->name,
+            'reviewed_at' => $req->reviewed_at?->toDateTimeString(),
+            'submitted_at' => $req->submitted_at?->toDateTimeString(),
+            'hours_waiting' => $req->submitted_at ? round($req->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
             'approval_due_at' => $req->approval_due_at?->toDateTimeString(),
-            'is_overdue'     => $isPending && (bool) $req->approval_due_at?->isPast(),
+            'is_overdue' => $isPending && (bool) $req->approval_due_at?->isPast(),
             'due_within_24h' => $isPending && (bool) $req->approval_due_at?->between(now(), now()->copy()->addDay()),
             'escalation_level' => (int) ($req->escalation_level ?? 1),
-            'escalated'      => (int) ($req->escalation_level ?? 1) > 1,
+            'escalated' => (int) ($req->escalation_level ?? 1) > 1,
             'escalated_from' => $req->escalatedTo?->name,
             'roster_conflict' => $ctx['rosterConflict'] ?? ['has_conflict' => false, 'count' => 0, 'shifts' => []],
             'balance_impact' => $ctx['balanceImpact'] ?? null,
@@ -324,7 +330,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Balances — overview of leave balances                              */
+    /*  Balances — overview of leave balances */
     /* ------------------------------------------------------------------ */
 
     public function balances(Request $request)
@@ -341,8 +347,7 @@ class LeaveController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('year', $year)
             ->when(! $canManage, fn ($q) => $q->where('user_id', $user->id))
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->with('user:id,name,email')
             ->orderBy('leave_type')
@@ -381,7 +386,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Preview — read-only computed hours/balance/conflict/approver       */
+    /*  Preview — read-only computed hours/balance/conflict/approver */
     /* ------------------------------------------------------------------ */
 
     public function previewLeave(Request $request)
@@ -391,11 +396,11 @@ class LeaveController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'user_id'    => ['nullable', 'integer', 'exists:users,id'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
-            'period'     => ['nullable', Rule::in(['full_day', 'half_day_am', 'half_day_pm'])],
-            'starts_at'  => ['required', 'date'],
-            'ends_at'    => ['required', 'date'],
+            'period' => ['nullable', Rule::in(['full_day', 'half_day_am', 'half_day_pm'])],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date'],
         ]);
 
         $target = $user;
@@ -414,7 +419,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Balance adjustment + immutable ledger read                         */
+    /*  Balance adjustment + immutable ledger read */
     /* ------------------------------------------------------------------ */
 
     public function adjustBalance(Request $request)
@@ -424,12 +429,12 @@ class LeaveController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'user_id'    => ['required', 'integer', 'exists:users,id'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
-            'year'       => ['nullable', 'integer', 'min:2020', 'max:2100'],
-            'mode'       => ['required', Rule::in(['credit', 'debit', 'set_opening'])],
-            'hours'      => ['required', 'numeric', 'min:0', 'max:9999'],
-            'reason'     => ['nullable', 'string', 'max:2000'],
+            'year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
+            'mode' => ['required', Rule::in(['credit', 'debit', 'set_opening'])],
+            'hours' => ['required', 'numeric', 'min:0', 'max:9999'],
+            'reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $target = User::query()->findOrFail((int) $validated['user_id']);
@@ -491,7 +496,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Export — requests / balances (CSV · Excel-openable · PDF)          */
+    /*  Export — requests / balances (CSV · Excel-openable · PDF) */
     /* ------------------------------------------------------------------ */
 
     public function export(Request $request)
@@ -578,7 +583,7 @@ class LeaveController extends Controller
             $html = '<h2 style="font-family:sans-serif">'.e($title).'</h2>'
                 .'<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:11px"><thead><tr>'.$head.'</tr></thead><tbody>'.$body.'</tbody></table>';
 
-            return \Barryvdh\DomPDF\Facade\Pdf::loadHtml($html)->download($filename.'.pdf');
+            return Pdf::loadHtml($html)->download($filename.'.pdf');
         }
 
         return response()->streamDownload(function () use ($headers, $records) {
@@ -600,7 +605,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Create — show form to create leave request                         */
+    /*  Create — show form to create leave request */
     /* ------------------------------------------------------------------ */
 
     public function create(Request $request)
@@ -613,7 +618,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show — view single leave request                                   */
+    /*  Show — view single leave request */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrLeaveRequest $leaveRequest)
@@ -653,7 +658,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — submit a leave request                                     */
+    /*  Store — submit a leave request */
     /* ------------------------------------------------------------------ */
 
     public function store(StoreLeaveRequestFormRequest $request)
@@ -702,7 +707,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Approve                                                            */
+    /*  Approve */
     /* ------------------------------------------------------------------ */
 
     public function approve(Request $request, HrLeaveRequest $leaveRequest)
@@ -740,7 +745,7 @@ class LeaveController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Decline                                                            */
+    /*  Decline */
     /* ------------------------------------------------------------------ */
 
     public function decline(Request $request, HrLeaveRequest $leaveRequest)
@@ -911,7 +916,7 @@ class LeaveController extends Controller
     }
 
     /**
-     * @param Collection<int, int> $ids
+     * @param  Collection<int, int>  $ids
      * @return Collection<int, HrLeaveRequest>
      */
     private function loadPendingRequestsForBulk(Collection $ids, int $tenantId): Collection

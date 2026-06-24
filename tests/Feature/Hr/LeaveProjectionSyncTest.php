@@ -7,9 +7,10 @@ use App\Domain\Hr\Services\LeaveService;
 use App\Models\Permission;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->manager->setAttribute('tenant_id', 1);
@@ -78,11 +79,22 @@ test('editing an approved request re-syncs the projection via the observer', fun
 });
 
 test('roster-entered leave routes through the engine: creates an approved request, ledger and linked projection', function () {
+    // Anchor on weekdays so the window always has >0 business hours (a
+    // weekend-only window is correctly rejected as zero-hours leave).
+    $start = now()->addDays(3);
+    while ($start->isWeekend()) {
+        $start->addDay();
+    }
+    $end = $start->copy()->addDay();
+    while ($end->isWeekend()) {
+        $end->addDay();
+    }
+
     $this->actingAs($this->manager)
         ->post(route('operations.rostering.time_off.store'), [
             'user_id' => $this->staff->id,
-            'starts_at' => now()->addDays(3)->toDateString(),
-            'ends_at' => now()->addDays(4)->toDateString(),
+            'starts_at' => $start->toDateString(),
+            'ends_at' => $end->toDateString(),
             'type' => 'leave',
             'leave_type' => 'annual',
             'label' => 'Covered by roster manager',
