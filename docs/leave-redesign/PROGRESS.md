@@ -46,7 +46,7 @@
 
 ### PHASE 5 — Shared modal consolidation + self-service preview ◐
 - [x] 5.2 `LeaveRequestDialog` enriched: `mode='self'|'manager'`, part-day `period` (single-day), server-driven review preview (engine hours, balance before→after, insufficient soft-warn, roster conflict, approver+SLA), confetti on self-submit. tsc clean.
-- [ ] 5.1 Swap both `MyHrLeaveWizard` mounts (`pages/hr/my/index.tsx`, `pages/hr/my/leave.tsx`) to `<LeaveRequestDialog mode="self">` + `MyHrController` ship `leaveTypes` {value,label} + currentUser; delete `my-hr-leave-wizard.tsx` (carry `initial`/duplicate seed)  ← FRONTEND remaining
+- [x] 5.1 **Duplicate modal eliminated**: both `MyHrLeaveWizard` mounts (`pages/hr/my/{index,leave}.tsx`) → `<LeaveRequestDialog mode="self">` (pages transform `leaveTypes` string[]→{value,label} inline; `currentUser` from `myHr.profile.name`; `initial`/duplicate seed wired via new dialog prop). Deleted `my-hr-leave-wizard.tsx` + barrel export; moved `LeaveBalanceLite` local. ONE shared modal now.
 - [x] 5.3 `LeaveService::previewRequest()` + `GET /hr/leave/preview` (manager) + `GET /hr/my/leave/preview` (self). Test: `LeaveBalanceAdjustTest.php`
 
 ### PHASE 6 — Adjust/ledger + export + calendar feed + pending signal + collapse reads ◐

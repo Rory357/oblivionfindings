@@ -18,12 +18,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-    MyHrLeaveWizard,
     MyHrShell,
     hueFromId,
-    type LeaveWizardInitial,
     type MyHrShellData,
 } from '@/components/hr';
+import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
 import {
     ShiftContextMenu,
     type ShiftCtxState,
@@ -170,9 +169,18 @@ export default function MyLeave({
     whosOutWeek,
     requests,
     balances,
+    leaveTypes,
 }: Props) {
     const [wizardOpen, setWizardOpen] = useState(false);
-    const [wizardInitial, setWizardInitial] = useState<LeaveWizardInitial>();
+    const [wizardInitial, setWizardInitial] = useState<{
+        leave_type?: string;
+        starts_at?: string;
+        ends_at?: string;
+    }>();
+    const leaveTypeOptions = leaveTypes.map((t) => ({
+        value: t,
+        label: titleCase(t),
+    }));
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     function openNew() {
@@ -370,11 +378,15 @@ export default function MyLeave({
                 ) : null}
             </div>
 
-            <MyHrLeaveWizard
+            <LeaveRequestDialog
+                mode="self"
                 open={wizardOpen}
                 onClose={() => setWizardOpen(false)}
-                balances={balances}
+                staff={[]}
+                leaveTypes={leaveTypeOptions}
+                currentUser={{ name: myHr.profile.name }}
                 initial={wizardInitial}
+                onSubmitted={() => setWizardOpen(false)}
             />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </MyHrShell>

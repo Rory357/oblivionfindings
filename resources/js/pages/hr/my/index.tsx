@@ -25,9 +25,9 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
 import {
     MyHrAroundModal,
-    MyHrLeaveWizard,
     MyHrShell,
     MyHrShoutoutSpotlight,
     hueFromId,
@@ -36,7 +36,6 @@ import {
     type AroundCelebration,
     type AroundView,
     type AroundWhosOut,
-    type LeaveBalanceLite,
     type MyHrShellData,
     type MyHrShoutout,
 } from '@/components/hr';
@@ -47,6 +46,13 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { fireConfetti } from '@/lib/confetti';
 import { cn } from '@/lib/utils';
+
+type LeaveBalanceLite = {
+    leave_type: string;
+    entitlement_hours: number;
+    taken_hours: number;
+    remaining_hours: number;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -90,6 +96,7 @@ interface TodayShift {
 
 interface Props {
     myHr: MyHrShellData;
+    leaveTypes?: string[];
     overview: {
         shoutouts: MyHrShoutout[];
         attention: AttentionItem[];
@@ -389,12 +396,17 @@ function NextShiftCard({
 
 export default function MyHrIndex({
     myHr,
+    leaveTypes = [],
     overview,
     announcements,
     balances,
     canViewFeed = false,
     safeWorkProcedures = [],
 }: Props) {
+    const leaveTypeOptions = leaveTypes.map((t) => ({
+        value: t,
+        label: t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()),
+    }));
     const openKudos = useSendKudos();
     const { weekly } = myHr;
 
@@ -963,10 +975,14 @@ export default function MyHrIndex({
                 }}
             />
 
-            <MyHrLeaveWizard
+            <LeaveRequestDialog
+                mode="self"
                 open={leaveOpen}
                 onClose={() => setLeaveOpen(false)}
-                balances={balances}
+                staff={[]}
+                leaveTypes={leaveTypeOptions}
+                currentUser={{ name: myHr.profile.name }}
+                onSubmitted={() => setLeaveOpen(false)}
             />
         </MyHrShell>
     );

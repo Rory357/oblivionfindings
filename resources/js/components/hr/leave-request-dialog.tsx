@@ -77,6 +77,7 @@ export function LeaveRequestDialog({
     leaveTypes,
     mode = 'manager',
     currentUser,
+    initial,
     onSubmitted,
 }: {
     open: boolean;
@@ -84,7 +85,8 @@ export function LeaveRequestDialog({
     staff: LeaveStaff[];
     leaveTypes: LeaveTypeOption[];
     mode?: 'self' | 'manager';
-    currentUser?: { id: number; name: string };
+    currentUser?: { name: string };
+    initial?: { leave_type?: string; starts_at?: string; ends_at?: string };
     onSubmitted?: () => void;
 }) {
     const isSelf = mode === 'self';
@@ -102,7 +104,7 @@ export function LeaveRequestDialog({
         reason: string;
         supporting_doc: File | null;
     }>({
-        user_id: isSelf && currentUser ? String(currentUser.id) : '',
+        user_id: '',
         leave_type: '',
         period: 'full_day',
         starts_at: '',
@@ -127,6 +129,16 @@ export function LeaveRequestDialog({
         () => staff.map((s) => ({ value: String(s.id), label: s.name, sub: s.email })),
         [staff],
     );
+
+    // Seed from `initial` (the "Duplicate" action) each time the dialog opens.
+    useEffect(() => {
+        if (open && initial) {
+            if (initial.leave_type) form.setData('leave_type', initial.leave_type);
+            if (initial.starts_at) form.setData('starts_at', initial.starts_at);
+            if (initial.ends_at) form.setData('ends_at', initial.ends_at);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     const singleDay =
         form.data.starts_at !== '' && form.data.starts_at === form.data.ends_at;
