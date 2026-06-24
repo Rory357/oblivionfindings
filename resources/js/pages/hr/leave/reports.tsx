@@ -26,7 +26,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, BarChart3, Download, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 interface MonthlyData {
@@ -161,6 +162,29 @@ export default function LeaveReports({
                 }
             >
                 <LeaveTabs active="reports" />
+
+                {can.manage && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="mr-auto text-xs text-muted-foreground">
+                            Export reports
+                        </span>
+                        <Button asChild variant="outline" size="sm">
+                            <a href={`/hr/leave/reports/export?format=csv&year=${year}`}>
+                                <Download className="mr-1.5 h-4 w-4" /> CSV
+                            </a>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                            <a href={`/hr/leave/reports/export?format=csv&year=${year}`}>
+                                Excel
+                            </a>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                            <a href={`/hr/leave/reports/export?format=pdf&year=${year}`}>
+                                PDF
+                            </a>
+                        </Button>
+                    </div>
+                )}
 
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList>

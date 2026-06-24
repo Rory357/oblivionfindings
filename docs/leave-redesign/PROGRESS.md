@@ -62,13 +62,13 @@
 - [x] 7.2 Approvals section rebuilt as the segmented **cross-page** inbox (Awaiting my decision/Escalated to me/All pending/Recently decided) sourced from `inbox` prop — bulk-select now reaches every pending request; per-row roster-conflict + balance-impact (before→after, ⚠ insufficient) + doc 📎 + escalated-from + SLA/status badges + empty states. (right-click ctx menu = follow-up)
 - [ ] 7.3 Calendar tab pane (PH shading, pending dashed bars, site filters, coverage banner, week/day toggle)
 - [x] 7.4 Balances: clickable rows → immutable **ledger drawer** (fetches `/balances/{user}/ledger`) + **Adjust / opening balance** modal (credit/debit/set_opening → `/balances/adjust`) + **Export** button. tsc/eslint clean.
-- [ ] 7.5 Reports tab: export split-button, by-site utilisation, relocate type donut
+- [x] 7.5 Reports: **Export split-button** (CSV/Excel/PDF → `/reports/export`). (by-site utilisation + type-donut relocation = follow-up polish)
 - [ ] 7.6 Hero quick-actions + "Needs you" chips + on-leave Mix/Rate donut rail (shared `PageHero`)
 - [~] 7.7 Adjust modal + ledger drawer done (in 7.4); ctx menus + confetti-on-approve = follow-up
 
 ### PHASE 8 — Replace native dialogs + retire legacy surfaces ◐
 - [x] 8.1 `show.tsx` native `confirm()/alert()` replaced with an AlertDialog confirm (approve/decline) + toast for the required decline reason. tsc/eslint clean.
-- [ ] 8.2 Delete dead `create.tsx` (route already redirects to hub); convert Requests "View" → in-hub detail modal (keep `show.tsx` as deep-link fallback)
+- [x] 8.2 Deleted dead `create.tsx` (route already redirects to hub; confirmed zero real inbound links). ("View" → in-hub detail modal = follow-up; `show.tsx` remains the detail page)
 
 ---
 
