@@ -41,7 +41,12 @@ export function LeaveHubTabs({
     pendingCount?: number;
 }) {
     const items: HrTabItem[] = [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary' },
+        {
+            id: 'overview',
+            label: 'Overview',
+            icon: LayoutDashboard,
+            tone: 'primary',
+        },
         {
             id: 'approvals',
             label: 'Approvals',
@@ -51,12 +56,18 @@ export function LeaveHubTabs({
         },
         { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'info' },
         { id: 'balances', label: 'Balances', icon: BarChart3, tone: 'violet' },
-        { id: 'reports', label: 'Reports', icon: TrendingDown, tone: 'success' },
+        {
+            id: 'reports',
+            label: 'Reports',
+            icon: TrendingDown,
+            tone: 'success',
+        },
+        { id: 'holidays', label: 'Holidays', icon: CalendarOff, tone: 'info' },
     ];
 
     return (
         <HrTabs
-            value={active === 'holidays' ? '' : active}
+            value={active}
             onChange={(id) => {
                 if (id !== active) {
                     router.visit(TAB_URLS[id as LeaveHubTab], {
@@ -67,22 +78,6 @@ export function LeaveHubTabs({
             items={items}
             ariaLabel="Leave views"
             className="mb-6"
-            trailing={
-                // eslint-disable-next-line no-restricted-syntax -- overflow affordance styled as a tab chip, not a standard form button
-                <button
-                    type="button"
-                    onClick={() => router.visit(TAB_URLS.holidays)}
-                    className={`ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        active === 'holidays'
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:bg-muted'
-                    }`}
-                    title="Public holidays & settings"
-                >
-                    <CalendarOff className="h-4 w-4" />
-                    Holidays
-                </button>
-            }
         />
     );
 }

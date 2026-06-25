@@ -1,3 +1,5 @@
+import { LeaveHubHero, LeaveHubTabs, type HubHero } from '@/components/hr';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,11 +14,16 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { LeaveHubTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { CalendarDays, Globe, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+    CalendarDays,
+    Globe,
+    MapPin,
+    Pencil,
+    Plus,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type PublicHoliday = {
@@ -31,8 +38,11 @@ type PublicHoliday = {
 type Props = {
     holidays: PublicHoliday[];
     year: number;
+    hero: HubHero;
     can: {
         manage?: boolean;
+        approve?: boolean;
+        create?: boolean;
     };
 };
 
@@ -42,7 +52,7 @@ const breadcrumbs = [
     { title: 'Public Holidays', href: '/hr/leave/holidays' },
 ];
 
-export default function Holidays({ holidays, year, can }: Props) {
+export default function Holidays({ holidays, year, hero, can }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(
         null,
@@ -116,52 +126,48 @@ export default function Holidays({ holidays, year, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Public Holidays" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={CalendarDays}
-                        title="Public Holidays"
-                        description="Manage public holidays used for NZ leave calculations."
-                        stats={[
-                            { label: 'Year', value: year },
-                            { label: 'Holidays', value: holidays.length },
-                        ]}
-                        actions={
-                            <>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={() => handleYearChange(year - 1)}
-                                >
-                                    &larr; {year - 1}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={() => handleYearChange(year + 1)}
-                                >
-                                    {year + 1} &rarr;
-                                </Button>
-                                {can.manage && (
-                                    <Button
-                                        onClick={() =>
-                                            showForm
-                                                ? resetForm()
-                                                : setShowForm(true)
-                                        }
-                                    >
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add Holiday
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={<LeaveHubHero hero={hero} can={can} />}>
                 <LeaveHubTabs active="holidays" />
+
+                {/* toolbar: year nav + add */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-[13px] font-bold">
+                        Public holidays
+                    </span>
+                    <span className="text-[11.5px] text-muted-foreground">
+                        NZ stat days · {holidays.length} in {year}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleYearChange(year - 1)}
+                        >
+                            &larr; {year - 1}
+                        </Button>
+                        <span className="px-1 text-sm font-bold tabular-nums">
+                            {year}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleYearChange(year + 1)}
+                        >
+                            {year + 1} &rarr;
+                        </Button>
+                        {can.manage && (
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    showForm ? resetForm() : setShowForm(true)
+                                }
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Add Holiday
+                            </Button>
+                        )}
+                    </div>
+                </div>
 
                 {/* Add Holiday Form */}
                 {showForm && can.manage && (

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Carbon\Carbon;
@@ -14,6 +15,8 @@ use Inertia\Response;
 class PublicHolidayController extends Controller
 {
     use ResolvesHrTenant;
+
+    public function __construct(private readonly LeaveService $leaveService) {}
 
     public function index(Request $request): Response
     {
@@ -35,11 +38,17 @@ class PublicHolidayController extends Controller
             ->map(fn (HrPublicHoliday $holiday) => $this->serializeHoliday($holiday))
             ->values();
 
+        $canManage = $user->canDo('hr.leave.manage');
+        $canApprove = $user->canDo('hr.leave.approve') || $canManage;
+
         return Inertia::render('hr/leave/holidays', [
             'holidays' => $holidays,
             'year' => $year,
+            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canApprove),
             'can' => [
-                'manage' => $user->canDo('hr.leave.manage'),
+                'manage' => $canManage,
+                'approve' => $canApprove,
+                'create' => $canManage,
             ],
         ]);
     }
