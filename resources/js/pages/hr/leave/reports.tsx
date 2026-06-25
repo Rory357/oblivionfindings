@@ -18,16 +18,123 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Download } from 'lucide-react';
-import {
-    Area,
-    AreaChart,
-    Cell,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-} from 'recharts';
+
+/* Inline-SVG charts — recharts (ResponsiveContainer + fixed PieChart alike)
+ * collapses to a flat line on first paint inside this card layout and only
+ * fills in after a window resize. Raw SVG paints immediately and matches the
+ * hero's donut treatment. */
+
+function TypeDonut({ data }: { data: Array<{ type: string; value: number }> }) {
+    const segments = data.filter((d) => d.value > 0);
+    const total = segments.reduce((a, d) => a + d.value, 0) || 1;
+    const r = 42;
+    const c = 2 * Math.PI * r;
+    let acc = 0;
+    return (
+        <svg
+            width={132}
+            height={132}
+            viewBox="0 0 132 132"
+            className="flex-none"
+        >
+            <g transform="rotate(-90 66 66)">
+                <circle
+                    cx={66}
+                    cy={66}
+                    r={r}
+                    fill="none"
+                    stroke="var(--muted)"
+                    strokeWidth={13}
+                />
+                {segments.map((d) => {
+                    const len = (d.value / total) * c;
+                    const seg = (
+                        <circle
+                            key={d.type}
+                            cx={66}
+                            cy={66}
+                            r={r}
+                            fill="none"
+                            stroke={leaveTypeMeta(d.type).color}
+                            strokeWidth={13}
+                            strokeDasharray={`${len.toFixed(2)} ${(c - len).toFixed(2)}`}
+                            strokeDashoffset={(-acc).toFixed(2)}
+                        />
+                    );
+                    acc += len;
+                    return seg;
+                })}
+            </g>
+            <text
+                x={66}
+                y={72}
+                textAnchor="middle"
+                fontSize={20}
+                style={{ fill: 'var(--foreground)', fontWeight: 800 }}
+            >
+                {segments.reduce((a, d) => a + d.value, 0)}
+            </text>
+        </svg>
+    );
+}
+
+function AbsenceArea({
+    monthly,
+}: {
+    monthly: Array<{ label: string; count: number }>;
+}) {
+    const w = 320;
+    const h = 120;
+    const max = Math.max(...monthly.map((m) => m.count), 1);
+    const n = Math.max(1, monthly.length - 1);
+    const pts = monthly.map((m, i) => {
+        const x = (i / n) * w;
+        const y = h - (m.count / max) * (h - 8) - 2;
+        return [x, y] as const;
+    });
+    const line = pts
+        .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+        .join(' ');
+    const area = `0,${h} ${line} ${w},${h}`;
+    return (
+        <div>
+            <svg
+                viewBox={`0 0 ${w} ${h}`}
+                preserveAspectRatio="none"
+                width="100%"
+                height={130}
+            >
+                <defs>
+                    <linearGradient id="absFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                            offset="0%"
+                            stopColor="#b42318"
+                            stopOpacity={0.3}
+                        />
+                        <stop
+                            offset="100%"
+                            stopColor="#b42318"
+                            stopOpacity={0.02}
+                        />
+                    </linearGradient>
+                </defs>
+                <polygon points={area} fill="url(#absFill)" />
+                <polyline
+                    points={line}
+                    fill="none"
+                    stroke="#b42318"
+                    strokeWidth={1.5}
+                    vectorEffect="non-scaling-stroke"
+                />
+            </svg>
+            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                {monthly.map((m) => (
+                    <span key={m.label}>{m.label.slice(0, 1)}</span>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 interface MonthlyData {
     month: number;
@@ -186,50 +293,7 @@ export default function LeaveReports({
                                 Sick leave as % of scheduled hours · {year}
                             </p>
                             {absenteeism.monthly.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={160}>
-                                    <AreaChart data={absenteeism.monthly}>
-                                        <defs>
-                                            <linearGradient
-                                                id="absFill"
-                                                x1="0"
-                                                y1="0"
-                                                x2="0"
-                                                y2="1"
-                                            >
-                                                <stop
-                                                    offset="0%"
-                                                    stopColor="#b42318"
-                                                    stopOpacity={0.35}
-                                                />
-                                                <stop
-                                                    offset="100%"
-                                                    stopColor="#b42318"
-                                                    stopOpacity={0.02}
-                                                />
-                                            </linearGradient>
-                                        </defs>
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={{ fontSize: 11 }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <Tooltip
-                                            formatter={(v?: number) => [
-                                                `${v ?? 0} occ.`,
-                                                'Sick',
-                                            ]}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="#b42318"
-                                            strokeWidth={2}
-                                            fill="url(#absFill)"
-                                            name="Sick"
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
+                                <AbsenceArea monthly={absenteeism.monthly} />
                             ) : (
                                 <div className="flex h-[160px] items-center justify-center text-sm text-muted-foreground">
                                     No sick leave recorded
@@ -245,32 +309,10 @@ export default function LeaveReports({
                             </span>
                             {typeTotal > 0 ? (
                                 <div className="mt-2 flex items-center gap-4">
-                                    {/* Fixed-size chart (not ResponsiveContainer)
-                                        so the donut paints on first load without
-                                        a resize to re-measure its parent. */}
-                                    <PieChart width={132} height={132}>
-                                        <Pie
-                                            data={typeBreakdown}
-                                            dataKey="value"
-                                            nameKey="type"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={42}
-                                            outerRadius={62}
-                                            paddingAngle={2}
-                                        >
-                                            {typeBreakdown.map((e) => (
-                                                <Cell
-                                                    key={e.type}
-                                                    fill={
-                                                        leaveTypeMeta(e.type)
-                                                            .color
-                                                    }
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
+                                    {/* Inline SVG donut — recharts collapses on
+                                        first paint inside this layout; raw SVG
+                                        always renders. */}
+                                    <TypeDonut data={typeBreakdown} />
                                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                                         {typeBreakdown.map((t) => (
                                             <div
