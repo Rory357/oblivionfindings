@@ -1,4 +1,5 @@
 import {
+    LeaveAdjustDialog,
     LeaveAvatar,
     LeaveHubHero,
     LeaveHubTabs,
@@ -6,15 +7,7 @@ import {
 } from '@/components/hr';
 import { PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -22,13 +15,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, Download, Pencil, Search, X } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -122,41 +113,25 @@ export default function LeaveBalances({
         );
     };
 
-    // --- Adjust modal ---
+    // --- Adjust / opening-balance wizard ---
     const [adjustOpen, setAdjustOpen] = useState(false);
-    const [adjust, setAdjust] = useState({
-        user_id: '',
-        leave_type: 'annual',
-        mode: 'credit',
-        hours: '8',
-        reason: '',
-    });
-    const [processing, setProcessing] = useState(false);
+    const [adjustPreset, setAdjustPreset] = useState<
+        { user_id?: string; leave_type?: string } | undefined
+    >(undefined);
 
-    const openAdjust = (preset?: Partial<typeof adjust>) => {
-        setAdjust((a) => ({ ...a, ...preset }));
+    const openAdjust = (preset?: { user_id?: string; leave_type?: string }) => {
+        setAdjustPreset(preset);
         setAdjustOpen(true);
     };
 
-    const submitAdjust = () => {
-        if (!adjust.user_id) {
-            toast.error('Pick a person to adjust.');
-            return;
-        }
-        setProcessing(true);
-        router.post(
-            '/hr/leave/balances/adjust',
-            { ...adjust, year, hours: Number(adjust.hours) },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAdjustOpen(false);
-                    toast.success('Balance adjusted — ledger entry recorded.');
-                },
-                onError: () => toast.error('Could not apply the adjustment.'),
-                onFinish: () => setProcessing(false),
-            },
-        );
+    /** Current remaining hours for a staff member + type (Annual/Sick/Alt only). */
+    const currentBalanceFor = (userId: number, type: string): number | null => {
+        const row = balances.find((b) => b.user_id === userId);
+        if (!row) return null;
+        if (type === 'annual') return row.annual.remaining;
+        if (type === 'sick') return row.sick.remaining;
+        if (type === 'alternative') return row.alternative.remaining;
+        return null;
     };
 
     // --- Ledger drawer ---
@@ -324,137 +299,18 @@ export default function LeaveBalances({
                 </p>
             </PageLayout>
 
-            {/* Adjust balance modal */}
-            <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Adjust balance</DialogTitle>
-                    </DialogHeader>
-                    <p className="-mt-2 text-xs text-muted-foreground">
-                        Writes a ledger entry — keeps the audit trail complete.
-                    </p>
-                    <div className="grid gap-3 py-2">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <Label className="text-xs">Person</Label>
-                                <Select
-                                    value={adjust.user_id}
-                                    onValueChange={(v) =>
-                                        setAdjust((a) => ({ ...a, user_id: v }))
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select…" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {people.map((p) => (
-                                            <SelectItem
-                                                key={p.id}
-                                                value={String(p.id)}
-                                            >
-                                                {p.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Leave type</Label>
-                                <Select
-                                    value={adjust.leave_type}
-                                    onValueChange={(v) =>
-                                        setAdjust((a) => ({
-                                            ...a,
-                                            leave_type: v,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {leaveTypes.map((t) => (
-                                            <SelectItem
-                                                key={t}
-                                                value={t}
-                                                className="capitalize"
-                                            >
-                                                {t.replace(/_/g, ' ')}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <Label className="text-xs">Adjustment</Label>
-                                <Select
-                                    value={adjust.mode}
-                                    onValueChange={(v) =>
-                                        setAdjust((a) => ({ ...a, mode: v }))
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="credit">
-                                            Credit +
-                                        </SelectItem>
-                                        <SelectItem value="debit">
-                                            Debit −
-                                        </SelectItem>
-                                        <SelectItem value="set_opening">
-                                            Set opening
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Hours</Label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={adjust.hours}
-                                    onChange={(e) =>
-                                        setAdjust((a) => ({
-                                            ...a,
-                                            hours: e.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <Label className="text-xs">Reason</Label>
-                            <Textarea
-                                rows={2}
-                                value={adjust.reason}
-                                onChange={(e) =>
-                                    setAdjust((a) => ({
-                                        ...a,
-                                        reason: e.target.value,
-                                    }))
-                                }
-                                placeholder="e.g. Opening balance migrated from PayHero"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setAdjustOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={submitAdjust} disabled={processing}>
-                            {processing ? 'Applying…' : 'Apply adjustment'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Adjust / opening-balance wizard (Add-Client modal chrome) */}
+            {can.manage && (
+                <LeaveAdjustDialog
+                    open={adjustOpen}
+                    onClose={() => setAdjustOpen(false)}
+                    people={people}
+                    leaveTypes={leaveTypes}
+                    year={year}
+                    currentBalanceFor={currentBalanceFor}
+                    preset={adjustPreset}
+                />
+            )}
 
             {/* Ledger drawer */}
             {ledgerOpen && (

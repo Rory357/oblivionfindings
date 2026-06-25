@@ -11,6 +11,7 @@ export * from './departments-pane';
 export * from './documents-tabs';
 export * from './hr-hero';
 export * from './hr-tabs';
+export * from './leave-adjust-dialog';
 export * from './leave-calendar-pane';
 export * from './leave-context-menu';
 export * from './leave-detail-modal';
