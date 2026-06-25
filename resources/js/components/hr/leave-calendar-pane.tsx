@@ -3,9 +3,20 @@
  * bars (raw <button>/<div> + per-leave-type category colours), the view toggle
  * and site chips are custom selector buttons, not shadcn <Button>/<Card>. */
 import { router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Search, TriangleAlert } from 'lucide-react';
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Search,
+    TriangleAlert,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 import { LeaveAvatar, leaveTypeMeta } from './leave-hub-parts';
@@ -247,9 +258,11 @@ export function LeaveCalendarPane({
                         <ChevronRight className="h-4 w-4" />
                     </button>
                 </div>
-                <span className="min-w-[160px] text-base font-extrabold tracking-tight">
-                    {calendar.month_label}
-                </span>
+                <MonthPicker
+                    value={calendar.month}
+                    label={calendar.month_label}
+                    onPick={go}
+                />
                 <div className="ml-auto flex items-center gap-3.5 text-[11.5px] text-muted-foreground">
                     <LegendSwatch kind="approved" label="Approved" />
                     <LegendSwatch kind="pending" label="Pending" />
@@ -426,6 +439,104 @@ export function LeaveCalendarPane({
                 Pending leave shows hatched — click a bar to open the request.
             </div>
         </div>
+    );
+}
+
+const MONTHS = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+];
+
+/** Click the period label to jump months/years via a small calendar dropdown. */
+function MonthPicker({
+    value,
+    label,
+    onPick,
+}: {
+    value: string;
+    label: string;
+    onPick: (month: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const selYear = Number(value.split('-')[0]);
+    const selMonth = Number(value.split('-')[1]); // 1-12
+    const [pickYear, setPickYear] = useState(selYear);
+
+    return (
+        <Popover
+            open={open}
+            onOpenChange={(o) => {
+                setOpen(o);
+                if (o) setPickYear(selYear);
+            }}
+        >
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="inline-flex min-w-[150px] items-center gap-1.5 rounded-[9px] px-2 py-1 text-base font-extrabold tracking-tight transition-colors hover:bg-muted"
+                >
+                    {label}
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-60 p-3">
+                <div className="mb-2.5 flex items-center justify-between">
+                    <button
+                        type="button"
+                        onClick={() => setPickYear((y) => y - 1)}
+                        aria-label="Previous year"
+                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="text-sm font-extrabold tabular-nums">
+                        {pickYear}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setPickYear((y) => y + 1)}
+                        aria-label="Next year"
+                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                    {MONTHS.map((m, i) => {
+                        const isSel =
+                            pickYear === selYear && i + 1 === selMonth;
+                        return (
+                            <button
+                                key={m}
+                                type="button"
+                                onClick={() => {
+                                    onPick(`${pickYear}-${pad(i + 1)}`);
+                                    setOpen(false);
+                                }}
+                                className={cn(
+                                    'rounded-md py-1.5 text-xs font-bold transition-colors',
+                                    isSel
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'hover:bg-muted',
+                                )}
+                            >
+                                {m}
+                            </button>
+                        );
+                    })}
+                </div>
+            </PopoverContent>
+        </Popover>
     );
 }
 
