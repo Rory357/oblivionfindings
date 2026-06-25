@@ -245,35 +245,32 @@ export default function LeaveReports({
                             </span>
                             {typeTotal > 0 ? (
                                 <div className="mt-2 flex items-center gap-4">
-                                    <ResponsiveContainer
-                                        width={132}
-                                        height={132}
-                                    >
-                                        <PieChart>
-                                            <Pie
-                                                data={typeBreakdown}
-                                                dataKey="value"
-                                                nameKey="type"
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={42}
-                                                outerRadius={62}
-                                                paddingAngle={2}
-                                            >
-                                                {typeBreakdown.map((e) => (
-                                                    <Cell
-                                                        key={e.type}
-                                                        fill={
-                                                            leaveTypeMeta(
-                                                                e.type,
-                                                            ).color
-                                                        }
-                                                    />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    {/* Fixed-size chart (not ResponsiveContainer)
+                                        so the donut paints on first load without
+                                        a resize to re-measure its parent. */}
+                                    <PieChart width={132} height={132}>
+                                        <Pie
+                                            data={typeBreakdown}
+                                            dataKey="value"
+                                            nameKey="type"
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={42}
+                                            outerRadius={62}
+                                            paddingAngle={2}
+                                        >
+                                            {typeBreakdown.map((e) => (
+                                                <Cell
+                                                    key={e.type}
+                                                    fill={
+                                                        leaveTypeMeta(e.type)
+                                                            .color
+                                                    }
+                                                />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
                                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                                         {typeBreakdown.map((t) => (
                                             <div

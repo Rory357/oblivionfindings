@@ -135,7 +135,14 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
 };
 
 export function LeaveStatusChip({ status }: { status: string }) {
-    const meta = STATUS_META[status] ?? STATUS_META.pending;
+    // Honest fallback: an unrecognised status renders humanised + neutral, never
+    // silently masquerading as "Pending" (which would hide a data mismatch).
+    const meta = STATUS_META[status] ?? {
+        label: status
+            ? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+            : 'Unknown',
+        className: 'border-border bg-muted text-muted-foreground',
+    };
     return (
         <span
             className={cn(
@@ -257,6 +264,7 @@ export function ApprovalCard({
     onApprove,
     onDecline,
     onMore,
+    onOpenDetail,
     processing,
 }: {
     request: ApprovalCardRequest;
@@ -266,6 +274,7 @@ export function ApprovalCard({
     onApprove: () => void;
     onDecline: () => void;
     onMore: (e: React.MouseEvent) => void;
+    onOpenDetail?: () => void;
     processing: boolean;
 }) {
     const decided = r.status !== 'pending';
@@ -298,7 +307,25 @@ export function ApprovalCard({
                 ) : null}
                 <LeaveAvatar name={r.staff_name} />
 
-                <div className="min-w-0 flex-1">
+                <div
+                    className={cn(
+                        'min-w-0 flex-1',
+                        onOpenDetail && 'cursor-pointer',
+                    )}
+                    role={onOpenDetail ? 'button' : undefined}
+                    tabIndex={onOpenDetail ? 0 : undefined}
+                    onClick={onOpenDetail}
+                    onKeyDown={
+                        onOpenDetail
+                            ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      onOpenDetail();
+                                  }
+                              }
+                            : undefined
+                    }
+                >
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[14.5px] font-bold whitespace-nowrap">
                             {r.staff_name}
