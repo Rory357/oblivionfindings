@@ -196,12 +196,26 @@ export function LeaveCalendarPane({
             });
 
     const onPrev = () => {
-        if (view === 'month') go(shiftMonth(calendar.month, -1));
-        else setWinStart((s) => Math.max(0, s - winSize));
+        if (view === 'month') {
+            go(shiftMonth(calendar.month, -1));
+        } else if (clampedStart <= 0) {
+            // At the month's start — step into the previous month at its end.
+            setWinStart(9999);
+            go(shiftMonth(calendar.month, -1));
+        } else {
+            setWinStart((s) => Math.max(0, s - winSize));
+        }
     };
     const onNext = () => {
-        if (view === 'month') go(shiftMonth(calendar.month, 1));
-        else setWinStart((s) => Math.min(maxStart, s + winSize));
+        if (view === 'month') {
+            go(shiftMonth(calendar.month, 1));
+        } else if (clampedStart >= maxStart) {
+            // At the month's end — step into the next month at its start.
+            setWinStart(0);
+            go(shiftMonth(calendar.month, 1));
+        } else {
+            setWinStart((s) => Math.min(maxStart, s + winSize));
+        }
     };
     const onToday = () => {
         const todayMonth = currentMonth ?? calendar.month;

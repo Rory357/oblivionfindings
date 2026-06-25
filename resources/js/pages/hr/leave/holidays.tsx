@@ -1,5 +1,15 @@
 import { LeaveHubHero, LeaveHubTabs, type HubHero } from '@/components/hr';
 import { PageLayout } from '@/components/page';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,10 +109,14 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
         setShowForm(true);
     };
 
-    const handleDelete = (id: number) => {
-        if (!confirm('Are you sure you want to remove this public holiday?'))
-            return;
-        router.delete(`/hr/leave/holidays/${id}`);
+    const [deleteTarget, setDeleteTarget] = useState<PublicHoliday | null>(
+        null,
+    );
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        router.delete(`/hr/leave/holidays/${deleteTarget.id}`, {
+            onFinish: () => setDeleteTarget(null),
+        });
     };
 
     const handleYearChange = (newYear: number) => {
@@ -360,8 +374,8 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() =>
-                                                                handleDelete(
-                                                                    holiday.id,
+                                                                setDeleteTarget(
+                                                                    holiday,
                                                                 )
                                                             }
                                                             className="text-status-critical hover:text-status-critical"
@@ -396,6 +410,33 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
                     used in leave calculations under the NZ Holidays Act 2003.
                 </div>
             </PageLayout>
+
+            <AlertDialog
+                open={deleteTarget !== null}
+                onOpenChange={(o) => !o && setDeleteTarget(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Remove “{deleteTarget?.name}”?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This public holiday will no longer be shaded on the
+                            calendar or skipped in leave hour calculations. This
+                            can&apos;t be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-status-critical text-primary-foreground hover:bg-status-critical/90"
+                        >
+                            Remove holiday
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }
