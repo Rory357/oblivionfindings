@@ -9,7 +9,7 @@ import {
     SlidersHorizontal,
     UserRound,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -81,7 +81,7 @@ export function LeaveAdjustDialog({
     year: number;
     /** Returns the staff member's current remaining hours for a type, or null. */
     currentBalanceFor?: (userId: number, leaveType: string) => number | null;
-    preset?: { user_id?: string; leave_type?: string };
+    preset?: { user_id?: string; leave_type?: string; mode?: Mode };
 }) {
     const wiz = useWizard(STEPS.length);
     const [submitting, setSubmitting] = useState(false);
@@ -89,12 +89,28 @@ export function LeaveAdjustDialog({
     const [form, setForm] = useState({
         user_id: preset?.user_id ?? '',
         leave_type: preset?.leave_type ?? 'annual',
-        mode: 'credit' as Mode,
+        mode: (preset?.mode ?? 'credit') as Mode,
         hours: '8',
         reason: '',
     });
     const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
         setForm((f) => ({ ...f, [k]: v }));
+
+    // Re-seed the form from the preset each time the dialog opens (so a
+    // right-click "Adjust / Set opening for {person}" lands on the right row).
+    useEffect(() => {
+        if (!open) return;
+        wiz.reset();
+        setDone(false);
+        setForm({
+            user_id: preset?.user_id ?? '',
+            leave_type: preset?.leave_type ?? 'annual',
+            mode: (preset?.mode ?? 'credit') as Mode,
+            hours: '8',
+            reason: '',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     const personName =
         people.find((p) => String(p.id) === form.user_id)?.name ?? '';
@@ -120,21 +136,8 @@ export function LeaveAdjustDialog({
     const canContinue =
         wiz.index === 0 ? step0Valid : wiz.index === 1 ? step1Valid : true;
 
-    const close = () => {
-        onClose();
-        // Reset shortly after the dialog animates out.
-        window.setTimeout(() => {
-            wiz.reset();
-            setDone(false);
-            setForm({
-                user_id: preset?.user_id ?? '',
-                leave_type: preset?.leave_type ?? 'annual',
-                mode: 'credit',
-                hours: '8',
-                reason: '',
-            });
-        }, 150);
-    };
+    // The open-effect re-seeds the form on the next open, so close just dismisses.
+    const close = () => onClose();
 
     const submit = () => {
         if (!step0Valid || !step1Valid) return;

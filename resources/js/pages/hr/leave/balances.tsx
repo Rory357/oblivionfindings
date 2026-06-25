@@ -3,7 +3,9 @@ import {
     LeaveAvatar,
     LeaveHubHero,
     LeaveHubTabs,
+    useLeaveContextMenu,
     type HubHero,
+    type LeaveCtxItem,
 } from '@/components/hr';
 import { PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -18,7 +20,16 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
-import { CalendarDays, Download, Pencil, Search, X } from 'lucide-react';
+import {
+    CalendarDays,
+    Download,
+    Eye,
+    Pencil,
+    Plus,
+    Search,
+    SlidersHorizontal,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -104,6 +115,7 @@ export default function LeaveBalances({
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
     const people = balances.map((b) => ({ id: b.user_id, name: b.name }));
+    const { open: openCtx, element: ctxElement } = useLeaveContextMenu();
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -114,12 +126,17 @@ export default function LeaveBalances({
     };
 
     // --- Adjust / opening-balance wizard ---
+    type AdjustPreset = {
+        user_id?: string;
+        leave_type?: string;
+        mode?: 'credit' | 'debit' | 'set_opening';
+    };
     const [adjustOpen, setAdjustOpen] = useState(false);
-    const [adjustPreset, setAdjustPreset] = useState<
-        { user_id?: string; leave_type?: string } | undefined
-    >(undefined);
+    const [adjustPreset, setAdjustPreset] = useState<AdjustPreset | undefined>(
+        undefined,
+    );
 
-    const openAdjust = (preset?: { user_id?: string; leave_type?: string }) => {
+    const openAdjust = (preset?: AdjustPreset) => {
         setAdjustPreset(preset);
         setAdjustOpen(true);
     };
@@ -152,6 +169,47 @@ export default function LeaveBalances({
             .then((d) => setLedger(d.entries ?? []))
             .catch(() => setLedger([]))
             .finally(() => setLedgerLoading(false));
+    };
+
+    // Right-click a staff row → adjust / set-opening / view-ledger / request-leave.
+    const rowMenu = (row: BalanceRow): LeaveCtxItem[] => {
+        const items: LeaveCtxItem[] = [];
+        if (can.manage) {
+            items.push({
+                kind: 'item',
+                label: 'Adjust balance…',
+                icon: Pencil,
+                onSelect: () =>
+                    openAdjust({
+                        user_id: String(row.user_id),
+                        mode: 'credit',
+                    }),
+            });
+            items.push({
+                kind: 'item',
+                label: 'Set opening balance…',
+                icon: SlidersHorizontal,
+                onSelect: () =>
+                    openAdjust({
+                        user_id: String(row.user_id),
+                        mode: 'set_opening',
+                    }),
+            });
+        }
+        items.push({
+            kind: 'item',
+            label: 'View ledger',
+            icon: Eye,
+            onSelect: () => openLedger(row),
+        });
+        items.push({ kind: 'divider' });
+        items.push({
+            kind: 'item',
+            label: 'Request leave for…',
+            icon: Plus,
+            onSelect: () => router.visit('/hr/leave?new=1'),
+        });
+        return items;
     };
 
     return (
@@ -246,6 +304,7 @@ export default function LeaveBalances({
                                         openLedger(row);
                                     }
                                 }}
+                                onContextMenu={openCtx(rowMenu(row))}
                                 className="grid cursor-pointer grid-cols-[1.6fr_1.1fr_1.1fr_1fr_1fr] items-center gap-2 border-b border-border px-4 py-2.5 text-[13px] last:border-b-0 hover:bg-muted"
                             >
                                 <div className="flex min-w-0 items-center gap-2.5">
@@ -294,10 +353,15 @@ export default function LeaveBalances({
                     )}
                 </div>
                 <p className="text-[11.5px] text-muted-foreground">
-                    Click a row to open the immutable ledger — every reserve,
-                    accrual, taken &amp; adjustment.
+                    Click a row to open the immutable ledger
+                    {can.manage
+                        ? ' · right-click for adjust & opening balance'
+                        : ''}{' '}
+                    — every reserve, accrual, taken &amp; adjustment.
                 </p>
             </PageLayout>
+
+            {ctxElement}
 
             {/* Adjust / opening-balance wizard (Add-Client modal chrome) */}
             {can.manage && (
