@@ -791,6 +791,20 @@ export default function LeaveIndex({
                         <LeaveCalendarPane
                             calendar={calendar}
                             currentMonth={new Date().toISOString().slice(0, 7)}
+                            onOpenEntry={(entry) =>
+                                setDetailRequest({
+                                    id: entry.id,
+                                    staff_name: entry.user_name,
+                                    staff_id: entry.user_id,
+                                    leave_type: entry.leave_type,
+                                    period: entry.period,
+                                    start_date: entry.start,
+                                    end_date: entry.end,
+                                    hours: entry.hours ?? 0,
+                                    status: entry.status as LeaveRequest['status'],
+                                    reason: entry.reason,
+                                })
+                            }
                         />
                     )}
                 </div>

@@ -1056,6 +1056,8 @@ class LeaveService
             'leave_type' => $r->leave_type,
             'period' => $r->period ?: 'full_day',
             'status' => $r->status,
+            'hours' => (float) $r->hours_requested,
+            'reason' => $r->reason,
             'start' => $r->starts_at?->toDateString(),
             'end' => $r->ends_at?->toDateString(),
         ])->values();
