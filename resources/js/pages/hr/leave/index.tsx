@@ -2,6 +2,7 @@ import {
     ApprovalCard,
     LeaveAvatar,
     LeaveCalendarPane,
+    LeaveDetailModal,
     LeaveHubHero,
     LeaveHubTabs,
     LeaveRequestDialog,
@@ -229,6 +230,9 @@ export default function LeaveIndex({
 }: Props) {
     const { open: openCtx, element: ctxElement } = useLeaveContextMenu();
     const [requestOpen, setRequestOpen] = useState(false);
+    const [detailRequest, setDetailRequest] = useState<LeaveRequest | null>(
+        null,
+    );
     const [segment, setSegment] = useState<keyof Inbox>(initialSegment);
     const [searchTerm, setSearchTerm] = useState(filters.q ?? '');
     const segmentItems = inbox[segment].items;
@@ -355,8 +359,8 @@ export default function LeaveIndex({
             );
         }
     }
-    function openDetail(requestId: number) {
-        router.visit(`/hr/leave/${requestId}`);
+    function openDetail(request: LeaveRequest) {
+        setDetailRequest(request);
     }
     function extendSlaByHours(requestId: number, hours: number) {
         router.post(
@@ -413,7 +417,7 @@ export default function LeaveIndex({
             kind: 'item',
             label: 'Open detail',
             icon: ExternalLink,
-            onSelect: () => openDetail(r.id),
+            onSelect: () => openDetail(r),
         });
         if (canAct) {
             items.push({
@@ -589,14 +593,14 @@ export default function LeaveIndex({
                                             key={r.id}
                                             role="button"
                                             tabIndex={0}
-                                            onClick={() => openDetail(r.id)}
+                                            onClick={() => openDetail(r)}
                                             onKeyDown={(e) => {
                                                 if (
                                                     e.key === 'Enter' ||
                                                     e.key === ' '
                                                 ) {
                                                     e.preventDefault();
-                                                    openDetail(r.id);
+                                                    openDetail(r);
                                                 }
                                             }}
                                             onContextMenu={openCtx(
@@ -773,6 +777,7 @@ export default function LeaveIndex({
                                                 handleDecline(r.id)
                                             }
                                             onMore={openCtx(requestMenu(r))}
+                                            onOpenDetail={() => openDetail(r)}
                                             processing={processing}
                                         />
                                     ))}
@@ -876,6 +881,23 @@ export default function LeaveIndex({
                     leaveTypes={leaveTypes}
                 />
             )}
+
+            <LeaveDetailModal
+                request={detailRequest}
+                can={can}
+                processing={processing}
+                onClose={() => setDetailRequest(null)}
+                onApprove={(id) => {
+                    setDetailRequest(null);
+                    handleApprove(id);
+                }}
+                onDecline={(id) => {
+                    setDetailRequest(null);
+                    handleDecline(id);
+                }}
+                onExtendSla={(id) => extendSlaByHours(id, 24)}
+                onEscalate={() => escalateNow()}
+            />
 
             {ctxElement}
         </AppLayout>

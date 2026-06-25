@@ -13,6 +13,7 @@ export * from './hr-hero';
 export * from './hr-tabs';
 export * from './leave-calendar-pane';
 export * from './leave-context-menu';
+export * from './leave-detail-modal';
 export * from './leave-hero';
 export * from './leave-hub-hero';
 export * from './leave-hub-parts';
