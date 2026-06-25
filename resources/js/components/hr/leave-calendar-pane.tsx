@@ -1,24 +1,35 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+/* eslint-disable no-restricted-syntax -- The leave calendar is a bespoke roster
+ * swimlane: per-staff rows × per-day columns with absolutely-positioned leave
+ * bars (raw <button>/<div> + per-leave-type category colours), the view toggle
+ * and site chips are custom selector buttons, not shadcn <Button>/<Card>. */
 import { router } from '@inertiajs/react';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, TriangleAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { cn } from '@/lib/utils';
+
+import { LeaveAvatar, leaveTypeMeta } from './leave-hub-parts';
+
+export type LeaveCalendarEntry = {
+    id: number;
+    user_id: number;
+    user_name: string;
+    site: string | null;
+    leave_type: string;
+    period: string;
+    status: string;
+    hours?: number;
+    reason?: string | null;
+    start: string;
+    end: string;
+};
 
 export type LeaveCalendarFeed = {
     month: string;
     month_label: string;
     start: string;
     end: string;
-    entries: Array<{
-        id: number;
-        user_id: number;
-        user_name: string;
-        site: string | null;
-        leave_type: string;
-        period: string;
-        status: string;
-        start: string;
-        end: string;
-    }>;
+    entries: LeaveCalendarEntry[];
     people: Array<{ user_id: number; name: string; site: string | null }>;
     public_holidays: Record<
         string,
@@ -26,23 +37,10 @@ export type LeaveCalendarFeed = {
     >;
 };
 
-const TYPE_COLOR: Record<string, string> = {
-    annual: 'bg-status-info text-white',
-    sick: 'bg-status-critical text-white',
-    bereavement: 'bg-primary text-primary-foreground',
-    parental: 'bg-status-warning text-white',
-    alternative: 'bg-status-success text-white',
-    public_holiday: 'bg-status-success text-white',
-    unpaid: 'bg-muted-foreground text-white',
-};
-
-const typeColor = (t: string) => TYPE_COLOR[t] ?? 'bg-muted-foreground text-white';
-const typeLabel = (t: string) =>
-    t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+type View = 'month' | 'week' | 'day';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function shiftMonth(month: string, delta: number): string {
     const [y, m] = month.split('-').map(Number);
@@ -53,20 +51,20 @@ function shiftMonth(month: string, delta: number): string {
 export function LeaveCalendarPane({
     calendar,
     currentMonth,
+    onOpenEntry,
 }: {
     calendar: LeaveCalendarFeed | null | undefined;
-    /** Server "now" month (Y-m) for the Today button; falls back to feed month. */
     currentMonth?: string;
+    onOpenEntry?: (entry: LeaveCalendarEntry) => void;
 }) {
-    if (!calendar) {
-        return (
-            <Card>
-                <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                    Loading calendar…
-                </CardContent>
-            </Card>
-        );
-    }
+    const [view, setView] = useState<View>('month');
+    const [query, setQuery] = useState('');
+    const [site, setSite] = useState<string>('all');
+    // Client-side window start (index into the month's days) for week / day views.
+    const [winStart, setWinStart] = useState<number>(() => {
+        const today = new Date();
+        return today.getDate() - 1;
+    });
 
     const go = (month: string) =>
         router.get(
@@ -75,167 +73,415 @@ export function LeaveCalendarPane({
             { preserveState: true, preserveScroll: true },
         );
 
-    const [year, monthNum] = calendar.month.split('-').map(Number);
-    const daysInMonth = new Date(year, monthNum, 0).getDate();
-    const firstWeekday = (new Date(year, monthNum - 1, 1).getDay() + 6) % 7; // Mon=0
+    const allDays = useMemo(() => {
+        if (!calendar) return [];
+        const [year, monthNum] = calendar.month.split('-').map(Number);
+        const count = new Date(year, monthNum, 0).getDate();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        return Array.from({ length: count }, (_, i) => {
+            const day = i + 1;
+            const date = `${year}-${pad(monthNum)}-${pad(day)}`;
+            const dow = new Date(year, monthNum - 1, day).getDay();
+            return {
+                day,
+                date,
+                dow,
+                dowLabel: DOW[dow],
+                weekend: dow === 0 || dow === 6,
+                holiday: calendar.public_holidays[date],
+                isToday: date === todayStr,
+            };
+        });
+    }, [calendar]);
 
-    const cells: Array<{ day: number; date: string } | null> = [];
-    for (let i = 0; i < firstWeekday; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-        cells.push({ day: d, date: `${year}-${pad(monthNum)}-${pad(d)}` });
-    }
-    while (cells.length % 7 !== 0) cells.push(null);
-
-    const entriesForDay = (date: string) =>
-        calendar.entries.filter((e) => e.start <= date && e.end >= date);
-
-    const typesPresent = Array.from(
-        new Set(calendar.entries.map((e) => e.leave_type)),
+    const winSize = view === 'month' ? allDays.length : view === 'week' ? 7 : 1;
+    const maxStart = Math.max(0, allDays.length - winSize);
+    const clampedStart =
+        view === 'month' ? 0 : Math.min(Math.max(0, winStart), maxStart);
+    const visibleDays = useMemo(
+        () =>
+            view === 'month'
+                ? allDays
+                : allDays.slice(clampedStart, clampedStart + winSize),
+        [allDays, view, clampedStart, winSize],
     );
 
-    const todayMonth = currentMonth ?? calendar.month;
+    const sites = useMemo(() => {
+        if (!calendar) return [];
+        return Array.from(
+            new Set(
+                calendar.people
+                    .map((p) => p.site)
+                    .filter((s): s is string => !!s),
+            ),
+        ).sort();
+    }, [calendar]);
+
+    const people = useMemo(() => {
+        if (!calendar) return [];
+        const q = query.trim().toLowerCase();
+        return calendar.people.filter(
+            (p) =>
+                (site === 'all' || p.site === site) &&
+                (q === '' || p.name.toLowerCase().includes(q)),
+        );
+    }, [calendar, query, site]);
+
+    // Coverage-at-risk: the site/day with the most people concurrently off.
+    const coverage = useMemo(() => {
+        if (!calendar) return null;
+        let peak = { site: '', date: '', count: 0 };
+        const bySite: Record<string, Record<string, Set<number>>> = {};
+        calendar.entries.forEach((e) => {
+            const s = e.site ?? 'Unassigned';
+            allDays.forEach((d) => {
+                if (e.start <= d.date && e.end >= d.date) {
+                    bySite[s] ??= {};
+                    bySite[s][d.date] ??= new Set();
+                    bySite[s][d.date].add(e.user_id);
+                }
+            });
+        });
+        Object.entries(bySite).forEach(([s, days]) =>
+            Object.entries(days).forEach(([date, set]) => {
+                if (set.size > peak.count)
+                    peak = { site: s, date, count: set.size };
+            }),
+        );
+        return peak.count >= 2 ? peak : null;
+    }, [calendar, allDays]);
+
+    if (!calendar) {
+        return (
+            <div className="rounded-[14px] border border-border bg-card py-12 text-center text-sm text-muted-foreground">
+                Loading calendar…
+            </div>
+        );
+    }
+
+    const N = visibleDays.length;
+    const visStart = visibleDays[0]?.date ?? calendar.start;
+    const visEnd = visibleDays[N - 1]?.date ?? calendar.end;
+
+    const barsFor = (userId: number) =>
+        calendar.entries
+            .filter(
+                (e) =>
+                    e.user_id === userId &&
+                    e.start <= visEnd &&
+                    e.end >= visStart,
+            )
+            .map((e) => {
+                const sIdx = Math.max(
+                    0,
+                    visibleDays.findIndex((d) => d.date >= e.start),
+                );
+                let eIdx = visibleDays.findIndex((d) => d.date >= e.end);
+                if (eIdx === -1) eIdx = N - 1;
+                const span = Math.max(1, eIdx - sIdx + 1);
+                const meta = leaveTypeMeta(e.leave_type);
+                const pending = e.status === 'pending';
+                return { entry: e, sIdx, span, meta, pending };
+            });
+
+    const onPrev = () => {
+        if (view === 'month') go(shiftMonth(calendar.month, -1));
+        else setWinStart((s) => Math.max(0, s - winSize));
+    };
+    const onNext = () => {
+        if (view === 'month') go(shiftMonth(calendar.month, 1));
+        else setWinStart((s) => Math.min(maxStart, s + winSize));
+    };
+    const onToday = () => {
+        const todayMonth = currentMonth ?? calendar.month;
+        if (todayMonth !== calendar.month) {
+            go(todayMonth);
+            return;
+        }
+        setWinStart(new Date().getDate() - 1);
+    };
 
     return (
-        <div className="space-y-4">
-            {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => go(shiftMonth(calendar.month, -1))}
-                        aria-label="Previous month"
+        <div className="flex flex-col gap-3.5">
+            {/* toolbar: view · nav · period · legend */}
+            <div className="flex flex-wrap items-center gap-2.5">
+                <div className="inline-flex gap-0.5 rounded-[10px] border border-border bg-card p-0.5">
+                    {(['month', 'week', 'day'] as View[]).map((v) => (
+                        <button
+                            key={v}
+                            type="button"
+                            onClick={() => setView(v)}
+                            className={cn(
+                                'rounded-[7px] px-3.5 py-1.5 text-xs font-bold capitalize transition-colors',
+                                view === v
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted',
+                            )}
+                        >
+                            {v}
+                        </button>
+                    ))}
+                </div>
+                <div className="inline-flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={onPrev}
+                        aria-label="Previous"
+                        className="grid h-[34px] w-[34px] place-items-center rounded-[9px] border border-border bg-card text-foreground hover:bg-muted"
                     >
                         <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="min-w-[160px] text-center text-base font-bold">
-                        {calendar.month_label}
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => go(shiftMonth(calendar.month, 1))}
-                        aria-label="Next month"
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-2"
-                        onClick={() => go(todayMonth)}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onToday}
+                        className="h-[34px] rounded-[9px] border border-border bg-card px-3 text-[12.5px] font-bold text-foreground hover:bg-muted"
                     >
                         Today
-                    </Button>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onNext}
+                        aria-label="Next"
+                        className="grid h-[34px] w-[34px] place-items-center rounded-[9px] border border-border bg-card text-foreground hover:bg-muted"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </button>
                 </div>
-                {/* Legend */}
-                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {typesPresent.map((t) => (
-                        <span key={t} className="inline-flex items-center gap-1.5">
-                            <span
-                                className={`h-2.5 w-2.5 rounded-sm ${typeColor(t).split(' ')[0]}`}
-                            />
-                            {typeLabel(t)}
-                        </span>
-                    ))}
-                    <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-sm bg-status-success/30" />
-                        Public holiday
-                    </span>
+                <span className="min-w-[160px] text-base font-extrabold tracking-tight">
+                    {calendar.month_label}
+                </span>
+                <div className="ml-auto flex items-center gap-3.5 text-[11.5px] text-muted-foreground">
+                    <LegendSwatch kind="approved" label="Approved" />
+                    <LegendSwatch kind="pending" label="Pending" />
+                    <LegendSwatch kind="holiday" label="Public holiday" />
                 </div>
             </div>
 
-            <Card>
-                <CardContent className="p-3">
-                    {/* Weekday header */}
-                    <div className="grid grid-cols-7 gap-1.5 pb-1.5">
-                        {WEEKDAYS.map((w) => (
-                            <div
-                                key={w}
-                                className="px-1 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-                            >
-                                {w}
-                            </div>
-                        ))}
-                    </div>
-                    {/* Day grid */}
-                    <div className="grid grid-cols-7 gap-1.5">
-                        {cells.map((cell, idx) => {
-                            if (!cell)
-                                return (
-                                    <div
-                                        key={`pad-${idx}`}
-                                        className="min-h-[92px] rounded-lg bg-muted/30"
-                                    />
-                                );
-                            const holiday = calendar.public_holidays[cell.date];
-                            const dayEntries = entriesForDay(cell.date);
-                            return (
+            {/* toolbar: search + sites */}
+            <div className="flex flex-wrap items-center gap-2.5">
+                <div className="relative flex items-center">
+                    <Search className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search team member…"
+                        className="h-[34px] w-[210px] rounded-[10px] border border-border bg-card pr-3 pl-8 text-[13px] outline-none focus:border-primary"
+                    />
+                </div>
+                <div className="inline-flex flex-wrap gap-0.5 rounded-[10px] border border-border bg-card p-0.5">
+                    <SiteChip
+                        label="All sites"
+                        active={site === 'all'}
+                        onClick={() => setSite('all')}
+                    />
+                    {sites.map((s) => (
+                        <SiteChip
+                            key={s}
+                            label={s}
+                            active={site === s}
+                            onClick={() => setSite(s)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* coverage banner */}
+            {coverage ? (
+                <div className="flex items-center gap-2 rounded-[12px] border border-status-warning/30 bg-status-warning-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-status-warning">
+                    <TriangleAlert className="h-4 w-4 flex-none" />
+                    Coverage at risk —{' '}
+                    <strong className="font-extrabold">
+                        {coverage.site}, {coverage.date}
+                    </strong>
+                    : {coverage.count} team members off. Consider staggering
+                    leave or arranging backfill.
+                </div>
+            ) : null}
+
+            {/* grid */}
+            <div className="overflow-x-auto rounded-[14px] border border-border bg-card">
+                <div style={{ minWidth: 168 + N * 40 }}>
+                    {/* day header */}
+                    <div className="flex border-b border-border">
+                        <div className="w-[168px] flex-none px-3.5 py-2.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                            Team member
+                        </div>
+                        <div className="flex flex-1">
+                            {visibleDays.map((d) => (
                                 <div
-                                    key={cell.date}
-                                    className={`min-h-[92px] rounded-lg border p-1.5 ${
-                                        holiday
-                                            ? 'border-status-success/40 bg-status-success/10'
-                                            : 'border-border bg-card'
-                                    }`}
+                                    key={d.date}
+                                    className={cn(
+                                        'flex-1 border-l border-border py-1.5 text-center',
+                                        d.holiday
+                                            ? 'bg-[color:var(--hr-cal-holiday)]'
+                                            : d.weekend
+                                              ? 'bg-muted/40'
+                                              : '',
+                                    )}
+                                    style={
+                                        {
+                                            '--hr-cal-holiday':
+                                                'color-mix(in oklab, var(--status-warning) 12%, var(--card))',
+                                        } as React.CSSProperties
+                                    }
+                                    title={d.holiday?.name}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold">
-                                            {cell.day}
-                                        </span>
-                                        {holiday && (
-                                            <span
-                                                className="truncate text-[9px] font-medium text-status-success"
-                                                title={holiday.name}
-                                            >
-                                                {holiday.name}
-                                            </span>
-                                        )}
+                                    <div className="text-[9.5px] font-bold text-muted-foreground">
+                                        {d.dowLabel}
                                     </div>
-                                    <div className="mt-1 space-y-1">
-                                        {dayEntries.slice(0, 3).map((e) => (
-                                            <div
-                                                key={`${e.id}-${cell.date}`}
-                                                className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium ${typeColor(e.leave_type)} ${
-                                                    e.status === 'pending'
-                                                        ? 'opacity-60'
-                                                        : ''
-                                                }`}
-                                                title={`${e.user_name} · ${typeLabel(e.leave_type)}${e.status === 'pending' ? ' (pending)' : ''}`}
-                                            >
-                                                {e.user_name}
-                                            </div>
-                                        ))}
-                                        {dayEntries.length > 3 && (
-                                            <div className="px-1 text-[10px] text-muted-foreground">
-                                                +{dayEntries.length - 3} more
-                                            </div>
+                                    <div
+                                        className={cn(
+                                            'text-[12px] font-bold',
+                                            d.isToday && 'text-primary',
                                         )}
+                                    >
+                                        {d.day}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
 
-            {calendar.entries.length === 0 && (
-                <Card>
-                    <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                        <CalendarDays className="h-7 w-7 text-muted-foreground" />
-                        <div className="text-sm font-semibold">
-                            No leave booked this month
+                    {/* rows */}
+                    {people.length === 0 ? (
+                        <div className="px-4 py-6 text-[12.5px] text-muted-foreground">
+                            {calendar.people.length === 0
+                                ? 'No leave booked this month.'
+                                : `No team member matches your filters.`}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                            Approved and pending leave appears here as soon as it's
-                            scheduled.
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                    ) : (
+                        people.map((p) => (
+                            <div
+                                key={p.user_id}
+                                className="flex border-b border-border last:border-b-0"
+                            >
+                                <div className="flex w-[168px] flex-none items-center gap-2.5 px-3.5 py-2.5">
+                                    <LeaveAvatar name={p.name} size={28} />
+                                    <div className="min-w-0">
+                                        <div className="truncate text-[12.5px] font-bold">
+                                            {p.name}
+                                        </div>
+                                        {p.site ? (
+                                            <div className="text-[10px] text-muted-foreground">
+                                                {p.site}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div className="relative flex flex-1">
+                                    {visibleDays.map((d) => (
+                                        <div
+                                            key={d.date}
+                                            className={cn(
+                                                'min-h-[46px] flex-1 border-l border-border',
+                                                d.holiday
+                                                    ? 'bg-[color:var(--hr-cal-holiday)]'
+                                                    : d.weekend
+                                                      ? 'bg-muted/30'
+                                                      : '',
+                                            )}
+                                            style={
+                                                {
+                                                    '--hr-cal-holiday':
+                                                        'color-mix(in oklab, var(--status-warning) 10%, var(--card))',
+                                                } as React.CSSProperties
+                                            }
+                                        />
+                                    ))}
+                                    {barsFor(p.user_id).map((b) => (
+                                        <button
+                                            key={b.entry.id}
+                                            type="button"
+                                            onClick={() =>
+                                                onOpenEntry?.(b.entry)
+                                            }
+                                            title={`${b.entry.user_name} · ${b.meta.label}${b.pending ? ' (pending)' : ''} · ${b.entry.start} – ${b.entry.end}`}
+                                            className="absolute top-[9px] flex h-7 items-center overflow-hidden rounded-[7px] border px-2 text-[10.5px] font-bold whitespace-nowrap"
+                                            style={{
+                                                left: `${(b.sIdx / N) * 100}%`,
+                                                width: `calc(${(b.span / N) * 100}% - 4px)`,
+                                                marginLeft: 2,
+                                                color: b.meta.color,
+                                                borderColor: `color-mix(in oklab, ${b.meta.color} ${b.pending ? '45%' : '35%'}, var(--card))`,
+                                                borderStyle: b.pending
+                                                    ? 'dashed'
+                                                    : 'solid',
+                                                background: b.pending
+                                                    ? `repeating-linear-gradient(45deg, color-mix(in oklab, ${b.meta.color} 20%, var(--card)), color-mix(in oklab, ${b.meta.color} 20%, var(--card)) 3px, var(--card) 3px, var(--card) 6px)`
+                                                    : `color-mix(in oklab, ${b.meta.color} 16%, var(--card))`,
+                                            }}
+                                        >
+                                            {b.meta.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            <div className="text-[11.5px] text-muted-foreground">
+                Pending leave shows hatched — click a bar to open the request.
+            </div>
         </div>
+    );
+}
+
+function LegendSwatch({
+    kind,
+    label,
+}: {
+    kind: 'approved' | 'pending' | 'holiday';
+    label: string;
+}) {
+    const style: React.CSSProperties =
+        kind === 'approved'
+            ? {
+                  background: 'color-mix(in oklab, var(--primary) 18%, white)',
+                  border: '1px solid color-mix(in oklab, var(--primary) 35%, white)',
+              }
+            : kind === 'pending'
+              ? {
+                    background:
+                        'repeating-linear-gradient(45deg, color-mix(in oklab, var(--primary) 20%, white), color-mix(in oklab, var(--primary) 20%, white) 3px, white 3px, white 6px)',
+                    border: '1px dashed color-mix(in oklab, var(--primary) 45%, white)',
+                }
+              : {
+                    background:
+                        'color-mix(in oklab, var(--status-warning) 40%, white)',
+                };
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-4 flex-none rounded-[3px]" style={style} />
+            {label}
+        </span>
+    );
+}
+
+function SiteChip({
+    label,
+    active,
+    onClick,
+}: {
+    label: string;
+    active: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'rounded-[7px] px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted',
+            )}
+        >
+            {label}
+        </button>
     );
 }
 
