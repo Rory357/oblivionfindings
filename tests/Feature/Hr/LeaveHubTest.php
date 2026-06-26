@@ -1,7 +1,6 @@
 <?php
 
 use App\Domain\Hr\Models\HrLeaveBalance;
-use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -52,7 +51,7 @@ test('a leave request can be submitted via the store endpoint', function () {
     ]);
 });
 
-test('the balances view exposes entitlement/taken/remaining (not the raw columns)', function () {
+test('the balances view pivots per staff member with remaining = balance − used − pending', function () {
     HrLeaveBalance::query()->create([
         'tenant_id' => 1,
         'user_id' => $this->hr->id,
@@ -67,11 +66,13 @@ test('the balances view exposes entitlement/taken/remaining (not the raw columns
     $response = $this->actingAs($this->hr)->get('/hr/leave/balances?year='.now()->year);
     $response->assertOk();
 
-    $rows = collect($response->inertiaProps('balances.data'));
-    $row = $rows->firstWhere('leave_type', 'annual');
+    // Balances are now a flat array, one pivoted row per staff member
+    // (annual / sick / alternative each carrying remaining + entitlement).
+    $rows = collect($response->inertiaProps('balances'));
+    $row = $rows->firstWhere('user_id', $this->hr->id);
 
     expect($row)->not->toBeNull();
-    expect((float) $row['entitlement_hours'])->toBe(160.0);
-    expect((float) $row['taken_hours'])->toBe(40.0);
-    expect((float) $row['remaining_hours'])->toBe(112.0); // 160 - 40 - 8
+    expect((float) $row['annual']['entitlement'])->toBe(160.0);
+    expect((float) $row['annual']['remaining'])->toBe(112.0); // 160 - 40 - 8
+    expect((float) $row['pending'])->toBe(8.0);
 });

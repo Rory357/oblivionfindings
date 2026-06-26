@@ -803,6 +803,7 @@ export default function LeaveIndex({
                                     hours: entry.hours ?? 0,
                                     status: entry.status as LeaveRequest['status'],
                                     reason: entry.reason,
+                                    submitted_at: entry.submitted_at,
                                 })
                             }
                         />

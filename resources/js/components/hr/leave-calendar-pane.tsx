@@ -31,6 +31,7 @@ export type LeaveCalendarEntry = {
     status: string;
     hours?: number;
     reason?: string | null;
+    submitted_at?: string | null;
     start: string;
     end: string;
 };
@@ -52,6 +53,12 @@ type View = 'month' | 'week' | 'day';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+/** Local (not UTC) Y-m-d — matches how the day columns + winStart index are
+ *  built, so "today" lines up in NZ (UTC+12/13) instead of being a day off. */
+function localDateStr(d: Date): string {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 function shiftMonth(month: string, delta: number): string {
     const [y, m] = month.split('-').map(Number);
@@ -88,7 +95,7 @@ export function LeaveCalendarPane({
         if (!calendar) return [];
         const [year, monthNum] = calendar.month.split('-').map(Number);
         const count = new Date(year, monthNum, 0).getDate();
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = localDateStr(new Date());
         return Array.from({ length: count }, (_, i) => {
             const day = i + 1;
             const date = `${year}-${pad(monthNum)}-${pad(day)}`;
@@ -107,8 +114,18 @@ export function LeaveCalendarPane({
 
     const winSize = view === 'month' ? allDays.length : view === 'week' ? 7 : 1;
     const maxStart = Math.max(0, allDays.length - winSize);
-    const clampedStart =
-        view === 'month' ? 0 : Math.min(Math.max(0, winStart), maxStart);
+    // `winStart` is the focus day; the visible window starts on the focus day
+    // (Day view) or on the Monday of the focus day's week (Week view).
+    const focus = Math.min(
+        Math.max(0, winStart),
+        Math.max(0, allDays.length - 1),
+    );
+    const clampedStart = (() => {
+        if (view === 'month') return 0;
+        if (view === 'day') return Math.min(focus, maxStart);
+        const dow = allDays[focus]?.dow ?? 1; // 0=Sun … 6=Sat
+        return Math.max(0, Math.min(focus - ((dow + 6) % 7), maxStart));
+    })();
     const visibleDays = useMemo(
         () =>
             view === 'month'
@@ -183,10 +200,11 @@ export function LeaveCalendarPane({
                     e.end >= visStart,
             )
             .map((e) => {
-                const sIdx = Math.max(
-                    0,
-                    visibleDays.findIndex((d) => d.date >= e.start),
-                );
+                // Bar starting before the window clips to the left edge (idx 0);
+                // a -1 (starts after the window) shouldn't survive the filter, but
+                // clamp to the last column rather than the left edge just in case.
+                const sRaw = visibleDays.findIndex((d) => d.date >= e.start);
+                const sIdx = sRaw === -1 ? N - 1 : sRaw;
                 let eIdx = visibleDays.findIndex((d) => d.date >= e.end);
                 if (eIdx === -1) eIdx = N - 1;
                 const span = Math.max(1, eIdx - sIdx + 1);
@@ -198,23 +216,30 @@ export function LeaveCalendarPane({
     const onPrev = () => {
         if (view === 'month') {
             go(shiftMonth(calendar.month, -1));
-        } else if (clampedStart <= 0) {
-            // At the month's start — step into the previous month at its end.
+            return;
+        }
+        const step = view === 'week' ? 7 : 1;
+        if (focus - step < 0) {
+            // Stepped before day 1 — into the previous month, near its end.
             setWinStart(9999);
             go(shiftMonth(calendar.month, -1));
         } else {
-            setWinStart((s) => Math.max(0, s - winSize));
+            setWinStart(focus - step);
         }
     };
     const onNext = () => {
         if (view === 'month') {
             go(shiftMonth(calendar.month, 1));
-        } else if (clampedStart >= maxStart) {
-            // At the month's end — step into the next month at its start.
-            setWinStart(0);
+            return;
+        }
+        const step = view === 'week' ? 7 : 1;
+        const next = focus + step;
+        if (next > allDays.length - 1) {
+            // Stepped past the last day — into the next month, by the overflow.
+            setWinStart(next - allDays.length);
             go(shiftMonth(calendar.month, 1));
         } else {
-            setWinStart((s) => Math.min(maxStart, s + winSize));
+            setWinStart(next);
         }
     };
     const onToday = () => {
