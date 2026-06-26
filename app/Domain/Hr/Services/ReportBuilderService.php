@@ -9,7 +9,6 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrSavedReport;
 use App\Domain\Hr\Models\HrTimeEntry;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
 
 class ReportBuilderService
 {
@@ -61,7 +60,28 @@ class ReportBuilderService
      */
     public function getAvailableSources(): array
     {
-        return self::REPORT_SOURCES;
+        $sources = self::REPORT_SOURCES;
+
+        // Need-to-know: the free-text leave reason is only offered as a report
+        // column to HR (hr.leave.manage) — mirrors the leave hub / API / roster.
+        if (! $this->canSeeSensitiveLeaveReason()) {
+            $sources['leave']['fields'] = array_values(array_filter(
+                $sources['leave']['fields'],
+                fn ($field) => $field !== 'reason',
+            ));
+        }
+
+        return $sources;
+    }
+
+    /**
+     * Whether the current viewer may include the free-text leave reason as a
+     * report column. Restricted to HR (hr.leave.manage); a non-manage viewer or
+     * an unauthenticated (scheduled) run never sees it.
+     */
+    private function canSeeSensitiveLeaveReason(): bool
+    {
+        return auth()->user()?->canDo('hr.leave.manage') ?? false;
     }
 
     /**
@@ -170,7 +190,7 @@ class ReportBuilderService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private query builders per report type                             */
+    /*  Private query builders per report type */
     /* ------------------------------------------------------------------ */
 
     private function buildEmployeeQuery(array $fields): Builder
@@ -214,6 +234,13 @@ class ReportBuilderService
 
     private function buildLeaveQuery(array $fields): Builder
     {
+        // Need-to-know: drop the free-text reason column for non-HR viewers so it
+        // can never be selected (covers ad-hoc previews AND saved-report runs whose
+        // stored fields include reason).
+        if (! $this->canSeeSensitiveLeaveReason()) {
+            $fields = array_values(array_filter($fields, fn ($field) => $field !== 'reason'));
+        }
+
         $fieldMap = [
             'employee_name' => 'users.name as employee_name',
             'leave_type' => 'hr_leave_requests.leave_type',
@@ -233,13 +260,16 @@ class ReportBuilderService
             }
         }
 
+        // Never fall through to SELECT * — that would expose reason + every column.
+        if (empty($selects)) {
+            $selects[] = 'hr_leave_requests.id';
+        }
+
         $query = HrLeaveRequest::query()
             ->join('users', 'users.id', '=', 'hr_leave_requests.user_id')
             ->leftJoin('users as reviewers', 'reviewers.id', '=', 'hr_leave_requests.reviewed_by');
 
-        if (! empty($selects)) {
-            $query->selectRaw(implode(', ', $selects));
-        }
+        $query->selectRaw(implode(', ', $selects));
 
         return $query;
     }
