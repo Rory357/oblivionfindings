@@ -787,9 +787,12 @@ class LeaveService
             ->map(fn ($row) => ['type' => (string) $row->leave_type, 'count' => (int) $row->count])
             ->all();
 
-        // Absence rate (sick hours / schedulable hours, last 30 days).
+        // Absence rate (sick hours / schedulable hours, last 30 days). Scope the
+        // denominator the same way as the (viewer-scoped) sick-hours numerator so
+        // a personal lens (non-manager) reads its own rate, not own-sick ÷ whole-org.
         $totalActiveStaff = HrEmployeeProfile::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->when(! $canViewAllQueue, fn ($q) => $q->where('user_id', $viewer->id))
             ->where('is_active', true)
             ->count();
         $sickHours = $scoped(
@@ -1058,6 +1061,7 @@ class LeaveService
             'status' => $r->status,
             'hours' => (float) $r->hours_requested,
             'reason' => $r->reason,
+            'submitted_at' => $r->submitted_at?->toDateTimeString(),
             'start' => $r->starts_at?->toDateString(),
             'end' => $r->ends_at?->toDateString(),
         ])->values();
