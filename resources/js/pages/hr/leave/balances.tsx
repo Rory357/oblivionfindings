@@ -30,7 +30,7 @@ import {
     SlidersHorizontal,
     X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -156,8 +156,12 @@ export default function LeaveBalances({
     const [ledgerLoading, setLedgerLoading] = useState(false);
     const [ledgerName, setLedgerName] = useState('');
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+    // Generation token: only the latest open's response is allowed to win, so
+    // a slow earlier fetch can't overwrite a quickly-opened later one.
+    const ledgerReqRef = useRef(0);
 
     const openLedger = (row: BalanceRow) => {
+        const reqId = ++ledgerReqRef.current;
         setLedgerName(row.name);
         setLedgerOpen(true);
         setLedgerLoading(true);
@@ -166,9 +170,15 @@ export default function LeaveBalances({
             headers: { Accept: 'application/json' },
         })
             .then((r) => (r.ok ? r.json() : { entries: [] }))
-            .then((d) => setLedger(d.entries ?? []))
-            .catch(() => setLedger([]))
-            .finally(() => setLedgerLoading(false));
+            .then((d) => {
+                if (ledgerReqRef.current === reqId) setLedger(d.entries ?? []);
+            })
+            .catch(() => {
+                if (ledgerReqRef.current === reqId) setLedger([]);
+            })
+            .finally(() => {
+                if (ledgerReqRef.current === reqId) setLedgerLoading(false);
+            });
     };
 
     // Right-click a staff row → adjust / set-opening / view-ledger / request-leave.

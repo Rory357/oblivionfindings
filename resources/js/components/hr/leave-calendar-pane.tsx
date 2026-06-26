@@ -34,6 +34,24 @@ export type LeaveCalendarEntry = {
     submitted_at?: string | null;
     start: string;
     end: string;
+    balance_impact?: {
+        remaining_before: number;
+        projected_after: number;
+        insufficient: boolean;
+    } | null;
+    roster_conflict?: {
+        has_conflict: boolean;
+        count: number;
+        shifts: Array<{
+            site_id: number | null;
+            site_name: string | null;
+            date: string | null;
+            am_pm: string;
+        }>;
+    };
+    is_overdue?: boolean;
+    due_within_24h?: boolean;
+    hours_waiting?: number;
 };
 
 export type LeaveCalendarFeed = {
@@ -179,6 +197,17 @@ export function LeaveCalendarPane({
         return peak.count >= 2 ? peak : null;
     }, [calendar, allDays]);
 
+    // Group entries by user_id ONCE so each row does an O(1) lookup instead of
+    // re-filtering the full entries list (O(people × entries) per render).
+    const entriesByUser = useMemo(() => {
+        const groups: Record<number, LeaveCalendarEntry[]> = {};
+        if (!calendar) return groups;
+        for (const e of calendar.entries) {
+            (groups[e.user_id] ??= []).push(e);
+        }
+        return groups;
+    }, [calendar]);
+
     if (!calendar) {
         return (
             <div className="rounded-[14px] border border-border bg-card py-12 text-center text-sm text-muted-foreground">
@@ -192,13 +221,8 @@ export function LeaveCalendarPane({
     const visEnd = visibleDays[N - 1]?.date ?? calendar.end;
 
     const barsFor = (userId: number) =>
-        calendar.entries
-            .filter(
-                (e) =>
-                    e.user_id === userId &&
-                    e.start <= visEnd &&
-                    e.end >= visStart,
-            )
+        (entriesByUser[userId] ?? [])
+            .filter((e) => e.start <= visEnd && e.end >= visStart)
             .map((e) => {
                 // Bar starting before the window clips to the left edge (idx 0);
                 // a -1 (starts after the window) shouldn't survive the filter, but

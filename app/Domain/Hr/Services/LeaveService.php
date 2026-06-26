@@ -819,7 +819,9 @@ class LeaveService
         }
 
         return [
-            'site_count' => Site::query()->count(),
+            'site_count' => Site::query()
+                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->count(),
             'awaiting_my_decision' => $awaiting,
             'on_leave_today' => $onLeaveToday,
             'upcoming_7d' => $upcoming7d,
@@ -1051,20 +1053,34 @@ class LeaveService
             ->pluck('name', 'id');
         $siteFor = fn ($userId) => ($sid = $profiles->get($userId)?->primary_site_id) ? ($siteNames[$sid] ?? null) : null;
 
-        $entries = $requests->map(fn (HrLeaveRequest $r) => [
-            'id' => $r->id,
-            'user_id' => $r->user_id,
-            'user_name' => $r->user?->name ?? 'Unknown',
-            'site' => $siteFor($r->user_id),
-            'leave_type' => $r->leave_type,
-            'period' => $r->period ?: 'full_day',
-            'status' => $r->status,
-            'hours' => (float) $r->hours_requested,
-            'reason' => $r->reason,
-            'submitted_at' => $r->submitted_at?->toDateTimeString(),
-            'start' => $r->starts_at?->toDateString(),
-            'end' => $r->ends_at?->toDateString(),
-        ])->values();
+        // Per-request roster-conflict + balance-impact (batch, no N+1) so a
+        // detail modal opened straight from a calendar bar has the same context
+        // as the Approvals queue.
+        $context = $this->annotateRequestsContext($requests);
+
+        $entries = $requests->map(function (HrLeaveRequest $r) use ($siteFor, $context) {
+            $isPending = $r->status === 'pending';
+
+            return [
+                'id' => $r->id,
+                'user_id' => $r->user_id,
+                'user_name' => $r->user?->name ?? 'Unknown',
+                'site' => $siteFor($r->user_id),
+                'leave_type' => $r->leave_type,
+                'period' => $r->period ?: 'full_day',
+                'status' => $r->status,
+                'hours' => (float) $r->hours_requested,
+                'reason' => $r->reason,
+                'submitted_at' => $r->submitted_at?->toDateTimeString(),
+                'hours_waiting' => $r->submitted_at ? round($r->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
+                'is_overdue' => $isPending && (bool) $r->approval_due_at?->isPast(),
+                'due_within_24h' => $isPending && (bool) $r->approval_due_at?->between(now(), now()->copy()->addDay()),
+                'roster_conflict' => $context[$r->id]['rosterConflict'] ?? ['has_conflict' => false, 'count' => 0, 'shifts' => []],
+                'balance_impact' => $context[$r->id]['balanceImpact'] ?? null,
+                'start' => $r->starts_at?->toDateString(),
+                'end' => $r->ends_at?->toDateString(),
+            ];
+        })->values();
 
         $people = $entries->groupBy('user_id')->map(fn ($grp) => [
             'user_id' => $grp->first()['user_id'],

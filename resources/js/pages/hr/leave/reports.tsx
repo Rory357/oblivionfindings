@@ -261,7 +261,7 @@ export default function LeaveReports({
                             </Button>
                             <Button asChild variant="outline" size="sm">
                                 <a
-                                    href={`/hr/leave/reports/export?format=csv&year=${year}`}
+                                    href={`/hr/leave/reports/export?format=xls&year=${year}`}
                                 >
                                     Excel
                                 </a>

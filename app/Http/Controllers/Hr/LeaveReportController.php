@@ -95,6 +95,10 @@ class LeaveReportController extends Controller
 
         $filename = 'leave-reports-'.$year;
 
+        if ($format === 'xls' || $format === 'xlsx' || $format === 'excel') {
+            return $this->streamSpreadsheetMl($sections, $filename);
+        }
+
         if ($format === 'pdf') {
             $html = '';
             foreach ($sections as $s) {
@@ -126,5 +130,59 @@ class LeaveReportController extends Controller
         $v = (string) $value;
 
         return $v !== '' && in_array($v[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$v : $v;
+    }
+
+    /**
+     * Stream a genuine Excel file as SpreadsheetML 2003 (a plain XML format
+     * Excel opens natively) — one worksheet per section, header row bold.
+     * Used because no spreadsheet library (PhpSpreadsheet / Laravel Excel) is
+     * installed; this needs no extra dependency.
+     *
+     * @param  array<int,array{title:string,headers:array<int,string>,rows:array<int,array<int,mixed>>}>  $sections
+     */
+    private function streamSpreadsheetMl(array $sections, string $filename)
+    {
+        return response()->streamDownload(function () use ($sections) {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<?mso-application progid="Excel.Sheet"?>'."\n";
+            echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"'
+                .' xmlns:o="urn:schemas-microsoft-com:office:office"'
+                .' xmlns:x="urn:schemas-microsoft-com:office:excel"'
+                .' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'."\n";
+            echo '<Styles><Style ss:ID="hdr"><Font ss:Bold="1"/></Style></Styles>'."\n";
+
+            foreach ($sections as $i => $section) {
+                // Worksheet names must be unique, <=31 chars, and exclude : \ / ? * [ ].
+                $name = preg_replace('/[:\\\\\/?*\[\]]/', ' ', (string) $section['title']);
+                $name = trim(mb_substr($name, 0, 28));
+                if ($name === '') {
+                    $name = 'Sheet'.($i + 1);
+                }
+
+                echo '<Worksheet ss:Name="'.e($name).'"><Table>'."\n";
+
+                echo '<Row>';
+                foreach ($section['headers'] as $header) {
+                    echo '<Cell ss:StyleID="hdr"><Data ss:Type="String">'.e((string) $header).'</Data></Cell>';
+                }
+                echo '</Row>'."\n";
+
+                foreach ($section['rows'] as $row) {
+                    echo '<Row>';
+                    foreach ($row as $cell) {
+                        if (is_int($cell) || is_float($cell)) {
+                            echo '<Cell><Data ss:Type="Number">'.e((string) $cell).'</Data></Cell>';
+                        } else {
+                            echo '<Cell><Data ss:Type="String">'.e((string) $cell).'</Data></Cell>';
+                        }
+                    }
+                    echo '</Row>'."\n";
+                }
+
+                echo '</Table></Worksheet>'."\n";
+            }
+
+            echo '</Workbook>'."\n";
+        }, $filename.'.xls', ['Content-Type' => 'application/vnd.ms-excel']);
     }
 }
