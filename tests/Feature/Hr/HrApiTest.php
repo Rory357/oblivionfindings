@@ -235,6 +235,32 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
         ->assertJsonPath('data.0.tenant_id', 1);
 });
 
+test('hr api redacts a sensitive leave reason and never exposes the document path for a non-HR viewer', function () {
+    // $this->viewer holds hr.leave.viewAny + approve, but NOT hr.leave.manage.
+    $staff = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+
+    HrLeaveRequest::factory()->create([
+        'tenant_id' => 1,
+        'user_id' => $staff->id,
+        'leave_type' => 'sick',
+        'status' => 'pending',
+        'reason' => 'Specialist referral',
+        'supporting_doc_path' => 'leave/'.$staff->id.'/note.pdf',
+        'created_by' => $staff->id,
+    ]);
+
+    $res = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/leave/requests')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.leave_type', 'sick')
+        ->assertJsonPath('data.0.reason', null)
+        ->assertJsonPath('data.0.reason_restricted', true)
+        ->assertJsonPath('data.0.has_doc', false);
+
+    // The private-disk storage path must never be serialized to the client.
+    expect($res->json('data.0'))->not->toHaveKey('supporting_doc_path');
+});
+
 function profileFor(User $user, int $tenantId, string $employeeNumber): HrEmployeeProfile
 {
     return HrEmployeeProfile::factory()->create([

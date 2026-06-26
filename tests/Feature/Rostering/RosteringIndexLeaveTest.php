@@ -107,3 +107,37 @@ it('surfaces pending HR leave overlapping the rostering week', function () {
             ->where('pendingLeave.0.reason', 'Family leave')
             ->where('pendingLeave.0.status', 'pending'));
 });
+
+it('redacts a sensitive (sick) leave reason from the rostering overlay for a non-HR scheduler', function () {
+    // The scheduler holds hr.leave.approve but NOT hr.leave.manage.
+    $manager = userWithRosteringLeavePermissions();
+    $staff = User::factory()->create([
+        'organization_id' => 1,
+        'name' => 'Bo Rata',
+        'approved_at' => now(),
+    ]);
+
+    HrLeaveRequest::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $staff->id,
+        'leave_type' => 'sick',
+        'starts_at' => '2026-05-05 09:00:00',
+        'ends_at' => '2026-05-05 17:00:00',
+        'hours_requested' => 8,
+        'reason' => 'Medical procedure',
+        'status' => 'pending',
+        'submitted_at' => now(),
+        'created_by' => $staff->id,
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('operations.rostering.index', ['week' => '2026-05-04']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('pendingLeave', 1)
+            // Schedulers still see WHO is off + the leave type (to plan cover)…
+            ->where('pendingLeave.0.user', 'Bo Rata')
+            ->where('pendingLeave.0.leave_type', 'sick')
+            // …but the free-text reason is need-to-know (HR/employee only).
+            ->where('pendingLeave.0.reason', null));
+});

@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\JsonResponse;
@@ -71,6 +72,23 @@ class HrApiController extends Controller
             ->when($request->query('user_id'), fn ($q, $userId) => $q->where('user_id', $userId))
             ->orderByDesc('submitted_at')
             ->paginate($request->integer('per_page', 25));
+
+        // Need-to-know: redact sick / family-violence reason for viewers who aren't
+        // the subject or HR (manage), and never expose the private-disk doc path.
+        $canSeeSensitive = $user->canDo('hr.leave.manage');
+        $requests->getCollection()->transform(function (HrLeaveRequest $r) use ($canSeeSensitive, $user) {
+            $restricted = LeaveService::isSensitiveLeaveType($r->leave_type)
+                && ! $canSeeSensitive
+                && $r->user_id !== $user->id;
+            if ($restricted) {
+                $r->reason = null;
+            }
+            $r->setAttribute('reason_restricted', $restricted);
+            $r->setAttribute('has_doc', ! $restricted && ! empty($r->supporting_doc_path));
+            $r->makeHidden('supporting_doc_path');
+
+            return $r;
+        });
 
         return response()->json($requests);
     }
