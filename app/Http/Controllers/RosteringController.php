@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Domain\Rostering\RosterPeriodService;
@@ -49,6 +50,9 @@ class RosteringController extends Controller
 
         $canManageAny = $auth->canDo('shifts.manageAny');
         $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
+        // Need-to-know: schedulers see WHO is off + the leave type, but the free-text
+        // reason of sick / family-violence leave is HR/employee-only (mirrors the hub).
+        $canSeeSensitiveLeave = $auth->canDo('hr.leave.manage');
         $organizationId = $auth->organization_id;
 
         // Roster Templates live as a tab in this workspace. View access piggybacks
@@ -675,7 +679,7 @@ class RosteringController extends Controller
                     'user_id' => $l->user_id,
                     'user' => $l->user?->name,
                     'leave_type' => $l->leave_type,
-                    'reason' => $l->reason,
+                    'reason' => (LeaveService::isSensitiveLeaveType($l->leave_type) && ! $canSeeSensitiveLeave && $l->user_id !== $auth->id) ? null : $l->reason,
                     'status' => $l->status,
                     'starts_at' => $l->starts_at?->toIso8601String(),
                     'ends_at' => $l->ends_at?->toIso8601String(),
@@ -686,7 +690,7 @@ class RosteringController extends Controller
                     'user_id' => $l->user_id,
                     'user' => $l->user?->name,
                     'leave_type' => $l->leave_type,
-                    'reason' => $l->reason,
+                    'reason' => (LeaveService::isSensitiveLeaveType($l->leave_type) && ! $canSeeSensitiveLeave && $l->user_id !== $auth->id) ? null : $l->reason,
                     'status' => $l->status,
                     'starts_at' => $l->starts_at?->toIso8601String(),
                     'ends_at' => $l->ends_at?->toIso8601String(),

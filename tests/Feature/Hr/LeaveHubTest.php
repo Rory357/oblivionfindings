@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -49,6 +50,31 @@ test('a plain approver sees sensitive leave reasons redacted in the requests lis
     expect($asHr['reason'])->toBe('Specialist appointment');
     expect($asHr['reason_restricted'])->toBeFalse();
     expect($asHr['has_doc'])->toBeTrue();
+});
+
+test('the approver leave-request email redacts a sensitive reason for non-HR approvers', function () {
+    $coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    $coordinator->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'coordinator')->first()->id,
+    ]);
+
+    $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $leave = HrLeaveRequest::query()->create([
+        'tenant_id' => 1, 'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
+        'starts_at' => now()->addWeek(), 'ends_at' => now()->addWeek(), 'hours_requested' => 8,
+        'status' => 'pending', 'submitted_at' => now(), 'escalation_level' => 1,
+        'reason' => 'Counselling session',
+    ]);
+    $notification = new LeaveRequestNotification($leave);
+
+    // A plain approver (coordinator) must not receive the sensitive reason by email.
+    $coordinatorLines = collect($notification->toMail($coordinator)->introLines)->implode(' ');
+    expect($coordinatorLines)->toContain('Restricted');
+    expect($coordinatorLines)->not->toContain('Counselling session');
+
+    // HR (manage) still gets the reason.
+    $hrLines = collect($notification->toMail($this->hr)->introLines)->implode(' ');
+    expect($hrLines)->toContain('Counselling session');
 });
 
 test('the leave hub index ships the request-modal staff and leave types', function () {
