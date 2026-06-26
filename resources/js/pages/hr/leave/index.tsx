@@ -804,6 +804,11 @@ export default function LeaveIndex({
                                     status: entry.status as LeaveRequest['status'],
                                     reason: entry.reason,
                                     submitted_at: entry.submitted_at,
+                                    hours_waiting: entry.hours_waiting,
+                                    is_overdue: entry.is_overdue,
+                                    due_within_24h: entry.due_within_24h,
+                                    roster_conflict: entry.roster_conflict,
+                                    balance_impact: entry.balance_impact,
                                 })
                             }
                         />
