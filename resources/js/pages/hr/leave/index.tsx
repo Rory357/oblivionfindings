@@ -11,6 +11,7 @@ import {
     LeaveTypeChip,
     useLeaveContextMenu,
     type HubHero,
+    type LeaveCalendarFeed,
     type LeaveCtxItem,
     type LeaveStaff,
     type LeaveTypeOption,
@@ -118,29 +119,6 @@ type Inbox = {
     recently_decided: InboxSegment;
 };
 
-type CalendarFeed = {
-    month: string;
-    month_label: string;
-    start: string;
-    end: string;
-    entries: Array<{
-        id: number;
-        user_id: number;
-        user_name: string;
-        site: string | null;
-        leave_type: string;
-        period: string;
-        status: string;
-        start: string;
-        end: string;
-    }>;
-    people: Array<{ user_id: number; name: string; site: string | null }>;
-    public_holidays: Record<
-        string,
-        { name: string; is_national: boolean; region: string | null }
-    >;
-};
-
 type PaginatedRequests = {
     data: LeaveRequest[];
     current_page: number;
@@ -154,7 +132,7 @@ type Props = {
     requests: PaginatedRequests;
     tab: 'overview' | 'approvals' | 'calendar';
     approvalInbox: Inbox;
-    calendar?: CalendarFeed | null;
+    calendar?: LeaveCalendarFeed | null;
     hero: HubHero;
     filters: {
         status?: string;
