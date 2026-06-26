@@ -96,6 +96,7 @@ type LeaveRequest = {
     hours: number;
     status: 'pending' | 'approved' | 'declined' | 'cancelled';
     reason?: string | null;
+    reason_restricted?: boolean;
     has_doc?: boolean;
     reviewed_by?: string | null;
     reviewed_at?: string | null;
@@ -781,6 +782,7 @@ export default function LeaveIndex({
                                     hours: entry.hours ?? 0,
                                     status: entry.status as LeaveRequest['status'],
                                     reason: entry.reason,
+                                    reason_restricted: entry.reason_restricted,
                                     submitted_at: entry.submitted_at,
                                     hours_waiting: entry.hours_waiting,
                                     is_overdue: entry.is_overdue,

@@ -203,7 +203,7 @@ export function LeaveHero({
                     {/* needs you */}
                     {needs.length > 0 ? (
                         <div className="mt-[18px] flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
+                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/70 uppercase">
                                 Needs you
                             </span>
                             {needs.map((chip) => (
@@ -224,7 +224,7 @@ export function LeaveHero({
                 {/* ── right rail: on-leave mix / coverage rate ── */}
                 <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[320px] sm:border-t-0 sm:border-l">
                     <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/55 uppercase">
+                        <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/70 uppercase">
                             On leave
                         </span>
                         <div className="inline-flex gap-0.5 rounded-lg bg-primary-foreground/[0.12] p-0.5">
@@ -294,6 +294,7 @@ function MixDonut({ mix }: { mix: LeaveMixSegment[] }) {
                     height="112"
                     viewBox="0 0 140 140"
                     style={{ transform: 'rotate(-90deg)' }}
+                    aria-hidden="true"
                 >
                     <circle
                         cx="70"
@@ -369,6 +370,7 @@ function CoverageRing({
                     height="112"
                     viewBox="0 0 112 112"
                     style={{ transform: 'rotate(-90deg)' }}
+                    aria-hidden="true"
                 >
                     <circle
                         cx="56"

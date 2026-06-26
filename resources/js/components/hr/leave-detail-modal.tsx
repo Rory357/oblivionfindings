@@ -12,6 +12,7 @@ import {
     CheckCircle2,
     Clock,
     ExternalLink,
+    Lock,
     Paperclip,
     XCircle,
 } from 'lucide-react';
@@ -157,6 +158,13 @@ export function LeaveDetailModal({
                                             Supporting document attached
                                         </span>
                                     ) : null}
+                                </div>
+                            ) : r.reason_restricted ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-[12.5px] text-muted-foreground">
+                                    <Lock className="h-3.5 w-3.5 flex-none" />
+                                    Reason &amp; any supporting document are
+                                    restricted — visible only to the employee
+                                    and HR.
                                 </div>
                             ) : null}
 

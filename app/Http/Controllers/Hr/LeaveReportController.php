@@ -127,9 +127,16 @@ class LeaveReportController extends Controller
     /** Neutralise spreadsheet formula injection in a free-text CSV cell. */
     private function csvCell(?string $value): string
     {
-        $v = (string) $value;
+        return $this->neutraliseFormula((string) $value);
+    }
 
-        return $v !== '' && in_array($v[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$v : $v;
+    /**
+     * Prefix a leading =, +, -, @, tab, or CR with a single quote so spreadsheet
+     * apps treat the cell as literal text rather than evaluating it as a formula.
+     */
+    private function neutraliseFormula(string $value): string
+    {
+        return $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
     }
 
     /**
@@ -173,7 +180,7 @@ class LeaveReportController extends Controller
                         if (is_int($cell) || is_float($cell)) {
                             echo '<Cell><Data ss:Type="Number">'.e((string) $cell).'</Data></Cell>';
                         } else {
-                            echo '<Cell><Data ss:Type="String">'.e((string) $cell).'</Data></Cell>';
+                            echo '<Cell><Data ss:Type="String">'.e($this->neutraliseFormula((string) $cell)).'</Data></Cell>';
                         }
                     }
                     echo '</Row>'."\n";

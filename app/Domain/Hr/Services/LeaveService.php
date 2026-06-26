@@ -39,6 +39,19 @@ class LeaveService
         'other',
     ];
 
+    /**
+     * Leave types whose free-text reason + supporting document are need-to-know:
+     * the medical detail of sick leave and the safety-sensitive detail of
+     * family-violence leave are visible only to the employee themselves and to
+     * HR (hr.leave.manage) — never to every line-manager who can merely approve.
+     */
+    public const SENSITIVE_LEAVE_TYPES = ['sick', 'family_violence'];
+
+    public static function isSensitiveLeaveType(?string $type): bool
+    {
+        return in_array($type, self::SENSITIVE_LEAVE_TYPES, true);
+    }
+
     public function __construct(
         private readonly PublicHolidayCalendar $holidays = new PublicHolidayCalendar,
     ) {}
@@ -1019,7 +1032,7 @@ class LeaveService
      *
      * @param  array{site_id?: int|string|null}  $filters
      */
-    public function calendarFeed(?int $tenantId, string $month, array $filters = []): array
+    public function calendarFeed(?int $tenantId, string $month, array $filters = [], ?int $viewerUserId = null, bool $canSeeSensitive = false): array
     {
         try {
             $start = Carbon::parse($month.'-01')->startOfMonth();
@@ -1058,8 +1071,11 @@ class LeaveService
         // as the Approvals queue.
         $context = $this->annotateRequestsContext($requests);
 
-        $entries = $requests->map(function (HrLeaveRequest $r) use ($siteFor, $context) {
+        $entries = $requests->map(function (HrLeaveRequest $r) use ($siteFor, $context, $viewerUserId, $canSeeSensitive) {
             $isPending = $r->status === 'pending';
+            $reasonRestricted = self::isSensitiveLeaveType($r->leave_type)
+                && ! $canSeeSensitive
+                && $r->user_id !== $viewerUserId;
 
             return [
                 'id' => $r->id,
@@ -1070,7 +1086,8 @@ class LeaveService
                 'period' => $r->period ?: 'full_day',
                 'status' => $r->status,
                 'hours' => (float) $r->hours_requested,
-                'reason' => $r->reason,
+                'reason' => $reasonRestricted ? null : $r->reason,
+                'reason_restricted' => $reasonRestricted,
                 'submitted_at' => $r->submitted_at?->toDateTimeString(),
                 'hours_waiting' => $r->submitted_at ? round($r->submitted_at->diffInMinutes(now()) / 60, 1) : 0,
                 'is_overdue' => $isPending && (bool) $r->approval_due_at?->isPast(),
