@@ -97,6 +97,7 @@ interface TodayShift {
 interface Props {
     myHr: MyHrShellData;
     leaveTypes?: string[];
+    publicHolidays?: Record<string, string>;
     overview: {
         shoutouts: MyHrShoutout[];
         attention: AttentionItem[];
@@ -397,6 +398,7 @@ function NextShiftCard({
 export default function MyHrIndex({
     myHr,
     leaveTypes = [],
+    publicHolidays,
     overview,
     announcements,
     balances,
@@ -982,6 +984,7 @@ export default function MyHrIndex({
                 staff={[]}
                 leaveTypes={leaveTypeOptions}
                 currentUser={{ name: myHr.profile.name }}
+                holidays={publicHolidays}
                 onSubmitted={() => setLeaveOpen(false)}
             />
         </MyHrShell>

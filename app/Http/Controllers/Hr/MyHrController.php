@@ -314,6 +314,10 @@ class MyHrController extends Controller
             'kudosReceived' => $kudosReceived,
             'announcements' => $announcements,
             'canViewFeed' => $user->canDo('hr.announcements.view'),
+            // Feeds the Overview's hosted "Request leave" wizard (tile picker +
+            // calendar holiday highlight).
+            'leaveTypes' => LeaveService::LEAVE_TYPES,
+            'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
         ]);
     }
 
@@ -357,6 +361,7 @@ class MyHrController extends Controller
             'requests' => $requests,
             'balances' => $balances,
             'leaveTypes' => LeaveService::LEAVE_TYPES,
+            'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
         ]);
     }
 

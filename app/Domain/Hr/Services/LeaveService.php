@@ -1129,6 +1129,29 @@ class LeaveService
     }
 
     /**
+     * Public holidays as an ISO-date → name map, for the leave-request modal's
+     * inline calendar (a decorative highlight + "won't come off your balance"
+     * chip). The hours engine remains the authoritative source for which days
+     * are actually paid; this is purely presentational. Defaults to a 14-month
+     * window from the start of the current month.
+     *
+     * @return array<string, string>
+     */
+    public function publicHolidayMap(int $tenantId, ?Carbon $from = null, ?Carbon $to = null): array
+    {
+        $from ??= now()->startOfMonth();
+        $to ??= now()->copy()->addMonths(14)->endOfMonth();
+
+        return HrPublicHoliday::query()
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->orderBy('date')
+            ->get()
+            ->mapWithKeys(fn (HrPublicHoliday $h) => [$h->date->toDateString() => (string) $h->name])
+            ->all();
+    }
+
+    /**
      * @return array{approver_user_id: int|null, escalation_after_hours: int}
      */
     protected function resolveApprovalRoute(User $user, int $level): array
