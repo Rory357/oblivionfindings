@@ -87,11 +87,11 @@ class LeaveController extends Controller
         );
 
         // Transform paginated data to match frontend LeaveRequest shape
-        $requests->through(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? []));
+        $requests->through(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? [], $user->id, $canManage));
 
         $inbox = collect($inboxRaw)->map(fn ($seg) => [
             'count' => $seg['count'],
-            'items' => $seg['items']->map(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? []))->values(),
+            'items' => $seg['items']->map(fn ($req) => $this->transformLeaveRow($req, $context[$req->id] ?? [], $user->id, $canManage))->values(),
         ])->all();
 
         $sla = $this->leaveService->approvalSlaSummary(
@@ -113,6 +113,8 @@ class LeaveController extends Controller
                 $tenantId,
                 (string) $request->query('month', now()->format('Y-m')),
                 ['site_id' => $request->query('site_id')],
+                $user->id,
+                $canManage,
             )
             : null;
 
@@ -145,9 +147,15 @@ class LeaveController extends Controller
      *
      * @param  array{rosterConflict?: array, balanceImpact?: array|null}  $ctx
      */
-    private function transformLeaveRow(HrLeaveRequest $req, array $ctx): array
+    private function transformLeaveRow(HrLeaveRequest $req, array $ctx, int $viewerId, bool $canSeeSensitiveAll): array
     {
         $isPending = $req->status === 'pending';
+
+        // Need-to-know: sick / family-violence reason + document are visible only
+        // to the employee themselves and to HR (manage), never to plain approvers.
+        $reasonRestricted = LeaveService::isSensitiveLeaveType($req->leave_type)
+            && ! $canSeeSensitiveAll
+            && $req->user_id !== $viewerId;
 
         return [
             'id' => $req->id,
@@ -159,8 +167,9 @@ class LeaveController extends Controller
             'end_date' => $req->ends_at?->toDateString(),
             'hours' => (float) $req->hours_requested,
             'status' => $req->status,
-            'reason' => $req->reason,
-            'has_doc' => ! empty($req->supporting_doc_path),
+            'reason' => $reasonRestricted ? null : $req->reason,
+            'reason_restricted' => $reasonRestricted,
+            'has_doc' => ! $reasonRestricted && ! empty($req->supporting_doc_path),
             'reviewed_by' => $req->reviewer?->name,
             'reviewed_at' => $req->reviewed_at?->toDateTimeString(),
             'submitted_at' => $req->submitted_at?->toDateTimeString(),
@@ -350,6 +359,13 @@ class LeaveController extends Controller
             abort(403);
         }
 
+        // Keep a manager's ledger read inside their own tenant (mirrors adjustBalance).
+        $tenantId = $this->resolveHrTenantIdForUser($actor);
+        $profileTenantId = HrEmployeeProfile::query()->where('user_id', $user->id)->value('tenant_id');
+        if (is_numeric($profileTenantId) && (int) $profileTenantId !== $tenantId) {
+            abort(404);
+        }
+
         $year = (int) $request->query('year', now()->year);
         $leaveType = $request->query('leave_type');
         $rows = $this->leaveService->balanceLedger($user->id, $leaveType, $year);
@@ -514,6 +530,13 @@ class LeaveController extends Controller
             'reviewer:id,name',
         ]);
 
+        // Need-to-know: redact sick / family-violence reason + document for plain
+        // approvers (only the employee + HR see them). Ship a has_doc boolean — the
+        // private-disk storage path must never reach the client.
+        $reasonRestricted = LeaveService::isSensitiveLeaveType($leaveRequest->leave_type)
+            && ! $user->canDo('hr.leave.manage')
+            && $leaveRequest->user_id !== $user->id;
+
         return Inertia::render('hr/leave/show', [
             'request' => [
                 'id' => $leaveRequest->id,
@@ -524,12 +547,13 @@ class LeaveController extends Controller
                 'end_date' => $leaveRequest->ends_at?->toDateString(),
                 'hours' => (float) $leaveRequest->hours_requested,
                 'status' => $leaveRequest->status,
-                'reason' => $leaveRequest->reason,
+                'reason' => $reasonRestricted ? null : $leaveRequest->reason,
+                'reason_restricted' => $reasonRestricted,
                 'reviewed_by' => $leaveRequest->reviewer?->name,
                 'reviewed_at' => $leaveRequest->reviewed_at?->toDateTimeString(),
                 'review_notes' => $leaveRequest->review_notes,
                 'submitted_at' => $leaveRequest->submitted_at?->toDateTimeString(),
-                'supporting_doc_path' => $leaveRequest->supporting_doc_path,
+                'has_doc' => ! $reasonRestricted && ! empty($leaveRequest->supporting_doc_path),
             ],
             'can' => [
                 'approve' => $user->canDo('hr.leave.approve') && $leaveRequest->status === 'pending',

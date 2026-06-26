@@ -6,7 +6,7 @@
  * that shadcn <Button>/<Card> can't express. Status / SLA chips still use the
  * semantic status-* tokens. */
 import { cn } from '@/lib/utils';
-import { AlertTriangle, MoreHorizontal, Paperclip } from 'lucide-react';
+import { AlertTriangle, Lock, MoreHorizontal, Paperclip } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -226,6 +226,7 @@ export type ApprovalCardRequest = {
     hours: number;
     status: string;
     reason?: string | null;
+    reason_restricted?: boolean;
     has_doc?: boolean;
     hours_waiting?: number;
     is_overdue?: boolean;
@@ -385,6 +386,11 @@ export function ApprovalCard({
                                     <Paperclip className="h-3 w-3" /> document
                                 </span>
                             ) : null}
+                        </div>
+                    ) : r.reason_restricted ? (
+                        <div className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                            <Lock className="h-3 w-3" />
+                            Reason restricted to the employee &amp; HR
                         </div>
                     ) : null}
                 </div>

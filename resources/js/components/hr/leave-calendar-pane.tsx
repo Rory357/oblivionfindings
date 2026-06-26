@@ -31,6 +31,7 @@ export type LeaveCalendarEntry = {
     status: string;
     hours?: number;
     reason?: string | null;
+    reason_restricted?: boolean;
     submitted_at?: string | null;
     start: string;
     end: string;
@@ -472,6 +473,7 @@ export function LeaveCalendarPane({
                                             onClick={() =>
                                                 onOpenEntry?.(b.entry)
                                             }
+                                            aria-label={`${b.entry.user_name} · ${b.meta.label}${b.pending ? ' (pending approval)' : ''} · ${b.entry.start} to ${b.entry.end}`}
                                             title={`${b.entry.user_name} · ${b.meta.label}${b.pending ? ' (pending)' : ''} · ${b.entry.start} – ${b.entry.end}`}
                                             className="absolute top-[9px] flex h-7 items-center overflow-hidden rounded-[7px] border px-2 text-[10.5px] font-bold whitespace-nowrap"
                                             style={{

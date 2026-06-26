@@ -17,6 +17,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
@@ -28,7 +34,6 @@ import {
     Plus,
     Search,
     SlidersHorizontal,
-    X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -387,86 +392,69 @@ export default function LeaveBalances({
             )}
 
             {/* Ledger drawer */}
-            {ledgerOpen && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/40"
-                    onClick={() => setLedgerOpen(false)}
+            <Sheet open={ledgerOpen} onOpenChange={setLedgerOpen}>
+                <SheetContent
+                    side="right"
+                    className="w-[420px] max-w-[92vw] gap-0 bg-card p-0 sm:max-w-[420px]"
                 >
-                    <div
-                        className="absolute top-0 right-0 flex h-full w-[420px] max-w-[92vw] flex-col bg-card shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between border-b px-5 py-4">
-                            <div>
-                                <div className="text-base font-bold">
-                                    {ledgerName}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Leave ledger · {year}
-                                </div>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setLedgerOpen(false)}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
+                    <SheetHeader className="gap-0 border-b px-5 py-4">
+                        <SheetTitle className="text-base font-bold">
+                            {ledgerName}
+                        </SheetTitle>
+                        <div className="text-xs text-muted-foreground">
+                            Leave ledger · {year}
                         </div>
-                        <div className="flex-1 overflow-y-auto px-5 py-3">
-                            {ledgerLoading ? (
-                                <p className="py-8 text-center text-sm text-muted-foreground">
-                                    Loading…
-                                </p>
-                            ) : ledger.length === 0 ? (
-                                <p className="py-8 text-center text-sm text-muted-foreground">
-                                    No ledger entries yet.
-                                </p>
-                            ) : (
-                                ledger.map((e) => (
-                                    <div
-                                        key={e.id}
-                                        className="flex items-center gap-3 border-b py-2.5 last:border-b-0"
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-semibold capitalize">
-                                                {e.entry_type.replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </div>
-                                            <div className="text-[11px] text-muted-foreground">
-                                                {e.created_at
-                                                    ?.slice(0, 16)
-                                                    .replace('T', ' ')}
-                                                {e.created_by
-                                                    ? ` · ${e.created_by}`
-                                                    : ''}
-                                                {e.notes ? ` · ${e.notes}` : ''}
-                                            </div>
+                    </SheetHeader>
+                    <div className="flex-1 overflow-y-auto px-5 py-3">
+                        {ledgerLoading ? (
+                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                Loading…
+                            </p>
+                        ) : ledger.length === 0 ? (
+                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                No ledger entries yet.
+                            </p>
+                        ) : (
+                            ledger.map((e) => (
+                                <div
+                                    key={e.id}
+                                    className="flex items-center gap-3 border-b py-2.5 last:border-b-0"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-semibold capitalize">
+                                            {e.entry_type.replace(/_/g, ' ')}
                                         </div>
-                                        <div className="text-right">
-                                            <div
-                                                className={
-                                                    e.hours_delta >= 0
-                                                        ? 'text-sm font-bold text-status-success'
-                                                        : 'text-sm font-bold text-status-critical'
-                                                }
-                                            >
-                                                {e.hours_delta >= 0 ? '+' : ''}
-                                                {e.hours_delta}h
-                                            </div>
-                                            <div className="text-[11px] text-muted-foreground">
-                                                → {e.balance_after}h
-                                            </div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                            {e.created_at
+                                                ?.slice(0, 16)
+                                                .replace('T', ' ')}
+                                            {e.created_by
+                                                ? ` · ${e.created_by}`
+                                                : ''}
+                                            {e.notes ? ` · ${e.notes}` : ''}
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                    <div className="text-right">
+                                        <div
+                                            className={
+                                                e.hours_delta >= 0
+                                                    ? 'text-sm font-bold text-status-success'
+                                                    : 'text-sm font-bold text-status-critical'
+                                            }
+                                        >
+                                            {e.hours_delta >= 0 ? '+' : ''}
+                                            {e.hours_delta}h
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                            → {e.balance_after}h
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
-                </div>
-            )}
+                </SheetContent>
+            </Sheet>
         </AppLayout>
     );
 }

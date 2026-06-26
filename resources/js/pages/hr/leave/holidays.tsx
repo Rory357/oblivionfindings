@@ -362,6 +362,7 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
+                                                            aria-label={`Edit ${holiday.name}`}
                                                             onClick={() =>
                                                                 startEdit(
                                                                     holiday,
@@ -373,6 +374,7 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
+                                                            aria-label={`Delete ${holiday.name}`}
                                                             onClick={() =>
                                                                 setDeleteTarget(
                                                                     holiday,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -14,6 +15,40 @@ beforeEach(function () {
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+});
+
+test('a plain approver sees sensitive leave reasons redacted in the requests list', function () {
+    // coordinator = hr.leave.viewAny + approve, but NOT hr.leave.manage.
+    $coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    $coordinator->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'coordinator')->first()->id,
+    ]);
+    $coordinator->setAttribute('tenant_id', 1);
+
+    $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $staff->setAttribute('tenant_id', 1);
+
+    $sick = HrLeaveRequest::query()->create([
+        'tenant_id' => 1, 'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
+        'starts_at' => now()->addWeek(), 'ends_at' => now()->addWeek(),
+        'hours_requested' => 8, 'status' => 'pending', 'submitted_at' => now(), 'escalation_level' => 1,
+        'reason' => 'Specialist appointment', 'supporting_doc_path' => 'leave/x/note.pdf',
+    ]);
+
+    $rowFor = fn ($response) => collect($response->inertiaProps('requests')['data'])
+        ->firstWhere('id', $sick->id);
+
+    // The coordinator (plain approver) must NOT see the reason or that a doc exists.
+    $asCoordinator = $rowFor($this->actingAs($coordinator)->get('/hr/leave'));
+    expect($asCoordinator['reason'])->toBeNull();
+    expect($asCoordinator['reason_restricted'])->toBeTrue();
+    expect($asCoordinator['has_doc'])->toBeFalse();
+
+    // HR (manage clearance) sees the full reason + document indicator.
+    $asHr = $rowFor($this->actingAs($this->hr)->get('/hr/leave'));
+    expect($asHr['reason'])->toBe('Specialist appointment');
+    expect($asHr['reason_restricted'])->toBeFalse();
+    expect($asHr['has_doc'])->toBeTrue();
 });
 
 test('the leave hub index ships the request-modal staff and leave types', function () {

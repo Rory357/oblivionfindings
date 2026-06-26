@@ -32,6 +32,7 @@ function TypeDonut({ data }: { data: Array<{ type: string; value: number }> }) {
     let acc = 0;
     return (
         <svg
+            aria-hidden="true"
             width={132}
             height={132}
             viewBox="0 0 132 132"
@@ -99,6 +100,10 @@ function AbsenceArea({
     return (
         <div>
             <svg
+                role="img"
+                aria-label={`Monthly absence trend: ${monthly
+                    .map((m) => `${m.label} ${m.count}`)
+                    .join(', ')}`}
                 viewBox={`0 0 ${w} ${h}`}
                 preserveAspectRatio="none"
                 width="100%"
