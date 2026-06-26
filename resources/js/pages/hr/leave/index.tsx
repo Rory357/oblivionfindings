@@ -151,6 +151,7 @@ type Props = {
     };
     staff: LeaveStaff[];
     leaveTypes: LeaveTypeOption[];
+    publicHolidays?: Record<string, string>;
     can: { approve?: boolean; manage?: boolean; create?: boolean };
 };
 
@@ -205,6 +206,7 @@ export default function LeaveIndex({
     sla,
     staff,
     leaveTypes,
+    publicHolidays,
     can,
 }: Props) {
     const { open: openCtx, element: ctxElement } = useLeaveContextMenu();
@@ -879,6 +881,7 @@ export default function LeaveIndex({
                     onClose={() => setRequestOpen(false)}
                     staff={staff}
                     leaveTypes={leaveTypes}
+                    holidays={publicHolidays}
                 />
             )}
 

@@ -133,6 +133,7 @@ class LeaveController extends Controller
             'calendar' => $calendar,
             'staff' => $this->leaveFormStaff($tenantId),
             'leaveTypes' => $this->leaveTypeOptions(),
+            'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
             'can' => [
                 'approve' => $canApprove,
                 'manage' => $canManage,

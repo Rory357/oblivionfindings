@@ -70,6 +70,7 @@ interface Props {
     };
     balances: LeaveBalance[];
     leaveTypes: string[];
+    publicHolidays?: Record<string, string>;
 }
 
 const TYPE_ICON: Record<string, typeof Palmtree> = {
@@ -170,6 +171,7 @@ export default function MyLeave({
     requests,
     balances,
     leaveTypes,
+    publicHolidays,
 }: Props) {
     const [wizardOpen, setWizardOpen] = useState(false);
     const [wizardInitial, setWizardInitial] = useState<{
@@ -385,6 +387,7 @@ export default function MyLeave({
                 staff={[]}
                 leaveTypes={leaveTypeOptions}
                 currentUser={{ name: myHr.profile.name }}
+                holidays={publicHolidays}
                 initial={wizardInitial}
                 onSubmitted={() => setWizardOpen(false)}
             />
