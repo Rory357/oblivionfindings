@@ -53,6 +53,7 @@ import { HrTabs } from '@/components/hr';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import {
     CALENDAR_LAYERS,
+    LAYER_DISPLAY_ORDER,
     DEFAULT_ACTIVE_LAYERS,
     LAYER_META,
     type CalendarLayer,
@@ -1236,7 +1237,7 @@ function LayerRail({
             </p>
 
             <div className="flex flex-col gap-1.5">
-                {CALENDAR_LAYERS.map((layer) => {
+                {LAYER_DISPLAY_ORDER.map((layer) => {
                     const meta = LAYER_META[layer];
                     const active = activeLayers.includes(layer);
                     return (
@@ -1297,7 +1298,7 @@ function Legend({
 }) {
     return (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {CALENDAR_LAYERS.filter((l) => activeLayers.includes(l)).map((layer) => {
+            {LAYER_DISPLAY_ORDER.filter((l) => activeLayers.includes(l)).map((layer) => {
                 const meta = LAYER_META[layer];
                 return (
                     <div key={layer} className="flex items-center gap-1.5 text-xs text-muted-foreground">
