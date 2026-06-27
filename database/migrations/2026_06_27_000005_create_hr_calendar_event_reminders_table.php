@@ -22,7 +22,8 @@ return new class extends Migration
             $table->dateTime('last_sent_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['event_id', 'offset_minutes', 'channel']);
+            // Explicit short name — the auto-generated one exceeds MySQL's 64-char limit.
+            $table->unique(['event_id', 'offset_minutes', 'channel'], 'hr_cal_reminder_unique');
         });
     }
 
