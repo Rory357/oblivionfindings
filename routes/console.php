@@ -73,6 +73,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
 
+// Day-before interview reminders (candidate + panel): 08:00 NZ
+app(Schedule::class)
+    ->command('recruitment:send-interview-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00');
+
 // PPE compliance reminders: worker unacknowledged/fit-test digests + H&S lead
 // overdue-inspection/expiring/condemned digests — every day 08:15 NZ.
 app(Schedule::class)

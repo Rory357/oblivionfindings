@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers\Careers;
 
+use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
+use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
+use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
+use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -189,7 +195,7 @@ class CareerPortalController extends Controller
                 $applicationData['cv_original_name'] = $request->file('cv')->getClientOriginalName();
             }
 
-            $this->recruitmentService->createApplication($candidate, $applicationData);
+            $application = $this->recruitmentService->createApplication($candidate, $applicationData);
         } catch (\InvalidArgumentException|\LogicException $exception) {
             return redirect()->back()->withErrors(['application' => $exception->getMessage()]);
         } catch (\Throwable $exception) {
@@ -197,9 +203,32 @@ class CareerPortalController extends Controller
             return redirect()->back()->withErrors(['application' => 'Application could not be submitted.']);
         }
 
+        $this->dispatchApplicationNotifications($job, $candidate, $application);
+
         return redirect()
             ->route('careers.apply', ['job' => $job->slug])
             ->with('success', 'Thanks, your application has been received.');
+    }
+
+    /**
+     * Confirm to the candidate + alert the requisition's hiring manager that an
+     * application landed. Best-effort — a mail failure must not fail the apply.
+     */
+    private function dispatchApplicationNotifications(HrJobRequisition $job, HrCandidate $candidate, HrApplication $application): void
+    {
+        try {
+            if ($candidate->personal_email) {
+                Notification::route('mail', $candidate->personal_email)
+                    ->notify(new ApplicationConfirmationNotification($job, $candidate, $application));
+            }
+
+            $manager = $job->hiringManager()->first();
+            if ($manager) {
+                $manager->notify(new JobApplicationReceivedNotification($job, $candidate, $application));
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function showOffer(Request $request, string $token)
@@ -267,7 +296,10 @@ class CareerPortalController extends Controller
             'response' => ['required', 'string', Rule::in(['accepted', 'declined', 'withdrawn'])],
             'signature_name' => ['nullable', 'string', 'max:255'],
             'response_notes' => ['nullable', 'string', 'max:5000'],
-            'terms_accepted' => ['nullable', 'accepted'],
+            // boolean (not the implicit `accepted` rule) so declining/withdrawing
+            // doesn't get blocked for lacking terms acceptance — the accept branch
+            // below enforces terms_accepted only when actually accepting.
+            'terms_accepted' => ['nullable', 'boolean'],
         ]);
 
         $response = $validated['response'];
@@ -314,6 +346,16 @@ class CareerPortalController extends Controller
                     'status' => $response === 'withdrawn' ? 'withdrawn' : 'rejected',
                     'rejection_reason' => $response === 'declined' ? ($validated['response_notes'] ?? 'Candidate declined offer') : $application->rejection_reason,
                 ]);
+            }
+
+            // Acknowledge the candidate (mirrors the in-app respondOffer path).
+            if (in_array($response, ['accepted', 'declined'], true) && $candidate->personal_email) {
+                try {
+                    Notification::route('mail', $candidate->personal_email)
+                        ->notify(new OfferResponseAckNotification($offer, $candidate, $response));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
             }
         }
 

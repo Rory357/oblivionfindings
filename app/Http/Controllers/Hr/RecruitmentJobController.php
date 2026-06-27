@@ -129,6 +129,12 @@ class RecruitmentJobController extends Controller
             'position_id' => ['nullable', 'integer', $positionRule],
             'site_id' => ['nullable', 'integer', $siteRule],
             'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
+            'salary_range_min' => ['nullable', 'numeric', 'min:0'],
+            'salary_range_max' => ['nullable', 'numeric', 'min:0', 'gte:salary_range_min'],
+            'show_salary' => ['nullable', 'boolean'],
+            'screening_questions' => ['nullable', 'array'],
+            'screening_questions.*' => ['string', 'max:500'],
+            'requires_approval' => ['nullable', 'boolean'],
             'openings' => ['required', 'integer', 'min:1', 'max:100'],
             'summary' => ['nullable', 'string', 'max:1000'],
             'description' => ['required', 'string', 'max:20000'],
@@ -176,6 +182,12 @@ class RecruitmentJobController extends Controller
             'position_id' => ['nullable', 'integer', $positionRule],
             'site_id' => ['nullable', 'integer', $siteRule],
             'employment_type' => ['sometimes', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
+            'salary_range_min' => ['nullable', 'numeric', 'min:0'],
+            'salary_range_max' => ['nullable', 'numeric', 'min:0', 'gte:salary_range_min'],
+            'show_salary' => ['nullable', 'boolean'],
+            'screening_questions' => ['nullable', 'array'],
+            'screening_questions.*' => ['string', 'max:500'],
+            'requires_approval' => ['nullable', 'boolean'],
             'openings' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'summary' => ['nullable', 'string', 'max:1000'],
             'description' => ['sometimes', 'string', 'max:20000'],
@@ -186,7 +198,7 @@ class RecruitmentJobController extends Controller
             'posting_channels' => ['nullable', 'array'],
             'posting_channels.*' => ['string', Rule::in(self::POSTING_CHANNELS)],
             'closing_at' => ['nullable', 'date'],
-            'status' => ['sometimes', 'string', Rule::in(['draft', 'published', 'paused', 'closed'])],
+            'status' => ['sometimes', 'string', Rule::in(['draft', 'published', 'paused', 'closed', 'pending_approval'])],
         ]);
 
         if (array_key_exists('title', $validated) && $validated['title'] !== $job->title) {
@@ -228,6 +240,70 @@ class RecruitmentJobController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Job closed.');
+    }
+
+    /** Route a requisition to its hiring manager for sign-off before publishing. */
+    public function submitForApproval(Request $request, HrJobRequisition $job)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+
+        if (! in_array($job->status, ['draft', 'paused'], true)) {
+            return redirect()->back()->with('error', 'Only a draft requisition can be submitted for approval.');
+        }
+
+        $job->update(['status' => 'pending_approval', 'updated_by' => $user->id]);
+
+        $manager = $job->hiringManager()->first();
+        if ($manager) {
+            try {
+                $manager->notify(new \App\Domain\Hr\Notifications\RequisitionApprovalRequestNotification($job, $user));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Requisition submitted for approval.');
+    }
+
+    /** Hiring-manager sign-off → published. */
+    public function approve(Request $request, HrJobRequisition $job)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+
+        if ($job->status !== 'pending_approval') {
+            return redirect()->back()->with('error', 'Only a requisition pending approval can be approved.');
+        }
+
+        $job->update([
+            'status' => 'published',
+            'published_at' => $job->published_at ?? now(),
+            'updated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Requisition approved and published.');
+    }
+
+    /** Reject the approval request → back to draft. */
+    public function rejectApproval(Request $request, HrJobRequisition $job)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+
+        if ($job->status !== 'pending_approval') {
+            return redirect()->back()->with('error', 'Only a requisition pending approval can be rejected.');
+        }
+
+        $job->update(['status' => 'draft', 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Approval rejected — requisition returned to draft.');
     }
 
     public function syncPosting(Request $request, HrJobRequisition $job)

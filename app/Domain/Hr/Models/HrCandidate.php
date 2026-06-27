@@ -60,6 +60,11 @@ class HrCandidate extends Model
         return $this->hasMany(HrCandidateDocument::class, 'candidate_id');
     }
 
+    public function talentPoolMembership(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(HrTalentPool::class, 'candidate_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

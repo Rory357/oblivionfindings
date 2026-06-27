@@ -402,7 +402,11 @@ function RequisitionWizard({ onClose, support }: WizProps) {
         default_interview_kit_id: '',
         posting_channels: ['career_page'] as string[],
         closing_at: '',
+        salary_range_min: '',
+        salary_range_max: '',
     });
+    const [showSalary, setShowSalary] = useState(false);
+    const [requiresApproval, setRequiresApproval] = useState(false);
 
     const steps: WizardStep[] = [
         { key: 'role', label: 'Role & position', blurb: 'Seat & title', icon: Briefcase },
@@ -431,6 +435,10 @@ function RequisitionWizard({ onClose, support }: WizProps) {
             default_interview_kit_id: d.default_interview_kit_id || undefined,
             posting_channels: channels,
             closing_at: d.closing_at || undefined,
+            salary_range_min: d.salary_range_min || undefined,
+            salary_range_max: d.salary_range_max || undefined,
+            show_salary: showSalary,
+            requires_approval: requiresApproval,
         }));
         form.post('/hr/recruitment/jobs', {
             preserveScroll: true,
@@ -584,8 +592,16 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                             })}
                         </div>
                     </Field>
-                    <div className="mt-3 max-w-[220px]">
-                        <Txt label="Closing date" hint="(optional)" type="date" value={form.data.closing_at} onChange={(v) => form.setData('closing_at', v)} />
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <Txt label="Salary min" hint="($)" value={form.data.salary_range_min} onChange={(v) => form.setData('salary_range_min', v)} />
+                        <Txt label="Salary max" hint="($)" value={form.data.salary_range_max} onChange={(v) => form.setData('salary_range_max', v)} />
+                        <div className="max-w-[220px]">
+                            <Txt label="Closing date" hint="(optional)" type="date" value={form.data.closing_at} onChange={(v) => form.setData('closing_at', v)} />
+                        </div>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2">
+                        <Toggle checked={showSalary} onChange={setShowSalary} title="Show salary on the ad" sub="Display the pay range to candidates on the careers page." />
+                        <Toggle checked={requiresApproval} onChange={setRequiresApproval} title="Requires approval before publishing" sub="Routes to the hiring manager for sign-off before it goes live." />
                     </div>
                 </WizardStepPane>
             ) : null}
@@ -1161,13 +1177,19 @@ function RejectWizard({ onClose, ctx }: WizProps) {
     const [reason, setReason] = useState('');
     const form = useForm({ rejection_reason: '' });
     const [note, setNote] = useState('');
+    const [addToPool, setAddToPool] = useState(false);
+    const [sendDecline, setSendDecline] = useState(false);
 
     const canSubmit = reason !== '' && Boolean(ctx.applicationId);
 
     const submit = () => {
         if (!ctx.applicationId) return;
         const combined = [reason, note.trim()].filter(Boolean).join(' — ');
-        form.transform(() => ({ rejection_reason: combined }));
+        form.transform(() => ({
+            rejection_reason: combined,
+            add_to_pool: addToPool,
+            send_decline_email: sendDecline,
+        }));
         form.post(`/hr/recruitment/applications/${ctx.applicationId}/reject`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -1237,6 +1259,20 @@ function RejectWizard({ onClose, ctx }: WizProps) {
                 </Field>
                 <div className="mt-3">
                     <Area label="Internal note (not shared with candidate)" value={note} onChange={setNote} />
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                    <Toggle
+                        checked={addToPool}
+                        onChange={setAddToPool}
+                        title="Add to talent pool"
+                        sub="Keep them warm for future roles instead of purging on retention."
+                    />
+                    <Toggle
+                        checked={sendDecline}
+                        onChange={setSendDecline}
+                        title="Send respectful decline email"
+                        sub="Optional — a warm, brand-consistent decline."
+                    />
                 </div>
                 {!ctx.applicationId ? <Hint msg="This candidate has no application to reject." /> : null}
             </WizardStepPane>

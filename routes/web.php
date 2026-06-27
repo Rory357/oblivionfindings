@@ -100,6 +100,9 @@ Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer
 Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->name('careers.offer.respond');
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
+// Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
+Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->name('careers.reference.show');
+Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->name('careers.reference.submit');
 Route::get('/careers/{slug}', [App\Http\Controllers\CareerPortalController::class, 'show'])->name('careers.show');
 
 // Authenticated routes

@@ -92,23 +92,37 @@ class RecruitmentAnalyticsService
         return $result;
     }
 
-    public function getOpenPositionsSummary(?int $tenantId): array
+    /**
+     * Open positions keyed on requisition_id (not the free-text position_title),
+     * so two requisitions that happen to share a title stay distinct. Optional
+     * created-at date window. COALESCE keeps legacy applications without a linked
+     * requisition visible under their stored title.
+     */
+    public function getOpenPositionsSummary(?int $tenantId, ?string $from = null, ?string $to = null): array
     {
         $results = DB::table('hr_applications')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->leftJoin('hr_job_requisitions as r', 'r.id', '=', 'hr_applications.requisition_id')
+            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
+            ->whereNotIn('hr_applications.status', ['rejected', 'withdrawn'])
+            ->when($from, fn ($q) => $q->where('hr_applications.created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('hr_applications.created_at', '<=', $to))
             ->selectRaw("
-                position_title,
+                hr_applications.requisition_id,
+                COALESCE(r.title, hr_applications.position_title) as title,
                 COUNT(*) as applications,
-                MIN(created_at) as first_application,
-                DATEDIFF(NOW(), MIN(created_at)) as days_open
+                MIN(hr_applications.created_at) as first_application,
+                DATEDIFF(NOW(), MIN(hr_applications.created_at)) as days_open
             ")
-            ->groupBy('position_title')
+            // Group by the raw columns inside COALESCE (not the alias) so MySQL's
+            // ONLY_FULL_GROUP_BY is satisfied — grouping by the alias leaves
+            // position_title non-functionally-dependent and 500s the page.
+            ->groupBy('hr_applications.requisition_id', 'r.title', 'hr_applications.position_title')
             ->orderByDesc('applications')
             ->get();
 
         return $results->map(fn ($r) => [
-            'position_title' => $r->position_title,
+            'requisition_id' => $r->requisition_id !== null ? (int) $r->requisition_id : null,
+            'position_title' => $r->title,
             'applications' => (int) $r->applications,
             'days_open' => (int) $r->days_open,
             'first_application' => $r->first_application,

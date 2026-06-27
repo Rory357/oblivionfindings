@@ -25,6 +25,8 @@ class HrInterview extends Model
         'rating',
         'outcome',
         'completed_by',
+        'invite_sent_at',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
@@ -32,6 +34,8 @@ class HrInterview extends Model
         'interviewers' => 'array',
         'rating' => 'integer',
         'duration_minutes' => 'integer',
+        'invite_sent_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */

@@ -5,6 +5,7 @@ namespace App\Domain\Hr\Notifications;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrJobPosting;
+use App\Domain\Hr\Models\HrJobRequisition;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,7 +16,7 @@ class ApplicationConfirmationNotification extends Notification implements Should
     use Queueable;
 
     public function __construct(
-        private HrJobPosting $posting,
+        private HrJobPosting|HrJobRequisition $posting,
         private HrCandidate $candidate,
         private HrApplication $application,
     ) {}

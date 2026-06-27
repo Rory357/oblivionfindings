@@ -53,6 +53,7 @@ use App\Http\Controllers\Hr\PolicyController;
 use App\Http\Controllers\Hr\PositionController;
 use App\Http\Controllers\Hr\PublicHolidayController;
 use App\Http\Controllers\Hr\RecruitmentController;
+use App\Http\Controllers\Hr\RecruitmentExportController;
 use App\Http\Controllers\Hr\RecruitmentJobController;
 use App\Http\Controllers\Hr\ReportBuilderController;
 use App\Http\Controllers\Hr\ScorecardController;
@@ -123,6 +124,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.recruitment.view')->group(function () {
         Route::get('/recruitment', [RecruitmentController::class, 'index'])->name('recruitment.index');
         Route::get('/recruitment/candidates', [RecruitmentController::class, 'index'])->name('candidates.index');
+        Route::get('/recruitment/export', [RecruitmentExportController::class, 'export'])->name('recruitment.export');
         // Retired standalone tab pages — collapsed into the unified Recruitment hub.
         Route::get('/recruitment/kanban', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'board']))->name('recruitment.kanban');
         Route::get('/recruitment/analytics', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'analytics']))->name('recruitment.analytics');
@@ -156,6 +158,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         // Application Actions
         Route::post('/recruitment/applications/{application}/reject', [CandidateController::class, 'rejectApplication'])->name('applications.reject')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/applications/bulk', [CandidateController::class, 'bulkAction'])->name('applications.bulk')
+            ->middleware('permission:hr.recruitment.manage');
+
+        // Talent pool
+        Route::post('/recruitment/candidates/{candidate}/pool', [CandidateController::class, 'addToPool'])->name('pool.add')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/{candidate}/reactivate', [CandidateController::class, 'reactivatePool'])->name('pool.reactivate')
+            ->middleware('permission:hr.recruitment.manage');
 
         // Candidate Documents
         Route::post('/recruitment/candidates/{candidate}/documents', [CandidateController::class, 'storeDocument'])->name('candidate.documents.store')
@@ -171,13 +181,16 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/resend', [CandidateController::class, 'resendOffer'])->name('offers.resend')
+            ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
             ->middleware('permission:hr.recruitment.manage');
+        // Segregation of duties: minting a login account additionally requires hr.employees.manage.
         Route::post('/recruitment/offers/{offer}/convert', [CandidateController::class, 'convertToEmployee'])->name('offers.convert')
-            ->middleware('permission:hr.recruitment.manage');
+            ->middleware('permission:hr.recruitment.manage', 'permission:hr.employees.manage');
 
         // Jobs & ATS setup
         Route::post('/recruitment/jobs', [RecruitmentJobController::class, 'store'])->name('jobs.store')
@@ -185,6 +198,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::put('/recruitment/jobs/{job}', [RecruitmentJobController::class, 'update'])->name('jobs.update')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/publish', [RecruitmentJobController::class, 'publish'])->name('jobs.publish')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/submit-approval', [RecruitmentJobController::class, 'submitForApproval'])->name('jobs.submit-approval')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/approve', [RecruitmentJobController::class, 'approve'])->name('jobs.approve')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/reject-approval', [RecruitmentJobController::class, 'rejectApproval'])->name('jobs.reject-approval')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/close', [RecruitmentJobController::class, 'close'])->name('jobs.close')
             ->middleware('permission:hr.recruitment.manage');

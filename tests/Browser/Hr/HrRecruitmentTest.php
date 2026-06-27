@@ -33,42 +33,16 @@ test('hr candidates create page loads', function () {
     });
 });
 
-test('hr recruitment jobs page loads', function () {
+// The standalone jobs/kanban/analytics/kits pages were retired into the unified
+// Recruitment hub — their routes now redirect to /hr/recruitment?tab=...
+test('retired recruitment tab pages redirect into the hub', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/hr/recruitment/jobs')
-            ->waitForText('Job', 10)
-            ->assertPathIs('/hr/recruitment/jobs');
-    });
-});
-
-test('hr recruitment kanban page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/hr/recruitment/kanban')
-            ->waitForText('Kanban', 10)
-            ->assertPathIs('/hr/recruitment/kanban');
-    });
-});
-
-test('hr recruitment analytics page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/hr/recruitment/analytics')
-            ->waitForText('Analytics', 10)
-            ->assertPathIs('/hr/recruitment/analytics');
-    });
-});
-
-test('hr recruitment kits page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/hr/recruitment/kits')
-            ->waitForText('Kit', 10)
-            ->assertPathIs('/hr/recruitment/kits');
+        foreach (['jobs', 'kanban', 'analytics', 'kits'] as $page) {
+            $browser->loginAs($user)
+                ->visit('/hr/recruitment/'.$page)
+                ->waitForText('Recruitment', 10)
+                ->assertPathIs('/hr/recruitment');
+        }
     });
 });

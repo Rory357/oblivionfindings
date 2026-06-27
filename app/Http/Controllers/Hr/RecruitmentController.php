@@ -53,6 +53,8 @@ class RecruitmentController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $staleDays = (int) config('hr.recruitment.stale_stage_days', 14);
+        $from = $request->filled('from') ? (string) $request->query('from') : null;
+        $to = $request->filled('to') ? (string) $request->query('to') : null;
 
         return Inertia::render('hr/recruitment/index', [
             'hero' => $this->buildHero($tenantId, $analytics),
@@ -61,7 +63,7 @@ class RecruitmentController extends Controller
             'requisitions' => $this->buildRequisitions($tenantId),
             'interviews' => $this->buildInterviews($tenantId),
             'offers' => $this->buildOffers($tenantId),
-            'analytics' => $this->buildAnalytics($tenantId, $analytics),
+            'analytics' => $this->buildAnalytics($tenantId, $analytics, $from, $to),
             'kits' => $this->buildKits($tenantId),
             'pool' => $this->buildPool($tenantId),
             'support' => $this->buildSupport($tenantId),
@@ -209,7 +211,7 @@ class RecruitmentController extends Controller
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->with(['site:id,name', 'position:id,title', 'hiringManager:id,name'])
             ->withCount('applications')
-            ->orderByRaw("FIELD(status, 'published', 'draft', 'paused', 'closed')")
+            ->orderByRaw("FIELD(status, 'pending_approval', 'published', 'draft', 'paused', 'closed')")
             ->orderByDesc('created_at')
             ->limit(60)
             ->get();
@@ -225,7 +227,22 @@ class RecruitmentController extends Controller
             'employment_type' => $r->employment_type,
             'position' => $r->position?->title ?? $r->title,
             'position_id' => $r->position_id,
+            'requires_approval' => (bool) $r->requires_approval,
+            'pay' => $this->payRange($r),
         ])->values()->all();
+    }
+
+    private function payRange(HrJobRequisition $r): ?string
+    {
+        if (! $r->show_salary || ($r->salary_range_min === null && $r->salary_range_max === null)) {
+            return null;
+        }
+        $fmt = fn ($v) => '$'.number_format((float) $v, 0);
+        if ($r->salary_range_min !== null && $r->salary_range_max !== null) {
+            return $fmt($r->salary_range_min).' – '.$fmt($r->salary_range_max);
+        }
+
+        return $fmt($r->salary_range_min ?? $r->salary_range_max);
     }
 
     /* ------------------------------------------------------------------ */
@@ -399,12 +416,13 @@ class RecruitmentController extends Controller
     /*  Analytics                                                         */
     /* ------------------------------------------------------------------ */
 
-    private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics): array
+    private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
     {
         $conversion = collect($analytics->getPipelineConversion($tenantId));
         $sources = collect($analytics->getSourceEffectiveness($tenantId));
         $tth = collect($analytics->getTimeToHire($tenantId, 6));
         $velocity = collect($analytics->getHiringVelocity($tenantId));
+        $openPositions = collect($analytics->getOpenPositionsSummary($tenantId, $from, $to));
 
         $hiresThisMonth = (int) ($velocity->last()['count'] ?? 0);
         $avgTth = (int) round((float) ($tth->avg('avg_days') ?? 0));
@@ -439,6 +457,12 @@ class RecruitmentController extends Controller
                 'detail' => $row['hired'].' hired · '.$row['conversion_rate'].'%',
                 'width' => round(((int) $row['total'] / $maxSrc) * 100),
             ])->values()->all(),
+            'open_positions' => $openPositions->map(fn ($row) => [
+                'requisition_id' => $row['requisition_id'],
+                'title' => $row['position_title'] ?: 'Untitled',
+                'applications' => (int) $row['applications'],
+                'days_open' => (int) $row['days_open'],
+            ])->values()->all(),
         ];
     }
 
@@ -468,20 +492,24 @@ class RecruitmentController extends Controller
 
     private function buildPool(?int $tenantId): array
     {
-        // Talent pool = candidates explicitly tagged (no dedicated table yet).
-        return HrCandidate::query()
+        // Durable talent pool — explicit hr_talent_pool membership (D5 / item 22),
+        // not any non-empty tags. Membership survives candidate anonymisation.
+        return \App\Domain\Hr\Models\HrTalentPool::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereNotNull('tags')
-            ->with(['applications' => fn ($q) => $q->select('id', 'candidate_id', 'position_title')->latest('id')])
-            ->limit(60)
+            ->with([
+                'candidate' => fn ($q) => $q->withTrashed()->select('id', 'first_name', 'last_name', 'deleted_at'),
+                'candidate.applications' => fn ($q) => $q->select('id', 'candidate_id', 'position_title')->latest('id'),
+            ])
+            ->latest('updated_at')
+            ->limit(80)
             ->get()
-            ->filter(fn (HrCandidate $c) => ! empty($c->tags))
-            ->map(fn (HrCandidate $c) => [
-                'id' => $c->id,
-                'name' => $c->full_name,
-                'last_role' => $c->applications->first()?->position_title ?? '—',
-                'tags' => array_values((array) $c->tags),
-                'reason' => $c->status === 'rejected' ? 'Strong but not selected' : 'Kept warm',
+            ->filter(fn ($membership) => $membership->candidate !== null)
+            ->map(fn ($membership) => [
+                'id' => $membership->candidate_id,
+                'name' => $membership->candidate->full_name,
+                'last_role' => $membership->candidate->applications->first()?->position_title ?? '—',
+                'tags' => array_values((array) ($membership->tags ?? [])),
+                'reason' => $membership->reason ?: 'Kept warm',
             ])->values()->all();
     }
 

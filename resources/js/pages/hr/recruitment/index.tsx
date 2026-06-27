@@ -85,6 +85,8 @@ type Requisition = {
     employment_type: string;
     position: string;
     position_id?: number | null;
+    requires_approval?: boolean;
+    pay?: string | null;
 };
 
 type WeekInterview = {
@@ -122,6 +124,7 @@ type AnalyticsData = {
     kpis: { key: string; label: string; value: string; trend: string }[];
     funnel: { label: string; count: number; rate: string; width: number }[];
     sources: { name: string; total: number; hired: number; detail: string; width: number }[];
+    open_positions: { requisition_id: number | null; title: string; applications: number; days_open: number }[];
 };
 
 type Kit = { id: number; name: string; role: string | null; is_active: boolean; criteria: { label: string; weight: number }[] };
@@ -246,6 +249,23 @@ export default function RecruitmentHub(props: Props) {
         );
     };
 
+    const bulkAction = (action: 'advance' | 'reject') => {
+        if (selected.length === 0) return;
+        router.post(
+            '/hr/recruitment/applications/bulk',
+            { action, candidate_ids: selected },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else toast.success(f?.success ?? `${selected.length} candidates ${action === 'advance' ? 'advanced' : 'rejected'}`);
+                    setSelected([]);
+                },
+            },
+        );
+    };
+
     const toggleSelect = (id: number) =>
         setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
     const toggleAll = () => {
@@ -254,21 +274,13 @@ export default function RecruitmentHub(props: Props) {
         setSelected(all ? [] : ids);
     };
 
-    const exportCsv = () => {
-        const rows = filtered.length ? filtered : candidates;
-        const head = ['Name', 'Email', 'Stage', 'Requisition', 'Source', 'Days'];
-        const body = rows.map((c) => [c.full_name, c.email, stageLabel(c.stage), c.requisition?.title ?? '', c.source, String(c.days)]);
-        const csv = [head, ...body]
-            .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
-            .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `recruitment-pipeline-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(`Exported ${rows.length} candidates`);
+    // Server-side, uncapped CSV export (the in-browser export was silently
+    // truncated at the 300-row index cap). Streams the chosen dataset.
+    const EXPORT_DATASETS = new Set(['pipeline', 'requisitions', 'offers', 'analytics']);
+    const exportData = (dataset?: string) => {
+        const ds = dataset && EXPORT_DATASETS.has(dataset) ? dataset : 'pipeline';
+        window.location.href = `/hr/recruitment/export?dataset=${ds}&format=csv`;
+        toast.success(`Exporting ${ds}…`);
     };
 
     /* ---- context menus ---- */
@@ -328,7 +340,7 @@ export default function RecruitmentHub(props: Props) {
         onNewRequisition: () => openWizard('requisition'),
         onSchedule: () => setTab('interviews'),
         onReviewOffers: () => setTab('offers'),
-        onExport: exportCsv,
+        onExport: () => exportData(EXPORT_DATASETS.has(tab) ? tab : 'pipeline'),
         onStat: (t: string) => setTab(t),
         onNeed: (chip: { tab: string }) => setTab(chip.tab),
     };
@@ -417,13 +429,11 @@ export default function RecruitmentHub(props: Props) {
                                 toggleSelect={toggleSelect}
                                 toggleAll={toggleAll}
                                 clearSelection={() => setSelected([])}
-                                onExport={exportCsv}
+                                onExport={() => exportData('pipeline')}
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
-                                onBulkReject={() => {
-                                    const first = candidates.find((c) => c.id === selected[0]);
-                                    if (first) openWizard('reject', candidateCtx(first));
-                                }}
+                                onBulkAdvance={() => bulkAction('advance')}
+                                onBulkReject={() => bulkAction('reject')}
                                 canManage={can.manage}
                             />
                         ) : null}
@@ -443,7 +453,27 @@ export default function RecruitmentHub(props: Props) {
                         ) : null}
 
                         {tab === 'requisitions' ? (
-                            <RequisitionsTab requisitions={requisitions} canManage={can.manage} onNew={() => openWizard('requisition')} />
+                            <RequisitionsTab
+                                requisitions={requisitions}
+                                canManage={can.manage}
+                                onNew={() => openWizard('requisition')}
+                                onAction={(jobId, action) => {
+                                    const urls: Record<string, string> = {
+                                        submit: `/hr/recruitment/jobs/${jobId}/submit-approval`,
+                                        approve: `/hr/recruitment/jobs/${jobId}/approve`,
+                                        reject: `/hr/recruitment/jobs/${jobId}/reject-approval`,
+                                        publish: `/hr/recruitment/jobs/${jobId}/publish`,
+                                    };
+                                    router.post(urls[action], {}, {
+                                        preserveScroll: true,
+                                        onSuccess: (pg) => {
+                                            const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                                            if (f?.error) toast.error(f.error);
+                                            else toast.success(f?.success ?? 'Done');
+                                        },
+                                    });
+                                }}
+                            />
                         ) : null}
 
                         {tab === 'interviews' ? (
@@ -454,14 +484,35 @@ export default function RecruitmentHub(props: Props) {
                             <OffersTab
                                 offers={offers}
                                 canManage={can.manage}
-                                onSend={(o) => sendOffer(o)}
+                                onSend={(o) => sendOffer(o, false)}
+                                onResend={(o) => sendOffer(o, true)}
                                 onConvert={(o) => openWizard('convert', { offerId: o.id, candidateName: o.candidate, role: o.role })}
                             />
                         ) : null}
 
                         {tab === 'analytics' ? <AnalyticsTab data={analytics} /> : null}
                         {tab === 'kits' ? <KitsTab kits={kits} /> : null}
-                        {tab === 'pool' ? <PoolTab pool={pool} /> : null}
+                        {tab === 'pool' ? (
+                            <PoolTab
+                                pool={pool}
+                                requisitions={requisitions.filter((r) => r.status !== 'closed')}
+                                canManage={can.manage}
+                                onReactivate={(candidateId, requisitionId) => {
+                                    router.post(
+                                        `/hr/recruitment/candidates/${candidateId}/reactivate`,
+                                        { requisition_id: requisitionId },
+                                        {
+                                            preserveScroll: true,
+                                            onSuccess: (pg) => {
+                                                const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                                                if (f?.error) toast.error(f.error);
+                                                else toast.success(f?.success ?? 'Candidate re-activated');
+                                            },
+                                        },
+                                    );
+                                }}
+                            />
+                        ) : null}
                     </div>
                 </div>
             </PageShell>
@@ -481,13 +532,14 @@ export default function RecruitmentHub(props: Props) {
         </AppLayout>
     );
 
-    function sendOffer(o: OfferRow) {
-        router.post(`/hr/recruitment/offers/${o.id}/send`, {}, {
+    function sendOffer(o: OfferRow, resend: boolean) {
+        const url = resend ? `/hr/recruitment/offers/${o.id}/resend` : `/hr/recruitment/offers/${o.id}/send`;
+        router.post(url, {}, {
             preserveScroll: true,
             onSuccess: (pg) => {
                 const f = (pg.props as { flash?: { error?: string } }).flash;
                 if (f?.error) toast.error(f.error);
-                else toast.success(`Offer sent to ${o.candidate}`);
+                else toast.success(resend ? `Offer link resent to ${o.candidate}` : `Offer emailed to ${o.candidate}`);
             },
         });
     }
@@ -540,6 +592,7 @@ function PipelineTab({
     onExport,
     onOpen,
     onCtx,
+    onBulkAdvance,
     onBulkReject,
     canManage,
 }: {
@@ -557,6 +610,7 @@ function PipelineTab({
     onExport: () => void;
     onOpen: (c: HubCandidate) => void;
     onCtx: (e: MouseEvent, c: HubCandidate) => void;
+    onBulkAdvance: () => void;
     onBulkReject: () => void;
     canManage: boolean;
 }) {
@@ -608,8 +662,11 @@ function PipelineTab({
                 <div className="mb-3.5 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2.5 motion-safe:animate-in motion-safe:fade-in-0">
                     <span className="text-[13px] font-bold text-primary">{selected.length} selected</span>
                     <div className="h-4 w-px bg-border" />
+                    <button type="button" onClick={onBulkAdvance} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Advance stage
+                    </button>
                     <button type="button" onClick={onBulkReject} className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-2.5 py-1 text-[12.5px] font-semibold text-status-critical">
-                        Reject…
+                        Reject
                     </button>
                     <button type="button" onClick={clearSelection} className="ml-auto text-[12.5px] font-semibold text-muted-foreground">
                         Clear
@@ -799,7 +856,17 @@ const REQ_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'i
     pending_approval: 'warning',
 };
 
-function RequisitionsTab({ requisitions, canManage, onNew }: { requisitions: Requisition[]; canManage: boolean; onNew: () => void }) {
+function RequisitionsTab({
+    requisitions,
+    canManage,
+    onNew,
+    onAction,
+}: {
+    requisitions: Requisition[];
+    canManage: boolean;
+    onNew: () => void;
+    onAction: (jobId: number, action: 'submit' | 'approve' | 'reject' | 'publish') => void;
+}) {
     return (
         <div>
             <div className="mb-4 flex items-center gap-3">
@@ -831,10 +898,24 @@ function RequisitionsTab({ requisitions, canManage, onNew }: { requisitions: Req
                                 <Stat value={r.openings} label="Openings" />
                                 <Stat value={r.applicants} label="Applicants" />
                                 <div className="flex-1 text-right">
-                                    <div className="text-[13px] font-bold capitalize">{r.employment_type?.replace(/_/g, ' ')}</div>
+                                    <div className="text-[13px] font-bold capitalize">{r.pay ?? r.employment_type?.replace(/_/g, ' ')}</div>
                                     <div className="text-[10.5px] text-muted-foreground">{r.hiring_manager ?? 'Unassigned'}</div>
                                 </div>
                             </div>
+                            {canManage ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {r.status === 'pending_approval' ? (
+                                        <>
+                                            <button type="button" onClick={() => onAction(r.id, 'approve')} className="h-8 rounded-md bg-status-success px-3 text-[12px] font-bold text-white">Approve</button>
+                                            <button type="button" onClick={() => onAction(r.id, 'reject')} className="h-8 rounded-md border border-status-critical/30 bg-status-critical-bg px-3 text-[12px] font-semibold text-status-critical">Reject</button>
+                                        </>
+                                    ) : r.status === 'draft' && r.requires_approval ? (
+                                        <button type="button" onClick={() => onAction(r.id, 'submit')} className="h-8 rounded-md border border-primary bg-primary/10 px-3 text-[12px] font-bold text-primary">Submit for approval</button>
+                                    ) : r.status === 'draft' || r.status === 'paused' ? (
+                                        <button type="button" onClick={() => onAction(r.id, 'publish')} className="h-8 rounded-md border border-primary bg-primary/10 px-3 text-[12px] font-bold text-primary">Publish</button>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -940,11 +1021,13 @@ function OffersTab({
     offers,
     canManage,
     onSend,
+    onResend,
     onConvert,
 }: {
     offers: { summary: { key: string; label: string; count: number; color: string }[]; list: OfferRow[] };
     canManage: boolean;
     onSend: (o: OfferRow) => void;
+    onResend: (o: OfferRow) => void;
     onConvert: (o: OfferRow) => void;
 }) {
     return (
@@ -979,7 +1062,7 @@ function OffersTab({
                                 ) : o.status === 'draft' || o.status === 'approved' ? (
                                     <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Send</button>
                                 ) : o.status === 'sent' ? (
-                                    <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
+                                    <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
                                 ) : (
                                     <span className="w-[60px]" />
                                 )
@@ -1043,6 +1126,26 @@ function AnalyticsTab({ data }: { data: AnalyticsData }) {
                     )}
                 </div>
             </div>
+
+            {data.open_positions.length > 0 ? (
+                <div className="mt-4 rounded-[14px] border border-border bg-card p-4">
+                    <div className="mb-3.5 text-[13px] font-bold">Open positions <span className="font-normal text-muted-foreground">· by requisition</span></div>
+                    <div className="overflow-hidden rounded-[10px] border border-border">
+                        <div className="grid grid-cols-[2.5fr_1fr_1fr] gap-2 border-b border-border bg-muted px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                            <span>Requisition</span>
+                            <span className="text-right">Applicants</span>
+                            <span className="text-right">Days open</span>
+                        </div>
+                        {data.open_positions.map((p, i) => (
+                            <div key={`${p.requisition_id ?? 'none'}-${i}`} className="grid grid-cols-[2.5fr_1fr_1fr] gap-2 border-b border-border px-3 py-2 text-[12.5px] last:border-0">
+                                <span className="truncate font-semibold">{p.title}</span>
+                                <span className="text-right tabular-nums">{p.applications}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">{p.days_open}d</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -1102,30 +1205,82 @@ function KitsTab({ kits }: { kits: Kit[] }) {
     );
 }
 
-function PoolTab({ pool }: { pool: PoolItem[] }) {
-    if (pool.length === 0) return <EmptyCard icon={Sparkles} title="Talent pool is empty" sub="Strong candidates you keep warm appear here. Tag a candidate to add them to the pool." />;
+function PoolTab({
+    pool,
+    requisitions,
+    canManage,
+    onReactivate,
+}: {
+    pool: PoolItem[];
+    requisitions: Requisition[];
+    canManage: boolean;
+    onReactivate: (candidateId: number, requisitionId: number) => void;
+}) {
+    if (pool.length === 0) return <EmptyCard icon={Sparkles} title="Talent pool is empty" sub="Strong candidates you keep warm appear here. Use a reject wizard's 'Add to talent pool' toggle to add them." />;
     return (
         <div>
-            <p className="mb-4 text-[13px] text-muted-foreground">Strong candidates kept warm. Tag, search and re-activate into a new requisition.</p>
-            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]">
+            <p className="mb-4 text-[13px] text-muted-foreground">Strong candidates kept warm, safe from data-retention purges. Re-activate into a requisition to put them back in the pipeline.</p>
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
                 {pool.map((p) => (
-                    <div key={p.id} className="rounded-[13px] border border-border bg-card p-4">
-                        <div className="flex items-center gap-2.5">
-                            <span style={avatarStyle(p.name)}>{initials(p.name)}</span>
-                            <div className="min-w-0 flex-1">
-                                <div className="text-[13.5px] font-bold">{p.name}</div>
-                                <div className="text-[11.5px] text-muted-foreground">{p.last_role}</div>
-                            </div>
-                        </div>
-                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                            {p.tags.map((t) => (
-                                <span key={t} className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">{t}</span>
-                            ))}
-                        </div>
-                        <div className="mt-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{p.reason}</div>
-                    </div>
+                    <PoolCard key={p.id} item={p} requisitions={requisitions} canManage={canManage} onReactivate={onReactivate} />
                 ))}
             </div>
+        </div>
+    );
+}
+
+function PoolCard({
+    item,
+    requisitions,
+    canManage,
+    onReactivate,
+}: {
+    item: PoolItem;
+    requisitions: Requisition[];
+    canManage: boolean;
+    onReactivate: (candidateId: number, requisitionId: number) => void;
+}) {
+    const [reqId, setReqId] = useState<string>('');
+    return (
+        <div className="rounded-[13px] border border-border bg-card p-4">
+            <div className="flex items-center gap-2.5">
+                <span style={avatarStyle(item.name)}>{initials(item.name)}</span>
+                <div className="min-w-0 flex-1">
+                    <div className="text-[13.5px] font-bold">{item.name}</div>
+                    <div className="text-[11.5px] text-muted-foreground">{item.last_role}</div>
+                </div>
+            </div>
+            {item.tags.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {item.tags.map((t) => (
+                        <span key={t} className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">{t}</span>
+                    ))}
+                </div>
+            ) : null}
+            <div className="mt-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{item.reason}</div>
+            {canManage ? (
+                <div className="mt-3 flex items-center gap-2">
+                    <select
+                        value={reqId}
+                        onChange={(e) => setReqId(e.target.value)}
+                        aria-label="Re-activate into requisition"
+                        className="h-8 min-w-0 flex-1 rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary"
+                    >
+                        <option value="">Into requisition…</option>
+                        {requisitions.map((r) => (
+                            <option key={r.id} value={r.id}>{r.title}</option>
+                        ))}
+                    </select>
+                    <button
+                        type="button"
+                        disabled={reqId === ''}
+                        onClick={() => onReactivate(item.id, Number(reqId))}
+                        className="h-8 rounded-md border border-primary bg-primary/10 px-2.5 text-[12px] font-bold text-primary disabled:opacity-40"
+                    >
+                        Re-activate
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }

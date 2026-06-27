@@ -9,14 +9,22 @@ use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
+use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
+use App\Domain\Hr\Models\HrTalentPool;
+use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\OfferResponseAckNotification;
+use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Domain\Hr\Notifications\ReferenceRequestNotification;
+use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -421,6 +429,11 @@ class CandidateController extends Controller
 
         $validated = $request->validate([
             'rejection_reason' => ['nullable', 'string', 'max:2000'],
+            // Opt-in only — a respectful decline email is never sent by default.
+            'send_decline_email' => ['nullable', 'boolean'],
+            'decline_message' => ['nullable', 'string', 'max:2000'],
+            // Keep a strong candidate warm in the talent pool instead of purging.
+            'add_to_pool' => ['nullable', 'boolean'],
         ]);
 
         $application->update([
@@ -428,7 +441,155 @@ class CandidateController extends Controller
             'rejection_reason' => $validated['rejection_reason'] ?? null,
         ]);
 
+        $candidate = $application->candidate()->first();
+
+        if ($candidate && $request->boolean('add_to_pool')) {
+            $this->poolCandidate($candidate, $user->id, 'Strong but not selected', $application->requisition_id, null);
+        }
+
+        if ($candidate && $candidate->personal_email && $request->boolean('send_decline_email')) {
+            try {
+                Notification::route('mail', $candidate->personal_email)
+                    ->notify(new RejectionNotification($candidate, $application, $validated['decline_message'] ?? null));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
         return redirect()->back()->with('success', 'Application rejected.');
+    }
+
+    /**
+     * Bulk advance/reject N selected candidates. Per-row (a prerequisite failure
+     * on one candidate doesn't abort the batch) with a summary flash. Tenant-scoped
+     * — foreign-tenant ids are silently excluded by the scoped query.
+     */
+    public function bulkAction(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', Rule::in(['advance', 'reject'])],
+            'candidate_ids' => ['required', 'array', 'min:1'],
+            'candidate_ids.*' => ['integer'],
+            'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $validated['candidate_ids'])
+            ->get();
+
+        $done = 0;
+        $skipped = 0;
+
+        foreach ($candidates as $candidate) {
+            try {
+                if ($validated['action'] === 'advance') {
+                    $this->recruitmentService->advanceStage($candidate, $validated['target_stage'] ?? null, $user->id);
+                } else {
+                    $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
+                    $candidate->applications()
+                        ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
+                        ->update(['status' => 'rejected', 'rejection_reason' => $validated['reason'] ?? null]);
+                }
+                $done++;
+            } catch (\Throwable $exception) {
+                $skipped++;
+            }
+        }
+
+        $verb = $validated['action'] === 'advance' ? 'advanced' : 'rejected';
+        $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Talent pool                                                        */
+    /* ------------------------------------------------------------------ */
+
+    public function addToPool(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
+            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+            'requisition_id' => ['nullable', 'integer', $requisitionRule],
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:100'],
+        ]);
+
+        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $validated['requisition_id'] ?? null, $validated['tags'] ?? null);
+
+        return redirect()->back()->with('success', "{$candidate->full_name} added to the talent pool.");
+    }
+
+    public function reactivatePool(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
+            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+
+        $validated = $request->validate([
+            'requisition_id' => ['required', 'integer', $requisitionRule],
+        ]);
+
+        $requisition = HrJobRequisition::query()->findOrFail($validated['requisition_id']);
+
+        $duplicate = HrApplication::query()
+            ->where('candidate_id', $candidate->id)
+            ->where('requisition_id', $requisition->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->exists();
+        if ($duplicate) {
+            return redirect()->back()->with('error', 'This candidate already has an active application for that requisition.');
+        }
+
+        try {
+            $this->recruitmentService->createApplication($candidate, [
+                'position_title' => $requisition->title,
+                'position_role' => $requisition->position_role,
+                'requisition_id' => $requisition->id,
+                'target_site_id' => $requisition->site_id,
+                'interview_kit_id' => $requisition->default_interview_kit_id,
+            ]);
+        } catch (\InvalidArgumentException|\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        $candidate->update(['status' => 'new', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
+        $candidate->talentPoolMembership()->delete();
+
+        return redirect()->back()->with('success', "{$candidate->full_name} re-activated into {$requisition->title}.");
+    }
+
+    /** Idempotent pool membership write (one per candidate). */
+    private function poolCandidate(HrCandidate $candidate, int $userId, string $reason, ?int $requisitionId, ?array $tags): void
+    {
+        HrTalentPool::query()->updateOrCreate(
+            ['candidate_id' => $candidate->id],
+            [
+                'tenant_id' => $candidate->tenant_id,
+                'requisition_id' => $requisitionId,
+                'reason' => $reason,
+                'pooled_by' => $userId,
+                'tags' => $tags,
+            ],
+        );
     }
 
     /* ------------------------------------------------------------------ */
@@ -453,7 +614,7 @@ class CandidateController extends Controller
             'notes'            => ['nullable', 'string', 'max:5000'],
         ]);
 
-        HrInterview::create([
+        $interview = HrInterview::create([
             'application_id'   => $application->id,
             'scheduled_at'     => $validated['scheduled_at'],
             'duration_minutes' => $validated['duration_minutes'],
@@ -464,7 +625,13 @@ class CandidateController extends Controller
             'notes'            => $validated['notes'] ?? null,
         ]);
 
-        return redirect()->back()->with('success', 'Interview scheduled successfully.');
+        try {
+            app(\App\Domain\Hr\Services\InterviewNotificationService::class)->sendInvites($interview);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return redirect()->back()->with('success', 'Interview scheduled — calendar invites emailed to the candidate and panel.');
     }
 
     public function updateInterview(Request $request, HrInterview $interview)
@@ -575,17 +742,31 @@ class CandidateController extends Controller
             'referee_relationship' => ['required', 'string', 'max:255'],
         ]);
 
-        HrReferenceCheck::create([
+        $reference = HrReferenceCheck::create([
             'application_id'       => $application->id,
             'referee_name'         => $validated['referee_name'],
             'referee_email'        => $validated['referee_email'] ?? null,
             'referee_phone'        => $validated['referee_phone'] ?? null,
             'referee_relationship' => $validated['referee_relationship'],
-            'status'               => 'pending',
+            'status'               => 'requested',
             'requested_at'         => now(),
+            'response_token'       => Str::random(64),
         ]);
 
-        return redirect()->back()->with('success', 'Reference check request created.');
+        // Email the referee a token-guarded questionnaire link.
+        if ($reference->referee_email) {
+            try {
+                $candidate = $application->candidate()->first();
+                Notification::route('mail', $reference->referee_email)
+                    ->notify(new ReferenceRequestNotification($reference, $candidate?->full_name ?? 'a candidate'));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return redirect()->back()->with('success', $reference->referee_email
+            ? 'Reference requested — a questionnaire link was emailed to the referee.'
+            : 'Reference check recorded. Add a referee email to send the questionnaire.');
     }
 
     public function updateReference(Request $request, HrReferenceCheck $reference)
@@ -830,13 +1011,72 @@ class CandidateController extends Controller
             'sent_at' => optional($offer->sent_at)->toDateTimeString(),
         ]);
 
-        return redirect()->back()->with('success', 'Offer sent to candidate.');
+        $this->emailOfferLink($offer->fresh(), $application->candidate);
+
+        return redirect()->back()->with('success', 'Offer sent — portal link emailed to the candidate.');
+    }
+
+    /**
+     * Re-deliver the offer portal link (refreshing expiry) without re-advancing
+     * the pipeline. Used when the original email bounced or expired.
+     */
+    public function resendOffer(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $application = $offer->application()->with('candidate')->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if (! $offer->sent_at) {
+            return redirect()->back()->with('error', 'Send the offer before resending the link.');
+        }
+
+        if ($offer->response !== null) {
+            return redirect()->back()->with('error', 'This offer has already been responded to.');
+        }
+
+        $offer->update([
+            'candidate_portal_token' => $offer->candidate_portal_token ?: Str::random(64),
+            'portal_expires_at' => now()->addDays(14),
+            'updated_by' => $user->id,
+        ]);
+
+        $this->emailOfferLink($offer->fresh(), $application->candidate);
+
+        return redirect()->back()->with('success', 'Offer link resent to the candidate.');
+    }
+
+    /**
+     * Best-effort delivery of the offer-portal link to the (non-User) candidate.
+     * A mail failure must not 500 the manager's request — the Resend action
+     * exists precisely to recover from a failed send.
+     */
+    private function emailOfferLink(?HrOffer $offer, ?HrCandidate $candidate): void
+    {
+        if (! $offer || ! $candidate || ! $candidate->personal_email || ! $offer->candidate_portal_token) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new OfferSentNotification($offer, $candidate));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function downloadOfferLetter(Request $request, HrOffer $offer)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // Tenant guard — every sibling offer action asserts this; the letter
+        // download must not be a cross-tenant IDOR hole.
+        $application = $offer->application()->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         abort_unless($offer->offer_letter_path, 404);
 
@@ -963,9 +1203,20 @@ class CandidateController extends Controller
             'response_at' => optional($offer->response_at)->toDateTimeString(),
         ]);
 
-        // Accepting an offer flows straight into employment + onboarding. The
-        // conversion is idempotent (firstOrCreate user / updateOrCreate profile /
-        // onboarding generated at most once), so a later manual "Convert" is safe.
+        // Acknowledge the candidate's response (before any convert attempt, so a
+        // convert failure never swallows the ack).
+        $this->ackOfferResponse($offer, $application->candidate, (string) $offer->response);
+
+        // Accepting an offer flows straight into employment + onboarding — but
+        // minting a login is a segregation-of-duties step. Only auto-convert when
+        // the actor also holds hr.employees.manage; otherwise the acceptance is
+        // saved and the hire waits at offer_accepted for account provisioning.
+        // The conversion is idempotent (firstOrCreate user / updateOrCreate
+        // profile / onboarding generated at most once), so a later Convert is safe.
+        if ($offer->response === 'accepted' && ! $user->canDo('hr.employees.manage')) {
+            return redirect()->back()->with('success', 'Offer accepted. Account provisioning is pending — a user with employee-management rights can Convert to finish the hire.');
+        }
+
         if ($offer->response === 'accepted') {
             $candidate = $application->candidate?->fresh();
 
@@ -980,6 +1231,8 @@ class CandidateController extends Controller
                         'employee_profile_id' => $profile->id,
                         'converted_by' => $user->id,
                     ]);
+
+                    $this->notifyHiringManagerOfHire($application, $candidate);
 
                     return redirect()->back()->with('success', 'Offer accepted — employee profile created and onboarding started.');
                 } catch (\Throwable $exception) {
@@ -1002,7 +1255,9 @@ class CandidateController extends Controller
     public function convertToEmployee(Request $request, HrOffer $offer)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        // Converting mints a User login — gated by hr.employees.manage in addition
+        // to hr.recruitment.manage (segregation of duties; the route enforces both).
+        abort_unless($user && $user->canDo('hr.recruitment.manage') && $user->canDo('hr.employees.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $offer->application()->with('candidate')->firstOrFail();
@@ -1028,7 +1283,38 @@ class CandidateController extends Controller
             'converted_by' => $user->id,
         ]);
 
+        $this->notifyHiringManagerOfHire($application, $candidate);
+
         return redirect()->back()->with('success', "Employee profile created (#{$profile->id}).");
+    }
+
+    /** Best-effort candidate acknowledgement of an accepted/declined offer. */
+    private function ackOfferResponse(HrOffer $offer, ?HrCandidate $candidate, string $response): void
+    {
+        if (! $candidate || ! $candidate->personal_email || ! in_array($response, ['accepted', 'declined'], true)) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new OfferResponseAckNotification($offer, $candidate, $response));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /** Best-effort hiring-manager notification when a candidate is converted. */
+    private function notifyHiringManagerOfHire(HrApplication $application, HrCandidate $candidate): void
+    {
+        try {
+            $requisition = $application->requisition()->with('hiringManager')->first();
+            $manager = $requisition?->hiringManager;
+            if ($manager) {
+                $manager->notify(new CandidateHiredNotification($candidate, $requisition));
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**
@@ -1138,12 +1424,24 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
 
+        $applicationRule = Rule::exists('hr_applications', 'id')
+            ->where(fn ($q) => $q->where('candidate_id', $candidate->id));
+
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
             'category' => ['required', 'string', Rule::in(array_keys(HrCandidateDocument::CATEGORIES))],
+            'application_id' => ['nullable', 'integer', $applicationRule],
             'notes' => ['nullable', 'string', 'max:500'],
             'expires_at' => ['nullable', 'date'],
         ]);
+
+        // Carry the application context: explicit param wins, else fall back to the
+        // candidate's most-recent active application so the doc isn't orphaned.
+        $applicationId = $validated['application_id']
+            ?? $candidate->applications()
+                ->whereNotIn('status', ['rejected', 'withdrawn'])
+                ->latest('id')
+                ->value('id');
 
         $file = $request->file('file');
         $path = $file->store("candidates/{$candidate->id}/documents", 'private');
@@ -1153,6 +1451,7 @@ class CandidateController extends Controller
         HrCandidateDocument::create([
             'tenant_id' => $candidate->tenant_id,
             'candidate_id' => $candidate->id,
+            'application_id' => $applicationId,
             'category' => $validated['category'],
             'title' => $categoryLabel . ' - ' . $file->getClientOriginalName(),
             'storage_path' => $path,
