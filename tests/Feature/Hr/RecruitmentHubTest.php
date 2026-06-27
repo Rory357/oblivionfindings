@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrInterview;
+use App\Domain\Hr\Models\HrInterviewKit;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
@@ -475,6 +476,34 @@ test('scheduling an interview emails the candidate and panel a calendar invite',
 
     $interview = HrInterview::query()->where('application_id', $application->id)->first();
     expect($interview->invite_sent_at)->not->toBeNull();
+});
+
+/* ---- Interview-kit editor (Kits tab made editable) ---- */
+
+test('a manager can create, edit and toggle an interview kit', function () {
+    $this->actingAs($this->hr)->post(route('hr.kits.store'), [
+        'name' => 'Support Worker scorecard',
+        'role' => 'support_worker',
+        'criteria' => [['label' => 'Values', 'weight' => 40], ['label' => 'Reliability', 'weight' => 60]],
+    ])->assertRedirect();
+
+    $kit = HrInterviewKit::query()->where('name', 'Support Worker scorecard')->first();
+    expect($kit)->not->toBeNull();
+    expect($kit->criteria)->toHaveCount(2);
+    expect($kit->is_active)->toBeTrue();
+
+    $this->actingAs($this->hr)->put(route('hr.kits.update', $kit->id), [
+        'name' => 'SW scorecard v2',
+        'criteria' => [['label' => 'Values', 'weight' => 100]],
+    ])->assertRedirect();
+    expect($kit->fresh()->name)->toBe('SW scorecard v2');
+    expect($kit->fresh()->criteria)->toHaveCount(1);
+
+    $this->actingAs($this->hr)->post(route('hr.kits.toggleActive', $kit->id))->assertRedirect();
+    expect($kit->fresh()->is_active)->toBeFalse();
+
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.kits.store'), ['name' => 'x'])->assertForbidden();
 });
 
 /* ---- D7: requisition salary + approval workflow (#5) ---- */
