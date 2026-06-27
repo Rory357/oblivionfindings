@@ -9,6 +9,16 @@ import { ActivityItem } from '@/components/recruitment/activity-item';
 import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
@@ -324,14 +334,27 @@ export default function CandidateShow({
             { preserveScroll: true },
         );
     }
+    const [confirmState, setConfirmState] = useState<{
+        title: string;
+        description: string;
+        confirmLabel: string;
+        destructive?: boolean;
+        action: () => void;
+    } | null>(null);
+
     function rejectApplication(applicationId: number) {
-        if (confirm('Are you sure you want to reject this application?')) {
-            router.post(
-                `/hr/recruitment/applications/${applicationId}/reject`,
-                {},
-                { preserveScroll: true },
-            );
-        }
+        setConfirmState({
+            title: 'Reject application?',
+            description: 'This moves the candidate out of the active pipeline. You can re-activate them later from the talent pool.',
+            confirmLabel: 'Reject',
+            destructive: true,
+            action: () =>
+                router.post(
+                    `/hr/recruitment/applications/${applicationId}/reject`,
+                    {},
+                    { preserveScroll: true },
+                ),
+        });
     }
     function updateInterviewStatus(
         interviewId: number,
@@ -394,11 +417,16 @@ export default function CandidateShow({
     }
 
     function deleteDocument(docId: number) {
-        if (confirm('Are you sure you want to delete this document?')) {
-            router.delete(`/hr/recruitment/documents/${docId}`, {
-                preserveScroll: true,
-            });
-        }
+        setConfirmState({
+            title: 'Delete document?',
+            description: 'This permanently removes the document from the candidate record.',
+            confirmLabel: 'Delete',
+            destructive: true,
+            action: () =>
+                router.delete(`/hr/recruitment/documents/${docId}`, {
+                    preserveScroll: true,
+                }),
+        });
     }
 
     function handleScheduleInterview(applicationId: number) {
@@ -2323,6 +2351,27 @@ export default function CandidateShow({
                     offerId={respondOffer.offerId}
                 />
             )}
+
+            <AlertDialog open={confirmState !== null} onOpenChange={(o) => !o && setConfirmState(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+                        <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className={confirmState?.destructive ? 'bg-status-critical text-white hover:bg-status-critical/90' : undefined}
+                            onClick={() => {
+                                confirmState?.action();
+                                setConfirmState(null);
+                            }}
+                        >
+                            {confirmState?.confirmLabel ?? 'Confirm'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

@@ -43,7 +43,6 @@ export * from './performance-tabs';
 export * from './photo-upload-button';
 export * from './position-dialog';
 export * from './positions-pane';
-export * from './recruitment-tabs';
 export * from './reports-tabs';
 export * from './settings-tabs';
 export * from './staff-details-modal';
