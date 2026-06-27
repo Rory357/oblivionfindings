@@ -343,6 +343,64 @@ test('correcting a missed clock-out closes the entry and records the reason', fu
     expect($entry->amendments()->where('field_name', 'clock_out')->exists())->toBeTrue();
 });
 
+test('a manager can add a team-visible note recorded on the amendment trail', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $staff->id,
+        'status' => 'submitted',
+    ]);
+
+    $this->actingAs($manager)
+        ->post("/hr/time/entries/{$entry->id}/note", [
+            'note' => 'Confirmed the extra hour with the duty manager.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(
+        $entry->amendments()
+            ->where('field_name', 'note')
+            ->where('reason', 'Confirmed the extra hour with the duty manager.')
+            ->exists()
+    )->toBeTrue();
+});
+
+test('a manual sleepover entry persists the disturbance log', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    hrTimeProfile($staff, $manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    $this->actingAs($manager)
+        ->post('/hr/time/entries', [
+            'user_id' => $staff->id,
+            'clock_in' => '2026-04-20 22:00',
+            'clock_out' => '2026-04-21 06:00',
+            'break_minutes' => 0,
+            'pay_type' => 'sleepover',
+            'is_sleepover' => true,
+            'sleepover_disturbances' => [
+                ['start' => '01:00', 'end' => '01:30', 'minutes' => 30],
+                ['start' => '03:15', 'end' => '03:45', 'minutes' => 30],
+            ],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+        ->where('user_id', $staff->id)
+        ->where('is_sleepover', true)
+        ->firstOrFail();
+
+    expect($entry->sleepover_disturbances)->toHaveCount(2);
+    expect((int) $entry->sleepover_disturbances[0]['minutes'])->toBe(30);
+});
+
 test('hr clock out rejects break_minutes above the shared 240 cap', function () {
     // D4 — break cap unified to 240 across the HR module too, matching the
     // frontline /attendance + /timesheets surfaces (this path was 480 before).

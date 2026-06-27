@@ -8,13 +8,16 @@ import {
     type NamedOption,
     type OnNowItem,
     type PaginatedData,
+    NoteDialog,
     type RecentActivityItem,
+    ReportsPane,
     type TimeCan,
     type TimeDialogMode,
     TimeEntryDialog,
     type TimeEntry,
     type TimeFilters,
     TimeHero,
+    type TimeReport,
     type TimesheetRow,
     TimesheetsPane,
     type WeeklyDay,
@@ -30,6 +33,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    BarChart3,
     CalendarClock,
     FileText,
     History,
@@ -38,6 +42,7 @@ import {
     Pencil,
     Pin,
     Star,
+    StickyNote,
     Trash2,
 } from 'lucide-react';
 import {
@@ -50,6 +55,7 @@ import {
 
 interface Props {
     entries: PaginatedData<TimeEntry>;
+    report: TimeReport | null;
     timesheets: PaginatedData<TimesheetRow>;
     approvalTimesheets: ApprovalTimesheet[];
     pendingApprovalCount: number;
@@ -73,10 +79,22 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Timekeeping', href: '/hr/time' },
 ];
 
-const KNOWN_TABS = ['overview', 'entries', 'timesheets'];
+const KNOWN_TABS = ['overview', 'entries', 'timesheets', 'reports'];
+
+/** Build a query string from the active server filters (minus tab). */
+function filterQuery(filters: TimeFilters): string {
+    const params = new URLSearchParams();
+    (Object.entries(filters) as [keyof TimeFilters, string | undefined][]).forEach(
+        ([k, v]) => {
+            if (v && k !== 'tab') params.set(k, String(v));
+        },
+    );
+    return params.toString();
+}
 
 export default function TimeIndex({
     entries,
+    report,
     timesheets,
     approvalTimesheets,
     pendingApprovalCount,
@@ -100,6 +118,7 @@ export default function TimeIndex({
     const [dialogMode, setDialogMode] = useState<TimeDialogMode | null>(null);
     const [dialogEntry, setDialogEntry] = useState<TimeEntry | null>(null);
     const [drawerEntry, setDrawerEntry] = useState<TimeEntry | null>(null);
+    const [noteEntry, setNoteEntry] = useState<TimeEntry | null>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     // tab pin / default-view persistence
@@ -125,6 +144,23 @@ export default function TimeIndex({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // On-now soft-refresh: while a manager is watching the Overview tab and the
+    // page is visible, poll the live props every 30s so "on now" elapsed times,
+    // exceptions and recent activity stay current without a manual reload. Paused
+    // when the tab is hidden or a dialog/drawer is open (avoid yanking state).
+    useEffect(() => {
+        if (!isManager || activeTab !== 'overview') return;
+        const tick = () => {
+            if (document.hidden || dialogMode || drawerEntry) return;
+            router.reload({
+                only: ['onNow', 'recentActivity', 'kpiStats', 'exceptions', 'weeklyTeam'],
+                preserveScroll: true,
+            });
+        };
+        const id = window.setInterval(tick, 30000);
+        return () => window.clearInterval(id);
+    }, [isManager, activeTab, dialogMode, drawerEntry]);
 
     // keyboard shortcuts
     useEffect(() => {
@@ -217,6 +253,7 @@ export default function TimeIndex({
             is_sleepover: false,
             is_on_call: false,
             is_public_holiday: false,
+            sleepover_disturbances: [],
             break_compliance_met: null,
             mileage_km: null,
             notes: null,
@@ -257,6 +294,11 @@ export default function TimeIndex({
                 onClick: () => setDrawerEntry(e),
             });
         }
+        items.push({
+            icon: <StickyNote className="h-4 w-4" />,
+            label: 'Add note',
+            onClick: () => setNoteEntry(e),
+        });
         items.push({
             icon: <List className="h-4 w-4" />,
             label: 'View this person’s entries',
@@ -362,7 +404,16 @@ export default function TimeIndex({
             tone: 'success',
             badge: pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
         },
+        {
+            id: 'reports',
+            label: 'Reports',
+            icon: BarChart3,
+            tone: 'info',
+        },
     ];
+
+    const exportHref = `/hr/time/export?${filterQuery({ ...filters, tab: undefined })}`;
+    const pdfHref = `/hr/time/report/pdf?scope=${filters.scope ?? 'team'}`;
 
     const orderedTabs = [
         ...tabItems.filter((t) => pins.includes(t.id)),
@@ -463,6 +514,11 @@ export default function TimeIndex({
                             onAddEntry: isManager ? () => openDialog('add') : undefined,
                             onClockOnBehalf: can.clockOnBehalf ? () => openDialog('behalf') : undefined,
                             onReviewTimesheets: () => router.visit('/operations/timesheets'),
+                            onExport: isManager
+                                ? () => {
+                                      window.location.href = exportHref;
+                                  }
+                                : undefined,
                             onStatOnNow: () => setTab('overview'),
                             onStatHours: () => setTab('entries'),
                             onStatApproval: () => setTab('timesheets'),
@@ -516,6 +572,10 @@ export default function TimeIndex({
                 {activeTab === 'timesheets' && isManager ? (
                     <TimesheetsPane timesheets={timesheets} canApproveAny={!!can.approveAny} />
                 ) : null}
+
+                {activeTab === 'reports' && isManager ? (
+                    <ReportsPane report={report} exportHref={exportHref} pdfHref={pdfHref} />
+                ) : null}
             </PageLayout>
 
             {isManager ? (
@@ -539,6 +599,8 @@ export default function TimeIndex({
                 }
                 onClose={() => setDrawerEntry(null)}
             />
+
+            <NoteDialog entry={noteEntry} onClose={() => setNoteEntry(null)} />
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>

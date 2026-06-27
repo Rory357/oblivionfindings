@@ -39,7 +39,7 @@ Repository files checked for this snapshot:
 | `/my-roster`, `/my-calendar` | Frontline roster/calendar | Frontline read surfaces for own roster and calendar data. |
 | `/attendance/*` | Frontline clocking | Canonical clock/break/handover endpoints. These are not legacy duplicates. |
 | `/control-room/*` | Control Room operations | Intentional role separation. Do not collapse into operations shifts. |
-| `/hr/time/*` | HR period timekeeping | Uses `HrTimesheet` for HR period aggregates, but follows the same submit/approve/return/reject workflow shape as operations shift timesheets through `HrTimesheetApprovalService`. |
+| `/hr/time/*` | HR timekeeping (manager oversight) | Owns `HrTimeEntry` (clock + manual entries with NZ break-compliance + amendment trail). Each clocked-out `HrTimeEntry` spawns/updates an Operations `Timesheet` draft via `DraftTimesheetService`. There is **no** `HrTimesheet` aggregate model; the "period" framing is a Mon–Sun **display bucket** over per-shift Operations `Timesheet` rows. Submit/approve/return/reject are owned by Operations (`TimesheetApprovalService`), surfaced read-only here. |
 | `/shifts/*`, `/timesheets/*` | Legacy GET redirects only | Unnamed permanent redirects for deep links. Legacy route names and state-changing mounts have been removed. |
 
 ## Frontline Route Inventory
@@ -200,14 +200,9 @@ Legacy Timesheet route names have been removed. The GET URLs remain only as unna
 | POST | `/hr/time/entries` | `hr.time.entries.store` | `Hr\TimeTrackingController@store` | `HrTimeEntry`. |
 | PUT | `/hr/time/entries/{entry}` | `hr.time.entries.update` | `Hr\TimeTrackingController@updateEntry` | `HrTimeEntry`. |
 | GET | `/hr/time/entries/{entry}/amendments` | `hr.time.entries.amendments` | `Hr\TimeTrackingController@entryAmendments` | `HrTimeEntryAmendment`. |
-| GET | `/hr/time/timesheets` | `hr.time.timesheets` | `Hr\TimeTrackingController@timesheets` | `HrTimesheet`. |
-| POST | `/hr/time/timesheets/{timesheet}/submit` | `hr.time.timesheets.submit` | `Hr\TimeTrackingController@submitTimesheet` | `HrTimesheetApprovalService::submit()`. |
-| POST | `/hr/time/timesheets/{timesheet}/approve` | `hr.time.timesheets.approve` | `Hr\TimeTrackingController@approveTimesheet` | `HrTimesheetApprovalService::approve()`. |
-| POST | `/hr/time/timesheets/{timesheet}/reject` | `hr.time.timesheets.reject` | `Hr\TimeTrackingController@rejectTimesheet` | `HrTimesheetApprovalService::reject()`. |
-| POST | `/hr/time/timesheets/{timesheet}/return` | `hr.time.timesheets.return` | `Hr\TimeTrackingController@returnTimesheet` | `HrTimesheetApprovalService::returnForChanges()`. |
-| POST | `/hr/time/timesheets/bulk-approve` | `hr.time.timesheets.bulk-approve` | `Hr\TimeTrackingController@bulkApproveTimesheets` | `HrTimesheetApprovalService::bulkApprove()`. |
-| POST | `/hr/time/timesheets/bulk-reject` | `hr.time.timesheets.bulk-reject` | `Hr\TimeTrackingController@bulkRejectTimesheets` | `HrTimesheetApprovalService::bulkReject()`. |
-| POST | `/hr/time/timesheets/bulk-return` | `hr.time.timesheets.bulk-return` | `Hr\TimeTrackingController@bulkReturnTimesheets` | `HrTimesheetApprovalService::bulkReturn()`. |
+| POST | `/hr/time/entries/{entry}/correct` | `hr.time.entries.correct` | `Hr\TimeTrackingController@correct` | Force-closes a missed clock-out via `AttendanceService::correctSession`. |
+| POST | `/hr/time/entries/{entry}/void` | `hr.time.entries.void` | `Hr\TimeTrackingController@void` | Soft-deletes an entry (reason → amendment trail). `manageAny` only. |
+| GET | `/hr/time/timesheets` | `hr.time.timesheets` | `Hr\TimeTrackingController@timesheets` | Redirect to `hr.time.index?tab=timesheets`. There is **no** `HrTimesheet` model — the Shift Timesheets tab is a read-only window onto Operations `Timesheet` rows, bucketed Mon–Sun for display. Submit/approve/reject/return/bulk live in Operations (`operations.timesheets.*` → `TimesheetApprovalService`), not here. |
 
 The HR time routes keep their `hr.time.*` route names, but permissions are canonical `timesheets.*`. Legacy `hr.time.*` permission keys are policy-layer aliases only. Team approval actions are additionally scoped in the controller before calling the service.
 
@@ -282,13 +277,8 @@ The primary duplicate pairs were true controller duplicates, not role separation
 
 | Action | Current operations path | Current HR path | Fragmentation note |
 | --- | --- | --- | --- |
-| Submit | `TimesheetController@submit` -> `TimesheetApprovalService::submit()` | `Hr\TimeTrackingController@submitTimesheet` -> `HrTimesheetApprovalService::submit()` | Same workflow shape; operations is shift-level, HR is period-level. |
-| Resubmit | `TimesheetController@resubmit` -> `TimesheetApprovalService::resubmit()` | `HrTimesheetApprovalService::submit()` accepts `returned` HR period timesheets | Operations supports atomic update + resubmit; HR period corrections use returned -> submitted. |
-| Approve single | `TimesheetController@approve` -> `TimesheetApprovalService::approve()` | `Hr\TimeTrackingController@approveTimesheet` -> `HrTimesheetApprovalService::approve()` | Both approval paths are service-owned and idempotent. |
-| Approve bulk | `TimesheetController@bulkApprove` -> `TimesheetApprovalService::bulkApprove()` | `Hr\TimeTrackingController@bulkApproveTimesheets` -> `HrTimesheetApprovalService::bulkApprove()` | Bulk calls the same single approval method internally on both surfaces. |
-| Return | `TimesheetController@returnForChanges` -> `TimesheetApprovalService::returnForChanges()` | `Hr\TimeTrackingController@returnTimesheet` -> `HrTimesheetApprovalService::returnForChanges()` | Both use explicit returned semantics. |
-| Reject | `TimesheetController@reject` -> `TimesheetApprovalService::reject()` | `Hr\TimeTrackingController@rejectTimesheet` -> `HrTimesheetApprovalService::reject()` | Both rejection paths are service-owned. |
-| Approval snapshots | `TimesheetApprovalService::syncApprovedTimesheet()` | Not applicable to `HrTimesheet` period aggregates | Operations approval populates immutable payroll snapshots and triggers HR sync + billing; HR period approval updates HR time entries only. |
+| Submit / Resubmit / Approve / Return / Reject / Bulk | `TimesheetController@*` -> `TimesheetApprovalService::*` | **None — HR has no separate approval workflow.** `/hr/time` surfaces Operations `Timesheet` rows read-only and deep-links to `operations.timesheets.*`. | The single timesheet of record is the Operations `Timesheet`; HR owns `HrTimeEntry` (clock/manual entries) which spawn Operations drafts via `DraftTimesheetService`. There is no `HrTimesheet` model and no `HrTimesheetApprovalService`. |
+| Approval snapshots | `TimesheetApprovalService::syncApprovedTimesheet()` | Mirrored back to HR via `TimesheetHrSyncService::syncToHr()` | Operations approval populates immutable payroll snapshots, triggers HR sync + billing, and mirrors status back onto the linked `HrTimeEntry`. |
 
 ## Integration Contract Table
 
@@ -297,7 +287,7 @@ The primary duplicate pairs were true controller duplicates, not role separation
 | My Day | `/my-day`, `my-day.*`, attendance endpoints | Frontline staff should remain in frontline UI and not be linked into scheduler-only operations views. |
 | Roster | `/operations/rostering*`, `/my-roster*`, shift assign/unassign | Assignment must keep synchronous eligibility checks and preserve roster permission gates. |
 | Attendance | `/attendance/*`, `AttendanceService` | Clock-in/clock-out remain canonical frontline clock entries and must create real attendance sessions. |
-| Timesheets | `operations.timesheets.*`, `hr.time.timesheets.*` | Operations timesheet workflow gate and snapshot immutability must remain in place. |
+| Timesheets | `operations.timesheets.*` (workflow), `hr.time.entries.*` (HR clock/manual entries, read-only timesheet window) | Operations timesheet workflow gate and snapshot immutability must remain in place; `/hr/time` links out to it rather than rebuilding approval. |
 | Payroll | `PayrollRateResolver`, operations payroll export, HR payroll services | Sleepover, on-call, break, public holiday, and coverage-role semantics must not drift. |
 | Eligibility | `ShiftStaffEligibilityService`, `ShiftEligibilityOverride` | Evaluate synchronously on assign; hard blocks stay blocking. |
 | Fatigue | `FatigueRule` | Cancelled shifts remain excluded from daily, weekly, rest-gap, and consecutive-day checks. |
@@ -321,7 +311,7 @@ The primary duplicate pairs were true controller duplicates, not role separation
 4. Operations timesheet approval is consolidated:
    - `TimesheetController` single and bulk actions call `TimesheetApprovalService`.
    - Bulk actions loop through the same single-transition methods to keep workflow gates, snapshots, HR sync, billing, and idempotency consistent.
-   - HR time approval routes use `Hr\TimeTrackingController` and `HrTimesheetApprovalService` against `HrTimesheet` period aggregates. This gives managers one workflow vocabulary while preserving the model boundary between shift-level operations timesheets and HR period timesheets.
+   - `/hr/time` does **not** run its own timesheet approval workflow. It owns `HrTimeEntry` (clock + manual entries) which spawn Operations `Timesheet` drafts via `DraftTimesheetService`; the Shift Timesheets tab is a read-only Mon–Sun window onto those Operations rows and deep-links to `operations.timesheets.*` for submit/approve/return/reject. There is no `HrTimesheet` model or `HrTimesheetApprovalService`.
 
 5. Defensive model invariants already exist and must remain after service consolidation:
    - `Shift::booted()` calls `ShiftSafetyInvariantService::assertShift()`.

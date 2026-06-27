@@ -363,9 +363,11 @@ test('clock out rejects break_minutes above the shared 240 cap', function () {
 // All three clock entry points funnel through AttendanceService, so a full
 // clock-in → clock-out cycle on any of them must produce exactly one
 // HrAttendanceSession and exactly one canonical draft Timesheet (linked to
-// that session). The two HR surfaces additionally maintain an HrTimeEntry;
-// the canonical /attendance surface does not. Locks in the "not a duplicate"
-// finding so a future refactor can't silently diverge the three paths.
+// that session). Per backend handoff §5 every surface — including the canonical
+// /attendance surface — now also maintains exactly one HrTimeEntry via the
+// shared TimeTrackingService::syncEntryFromSession, so the HR Time-entries tab
+// and HrTimeEntry-based KPIs include /my-day clockers. Locks in the unified
+// "one session · one timesheet · one time-entry" contract across all paths.
 // ──────────────────────────────────────────────
 
 test('every clock surface funnels into one session and one canonical timesheet', function (array $surface) {
@@ -409,7 +411,7 @@ test('every clock surface funnels into one session and one canonical timesheet',
     'canonical attendance' => [[
         'clock_in' => '/attendance/clock-in',
         'clock_out' => '/attendance/clock-out',
-        'expected_time_entries' => 0,
+        'expected_time_entries' => 1,
     ]],
     'hr self-service' => [[
         'clock_in' => '/hr/my/time/clock-in',

@@ -368,8 +368,14 @@ class TimeTrackingController extends Controller
                 'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
             ])->all();
 
+        // Reports tab data (manager-only, computed lazily on that tab).
+        $report = ($tab === 'reports' && $access['canApproveAny'])
+            ? $this->buildReport($tenantId, $user, $access, $scope, $weekStart, $weekEnd)
+            : null;
+
         return Inertia::render('hr/time/index', [
             'entries' => $entries,
+            'report' => $report,
             'timesheets' => $timesheets,
             'approvalTimesheets' => $approvalTimesheets,
             'pendingApprovalCount' => $pendingApprovalCount,
@@ -456,6 +462,7 @@ class TimeTrackingController extends Controller
             'is_sleepover' => (bool) $entry->is_sleepover,
             'is_on_call' => (bool) $entry->is_on_call,
             'is_public_holiday' => (bool) $entry->is_public_holiday,
+            'sleepover_disturbances' => $entry->sleepover_disturbances ?? [],
             'break_compliance_met' => $entry->break_compliance_met,
             'mileage_km' => $entry->mileage_km !== null ? (float) $entry->mileage_km : null,
             'notes' => $entry->notes,
@@ -779,6 +786,25 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Add note */
+    /* ------------------------------------------------------------------ */
+
+    public function addNote(Request $request, HrTimeEntry $entry)
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve')), 403);
+        $this->assertEntryAccess($entry, $user);
+
+        $validated = $request->validate([
+            'note' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $this->timeTrackingService->addNote($entry, $user, $validated['note']);
+
+        return redirect()->back()->with('success', 'Note added.');
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Timesheets */
     /* ------------------------------------------------------------------ */
 
@@ -788,5 +814,156 @@ class TimeTrackingController extends Controller
 
         // Redirect to main page with timesheets tab
         return redirect()->route('hr.time.index', ['tab' => 'timesheets']);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Export + reports (backend handoff §12) */
+    /* ------------------------------------------------------------------ */
+
+    private function scopedEntriesQuery(int $tenantId, User $user, array $access, string $scope)
+    {
+        $query = HrTimeEntry::forTenant($tenantId);
+        if ($scope === 'mine') {
+            $query->forUser($user->id);
+        } elseif ($scope === 'team' && $access['canApproveTeam'] && ! $access['canManage']) {
+            $query->forUserOrTeam($user->id, $access['teamUserIds']);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Streamed CSV of time entries honouring the current scope/status/pay/site/
+     * search filters. Payroll export ("mark paid") stays the HR pay run — this is
+     * a read-only data export with overtime/break-compliance/mileage columns.
+     */
+    public function export(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $access = $this->resolveAccess($user);
+        $tz = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+        $scope = $request->query('scope', $access['canApproveAny'] ? 'team' : 'mine');
+
+        $query = $this->scopedEntriesQuery($tenantId, $user, $access, $scope)
+            ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
+            ->when($request->query('pay_type'), fn ($q, $v) => $q->where('pay_type', $v))
+            ->when($request->query('site_id'), fn ($q, $v) => $q->where('site_id', $v))
+            ->when(trim((string) $request->query('q', '')) !== '', function ($q) use ($request) {
+                $search = trim((string) $request->query('q', ''));
+                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            })
+            ->with('user:id,name', 'site:id,name')
+            ->orderByDesc('entry_date')
+            ->orderByDesc('clock_in');
+
+        $filename = 'time-entries-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($query, $tz) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, [
+                'Staff', 'Date', 'Clock in', 'Clock out', 'Break (min)', 'Hours',
+                'Pay type', 'Sleepover', 'On-call', 'Public holiday',
+                'Break compliant', 'Mileage (km)', 'Site', 'Status',
+            ]);
+            $query->chunk(500, function ($rows) use ($out, $tz) {
+                foreach ($rows as $e) {
+                    fputcsv($out, [
+                        $e->user?->name ?? 'Unknown',
+                        $e->entry_date->toDateString(),
+                        $e->clock_in?->copy()->setTimezone($tz)->format('Y-m-d H:i'),
+                        $e->clock_out?->copy()->setTimezone($tz)->format('Y-m-d H:i'),
+                        $e->break_minutes,
+                        $e->total_hours,
+                        $e->pay_type,
+                        $e->is_sleepover ? 'Yes' : 'No',
+                        $e->is_on_call ? 'Yes' : 'No',
+                        $e->is_public_holiday ? 'Yes' : 'No',
+                        $e->break_compliance_met === null ? '' : ($e->break_compliance_met ? 'Yes' : 'No'),
+                        $e->mileage_km,
+                        $e->site?->name,
+                        $e->status,
+                    ]);
+                }
+            });
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Hours & compliance report for a week (this-week by default): KPIs, hours by
+     * site and hours by staff (with per-staff overtime over 40h). Feeds the
+     * Reports tab and the PDF export. Manager-scoped.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildReport(int $tenantId, User $user, array $access, string $scope, string $weekStart, string $weekEnd): array
+    {
+        $rows = $this->scopedEntriesQuery($tenantId, $user, $access, $scope)
+            ->forDateRange($weekStart, $weekEnd)
+            ->whereNotNull('clock_out')
+            ->with('user:id,name', 'site:id,name')
+            ->get();
+
+        $totalHours = round((float) $rows->sum('total_hours'), 1);
+        $mileage = round((float) $rows->sum('mileage_km'), 1);
+        $breakFails = $rows->where('break_compliance_met', false)->count();
+
+        $bySite = $rows->groupBy(fn ($e) => $e->site?->name ?? 'No site')
+            ->map(fn ($g, $name) => [
+                'name' => $name,
+                'hours' => round((float) $g->sum('total_hours'), 1),
+            ])->sortByDesc('hours')->values()->all();
+
+        $byStaff = $rows->groupBy('user_id')->map(function ($g) {
+            $hours = round((float) $g->sum('total_hours'), 1);
+
+            return [
+                'user_id' => $g->first()->user_id,
+                'name' => $g->first()->user?->name ?? 'Unknown',
+                'hours' => $hours,
+                'overtime' => round(max(0, $hours - 40), 1),
+            ];
+        })->sortByDesc('hours')->values()->all();
+
+        $overtime = round(array_sum(array_column($byStaff, 'overtime')), 1);
+
+        return [
+            'week_start' => $weekStart,
+            'week_end' => $weekEnd,
+            'kpis' => [
+                'total_hours' => $totalHours,
+                'overtime_hours' => $overtime,
+                'break_fails' => $breakFails,
+                'mileage_km' => $mileage,
+            ],
+            'by_site' => $bySite,
+            'by_staff' => $byStaff,
+        ];
+    }
+
+    /** PDF of the weekly hours & compliance report (dompdf). */
+    public function reportPdf(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $access = $this->resolveAccess($user);
+        abort_unless($access['canApproveAny'], 403);
+        $scope = $request->query('scope', 'team');
+        $weekStart = now()->startOfWeek()->toDateString();
+        $weekEnd = now()->endOfWeek()->toDateString();
+
+        $report = $this->buildReport($tenantId, $user, $access, $scope, $weekStart, $weekEnd);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('hr.time.report', [
+            'report' => $report,
+            'generatedAt' => now()->format('D d M Y, H:i'),
+        ]);
+
+        return $pdf->download('time-report-'.now()->format('Y-m-d').'.pdf');
     }
 }

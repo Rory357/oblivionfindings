@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
+use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
@@ -21,6 +22,7 @@ class AttendanceController extends Controller
         protected AttendanceService $attendanceService,
         protected ShiftHandoverService $handoverService,
         protected HandoverPresenter $handoverPresenter,
+        protected TimeTrackingService $timeTrackingService,
     ) {}
 
     public function index(Request $request)
@@ -281,7 +283,10 @@ class AttendanceController extends Controller
         }
 
         try {
-            $this->attendanceService->clockIn($auth, $data);
+            $session = $this->attendanceService->clockIn($auth, $data);
+            // Backend handoff §5 — every clock source now maintains a consistent
+            // HrTimeEntry so the HR Time entries tab + KPIs include /my-day clockers.
+            $this->timeTrackingService->syncEntryFromSession($session, $auth);
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['clock_in' => $exception->getMessage()]);
         }
@@ -352,6 +357,9 @@ class AttendanceController extends Controller
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['clock_out' => $exception->getMessage()]);
         }
+
+        // Keep the HrTimeEntry in lockstep with the closed session (handoff §5).
+        $this->timeTrackingService->syncEntryFromSession($closed, $auth);
 
         if ($closed->timesheet) {
             return redirect()->back()->with('success', "Clocked out. Draft timesheet #{$closed->timesheet->id} synced.");

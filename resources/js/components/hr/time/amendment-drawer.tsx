@@ -33,7 +33,11 @@ const FIELD_LABEL: Record<string, string> = {
     project_code: 'project code',
     created_on_behalf: 'created this entry on behalf',
     voided: 'voided the entry',
+    note: 'added a note',
 };
+
+/** Fields that are events, not scalar field changes (no "changed" verb). */
+const EVENT_FIELDS = ['created_on_behalf', 'voided', 'note'];
 
 function fieldLabel(field: string): string {
     return FIELD_LABEL[field] ?? field.replace(/_/g, ' ');
@@ -124,12 +128,20 @@ export function AmendmentDrawer({
                                                 <span className="font-bold">
                                                     {a.amended_by}
                                                 </span>{' '}
-                                                <span className="text-muted-foreground">
-                                                    changed
-                                                </span>{' '}
-                                                <span className="font-semibold">
-                                                    {fieldLabel(a.field_name)}
-                                                </span>
+                                                {EVENT_FIELDS.includes(a.field_name) ? (
+                                                    <span className="font-semibold">
+                                                        {fieldLabel(a.field_name)}
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-muted-foreground">
+                                                            changed
+                                                        </span>{' '}
+                                                        <span className="font-semibold">
+                                                            {fieldLabel(a.field_name)}
+                                                        </span>
+                                                    </>
+                                                )}
                                             </div>
                                             {hasDiff ? (
                                                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
