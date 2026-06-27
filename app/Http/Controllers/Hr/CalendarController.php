@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\Hr\Models\HrCalendarEventCategory;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -55,10 +56,15 @@ class CalendarController extends Controller
             ->where('user_id', $user->id)
             ->value('token');
 
+        $categories = HrCalendarEventCategory::query()
+            ->forTenant($tenantId)
+            ->get(['id', 'key', 'label', 'icon', 'color_token']);
+
         return Inertia::render('hr/calendar/index', [
             'sites' => $sites,
             'departments' => $departments,
             'teams' => $teams,
+            'categories' => $categories,
             'stats' => $this->heroStats($tenantId, $user),
             'upNext' => $this->upNext($tenantId, $user),
             'ical' => [
@@ -210,6 +216,8 @@ class CalendarController extends Controller
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ]);
 
+        $data['category_id'] = $this->resolveCategoryId($tenantId, $data['event_type'] ?? null);
+
         HrCalendarEvent::create([
             'tenant_id' => $tenantId,
             'created_by' => $user->id,
@@ -240,6 +248,10 @@ class CalendarController extends Controller
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ]);
+
+        if (array_key_exists('event_type', $data)) {
+            $data['category_id'] = $this->resolveCategoryId($event->tenant_id, $data['event_type']);
+        }
 
         $event->update($data);
 
@@ -274,6 +286,20 @@ class CalendarController extends Controller
             || $user->canDo('hr.leave.viewOwn')
             || $user->canDo('hr.leave.manage')
         );
+    }
+
+    /** Map an event_type key to its category id (tenant override, else system). */
+    private function resolveCategoryId(?int $tenantId, ?string $key): ?int
+    {
+        if (! $key) {
+            return null;
+        }
+
+        return HrCalendarEventCategory::query()
+            ->where('key', $key)
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->orderByRaw('tenant_id IS NULL') // prefer a tenant-specific override
+            ->value('id');
     }
 
     private function canManage($user): bool

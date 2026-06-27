@@ -25,6 +25,7 @@ class HrCalendarEvent extends Model
         'location',
         'department',
         'department_id',
+        'category_id',
         'site_id',
         'created_by',
     ];
@@ -56,6 +57,11 @@ class HrCalendarEvent extends Model
     public function departmentRef(): BelongsTo
     {
         return $this->belongsTo(HrDepartment::class, 'department_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(HrCalendarEventCategory::class, 'category_id');
     }
 
     /* ------------------------------------------------------------------ */
