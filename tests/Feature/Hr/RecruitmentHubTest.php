@@ -378,3 +378,37 @@ test('retention scrub nulls screening_answers and soft-deletes the candidate', f
     expect($application->fresh()->screening_answers)->toBeNull();
     expect(HrCandidate::withTrashed()->find($candidate->id)?->trashed())->toBeTrue();
 });
+
+/* ---- A9: analytics keyed on requisition_id (#23) ---- */
+
+test('analytics keys open positions on requisition, not free-text title', function () {
+    // Two distinct requisitions that share the same position_title string.
+    makeApplicant($this->hr->id, 'screening');
+    makeApplicant($this->hr->id, 'new');
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+    $response->assertOk();
+    $open = collect($response->inertiaProps('analytics.open_positions'));
+
+    // Old (group-by-title) collapsed both into one row; new keys on requisition_id.
+    expect($open->whereNotNull('requisition_id')->pluck('requisition_id')->unique()->count())->toBeGreaterThanOrEqual(2);
+});
+
+/* ---- A10: server-side streamed export (#26) ---- */
+
+test('server export streams a tenant-scoped pipeline csv', function () {
+    ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.export', ['dataset' => 'pipeline', 'format' => 'csv']));
+    $response->assertOk();
+    $body = $response->streamedContent();
+    expect($body)->toContain('Name,Email,Stage');
+    expect($body)->toContain($candidate->full_name);
+
+    // invalid dataset → validation redirect
+    $this->actingAs($this->hr)->get(route('hr.recruitment.export', ['dataset' => 'bogus']))->assertRedirect();
+
+    // gated on hr.recruitment.view
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->get(route('hr.recruitment.export', ['dataset' => 'pipeline']))->assertForbidden();
+});

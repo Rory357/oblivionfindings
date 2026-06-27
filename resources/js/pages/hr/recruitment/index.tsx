@@ -122,6 +122,7 @@ type AnalyticsData = {
     kpis: { key: string; label: string; value: string; trend: string }[];
     funnel: { label: string; count: number; rate: string; width: number }[];
     sources: { name: string; total: number; hired: number; detail: string; width: number }[];
+    open_positions: { requisition_id: number | null; title: string; applications: number; days_open: number }[];
 };
 
 type Kit = { id: number; name: string; role: string | null; is_active: boolean; criteria: { label: string; weight: number }[] };
@@ -254,21 +255,13 @@ export default function RecruitmentHub(props: Props) {
         setSelected(all ? [] : ids);
     };
 
-    const exportCsv = () => {
-        const rows = filtered.length ? filtered : candidates;
-        const head = ['Name', 'Email', 'Stage', 'Requisition', 'Source', 'Days'];
-        const body = rows.map((c) => [c.full_name, c.email, stageLabel(c.stage), c.requisition?.title ?? '', c.source, String(c.days)]);
-        const csv = [head, ...body]
-            .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
-            .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `recruitment-pipeline-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(`Exported ${rows.length} candidates`);
+    // Server-side, uncapped CSV export (the in-browser export was silently
+    // truncated at the 300-row index cap). Streams the chosen dataset.
+    const EXPORT_DATASETS = new Set(['pipeline', 'requisitions', 'offers', 'analytics']);
+    const exportData = (dataset?: string) => {
+        const ds = dataset && EXPORT_DATASETS.has(dataset) ? dataset : 'pipeline';
+        window.location.href = `/hr/recruitment/export?dataset=${ds}&format=csv`;
+        toast.success(`Exporting ${ds}…`);
     };
 
     /* ---- context menus ---- */
@@ -328,7 +321,7 @@ export default function RecruitmentHub(props: Props) {
         onNewRequisition: () => openWizard('requisition'),
         onSchedule: () => setTab('interviews'),
         onReviewOffers: () => setTab('offers'),
-        onExport: exportCsv,
+        onExport: () => exportData(EXPORT_DATASETS.has(tab) ? tab : 'pipeline'),
         onStat: (t: string) => setTab(t),
         onNeed: (chip: { tab: string }) => setTab(chip.tab),
     };
@@ -417,7 +410,7 @@ export default function RecruitmentHub(props: Props) {
                                 toggleSelect={toggleSelect}
                                 toggleAll={toggleAll}
                                 clearSelection={() => setSelected([])}
-                                onExport={exportCsv}
+                                onExport={() => exportData('pipeline')}
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
                                 onBulkReject={() => {
@@ -1047,6 +1040,26 @@ function AnalyticsTab({ data }: { data: AnalyticsData }) {
                     )}
                 </div>
             </div>
+
+            {data.open_positions.length > 0 ? (
+                <div className="mt-4 rounded-[14px] border border-border bg-card p-4">
+                    <div className="mb-3.5 text-[13px] font-bold">Open positions <span className="font-normal text-muted-foreground">· by requisition</span></div>
+                    <div className="overflow-hidden rounded-[10px] border border-border">
+                        <div className="grid grid-cols-[2.5fr_1fr_1fr] gap-2 border-b border-border bg-muted px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                            <span>Requisition</span>
+                            <span className="text-right">Applicants</span>
+                            <span className="text-right">Days open</span>
+                        </div>
+                        {data.open_positions.map((p, i) => (
+                            <div key={`${p.requisition_id ?? 'none'}-${i}`} className="grid grid-cols-[2.5fr_1fr_1fr] gap-2 border-b border-border px-3 py-2 text-[12.5px] last:border-0">
+                                <span className="truncate font-semibold">{p.title}</span>
+                                <span className="text-right tabular-nums">{p.applications}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">{p.days_open}d</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

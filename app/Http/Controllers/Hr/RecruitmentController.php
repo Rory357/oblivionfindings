@@ -53,6 +53,8 @@ class RecruitmentController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $staleDays = (int) config('hr.recruitment.stale_stage_days', 14);
+        $from = $request->filled('from') ? (string) $request->query('from') : null;
+        $to = $request->filled('to') ? (string) $request->query('to') : null;
 
         return Inertia::render('hr/recruitment/index', [
             'hero' => $this->buildHero($tenantId, $analytics),
@@ -61,7 +63,7 @@ class RecruitmentController extends Controller
             'requisitions' => $this->buildRequisitions($tenantId),
             'interviews' => $this->buildInterviews($tenantId),
             'offers' => $this->buildOffers($tenantId),
-            'analytics' => $this->buildAnalytics($tenantId, $analytics),
+            'analytics' => $this->buildAnalytics($tenantId, $analytics, $from, $to),
             'kits' => $this->buildKits($tenantId),
             'pool' => $this->buildPool($tenantId),
             'support' => $this->buildSupport($tenantId),
@@ -399,12 +401,13 @@ class RecruitmentController extends Controller
     /*  Analytics                                                         */
     /* ------------------------------------------------------------------ */
 
-    private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics): array
+    private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
     {
         $conversion = collect($analytics->getPipelineConversion($tenantId));
         $sources = collect($analytics->getSourceEffectiveness($tenantId));
         $tth = collect($analytics->getTimeToHire($tenantId, 6));
         $velocity = collect($analytics->getHiringVelocity($tenantId));
+        $openPositions = collect($analytics->getOpenPositionsSummary($tenantId, $from, $to));
 
         $hiresThisMonth = (int) ($velocity->last()['count'] ?? 0);
         $avgTth = (int) round((float) ($tth->avg('avg_days') ?? 0));
@@ -438,6 +441,12 @@ class RecruitmentController extends Controller
                 'hired' => (int) $row['hired'],
                 'detail' => $row['hired'].' hired · '.$row['conversion_rate'].'%',
                 'width' => round(((int) $row['total'] / $maxSrc) * 100),
+            ])->values()->all(),
+            'open_positions' => $openPositions->map(fn ($row) => [
+                'requisition_id' => $row['requisition_id'],
+                'title' => $row['position_title'] ?: 'Untitled',
+                'applications' => (int) $row['applications'],
+                'days_open' => (int) $row['days_open'],
             ])->values()->all(),
         ];
     }
