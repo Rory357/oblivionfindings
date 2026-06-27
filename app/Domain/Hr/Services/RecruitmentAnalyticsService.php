@@ -34,10 +34,12 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getSourceEffectiveness(?int $tenantId): array
+    public function getSourceEffectiveness(?int $tenantId, ?string $from = null, ?string $to = null): array
     {
         $results = DB::table('hr_candidates')
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
             ->selectRaw("
                 source,
                 COUNT(*) as total,
@@ -57,12 +59,14 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getPipelineConversion(?int $tenantId): array
+    public function getPipelineConversion(?int $tenantId, ?string $from = null, ?string $to = null): array
     {
         $stages = RecruitmentService::STAGES;
 
         $counts = DB::table('hr_candidates')
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')

@@ -130,6 +130,7 @@ type AnalyticsData = {
     funnel: { label: string; count: number; rate: string; width: number }[];
     sources: { name: string; total: number; hired: number; detail: string; width: number }[];
     open_positions: { requisition_id: number | null; title: string; applications: number; days_open: number }[];
+    range?: { from: string | null; to: string | null };
 };
 
 type Kit = { id: number; name: string; role: string | null; is_active: boolean; criteria: { label: string; weight: number }[] };
@@ -1120,8 +1121,41 @@ function OffersTab({
 /* ================================================================== */
 
 function AnalyticsTab({ data }: { data: AnalyticsData }) {
+    const [from, setFrom] = useState(data.range?.from ?? '');
+    const [to, setTo] = useState(data.range?.to ?? '');
+    const hasFilter = Boolean(data.range?.from || data.range?.to);
+
+    const apply = (next: { from?: string; to?: string }) => {
+        const params: Record<string, string> = { tab: 'analytics' };
+        const f = next.from ?? from;
+        const t = next.to ?? to;
+        if (f) params.from = f;
+        if (t) params.to = t;
+        router.get(window.location.pathname, params, { preserveState: true, preserveScroll: true });
+    };
+    const clear = () => {
+        setFrom('');
+        setTo('');
+        router.get(window.location.pathname, { tab: 'analytics' }, { preserveState: true, preserveScroll: true });
+    };
+
     return (
         <div>
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-[14px] border border-border bg-card px-4 py-3">
+                <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">From</label>
+                    <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-md border border-border bg-background px-2.5 text-[13px] outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">To</label>
+                    <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-md border border-border bg-background px-2.5 text-[13px] outline-none focus:border-primary" />
+                </div>
+                <button type="button" onClick={() => apply({})} className="h-9 rounded-md bg-primary px-4 text-[13px] font-bold text-primary-foreground">Apply</button>
+                {hasFilter ? (
+                    <button type="button" onClick={clear} className="h-9 rounded-md border border-border bg-card px-3 text-[13px] font-semibold hover:bg-muted">Clear</button>
+                ) : null}
+                <span className="ml-auto self-center text-[11.5px] text-muted-foreground">Scopes pipeline, sources &amp; open roles by candidate date.</span>
+            </div>
             <div className="mb-4 flex flex-wrap gap-3">
                 {data.kpis.map((k) => (
                     <div key={k.key} className="min-w-[170px] flex-1 rounded-[14px] border border-border bg-card px-4 py-3.5">

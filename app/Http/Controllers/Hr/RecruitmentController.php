@@ -424,8 +424,8 @@ class RecruitmentController extends Controller
 
     private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
     {
-        $conversion = collect($analytics->getPipelineConversion($tenantId));
-        $sources = collect($analytics->getSourceEffectiveness($tenantId));
+        $conversion = collect($analytics->getPipelineConversion($tenantId, $from, $to));
+        $sources = collect($analytics->getSourceEffectiveness($tenantId, $from, $to));
         $tth = collect($analytics->getTimeToHire($tenantId, 6));
         $velocity = collect($analytics->getHiringVelocity($tenantId));
         $openPositions = collect($analytics->getOpenPositionsSummary($tenantId, $from, $to));
@@ -469,6 +469,8 @@ class RecruitmentController extends Controller
                 'applications' => (int) $row['applications'],
                 'days_open' => (int) $row['days_open'],
             ])->values()->all(),
+            // Echo the active window so the tab's date filter reflects current state.
+            'range' => ['from' => $from, 'to' => $to],
         ];
     }
 
