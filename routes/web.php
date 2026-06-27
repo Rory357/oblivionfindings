@@ -95,7 +95,8 @@ Route::post('/contact', [ContactController::class, 'store']);
 // the candidate application-status tracker (`applicationStatus`) remains on the
 // original controller, now sourced from requisitions.
 Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.index');
-Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->name('careers.application.status');
+// Public capability-token lookup — throttle to blunt token enumeration.
+Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->middleware('throttle:30,1')->name('careers.application.status');
 Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->name('careers.offer.show');
 Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->name('careers.offer.respond');
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');

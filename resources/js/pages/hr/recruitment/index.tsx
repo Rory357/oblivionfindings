@@ -1135,6 +1135,10 @@ function OffersTab({
 /*  Analytics                                                         */
 /* ================================================================== */
 
+// Terminal stages are excluded from the pipeline list, so drilling into them
+// from the funnel would land on an empty view — keep them non-clickable.
+const NON_DRILLABLE_STAGES = ['withdrawn', 'rejected', 'hired'];
+
 function AnalyticsTab({ data, onDrill }: { data: AnalyticsData; onDrill: (stage: string) => void }) {
     const [from, setFrom] = useState(data.range?.from ?? '');
     const [to, setTo] = useState(data.range?.to ?? '');
@@ -1185,13 +1189,15 @@ function AnalyticsTab({ data, onDrill }: { data: AnalyticsData; onDrill: (stage:
                     {data.funnel.length === 0 ? (
                         <p className="py-6 text-center text-[13px] text-muted-foreground">Not enough data yet.</p>
                     ) : (
-                        data.funnel.map((f) => (
+                        data.funnel.map((f) => {
+                            const drillable = f.count > 0 && !NON_DRILLABLE_STAGES.includes(f.stage);
+                            return (
                             <button
                                 key={f.label}
                                 type="button"
-                                onClick={() => f.count > 0 && onDrill(f.stage)}
-                                title={f.count > 0 ? `View ${f.count} in the pipeline` : undefined}
-                                className={`mb-2.5 flex w-full items-center gap-3 rounded-lg text-left ${f.count > 0 ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default'}`}
+                                onClick={() => drillable && onDrill(f.stage)}
+                                title={drillable ? `View ${f.count} in the pipeline` : undefined}
+                                className={`mb-2.5 flex w-full items-center gap-3 rounded-lg text-left ${drillable ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default'}`}
                             >
                                 <span className="w-24 flex-none text-[12px] font-semibold">{f.label}</span>
                                 <div className="relative h-[30px] flex-1 overflow-hidden rounded-lg bg-muted">
@@ -1199,7 +1205,8 @@ function AnalyticsTab({ data, onDrill }: { data: AnalyticsData; onDrill: (stage:
                                 </div>
                                 <span className="w-14 flex-none text-right text-[11.5px] font-semibold text-muted-foreground">{f.rate}</span>
                             </button>
-                        ))
+                            );
+                        })
                     )}
                 </div>
                 <div className="rounded-[14px] border border-border bg-card p-4">

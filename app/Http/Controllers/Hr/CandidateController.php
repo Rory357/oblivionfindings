@@ -542,10 +542,11 @@ class CandidateController extends Controller
             ->get();
 
         $sent = 0;
-        $skipped = 0;
+        $noEmail = 0;
+        $failed = 0;
         foreach ($candidates as $candidate) {
             if (! $candidate->personal_email) {
-                $skipped++;
+                $noEmail++;
 
                 continue;
             }
@@ -555,11 +556,18 @@ class CandidateController extends Controller
                 $sent++;
             } catch (\Throwable $exception) {
                 report($exception);
-                $skipped++;
+                $failed++;
             }
         }
 
-        $message = "Message sent to {$sent} candidate(s)".($skipped > 0 ? ", {$skipped} skipped (no email)" : '').'.';
+        $message = "Message sent to {$sent} candidate(s)";
+        if ($noEmail > 0) {
+            $message .= ", {$noEmail} skipped (no email on file)";
+        }
+        if ($failed > 0) {
+            $message .= ", {$failed} failed to send";
+        }
+        $message .= '.';
 
         return redirect()->back()->with('success', $message);
     }
