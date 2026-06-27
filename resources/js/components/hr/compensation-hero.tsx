@@ -6,8 +6,18 @@
  * uses for brandColour) and referenced via inline style — never a colour literal
  * in a className — so the raw-colour lint stays green. */
 import { cn } from '@/lib/utils';
+import { usePage } from '@inertiajs/react';
 import type { ComponentType, CSSProperties, ReactNode } from 'react';
-import { AlertTriangle, Clock, DollarSign } from 'lucide-react';
+import {
+    AlertTriangle,
+    Banknote,
+    ClipboardCheck,
+    Clock,
+    DollarSign,
+    Download,
+    Plus,
+    Receipt,
+} from 'lucide-react';
 
 export type CompensationHeroStats = {
     people_out_of_band: number;
@@ -129,11 +139,33 @@ export function CompensationHero({
     periodLabel = 'NZD',
 }: {
     stats: CompensationHeroStats;
-    quickActions: CompensationQuickAction[];
+    /** Override the quick-action strip. When omitted, the standard hub set is
+     *  derived from the viewer's permissions (links, not modal triggers). */
+    quickActions?: CompensationQuickAction[];
     currency?: string;
     subtitle?: string;
     periodLabel?: string;
 }) {
+    const can = (
+        usePage().props as {
+            auth?: { can?: { hr?: { compensation?: { manage?: boolean }; expenses?: { view?: boolean } } } };
+        }
+    ).auth?.can?.hr;
+    const defaultActions: CompensationQuickAction[] = [
+        ...(can?.compensation?.manage
+            ? [
+                  { label: 'New band', icon: Plus, href: '/hr/compensation/bands' },
+                  { label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews/create' },
+                  { label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' },
+              ]
+            : []),
+        ...(can?.expenses?.view
+            ? [{ label: 'New claim', icon: Receipt, href: '/hr/compensation/expenses/create' }]
+            : []),
+        { label: 'Export', icon: Download, href: '/hr/compensation/bands/export' },
+    ];
+    const actions = quickActions ?? defaultActions;
+
     const rootStyle = { ['--hero-gold' as string]: GOLD } as CSSProperties;
     return (
         <div
@@ -181,7 +213,7 @@ export function CompensationHero({
                     </div>
 
                     <div className="mt-6 flex flex-wrap gap-2">
-                        {quickActions.map((a) => {
+                        {actions.map((a) => {
                             const Icon = a.icon;
                             const inner = (
                                 <>

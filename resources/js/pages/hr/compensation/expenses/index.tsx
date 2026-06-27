@@ -1,5 +1,5 @@
-import { CompensationTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +37,7 @@ type Props = {
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     filters: { status: string | null; q: string };
+    stats: CompensationHeroStats;
     can: { create: boolean; manage: boolean };
 };
 
@@ -79,7 +80,7 @@ const formatCurrency = (amount: number, currency = 'NZD') => {
     }).format(amount);
 };
 
-export default function ExpenseIndex({ claims, filters, can }: Props) {
+export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
             '/hr/compensation/expenses',
@@ -97,38 +98,19 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Expense Claims" />
 
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={Receipt}
-                        title="Expense Claims"
-                        description="Manage employee expense claims and reimbursements"
-                        stats={[
-                            { label: 'Total', value: claims.data.length },
-                            {
-                                label: 'Submitted',
-                                value: claims.data.filter((c) => c.status === 'submitted').length,
-                            },
-                            {
-                                label: 'Approved',
-                                value: claims.data.filter((c) => c.status === 'approved').length,
-                            },
-                            { label: 'Value', value: formatCurrency(totalClaimValue) },
-                        ]}
-                        actions={
-                            can.create && (
-                                <Button asChild size="sm">
-                                    <Link href="/hr/compensation/expenses/create">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Claim
-                                    </Link>
-                                </Button>
-                            )
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={<CompensationHero stats={stats} />}>
                 <CompensationTabs active="expenses" />
+
+                {can.create ? (
+                    <div className="flex justify-end">
+                        <Button asChild size="sm">
+                            <Link href="/hr/compensation/expenses/create">
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New claim
+                            </Link>
+                        </Button>
+                    </div>
+                ) : null}
 
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">

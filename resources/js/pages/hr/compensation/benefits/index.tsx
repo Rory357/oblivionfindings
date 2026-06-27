@@ -1,5 +1,5 @@
-import { CompensationTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +81,7 @@ interface Props {
     employees: Employee[];
     summary: Summary;
     filters: { status: string | null; plan_id: string | null };
+    stats: CompensationHeroStats;
     can: { manage: boolean };
 }
 
@@ -140,6 +141,7 @@ export default function BenefitsIndex({
     employees,
     summary,
     filters,
+    stats,
     can,
 }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
@@ -205,32 +207,17 @@ export default function BenefitsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Benefits Enrollments" />
 
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={Heart}
-                        title="Benefits Enrollments"
-                        description="Overview of employee benefit plan enrollments"
-                        stats={[
-                            { label: 'Total enrolled', value: totalEnrolled },
-                            { label: 'Plans', value: plans.length },
-                            {
-                                label: 'Active',
-                                value: enrollments.data.filter((e) => e.status === 'active').length,
-                            },
-                        ]}
-                        actions={
-                            can.manage && (
-                                <Button size="sm" onClick={() => setOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Enroll Employee
-                                </Button>
-                            )
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={<CompensationHero stats={stats} />}>
                 <CompensationTabs active="benefits" />
+
+                {can.manage ? (
+                    <div className="flex justify-end">
+                        <Button size="sm" onClick={() => setOpen(true)}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Enroll employee
+                        </Button>
+                    </div>
+                ) : null}
 
                 {/* Summary Cards */}
                 {Object.keys(summary).length > 0 && (

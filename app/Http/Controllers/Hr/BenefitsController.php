@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\BenefitsService;
+use App\Domain\Hr\Services\CompensationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,6 +18,7 @@ class BenefitsController extends Controller
 
     public function __construct(
         protected BenefitsService $benefitsService,
+        protected CompensationService $compensationService,
     ) {}
 
     /**
@@ -58,6 +60,8 @@ class BenefitsController extends Controller
                 'status' => $request->query('status'),
                 'plan_id' => $request->query('plan_id'),
             ],
+            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            'tabCounts' => $this->compensationService->tabCounts($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.benefits.manage'),
             ],
