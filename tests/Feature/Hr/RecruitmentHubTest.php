@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
@@ -16,6 +17,7 @@ use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Models\Permission;
 use App\Models\Role;
@@ -472,6 +474,49 @@ test('scheduling an interview emails the candidate and panel a calendar invite',
 
     $interview = HrInterview::query()->where('application_id', $application->id)->first();
     expect($interview->invite_sent_at)->not->toBeNull();
+});
+
+/* ---- D3: reference questionnaire (#17) ---- */
+
+test('requesting a reference emails the referee a questionnaire link', function () {
+    Notification::fake();
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_completed');
+
+    $this->actingAs($this->hr)->post(route('hr.references.store', $application->id), [
+        'referee_name' => 'Pat Manager',
+        'referee_email' => 'pat.manager@example.test',
+        'referee_relationship' => 'Former manager',
+    ])->assertRedirect();
+
+    Notification::assertSentOnDemand(ReferenceRequestNotification::class);
+    $reference = HrReferenceCheck::query()->where('application_id', $application->id)->first();
+    expect($reference->response_token)->not->toBeNull();
+    expect($reference->status)->toBe('requested');
+});
+
+test('a referee submits the public reference questionnaire', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_completed');
+    $reference = HrReferenceCheck::query()->create([
+        'application_id' => $application->id,
+        'referee_name' => 'Pat',
+        'referee_email' => 'pat@example.test',
+        'referee_relationship' => 'Manager',
+        'status' => 'requested',
+        'requested_at' => now(),
+        'response_token' => 'tok-ref-'.uniqid(),
+    ]);
+
+    $this->post(route('careers.reference.submit', ['token' => $reference->response_token]), [
+        'responses' => ['capacity' => 'Direct manager 2 years', 'reemploy' => 'Yes', 'reliability' => '5'],
+    ])->assertRedirect();
+
+    $reference->refresh();
+    expect($reference->status)->toBe('completed');
+    expect($reference->responses['reemploy'] ?? null)->toBe('Yes');
+    expect($reference->received_at)->not->toBeNull();
+
+    // an unknown token 404s
+    $this->post(route('careers.reference.submit', ['token' => 'nope']), ['responses' => ['capacity' => 'x']])->assertNotFound();
 });
 
 /* ---- D5: talent pool (#22) ---- */

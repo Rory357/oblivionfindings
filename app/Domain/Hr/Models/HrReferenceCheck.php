@@ -24,12 +24,15 @@ class HrReferenceCheck extends Model
         'verified_at',
         'reference_notes',
         'verified_by',
+        'responses',
+        'response_token',
     ];
 
     protected $casts = [
         'requested_at' => 'datetime',
         'received_at' => 'datetime',
         'verified_at' => 'datetime',
+        'responses' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */

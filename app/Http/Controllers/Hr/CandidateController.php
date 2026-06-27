@@ -16,6 +16,7 @@ use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
@@ -741,17 +742,31 @@ class CandidateController extends Controller
             'referee_relationship' => ['required', 'string', 'max:255'],
         ]);
 
-        HrReferenceCheck::create([
+        $reference = HrReferenceCheck::create([
             'application_id'       => $application->id,
             'referee_name'         => $validated['referee_name'],
             'referee_email'        => $validated['referee_email'] ?? null,
             'referee_phone'        => $validated['referee_phone'] ?? null,
             'referee_relationship' => $validated['referee_relationship'],
-            'status'               => 'pending',
+            'status'               => 'requested',
             'requested_at'         => now(),
+            'response_token'       => Str::random(64),
         ]);
 
-        return redirect()->back()->with('success', 'Reference check request created.');
+        // Email the referee a token-guarded questionnaire link.
+        if ($reference->referee_email) {
+            try {
+                $candidate = $application->candidate()->first();
+                Notification::route('mail', $reference->referee_email)
+                    ->notify(new ReferenceRequestNotification($reference, $candidate?->full_name ?? 'a candidate'));
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return redirect()->back()->with('success', $reference->referee_email
+            ? 'Reference requested — a questionnaire link was emailed to the referee.'
+            : 'Reference check recorded. Add a referee email to send the questionnaire.');
     }
 
     public function updateReference(Request $request, HrReferenceCheck $reference)
