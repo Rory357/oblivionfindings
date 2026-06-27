@@ -354,6 +354,7 @@ export default function CalendarIndex({
             recurrence_until: (props.recurrenceUntil as string) ?? null,
             audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'people') ?? 'org',
             audience_user_ids: (props.attendeeUserIds as number[]) ?? [],
+            reminders: (props.reminders as { offset_minutes: number; channel: string }[]) ?? [],
             scope,
             occurrence_date: (props.occurrenceDate as string) ?? null,
         };

@@ -1,11 +1,13 @@
 <?php
 
 use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\Hr\Models\HrCalendarEventReminder;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -207,6 +209,39 @@ test('a user who was not invited cannot RSVP', function () {
     $this->actingAs($outsider)
         ->post("/hr/calendar/events/{$event->id}/rsvp", ['status' => 'yes'])
         ->assertForbidden();
+});
+
+test('reminders are stored and the scheduler dispatches them at lead time', function () {
+    $invitee = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $invitee->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/calendar/events', [
+            'title' => 'Standup',
+            'event_type' => 'team',
+            'starts_at' => now()->addMinutes(10)->toDateTimeString(),
+            'ends_at' => now()->addMinutes(40)->toDateTimeString(),
+            'audience_type' => 'people',
+            'audience_user_ids' => [$invitee->id],
+            'reminders' => [['offset_minutes' => 10, 'channel' => 'notification']],
+        ])
+        ->assertRedirect();
+
+    $event = HrCalendarEvent::query()->where('title', 'Standup')->firstOrFail();
+
+    $this->assertDatabaseHas('hr_calendar_event_reminders', [
+        'event_id' => $event->id,
+        'offset_minutes' => 10,
+        'channel' => 'notification',
+    ]);
+
+    Notification::fake();
+
+    // The 10-minute reminder for an event 10 minutes out is due now.
+    $this->artisan('hr:dispatch-calendar-reminders')->assertExitCode(0);
+
+    $reminder = HrCalendarEventReminder::query()->where('event_id', $event->id)->firstOrFail();
+    expect($reminder->last_sent_at)->not->toBeNull();
 });
 
 test('unknown layer keys are ignored and default layers apply', function () {

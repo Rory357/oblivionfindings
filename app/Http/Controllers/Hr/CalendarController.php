@@ -235,11 +235,15 @@ class CalendarController extends Controller
             'audience_type' => ['nullable', 'in:org,site,department,people'],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
+            'reminders' => ['nullable', 'array'],
+            'reminders.*.offset_minutes' => ['required_with:reminders', 'integer', 'min:0', 'max:43200'],
+            'reminders.*.channel' => ['required_with:reminders', 'in:notification,email'],
         ]);
 
         $audienceType = $data['audience_type'] ?? null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
-        unset($data['audience_type'], $data['audience_user_ids']);
+        $reminders = $data['reminders'] ?? [];
+        unset($data['audience_type'], $data['audience_user_ids'], $data['reminders']);
 
         $data['category_id'] = $this->resolveCategoryId($tenantId, $data['event_type'] ?? null);
 
@@ -250,6 +254,7 @@ class CalendarController extends Controller
         ]);
 
         $this->syncAttendees($event, $audienceType, $audienceUserIds);
+        $this->syncReminders($event, $reminders);
 
         return redirect()->back()->with('success', 'Calendar event created.');
     }
@@ -279,6 +284,9 @@ class CalendarController extends Controller
             'audience_type' => ['nullable', 'in:org,site,department,people'],
             'audience_user_ids' => ['nullable', 'array'],
             'audience_user_ids.*' => ['integer', 'exists:users,id'],
+            'reminders' => ['nullable', 'array'],
+            'reminders.*.offset_minutes' => ['required_with:reminders', 'integer', 'min:0', 'max:43200'],
+            'reminders.*.channel' => ['required_with:reminders', 'in:notification,email'],
             // Recurring-edit scope (gated on calendar.manage_recurring below).
             'scope' => ['nullable', 'in:all,this,following'],
             'occurrence_date' => ['nullable', 'date'],
@@ -289,7 +297,12 @@ class CalendarController extends Controller
         $audienceType = $data['audience_type'] ?? null;
         $audienceUserIds = $data['audience_user_ids'] ?? [];
         $audienceProvided = $request->has('audience_type');
-        unset($data['scope'], $data['occurrence_date'], $data['audience_type'], $data['audience_user_ids']);
+        $reminders = $data['reminders'] ?? [];
+        $remindersProvided = $request->has('reminders');
+        unset(
+            $data['scope'], $data['occurrence_date'], $data['audience_type'],
+            $data['audience_user_ids'], $data['reminders'],
+        );
 
         if (array_key_exists('event_type', $data)) {
             $data['category_id'] = $this->resolveCategoryId($event->tenant_id, $data['event_type']);
@@ -318,8 +331,37 @@ class CalendarController extends Controller
         if ($audienceProvided) {
             $this->syncAttendees($event, $audienceType, $audienceUserIds);
         }
+        if ($remindersProvided) {
+            $this->syncReminders($event, $reminders);
+        }
 
         return redirect()->back()->with('success', 'Calendar event updated.');
+    }
+
+    /**
+     * Replace an event's reminders, preserving last_sent_at for any reminder that
+     * is unchanged (same offset + channel) so editing won't re-fire past sends.
+     *
+     * @param  list<array{offset_minutes:int, channel:string}>  $reminders
+     */
+    private function syncReminders(HrCalendarEvent $event, array $reminders): void
+    {
+        $keep = [];
+        foreach ($reminders as $r) {
+            $offset = (int) $r['offset_minutes'];
+            $channel = $r['channel'];
+            $event->reminders()->updateOrCreate(
+                ['offset_minutes' => $offset, 'channel' => $channel],
+                [],
+            );
+            $keep[] = $offset.':'.$channel;
+        }
+
+        foreach ($event->reminders()->get() as $existing) {
+            if (! in_array($existing->offset_minutes.':'.$existing->channel, $keep, true)) {
+                $existing->delete();
+            }
+        }
     }
 
     /**
