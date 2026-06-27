@@ -698,6 +698,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.expenses.view')->prefix('compensation/expenses')->name('compensation.expenses.')->group(function () {
         Route::get('/', [ExpenseController::class, 'index'])->name('index');
+        Route::get('/{expenseClaim}/items/{item}/receipt', [ExpenseController::class, 'downloadReceipt'])->name('receipt');
 
         Route::middleware('permission:hr.expenses.manage')->group(function () {
             Route::get('/create', [ExpenseController::class, 'create'])->name('create');
