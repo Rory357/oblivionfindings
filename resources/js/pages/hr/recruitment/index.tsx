@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog';
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
+import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import {
     RecruitmentWizards,
     type RecruitmentSupport,
@@ -97,6 +98,9 @@ type WeekInterview = {
     type: string;
     status: string;
     scheduled_at?: string | null;
+    scored?: boolean;
+    kit_name?: string | null;
+    criteria?: { label: string; weight: number }[];
 };
 
 type Consensus = {
@@ -182,6 +186,7 @@ export default function RecruitmentHub(props: Props) {
     const [sheetId, setSheetId] = useState<number | null>(null);
     const [wizard, setWizard] = useState<WizardState | null>(null);
     const [kitDialog, setKitDialog] = useState<{ kit: KitDraft | null } | null>(null);
+    const [scoreTarget, setScoreTarget] = useState<ScoreTarget | null>(null);
     const [dragId, setDragId] = useState<number | null>(null);
     const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -479,7 +484,12 @@ export default function RecruitmentHub(props: Props) {
                         ) : null}
 
                         {tab === 'interviews' ? (
-                            <InterviewsTab data={interviews} canManage={can.manage} onNew={() => setTab('pipeline')} />
+                            <InterviewsTab
+                                data={interviews}
+                                canManage={can.manage}
+                                onNew={() => setTab('pipeline')}
+                                onScore={(iv) => setScoreTarget({ id: iv.id, candidate: iv.candidate, kit_name: iv.kit_name, criteria: iv.criteria ?? [] })}
+                            />
                         ) : null}
 
                         {tab === 'offers' ? (
@@ -548,6 +558,7 @@ export default function RecruitmentHub(props: Props) {
 
             {wizard ? <RecruitmentWizards state={wizard} onClose={() => setWizard(null)} support={support} /> : null}
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
+            {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -957,7 +968,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 /*  Interviews                                                        */
 /* ================================================================== */
 
-function InterviewsTab({ data, canManage, onNew }: { data: { week: WeekInterview[]; consensus: Consensus }; canManage: boolean; onNew: () => void }) {
+function InterviewsTab({ data, canManage, onNew, onScore }: { data: { week: WeekInterview[]; consensus: Consensus }; canManage: boolean; onNew: () => void; onScore: (iv: WeekInterview) => void }) {
     return (
         <div>
             <div className="mb-4 flex items-center gap-3">
@@ -986,6 +997,15 @@ function InterviewsTab({ data, canManage, onNew }: { data: { week: WeekInterview
                                         <div className="text-[12px] font-semibold">{iv.scheduled_at ? new Date(iv.scheduled_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}</div>
                                         <div className="text-[11px] text-muted-foreground">{iv.scheduled_at ? new Date(iv.scheduled_at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }) : ''}</div>
                                     </div>
+                                    {canManage ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onScore(iv)}
+                                            className={`h-8 shrink-0 rounded-md border px-2.5 text-[12px] font-bold ${iv.scored ? 'border-border bg-card text-muted-foreground hover:bg-muted' : 'border-primary bg-primary/10 text-primary'}`}
+                                        >
+                                            {iv.scored ? 'Re-score' : 'Score'}
+                                        </button>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>

@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewKit;
+use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
@@ -698,4 +699,95 @@ test('the interview reminder command sends once for tomorrow', function () {
     Notification::fake();
     $this->artisan('recruitment:send-interview-reminders')->assertSuccessful();
     Notification::assertNothingSent();
+});
+
+/* ---- Interview scoring entry (Interviews tab → Score dialog) ---- */
+
+test('scoring an interview against its kit persists a weighted scorecard and completes the interview', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
+
+    $kit = HrInterviewKit::query()->create([
+        'tenant_id' => 1,
+        'name' => 'SW panel',
+        'role' => 'support_worker',
+        'criteria' => [['label' => 'Values', 'weight' => 40], ['label' => 'Reliability', 'weight' => 60]],
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+    ]);
+    $application->update(['interview_kit_id' => $kit->id]);
+
+    $interview = HrInterview::query()->create([
+        'application_id' => $application->id,
+        'scheduled_at' => now()->subHour()->utc(),
+        'duration_minutes' => 45,
+        'interview_type' => 'in_person',
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($this->hr)->post(route('hr.interviews.score', $interview->id), [
+        'recommendation' => 'yes',
+        'notes' => 'Strong values fit.',
+        'criteria_scores' => [
+            ['label' => 'Values', 'score' => 80, 'weight' => 40],
+            ['label' => 'Reliability', 'score' => 60, 'weight' => 60],
+        ],
+    ])->assertRedirect();
+
+    $score = HrInterviewScore::query()->where('interview_id', $interview->id)->first();
+    expect($score)->not->toBeNull();
+    expect($score->interviewer_user_id)->toBe($this->hr->id);
+    expect($score->kit_id)->toBe($kit->id);
+    expect($score->recommendation)->toBe('yes');
+    // Weighted: 80*0.4 + 60*0.6 = 32 + 36 = 68.
+    expect(round((float) $score->overall_score))->toBe(68.0);
+    expect($score->criteria_scores)->toHaveCount(2);
+    expect($interview->fresh()->status)->toBe('completed');
+});
+
+test('re-scoring an interview updates the same interviewer scorecard rather than duplicating', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
+    $interview = HrInterview::query()->create([
+        'application_id' => $application->id,
+        'scheduled_at' => now()->subHour()->utc(),
+        'duration_minutes' => 30,
+        'interview_type' => 'phone',
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($this->hr)->post(route('hr.interviews.score', $interview->id), [
+        'overall_score' => 55, 'recommendation' => 'maybe',
+    ])->assertRedirect();
+    $this->actingAs($this->hr)->post(route('hr.interviews.score', $interview->id), [
+        'overall_score' => 90, 'recommendation' => 'strong_yes',
+    ])->assertRedirect();
+
+    $scores = HrInterviewScore::query()->where('interview_id', $interview->id)->get();
+    expect($scores)->toHaveCount(1);
+    expect(round((float) $scores->first()->overall_score))->toBe(90.0);
+    expect($scores->first()->recommendation)->toBe('strong_yes');
+});
+
+test('scoring requires recruitment manage and rejects unknown criteria labels', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
+    $kit = HrInterviewKit::query()->create([
+        'tenant_id' => 1, 'name' => 'Kit', 'criteria' => [['label' => 'Values', 'weight' => 100]],
+        'is_active' => true, 'created_by' => $this->hr->id,
+    ]);
+    $application->update(['interview_kit_id' => $kit->id]);
+    $interview = HrInterview::query()->create([
+        'application_id' => $application->id, 'scheduled_at' => now()->utc(),
+        'duration_minutes' => 30, 'interview_type' => 'phone', 'status' => 'scheduled',
+    ]);
+
+    // Unknown label is rejected (kit mismatch).
+    $this->actingAs($this->hr)->post(route('hr.interviews.score', $interview->id), [
+        'criteria_scores' => [['label' => 'Charisma', 'score' => 90, 'weight' => 100]],
+    ])->assertSessionHasErrors('criteria_scores');
+    expect(HrInterviewScore::query()->count())->toBe(0);
+
+    // A view-only user cannot score.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.interviews.score', $interview->id), [
+        'overall_score' => 70,
+    ])->assertForbidden();
 });
