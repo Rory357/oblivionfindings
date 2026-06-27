@@ -1,9 +1,19 @@
 import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import { ExpenseClaimDialog } from '@/components/hr/expense-claim-dialog';
+import { StatusBadge } from '@/components/hr/status-badge';
 import { PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Table,
@@ -13,10 +23,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, Plus, Receipt } from 'lucide-react';
+import { CheckCircle, Eye, Plus, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
 type ExpenseClaim = {
     id: number;
@@ -38,40 +50,20 @@ type Props = {
     };
     filters: { status: string | null; q: string };
     stats: CompensationHeroStats;
-    can: { create: boolean; manage: boolean };
+    // `approve` is surfaced once the backend adds it (see backendNeeded); until
+    // then we fall back to `manage` so managers still see the inline actions.
+    can: { create: boolean; manage: boolean; approve?: boolean };
+    // Read-only IRD mileage rate (NZD/km) + the category list, surfaced for the
+    // New-claim dialog. Both are optional so the page renders before the
+    // controller passes them (see backendNeeded) — the dialog falls back safely.
+    mileageRatePerKm?: number;
+    categories?: string[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
     { title: 'Expenses', href: '/hr/compensation/expenses' },
 ];
-
-const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: {
-        className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-        label: 'Draft',
-    },
-    submitted: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Submitted',
-    },
-    approved: {
-        className:
-            'border-status-success/30 text-status-success bg-status-success-bg',
-        label: 'Approved',
-    },
-    rejected: {
-        className:
-            'border-status-critical/30 text-status-critical bg-status-critical-bg',
-        label: 'Rejected',
-    },
-    paid: {
-        className: 'border-status-info/30 text-status-info bg-status-info-bg',
-        label: 'Paid',
-    },
-};
 
 const formatCurrency = (amount: number, currency = 'NZD') => {
     return new Intl.NumberFormat('en-NZ', {
@@ -80,7 +72,46 @@ const formatCurrency = (amount: number, currency = 'NZD') => {
     }).format(amount);
 };
 
-export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
+// Statuses that count as "decided" for the segmented lens.
+const DECIDED_STATUSES = ['approved', 'rejected', 'paid', 'declined'];
+
+// Three top-level lenses. Awaiting maps to the single `submitted` status; All
+// clears the filter; Decided asks the backend for the decided set (whereIn).
+type Lens = 'awaiting' | 'all' | 'decided';
+const LENSES: { key: Lens; label: string; status: string | null }[] = [
+    { key: 'awaiting', label: 'Awaiting', status: 'submitted' },
+    { key: 'all', label: 'All', status: null },
+    { key: 'decided', label: 'Decided', status: 'decided' },
+];
+
+const activeLens = (status: string | null): Lens => {
+    if (!status) return 'all';
+    if (status === 'submitted') return 'awaiting';
+    if (status === 'decided' || DECIDED_STATUSES.includes(status)) {
+        return 'decided';
+    }
+    // draft (and any other single status) → no lens is highlighted; the
+    // granular chips below carry that selection instead.
+    return 'all';
+};
+
+export default function ExpenseIndex({
+    claims,
+    filters,
+    stats,
+    can,
+    mileageRatePerKm = 0,
+    categories,
+}: Props) {
+    // Managers see the inline approval actions; prefer the dedicated `approve`
+    // grant when the backend provides it, otherwise fall back to `manage`.
+    const canDecide = can.approve ?? can.manage;
+
+    const [claimOpen, setClaimOpen] = useState(false);
+    const [rejectTarget, setRejectTarget] = useState<ExpenseClaim | null>(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [busyId, setBusyId] = useState<number | null>(null);
+
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
             '/hr/compensation/expenses',
@@ -88,6 +119,40 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
             { preserveState: true, preserveScroll: true },
         );
     };
+
+    const lens = activeLens(filters.status);
+
+    const approve = (claim: ExpenseClaim) => {
+        setBusyId(claim.id);
+        router.post(
+            `/hr/compensation/expenses/${claim.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setBusyId(null),
+            },
+        );
+    };
+
+    const confirmReject = () => {
+        if (!rejectTarget || !rejectionReason.trim()) return;
+        const id = rejectTarget.id;
+        setBusyId(id);
+        router.post(
+            `/hr/compensation/expenses/${id}/reject`,
+            { rejection_reason: rejectionReason.trim() },
+            {
+                preserveScroll: true,
+                onFinish: () => setBusyId(null),
+                onSuccess: () => {
+                    setRejectTarget(null);
+                    setRejectionReason('');
+                },
+            },
+        );
+    };
+
+    const colSpan = can.manage ? 8 : 7;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -97,42 +162,58 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
                 <CompensationTabs active="expenses" />
 
                 {can.create ? (
-                    <div className="flex justify-end">
-                        <Button asChild size="sm">
+                    <div className="flex items-center justify-end gap-2">
+                        <Button asChild size="sm" variant="outline">
                             <Link href="/hr/compensation/expenses/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New claim
+                                Full form
                             </Link>
+                        </Button>
+                        <Button size="sm" onClick={() => setClaimOpen(true)}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            New claim
                         </Button>
                     </div>
                 ) : null}
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-2">
-                    {[
-                        'all',
-                        'draft',
-                        'submitted',
-                        'approved',
-                        'rejected',
-                        'paid',
-                    ].map((s) => (
-                        <Button
-                            key={s}
-                            variant={
-                                (!filters.status && s === 'all') ||
-                                filters.status === s
-                                    ? 'default'
-                                    : 'outline'
-                            }
-                            size="sm"
-                            onClick={() =>
-                                onFilter({ status: s === 'all' ? null : s })
-                            }
-                        >
-                            <span className="capitalize">{s}</span>
-                        </Button>
-                    ))}
+                {/* Segmented lens + granular status chips + search */}
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Awaiting / All / Decided */}
+                    <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
+                        {LENSES.map((l) => (
+                            // eslint-disable-next-line no-restricted-syntax -- segmented-control lens toggle, styled like the wizard Segmented primitive.
+                            <button
+                                key={l.key}
+                                type="button"
+                                onClick={() => onFilter({ status: l.status })}
+                                className={
+                                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors ' +
+                                    (lens === l.key
+                                        ? 'bg-background text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground')
+                                }
+                                aria-pressed={lens === l.key}
+                            >
+                                {l.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Granular status chips — keep every status reachable */}
+                    <div className="flex flex-wrap gap-2">
+                        {['draft', 'approved', 'rejected', 'paid'].map((s) => (
+                            <Button
+                                key={s}
+                                variant={
+                                    filters.status === s ? 'default' : 'outline'
+                                }
+                                size="sm"
+                                onClick={() => onFilter({ status: s })}
+                            >
+                                <span className="capitalize">{s}</span>
+                            </Button>
+                        ))}
+                    </div>
+
                     {can.manage && (
                         <Input
                             placeholder="Search by name..."
@@ -160,14 +241,16 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
                                     </TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Submitted</TableHead>
-                                    <TableHead className="w-16" />
+                                    <TableHead className="w-px text-right">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {claims.data.map((claim) => {
-                                    const config =
-                                        statusConfig[claim.status] ||
-                                        statusConfig.draft;
+                                    const isPending =
+                                        claim.status === 'submitted';
+                                    const busy = busyId === claim.id;
                                     return (
                                         <TableRow key={claim.id}>
                                             <TableCell className="font-mono text-sm">
@@ -191,28 +274,68 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={config.className}
-                                                >
-                                                    {config.label}
-                                                </Badge>
+                                                <StatusBadge
+                                                    status={claim.status}
+                                                />
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {claim.submitted_at || '-'}
                                             </TableCell>
                                             <TableCell>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`/hr/compensation/expenses/${claim.id}`}
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {canDecide &&
+                                                        isPending && (
+                                                            <>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    disabled={
+                                                                        busy
+                                                                    }
+                                                                    onClick={() =>
+                                                                        approve(
+                                                                            claim,
+                                                                        )
+                                                                    }
+                                                                    className="border-status-success/40 text-status-success hover:bg-status-success-bg"
+                                                                >
+                                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Approve
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    disabled={
+                                                                        busy
+                                                                    }
+                                                                    onClick={() => {
+                                                                        setRejectionReason(
+                                                                            '',
+                                                                        );
+                                                                        setRejectTarget(
+                                                                            claim,
+                                                                        );
+                                                                    }}
+                                                                    className="border-status-critical/40 text-status-critical hover:bg-status-critical-bg"
+                                                                >
+                                                                    <XCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Reject
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        asChild
                                                     >
-                                                        <Eye className="h-3.5 w-3.5" />
-                                                    </Link>
-                                                </Button>
+                                                        <Link
+                                                            href={`/hr/compensation/expenses/${claim.id}`}
+                                                            aria-label="View claim"
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5" />
+                                                        </Link>
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -220,7 +343,7 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
                                 {claims.data.length === 0 && (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={can.manage ? 8 : 7}
+                                            colSpan={colSpan}
                                             className="py-8 text-center text-muted-foreground"
                                         >
                                             No expense claims found.
@@ -237,6 +360,71 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
                     <LaravelPagination links={claims.links} />
                 )}
             </PageLayout>
+
+            {/* New claim — unified 3-step wizard (basics → items + mileage → review) */}
+            {can.create ? (
+                <ExpenseClaimDialog
+                    open={claimOpen}
+                    onClose={() => setClaimOpen(false)}
+                    mileageRatePerKm={mileageRatePerKm}
+                    categories={categories}
+                />
+            ) : null}
+
+            {/* Reject — reason required */}
+            <AlertDialog
+                open={rejectTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setRejectTarget(null);
+                        setRejectionReason('');
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reject expense claim</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {rejectTarget
+                                ? `Provide a reason for rejecting ${rejectTarget.claim_number} (${rejectTarget.title}). The claimant will see this.`
+                                : ''}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="reject-reason">Rejection reason</Label>
+                        <Textarea
+                            id="reject-reason"
+                            rows={3}
+                            value={rejectionReason}
+                            onChange={(e) =>
+                                setRejectionReason(e.target.value)
+                            }
+                            placeholder="e.g. Missing receipt for the accommodation line."
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setRejectTarget(null);
+                                setRejectionReason('');
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={
+                                !rejectionReason.trim() ||
+                                busyId === rejectTarget?.id
+                            }
+                            onClick={confirmReject}
+                        >
+                            Confirm rejection
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

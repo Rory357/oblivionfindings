@@ -1,15 +1,11 @@
+import {
+    ReviewBuilderDialog,
+    type ReviewBuilderBand,
+} from '@/components/hr/review-builder-dialog';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -18,12 +14,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle2, Play, X } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { CheckCircle2, ClipboardCheck, Play, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -71,6 +65,9 @@ type Props = {
     employees: Employee[];
     reviewCycles: ReviewCycleOption[];
     can: { manage: boolean };
+    /** Optional active salary bands for per-line in/under/over placement in the
+     *  builder. Omitted gracefully when the controller doesn't pass it. */
+    bands?: ReviewBuilderBand[];
 };
 
 const formatDate = (value?: string | null) => {
@@ -132,8 +129,10 @@ export default function CompensationReviewDetail({
     employees,
     reviewCycles,
     can,
+    bands,
 }: Props) {
     const isNew = !review;
+    const [builderOpen, setBuilderOpen] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
@@ -146,81 +145,6 @@ export default function CompensationReviewDetail({
                 : `/hr/compensation/reviews/${review.id}`,
         },
     ];
-
-    const [form, setForm] = useState({
-        title: review?.title ?? '',
-        review_cycle: review?.review_cycle ?? 'annual',
-        effective_date: review?.effective_date ?? '',
-        budget_amount: review?.budget_amount ?? '',
-        notes: review?.notes ?? '',
-        items: [] as Array<{
-            employee_profile_id: string;
-            current_salary: string;
-            proposed_salary: string;
-            change_percentage: string;
-            justification: string;
-        }>,
-    });
-
-    const set = (key: string, value: any) =>
-        setForm((prev) => ({ ...prev, [key]: value }));
-
-    const addItem = () => {
-        setForm((prev) => ({
-            ...prev,
-            items: [
-                ...prev.items,
-                {
-                    employee_profile_id: '',
-                    current_salary: '',
-                    proposed_salary: '',
-                    change_percentage: '',
-                    justification: '',
-                },
-            ],
-        }));
-    };
-
-    const updateItem = (idx: number, key: string, value: string) => {
-        setForm((prev) => {
-            const items = [...prev.items];
-            items[idx] = { ...items[idx], [key]: value };
-
-            // Auto-calculate change percentage
-            if (key === 'proposed_salary' || key === 'current_salary') {
-                const current = parseFloat(items[idx].current_salary);
-                const proposed = parseFloat(items[idx].proposed_salary);
-                if (current > 0 && proposed > 0) {
-                    items[idx].change_percentage = (
-                        ((proposed - current) / current) *
-                        100
-                    ).toFixed(2);
-                }
-            }
-
-            return { ...prev, items };
-        });
-    };
-
-    const removeItem = (idx: number) => {
-        setForm((prev) => ({
-            ...prev,
-            items: prev.items.filter((_, i) => i !== idx),
-        }));
-    };
-
-    const onEmployeeSelect = (idx: number, profileId: string) => {
-        const employee = employees.find((e) => String(e.id) === profileId);
-        updateItem(idx, 'employee_profile_id', profileId);
-        if (employee) {
-            updateItem(idx, 'current_salary', employee.annual_salary ?? '0');
-        }
-    };
-
-    const submitCreate = (e: FormEvent) => {
-        e.preventDefault();
-        router.post('/hr/compensation/reviews', form);
-    };
 
     const approveReview = () => {
         if (
@@ -244,239 +168,62 @@ export default function CompensationReviewDetail({
         }
     };
 
-    // Create mode
+    // Create mode — a guided 3-step builder wizard replaces the long inline form.
     if (isNew) {
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="New Compensation Review" />
                 <PageLayout
                     hero={
-                        <PageHero category="hr"
+                        <PageHero
+                            category="hr"
                             variant="compact"
                             backHref="/hr/compensation/reviews"
                             title="New Compensation Review"
                             description="Define a new review cycle and add employees for adjustments."
+                            actions={
+                                <Button onClick={() => setBuilderOpen(true)}>
+                                    <ClipboardCheck className="mr-1.5 h-4 w-4" />
+                                    Build review
+                                </Button>
+                            }
                         />
                     }
                 >
-                    <form onSubmit={submitCreate} className="space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    Review Details
+                    <Card>
+                        <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+                            <span className="relative grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+                                <ClipboardCheck className="h-8 w-8" />
+                                <Sparkles className="absolute -top-1.5 -right-1.5 h-5 w-5 text-primary" />
+                            </span>
+                            <div className="max-w-md space-y-1">
+                                <CardTitle className="text-lg">
+                                    Build a pay review in three steps
                                 </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Title</Label>
-                                        <Input
-                                            value={form.title}
-                                            onChange={(e) =>
-                                                set('title', e.target.value)
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>Review Cycle</Label>
-                                        <Select
-                                            value={form.review_cycle}
-                                            onValueChange={(v) =>
-                                                set('review_cycle', v)
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {reviewCycles.map((c) => (
-                                                    <SelectItem
-                                                        key={c.value}
-                                                        value={c.value}
-                                                    >
-                                                        {c.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label>Effective Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={form.effective_date}
-                                            onChange={(e) =>
-                                                set(
-                                                    'effective_date',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>Budget Amount</Label>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            value={form.budget_amount}
-                                            onChange={(e) =>
-                                                set(
-                                                    'budget_amount',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>Notes</Label>
-                                    <Textarea
-                                        value={form.notes}
-                                        onChange={(e) =>
-                                            set('notes', e.target.value)
-                                        }
-                                        rows={3}
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
+                                <p className="text-sm text-muted-foreground">
+                                    Set the cycle and identity, add employees
+                                    with their proposed adjustments, then review
+                                    the budget-vs-committed tally before you
+                                    create it.
+                                </p>
+                            </div>
+                            <Button
+                                size="lg"
+                                onClick={() => setBuilderOpen(true)}
+                            >
+                                <ClipboardCheck className="mr-1.5 h-4 w-4" />
+                                Start the builder
+                            </Button>
+                        </CardContent>
+                    </Card>
 
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base">
-                                    Employee Adjustments
-                                </CardTitle>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={addItem}
-                                >
-                                    Add Employee
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                {form.items.length === 0 && (
-                                    <p className="py-4 text-center text-sm text-muted-foreground">
-                                        No employees added yet. Click "Add
-                                        Employee" to begin.
-                                    </p>
-                                )}
-                                {form.items.map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="mb-4 grid grid-cols-6 gap-3 rounded-md border p-3"
-                                    >
-                                        <div className="col-span-2">
-                                            <Label className="text-xs">
-                                                Employee
-                                            </Label>
-                                            <Select
-                                                value={item.employee_profile_id}
-                                                onValueChange={(v) =>
-                                                    onEmployeeSelect(idx, v)
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {employees.map((emp) => (
-                                                        <SelectItem
-                                                            key={emp.id}
-                                                            value={String(
-                                                                emp.id,
-                                                            )}
-                                                        >
-                                                            {emp.user.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">
-                                                Current Salary
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.current_salary}
-                                                onChange={(e) =>
-                                                    updateItem(
-                                                        idx,
-                                                        'current_salary',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">
-                                                Proposed Salary
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.proposed_salary}
-                                                onChange={(e) =>
-                                                    updateItem(
-                                                        idx,
-                                                        'proposed_salary',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">
-                                                Change %
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.change_percentage}
-                                                readOnly
-                                                className="bg-muted"
-                                            />
-                                        </div>
-                                        <div className="flex items-end">
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => removeItem(idx)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                        <div className="col-span-6">
-                                            <Label className="text-xs">
-                                                Justification
-                                            </Label>
-                                            <Input
-                                                value={item.justification}
-                                                onChange={(e) =>
-                                                    updateItem(
-                                                        idx,
-                                                        'justification',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Reason for change..."
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-
-                        <div className="flex justify-end">
-                            <Button type="submit">Create Review</Button>
-                        </div>
-                    </form>
+                    <ReviewBuilderDialog
+                        open={builderOpen}
+                        onClose={() => setBuilderOpen(false)}
+                        employees={employees}
+                        reviewCycles={reviewCycles}
+                        bands={bands}
+                    />
                 </PageLayout>
             </AppLayout>
         );
@@ -489,20 +236,26 @@ export default function CompensationReviewDetail({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/compensation/reviews"
                         title={review.title}
                         description={`${getCycleLabel(review.review_cycle)} · Effective ${formatDate(review.effective_date)}`}
                         actions={
                             <div className="flex items-center gap-2">
-                                <Badge className={getStatusColor(review.status)}>
+                                <Badge
+                                    className={getStatusColor(review.status)}
+                                >
                                     {review.status.replace(/_/g, ' ')}
                                 </Badge>
                                 {can.manage &&
                                     (review.status === 'planning' ||
                                         review.status === 'in_progress') && (
-                                        <Button size="sm" onClick={approveReview}>
+                                        <Button
+                                            size="sm"
+                                            onClick={approveReview}
+                                        >
                                             <CheckCircle2 className="mr-1 h-4 w-4" />
                                             Approve Review
                                         </Button>

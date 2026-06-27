@@ -67,9 +67,15 @@ class ExpenseController extends Controller
             ],
             'stats' => $this->compensationService->heroStats($tenantId, $user),
             'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            // Surfaced for the New-claim dialog: IRD mileage rate (read-only) +
+            // the category list, so the dialog renders the config-driven mileage
+            // line (distance × rate) instead of hard-coding anything.
+            'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
+            'categories' => ExpenseService::CATEGORIES,
             'can' => [
                 'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,
+                'approve' => $user->canDo('hr.expenses.approve'),
             ],
         ]);
     }

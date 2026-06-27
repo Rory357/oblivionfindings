@@ -164,7 +164,7 @@ class BenefitsController extends Controller
         $data = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,opted_out,suspended,terminated'],
             'employee_contribution_rate' => ['sometimes', 'numeric', 'min:0', 'max:100'],
-            'employer_contribution_rate' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'employer_contribution_rate' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
             'opt_out_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
