@@ -51,7 +51,19 @@ const money = (value: number, currency = 'NZD') =>
         maximumFractionDigits: 0,
     }).format(value);
 
-function HealthRing({ pct }: { pct: number }) {
+// Threshold colours for the band-health ring (light variants that read on the
+// purple band), so a high vs low score differs by hue, not just arc length.
+const RING_GOOD = 'oklch(0.82 0.16 150)';
+const RING_MID = 'oklch(0.8 0.15 85)';
+const RING_BAD = 'oklch(0.72 0.18 25)';
+
+function healthBand(pct: number): { color: string; label: string } {
+    if (pct >= 90) return { color: RING_GOOD, label: 'Healthy' };
+    if (pct >= 75) return { color: RING_MID, label: 'Watch' };
+    return { color: RING_BAD, label: 'At risk' };
+}
+
+function HealthRing({ pct, color }: { pct: number; color: string }) {
     const size = 92;
     const r = (size - 10) / 2;
     const c = 2 * Math.PI * r;
@@ -72,7 +84,7 @@ function HealthRing({ pct }: { pct: number }) {
                     cy={size / 2}
                     r={r}
                     fill="none"
-                    stroke="var(--hero-gold)"
+                    stroke={color}
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeDasharray={c}
@@ -165,6 +177,7 @@ export function CompensationHero({
         { label: 'Export', icon: Download, href: '/hr/compensation/bands/export' },
     ];
     const actions = quickActions ?? defaultActions;
+    const health = healthBand(stats.band_health);
 
     const rootStyle = { ['--hero-gold' as string]: GOLD } as CSSProperties;
     return (
@@ -239,10 +252,10 @@ export function CompensationHero({
                 {/* Right: band-health ring + alert chips */}
                 <div className="flex shrink-0 flex-col gap-3 lg:w-72">
                     <div className="flex items-center gap-4">
-                        <HealthRing pct={stats.band_health} />
+                        <HealthRing pct={stats.band_health} color={health.color} />
                         <div>
                             <div className="text-[11px] font-semibold uppercase tracking-wide text-primary-foreground/60">
-                                Band health
+                                Band health · <span style={{ color: health.color }}>{health.label}</span>
                             </div>
                             <div className="mt-1 text-sm font-semibold leading-snug">
                                 {stats.people_in_band} of {stats.people_placed} people

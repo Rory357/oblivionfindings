@@ -89,11 +89,6 @@ export default function ExpenseIndex({ claims, filters, stats, can }: Props) {
         );
     };
 
-    const totalClaimValue = claims.data.reduce(
-        (sum, claim) => sum + (claim.total_amount || 0),
-        0,
-    );
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Expense Claims" />

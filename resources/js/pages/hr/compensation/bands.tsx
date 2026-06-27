@@ -176,6 +176,14 @@ const POSITION_DOT: Record<Placement['position'], string> = {
     over: 'bg-status-critical ring-status-critical/30',
 };
 
+// Shape also encodes band position (not colour alone, WCAG 1.4.1): in-band is a
+// round dot, out-of-band is a diamond.
+const POSITION_SHAPE: Record<Placement['position'], string> = {
+    under: 'rounded-[2px] rotate-45',
+    in: 'rounded-full',
+    over: 'rounded-[2px] rotate-45',
+};
+
 /* ------------------------------------------------------------------ */
 /*  Range bar — min/mid/max with target zone + employee dots           */
 /* ------------------------------------------------------------------ */
@@ -246,8 +254,9 @@ function RangeBar({
                                               aria-label={dotLabel}
                                               title={dotLabel}
                                               className={cn(
-                                                  'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                                  'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 ring-2 ring-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                                                   POSITION_DOT[p.position],
+                                                  POSITION_SHAPE[p.position],
                                               )}
                                               style={{ left: `${left}%` }}
                                           />
@@ -1035,10 +1044,13 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
         // always reflects what the user currently sees / is typing.
         const role = (roleQuery || filters.role || '').trim();
         if (role) params.set('role', role);
-        if (filters.active_only) params.set('active_only', '1');
+        if (filters.active_only) {
+            params.set('active_only', '1');
+            if (filters.as_of) params.set('as_of', filters.as_of);
+        }
         const qs = params.toString();
         return `/hr/compensation/bands/export${qs ? `?${qs}` : ''}`;
-    }, [roleQuery, filters.role, filters.active_only]);
+    }, [roleQuery, filters.role, filters.active_only, filters.as_of]);
 
     const heroActions: CompensationQuickAction[] = [
         ...(can.manage ? [{ label: 'New band', icon: Plus, onClick: openCreate }] : []),
@@ -1120,8 +1132,8 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
                     <span className="inline-flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-primary" /> In band
                     </span>
-                    <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-status-critical" /> Under / over band
+                    <span className="inline-flex items-center gap-2">
+                        <span className="h-2 w-2 rotate-45 rounded-[2px] bg-status-critical" /> Under / over band
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                         <span className="h-3 w-0.5 rounded bg-primary" /> Midpoint (compa-ratio 1.0)

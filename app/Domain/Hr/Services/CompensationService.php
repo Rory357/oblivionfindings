@@ -163,15 +163,19 @@ class CompensationService
             ->count();
 
         $canExpenses = $user->canDo('hr.expenses.view');
-        $awaitingClaims = $canExpenses
+        // "Awaiting my approval" must count only what this viewer can actually
+        // approve — expense approval is a distinct perm from view, and bonus
+        // approval rides on compensation.manage.
+        $awaitingClaims = $user->canDo('hr.expenses.approve')
             ? HrExpenseClaim::query()->where('tenant_id', $tenantId)->where('status', 'submitted')->count()
             : 0;
-        $pendingBonuses = HrBonusPayment::query()
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'pending')
-            ->count();
+        $pendingBonuses = $user->canDo('hr.compensation.manage')
+            ? HrBonusPayment::query()->where('tenant_id', $tenantId)->where('status', 'pending')->count()
+            : 0;
 
-        $monthStart = Carbon::now()->startOfMonth();
+        // Month boundary in the worker timezone (paid_at is stored UTC), so the
+        // "this month" KPI doesn't slip by ~13h at month edges in NZ.
+        $monthStart = Carbon::now(config('app.worker_timezone'))->startOfMonth()->utc();
         $reimbursed = $canExpenses
             ? (float) HrExpenseClaim::query()
                 ->where('tenant_id', $tenantId)
