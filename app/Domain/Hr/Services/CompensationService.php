@@ -327,10 +327,21 @@ class CompensationService
             foreach ($approvedItems as $item) {
                 $profile = HrEmployeeProfile::findOrFail($item->employee_profile_id);
 
+                // proposed_salary is an ANNUAL figure (the builder seeds it from
+                // annual_salary and places it against the band's annual range).
+                // Derive the hourly rate from contracted hours rather than writing
+                // the annual amount straight into hourly_rate (the old bug).
+                $proposedAnnual = (float) $item->proposed_salary;
+                $weeklyHours = (float) ($profile->hours_per_week ?? 0);
+                $annualHours = $weeklyHours > 0 ? $weeklyHours * 52 : 2080; // default FT year
+                $newHourly = $annualHours > 0
+                    ? round($proposedAnnual / $annualHours, 2)
+                    : $profile->hourly_rate;
+
                 $this->recordCompensationChange($profile, [
                     'change_type' => 'review',
-                    'new_hourly_rate' => $item->proposed_salary, // Service caller maps salary to hourly if needed
-                    'new_annual_salary' => $item->proposed_salary,
+                    'new_hourly_rate' => $newHourly,
+                    'new_annual_salary' => $proposedAnnual,
                     'change_percentage' => $item->change_percentage,
                     'reason' => $item->justification ?? "Applied from compensation review: {$review->title}",
                     'effective_date' => $review->effective_date,

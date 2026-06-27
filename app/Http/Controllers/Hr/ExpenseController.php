@@ -40,7 +40,10 @@ class ExpenseController extends Controller
 
         $claims = HrExpenseClaim::forTenant($tenantId)
             ->when(! $canManage, fn ($q) => $q->where('user_id', $user->id))
-            ->when($status, fn ($q) => $q->where('status', $status))
+            // "decided" is a UI lens, not a stored status — expand it to the set
+            // of terminal states; any other value filters literally.
+            ->when($status === 'decided', fn ($q) => $q->whereIn('status', ['approved', 'rejected', 'paid', 'declined']))
+            ->when($status && $status !== 'decided', fn ($q) => $q->where('status', $status))
             ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
                 $u->where('name', 'like', "%{$search}%")
             ))
@@ -176,6 +179,9 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.view'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        // Staff without manage may only open their own claims (mirrors index/receipt).
+        abort_unless($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id, 403);
 
         $expenseClaim->load(['user:id,name,email', 'items', 'approver:id,name']);
 
@@ -258,6 +264,7 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
 
         try {
             $this->expenseService->submitClaim($expenseClaim);
@@ -276,6 +283,7 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
 
         try {
             $this->expenseService->approveClaim($expenseClaim, $user);
@@ -294,6 +302,7 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:2000'],
@@ -316,6 +325,7 @@ class ExpenseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
 
         // Only disburse a claim that has been posted to the GL (the approve flow
         // dispatches PostExpenseJournalJob; markPaid itself guards status).

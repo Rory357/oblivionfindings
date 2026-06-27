@@ -92,6 +92,11 @@ test('approve unlocks apply end-to-end: applying then updates the employee salar
     expect($review->fresh()->status)->toBe('applied');
     expect((float) $this->profile->fresh()->annual_salary)->toBe(66000.0);
 
+    // Regression: hourly_rate must be DERIVED from the new annual (÷ contracted
+    // hours), not set to the annual figure (the old data-corruption bug).
+    expect((float) $this->profile->fresh()->hourly_rate)->toBe(round(66000 / 2080, 2));
+    expect((float) $this->profile->fresh()->hourly_rate)->toBeLessThan(100);
+
     $this->assertDatabaseHas('hr_compensation_history', [
         'employee_profile_id' => $this->profile->id,
         'change_type' => 'review',
