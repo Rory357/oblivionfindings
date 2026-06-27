@@ -141,6 +141,14 @@ const formatCurrency = (value: string | number | null, currency = 'NZD') => {
 const compaLabel = (compa: number | null | undefined) =>
     compa == null ? '—' : `${Math.round(compa * 100)}%`;
 
+const initials = (name: string) =>
+    name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0]?.toUpperCase() ?? '')
+        .join('') || '?';
+
 /** Lifecycle of a band derived from its effective dates. */
 function bandLifecycle(band: SalaryBand): { status: string; tone: StatusTone } {
     const now = Date.now();
@@ -394,29 +402,67 @@ function BandCard({
 /*  People-in-band drawer                                              */
 /* ------------------------------------------------------------------ */
 
+/** One-person position bar: plots the employee's dot on the band's min→max. */
+function PersonMiniBar({
+    band,
+    placement,
+}: {
+    band: SalaryBand;
+    placement: Placement;
+}) {
+    const min = num(band.min_salary);
+    const mid = num(band.mid_salary);
+    const max = num(band.max_salary);
+    if ([min, mid, max].some(Number.isNaN) || max <= min || placement.compa_ratio == null) {
+        return null;
+    }
+    const salary = placement.compa_ratio * mid;
+    const left = Math.min(100, Math.max(0, ((salary - min) / (max - min)) * 100));
+    return (
+        <div className="relative mt-1.5 h-1.5">
+            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+            <span
+                className={cn(
+                    'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card',
+                    POSITION_DOT[placement.position].split(' ')[0],
+                )}
+                style={{ left: `${left}%` }}
+            />
+        </div>
+    );
+}
+
 function BandDrawer({
     band,
     open,
+    canManage,
     onClose,
+    onEdit,
+    onDuplicate,
 }: {
     band: SalaryBand | null;
     open: boolean;
+    canManage: boolean;
     onClose: () => void;
+    onEdit: (band: SalaryBand) => void;
+    onDuplicate: (band: SalaryBand) => void;
 }) {
     return (
         <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-            <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+            <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
                 {band ? (
                     <>
-                        <SheetHeader>
+                        <SheetHeader className="border-b border-border">
                             <SheetTitle>{band.position_role}</SheetTitle>
                             <SheetDescription>
                                 {band.band_name} · {formatCurrency(band.min_salary, band.currency)}–
-                                {formatCurrency(band.max_salary, band.currency)}
+                                {formatCurrency(band.max_salary, band.currency)} ·{' '}
+                                {formatCurrency(band.min_hourly, band.currency)}–
+                                {formatCurrency(band.max_hourly, band.currency)}/hr
                             </SheetDescription>
                         </SheetHeader>
 
-                        <div className="space-y-5 px-4 pb-6">
+                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
                             <div className="rounded-xl border border-border bg-muted/30 p-4">
                                 <RangeBar band={band} placements={band.placements} />
                             </div>
@@ -435,37 +481,57 @@ function BandDrawer({
                                     <div className="text-[11px] text-muted-foreground">Under</div>
                                 </div>
                                 <div className="rounded-lg border border-border p-2">
-                                    <div className="text-lg font-bold text-status-critical tabular-nums">
-                                        {band.over_band ?? 0}
+                                    <div className="text-lg font-bold tabular-nums">
+                                        {compaLabel(band.avg_compa_ratio)}
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground">Over</div>
+                                    <div className="text-[11px] text-muted-foreground">Avg compa</div>
                                 </div>
                             </div>
 
                             <div>
                                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    People ({band.placements?.length ?? 0})
+                                    People in this band ({band.placements?.length ?? 0})
                                 </h4>
                                 {band.placements && band.placements.length > 0 ? (
                                     <ul className="space-y-1.5">
                                         {band.placements.map((p, i) => (
                                             <li
                                                 key={`${p.name}-${i}`}
-                                                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                                                className="rounded-lg border border-border px-3 py-2.5"
                                             >
-                                                <span className="flex min-w-0 items-center gap-2">
-                                                    <span
-                                                        className={cn(
-                                                            'h-2.5 w-2.5 shrink-0 rounded-full',
-                                                            POSITION_DOT[p.position].split(' ')[0],
-                                                        )}
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="flex min-w-0 items-center gap-2.5">
+                                                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                                                            {initials(p.name)}
+                                                        </span>
+                                                        <span className="min-w-0">
+                                                            <span className="block truncate text-sm font-medium">
+                                                                {p.name}
+                                                            </span>
+                                                            <span className="block text-[11px] tabular-nums text-muted-foreground">
+                                                                {compaLabel(p.compa_ratio)} compa
+                                                            </span>
+                                                        </span>
+                                                    </span>
+                                                    <StatusBadge
+                                                        status={p.position}
+                                                        tone={
+                                                            p.position === 'in'
+                                                                ? 'success'
+                                                                : p.position === 'under'
+                                                                  ? 'warning'
+                                                                  : 'critical'
+                                                        }
+                                                        label={
+                                                            p.position === 'in'
+                                                                ? 'In band'
+                                                                : p.position === 'under'
+                                                                  ? 'Under'
+                                                                  : 'Over'
+                                                        }
                                                     />
-                                                    <span className="truncate text-sm">{p.name}</span>
-                                                </span>
-                                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                                    {compaLabel(p.compa_ratio)} ·{' '}
-                                                    <span className="capitalize">{p.position}</span>
-                                                </span>
+                                                </div>
+                                                <PersonMiniBar band={band} placement={p} />
                                             </li>
                                         ))}
                                     </ul>
@@ -476,6 +542,24 @@ function BandDrawer({
                                 )}
                             </div>
                         </div>
+
+                        {canManage ? (
+                            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-muted/30 px-4 py-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onDuplicate(band)}
+                                >
+                                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                    Duplicate
+                                </Button>
+                                <Button type="button" size="sm" onClick={() => onEdit(band)}>
+                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                    Edit band
+                                </Button>
+                            </div>
+                        ) : null}
                     </>
                 ) : null}
             </SheetContent>
@@ -1090,7 +1174,16 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
             <BandDrawer
                 band={drawerBand}
                 open={drawerBand !== null}
+                canManage={can.manage}
                 onClose={() => setDrawerBand(null)}
+                onEdit={(b) => {
+                    setDrawerBand(null);
+                    openEdit(b);
+                }}
+                onDuplicate={(b) => {
+                    setDrawerBand(null);
+                    openDuplicate(b);
+                }}
             />
 
             {wizardOpen ? (
