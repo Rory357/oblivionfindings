@@ -115,6 +115,31 @@ test('updating a band cannot set max below the existing mid', function () {
         ->assertSessionHasErrors('max_salary');
 });
 
+test('partial update sending only effective_to before effective_from is rejected', function () {
+    $band = HrSalaryBand::query()->create([
+        'tenant_id' => 1,
+        'created_by' => $this->hr->id,
+        'position_role' => 'support_worker',
+        'band_name' => 'Band A',
+        'min_salary' => 50000,
+        'mid_salary' => 60000,
+        'max_salary' => 70000,
+        'min_hourly' => 25,
+        'max_hourly' => 35,
+        'currency' => 'NZD',
+        'effective_from' => '2026-07-01',
+    ]);
+
+    // Only effective_to in the payload — Laravel's after:effective_from rule can't
+    // see the stored effective_from, so the controller must guard it manually.
+    $this->actingAs($this->hr)
+        ->from('/hr/compensation/bands')
+        ->put('/hr/compensation/bands/'.$band->id, [
+            'effective_to' => '2026-06-01', // before the stored 2026-07-01
+        ])
+        ->assertSessionHasErrors('effective_to');
+});
+
 test('export streams a salary-bands csv', function () {
     HrSalaryBand::query()->create([
         'tenant_id' => 1,
