@@ -19,6 +19,7 @@ import {
     formatFileSize,
     StagedFileCard,
 } from '@/components/ui/file-dropzone';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,10 @@ const CATEGORY_LABELS: Record<string, string> = {
     mileage: 'Mileage',
     other: 'Other',
 };
+
+// Sentinel for the "file as myself" option — Radix SelectItem crashes on an
+// empty-string value (documented house rule), so we never use '' as a value.
+const SELF = '__self__';
 
 // Default category list mirrors ExpenseService::CATEGORIES so the dialog works
 // before the host page is wired to pass `categories` down from the controller.
@@ -140,8 +145,9 @@ export function ExpenseClaimDialog({
         new Date().toISOString().slice(0, 10),
     );
     const [notes, setNotes] = useState('');
-    // '' = file as myself; otherwise the target employee's user id (string).
-    const [onBehalfOf, setOnBehalfOf] = useState('');
+    // Radix SelectItem throws on an empty-string value, so "myself" uses a
+    // sentinel; otherwise the value is the target employee's user id (string).
+    const [onBehalfOf, setOnBehalfOf] = useState(SELF);
     const [items, setItems] = useState<LineItem[]>([blankItem()]);
 
     // Mileage line is a config-driven computed item — the user enters distance,
@@ -164,13 +170,19 @@ export function ExpenseClaimDialog({
         [km, rate],
     );
 
-    const itemsTotal = items.reduce((sum, it) => sum + num(it.amount), 0);
+    // An all-blank standard row is ignored (so a mileage-only claim is valid and
+    // submittable); a partially-filled row still has to be completed.
+    const isBlankItem = (it: LineItem) =>
+        it.description.trim() === '' && num(it.amount) <= 0 && !it.receipt;
+    const filledItems = items.filter((it) => !isBlankItem(it));
+
+    const itemsTotal = filledItems.reduce((sum, it) => sum + num(it.amount), 0);
     const total = itemsTotal + (mileageOn ? mileageAmount : 0);
 
     const mileageValid =
         !mileageOn || (km > 0 && rate > 0 && mileageDate !== '');
 
-    const standardItemsValid = items.every(
+    const standardItemsValid = filledItems.every(
         (it) =>
             it.description.trim() !== '' &&
             num(it.amount) > 0 &&
@@ -180,8 +192,7 @@ export function ExpenseClaimDialog({
     const basicsValid = title.trim() !== '' && claimDate !== '';
     // Need at least one payable line — either a valid standard item or mileage.
     const hasPayableLine =
-        (items.length > 0 && standardItemsValid) ||
-        (mileageOn && mileageAmount > 0);
+        filledItems.length > 0 || (mileageOn && mileageAmount > 0);
     const itemsStepValid = standardItemsValid && mileageValid && hasPayableLine;
 
     const stepValid = (i: number) => {
@@ -241,7 +252,7 @@ export function ExpenseClaimDialog({
         // calculation round-trips into the stored claim (the store endpoint does
         // not accept a distance_km field — see backendNeeded).
         const payloadItems = [
-            ...items.map((it) => ({
+            ...filledItems.map((it) => ({
                 description: it.description,
                 category: it.category,
                 amount: num(it.amount),
@@ -275,7 +286,8 @@ export function ExpenseClaimDialog({
                 title,
                 notes: notes || null,
                 currency,
-                on_behalf_user_id: canFileOnBehalf && onBehalfOf ? Number(onBehalfOf) : null,
+                on_behalf_user_id:
+                    canFileOnBehalf && onBehalfOf !== SELF ? Number(onBehalfOf) : null,
                 items: payloadItems,
             },
             {
@@ -409,7 +421,7 @@ export function ExpenseClaimDialog({
                                     placeholder="Myself"
                                     ariaLabel="File on behalf of"
                                     options={[
-                                        { value: '', label: 'Myself' },
+                                        { value: SELF, label: 'Myself' },
                                         ...employees.map((e) => ({
                                             value: String(e.id),
                                             label: e.name,
@@ -600,13 +612,10 @@ export function ExpenseClaimDialog({
                             )}
                         >
                             <label className="flex items-start gap-3">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={mileageOn}
-                                    onChange={(e) =>
-                                        setMileageOn(e.target.checked)
-                                    }
-                                    className="mt-0.5 h-4 w-4 rounded border-border"
+                                    onCheckedChange={(v) => setMileageOn(v === true)}
+                                    className="mt-0.5"
                                 />
                                 <span className="min-w-0">
                                     <span className="flex items-center gap-1.5 text-sm font-semibold">

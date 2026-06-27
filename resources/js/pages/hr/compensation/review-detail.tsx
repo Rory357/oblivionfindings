@@ -3,7 +3,7 @@ import {
     type ReviewBuilderBand,
 } from '@/components/hr/review-builder-dialog';
 import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/hr/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -92,24 +92,6 @@ const formatCurrency = (value: string | null) => {
     }).format(num);
 };
 
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'planning':
-            return 'bg-muted text-foreground border-border';
-        case 'in_progress':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'approved':
-            return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'applied':
-            return 'bg-status-info-bg text-status-info border-status-info/30';
-        case 'pending':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'rejected':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-};
 
 const getCycleLabel = (cycle: string) => {
     switch (cycle) {
@@ -270,11 +252,10 @@ export default function CompensationReviewDetail({
                         description={`${getCycleLabel(review.review_cycle)} · Effective ${formatDate(review.effective_date)}`}
                         actions={
                             <div className="flex items-center gap-2">
-                                <Badge
-                                    className={getStatusColor(review.status)}
-                                >
-                                    {review.status.replace(/_/g, ' ')}
-                                </Badge>
+                                <StatusBadge
+                                    status={review.status}
+                                    tone={review.status === 'applied' ? 'info' : undefined}
+                                />
                                 {can.manage &&
                                     (review.status === 'planning' ||
                                         review.status === 'in_progress') && (
@@ -396,13 +377,7 @@ export default function CompensationReviewDetail({
                                             {item.justification ?? '-'}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                className={getStatusColor(
-                                                    item.status,
-                                                )}
-                                            >
-                                                {item.status}
-                                            </Badge>
+                                            <StatusBadge status={item.status} />
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {item.approver?.name ?? '-'}
