@@ -32,7 +32,6 @@ class HrApplication extends Model
         'cv_storage_path',
         'cv_original_name',
         'cover_letter',
-        'answers',
         'screening_answers',
         'candidate_tracking_token',
         'status',
@@ -40,7 +39,6 @@ class HrApplication extends Model
     ];
 
     protected $casts = [
-        'answers' => 'array',
         'screening_answers' => 'array',
     ];
 

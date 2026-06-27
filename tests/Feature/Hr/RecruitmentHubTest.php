@@ -17,6 +17,7 @@ use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
+use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -306,6 +307,17 @@ test('offer letter download is tenant-scoped', function () {
     $this->actingAs($this->hr)->get(route('hr.offers.letter', $foreignOffer->id))->assertNotFound();
 });
 
+test('an offer with no uploaded letter generates a branded PDF on download', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+    expect($offer->offer_letter_path)->toBeNull();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.offers.letter', $offer->id));
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
 /* ---- A7: offer-response acks (#19) + hire notify ---- */
 
 test('responding to an offer acknowledges the candidate', function () {
@@ -328,7 +340,7 @@ test('converting notifies the hiring manager and provisions the work email', fun
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'personal_email' => 'new.hire@example.test', 'created_by' => $this->hr->id]);
     $application = HrApplication::factory()->create([
         'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $requisition->id,
         'position_title' => 'Support Worker', 'status' => 'active',
@@ -338,6 +350,8 @@ test('converting notifies the hiring manager and provisions the work email', fun
     $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertRedirect();
 
     Notification::assertSentTo($manager, CandidateHiredNotification::class);
+    // The new hire gets a branded welcome on their personal inbox.
+    Notification::assertSentOnDemand(NewHireWelcomeNotification::class);
     expect($offer->fresh()->work_email_provisioned)->toBeTrue();
     expect($offer->fresh()->work_email)->not->toBeNull();
     expect(HrEmployeeProfile::query()->count())->toBeGreaterThan(0);
@@ -790,4 +804,22 @@ test('scoring requires recruitment manage and rejects unknown criteria labels', 
     $this->actingAs($viewer)->post(route('hr.interviews.score', $interview->id), [
         'overall_score' => 70,
     ])->assertForbidden();
+});
+
+/* ---- C1: screening answers persist; legacy `answers` column retired ---- */
+
+test('createApplication persists screening answers and the legacy answers column is gone', function () {
+    ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
+
+    $application = app(\App\Domain\Hr\Services\RecruitmentService::class)->createApplication(
+        $candidate->fresh(),
+        [
+            'position_title' => 'Team Leader',
+            'screening_answers' => ['drivers_licence' => 'Yes', 'availability' => 'Weekends'],
+        ],
+    );
+
+    expect($application->screening_answers)->toBe(['drivers_licence' => 'Yes', 'availability' => 'Weekends']);
+    // The dead column is dropped by migration.
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('hr_applications', 'answers'))->toBeFalse();
 });

@@ -64,9 +64,7 @@ class ArchiveCandidateDataJob implements ShouldQueue
                     'cv_storage_path' => null,
                     'cv_original_name' => null,
                     'cover_letter' => null,
-                    'answers' => null,
-                    // Live screening capture also holds candidate-supplied PII —
-                    // scrub it on retention alongside the legacy 'answers' column.
+                    // Screening capture holds candidate-supplied PII — scrub on retention.
                     'screening_answers' => null,
                 ]);
 

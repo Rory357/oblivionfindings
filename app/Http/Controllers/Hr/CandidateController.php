@@ -14,6 +14,7 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -269,8 +270,11 @@ class CandidateController extends Controller
                         'response_notes' => $application->offer->response_notes,
                         'signed_full_name' => $application->offer->signed_full_name,
                         'signed_at' => optional($application->offer->signed_at)->toDateTimeString(),
-                        'offer_letter_name' => $application->offer->offer_letter_name,
-                        'offer_letter_id' => $application->offer->offer_letter_path ? $application->offer->id : null,
+                        // A letter is always downloadable — an uploaded copy when
+                        // present, otherwise generated on the fly from the offer.
+                        'offer_letter_name' => $application->offer->offer_letter_name ?? 'Offer letter',
+                        'offer_letter_id' => $application->offer->id,
+                        'offer_letter_generated' => ! $application->offer->offer_letter_path,
                         'portal_url' => $application->offer->candidate_portal_token
                             ? route('careers.offer.show', ['token' => $application->offer->candidate_portal_token])
                             : null,
@@ -1075,15 +1079,29 @@ class CandidateController extends Controller
 
         // Tenant guard — every sibling offer action asserts this; the letter
         // download must not be a cross-tenant IDOR hole.
-        $application = $offer->application()->firstOrFail();
+        $application = $offer->application()->with('candidate')->firstOrFail();
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
-        abort_unless($offer->offer_letter_path, 404);
-
+        // Prefer a manually-uploaded letter when one exists.
         $disk = \Illuminate\Support\Facades\Storage::disk('private');
-        abort_unless($disk->exists($offer->offer_letter_path), 404);
+        if ($offer->offer_letter_path && $disk->exists($offer->offer_letter_path)) {
+            return $disk->download($offer->offer_letter_path, $offer->offer_letter_name ?? 'offer-letter.pdf');
+        }
 
-        return $disk->download($offer->offer_letter_path, $offer->offer_letter_name ?? 'offer-letter.pdf');
+        // Otherwise generate a branded offer letter from the offer's own data.
+        $candidate = $application->candidate;
+        abort_unless($candidate, 404);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('hr.recruitment.offer-letter', [
+            'offer' => $offer,
+            'candidate' => $candidate,
+            'site' => $offer->primarySite()->first(),
+            'orgName' => config('app.name', 'Our Organisation'),
+        ]);
+
+        $slug = \Illuminate\Support\Str::slug($candidate->full_name ?: 'candidate') ?: 'candidate';
+
+        return $pdf->download("offer-letter-{$slug}.pdf");
     }
 
     public function approveOffer(Request $request, HrOffer $offer)
@@ -1284,6 +1302,7 @@ class CandidateController extends Controller
         ]);
 
         $this->notifyHiringManagerOfHire($application, $candidate);
+        $this->sendNewHireWelcome($candidate, $offer);
 
         return redirect()->back()->with('success', "Employee profile created (#{$profile->id}).");
     }
@@ -1312,6 +1331,21 @@ class CandidateController extends Controller
             if ($manager) {
                 $manager->notify(new CandidateHiredNotification($candidate, $requisition));
             }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /** Best-effort branded welcome to the new hire's personal inbox on convert. */
+    private function sendNewHireWelcome(HrCandidate $candidate, HrOffer $offer): void
+    {
+        if (! $candidate->personal_email) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new NewHireWelcomeNotification($candidate, $offer));
         } catch (\Throwable $exception) {
             report($exception);
         }

@@ -121,7 +121,7 @@ class RecruitmentService
             'cv_storage_path' => $data['cv_storage_path'] ?? null,
             'cv_original_name' => $data['cv_original_name'] ?? null,
             'cover_letter' => $data['cover_letter'] ?? null,
-            'answers' => $data['answers'] ?? null,
+            'screening_answers' => $data['screening_answers'] ?? $data['answers'] ?? null,
             'status' => 'active',
         ]);
     }
