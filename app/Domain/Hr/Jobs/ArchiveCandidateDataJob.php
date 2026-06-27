@@ -62,6 +62,9 @@ class ArchiveCandidateDataJob implements ShouldQueue
                     'cv_original_name' => null,
                     'cover_letter' => null,
                     'answers' => null,
+                    // Live screening capture also holds candidate-supplied PII —
+                    // scrub it on retention alongside the legacy 'answers' column.
+                    'screening_answers' => null,
                 ]);
 
                 if ((bool) config('hr.retention.anonymise_candidates_before_archive', true)) {

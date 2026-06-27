@@ -1,18 +1,25 @@
 <?php
 
+use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 function makeOffer(array $ctx, string $state, int $hrId, int $siteId): HrOffer
 {
@@ -287,4 +294,87 @@ test('offer letter download is tenant-scoped', function () {
 
     // hr user resolves to tenant 1 → cross-tenant letter is not reachable.
     $this->actingAs($this->hr)->get(route('hr.offers.letter', $foreignOffer->id))->assertNotFound();
+});
+
+/* ---- A7: offer-response acks (#19) + hire notify ---- */
+
+test('responding to an offer acknowledges the candidate', function () {
+    Notification::fake();
+    ['application' => $application] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+
+    $this->actingAs($this->hr)
+        ->post(route('hr.offers.respond', $offer->id), ['response' => 'declined'])
+        ->assertRedirect();
+
+    Notification::assertSentOnDemand(OfferResponseAckNotification::class);
+});
+
+test('converting notifies the hiring manager and provisions the work email', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $requisition = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
+    ]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'created_by' => $this->hr->id]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $requisition->id,
+        'position_title' => 'Support Worker', 'status' => 'active',
+    ]);
+    $offer = makeOffer(['application' => $application], 'accepted', $this->hr->id, $this->site->id);
+
+    $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertRedirect();
+
+    Notification::assertSentTo($manager, CandidateHiredNotification::class);
+    expect($offer->fresh()->work_email_provisioned)->toBeTrue();
+    expect($offer->fresh()->work_email)->not->toBeNull();
+    expect(HrEmployeeProfile::query()->count())->toBeGreaterThan(0);
+});
+
+/* ---- A8: gated rejection decline email (#18) ---- */
+
+test('rejection emails the candidate only when opted in', function () {
+    Notification::fake();
+    ['application' => $a1] = makeApplicant($this->hr->id);
+    $this->actingAs($this->hr)->post(route('hr.applications.reject', $a1->id), ['rejection_reason' => 'Not a fit'])->assertRedirect();
+    Notification::assertNothingSent();
+
+    ['application' => $a2] = makeApplicant($this->hr->id);
+    $this->actingAs($this->hr)->post(route('hr.applications.reject', $a2->id), ['send_decline_email' => true])->assertRedirect();
+    Notification::assertSentOnDemand(RejectionNotification::class);
+});
+
+/* ---- A11: document carries application context ---- */
+
+test('uploading a document carries the application context', function () {
+    Storage::fake('private');
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id);
+
+    $this->actingAs($this->hr)->post(route('hr.candidate.documents.store', $candidate->id), [
+        'file' => UploadedFile::fake()->create('cv.pdf', 100, 'application/pdf'),
+        'category' => 'cv',
+    ])->assertRedirect();
+
+    $doc = HrCandidateDocument::query()->where('candidate_id', $candidate->id)->first();
+    expect($doc)->not->toBeNull();
+    expect($doc->application_id)->toBe($application->id);
+});
+
+/* ---- Cross-cutting: retention scrub nulls screening_answers ---- */
+
+test('retention scrub nulls screening_answers and soft-deletes the candidate', function () {
+    config(['hr.candidate_retention_months' => 1]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'rejected', 'created_by' => $this->hr->id]);
+    HrCandidate::query()->where('id', $candidate->id)->update(['updated_at' => now()->subMonths(6)]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'status' => 'rejected',
+        'screening_answers' => ['why' => 'sensitive personal answer'],
+    ]);
+
+    (new ArchiveCandidateDataJob(1))->handle();
+
+    expect($application->fresh()->screening_answers)->toBeNull();
+    expect(HrCandidate::withTrashed()->find($candidate->id)?->trashed())->toBeTrue();
 });

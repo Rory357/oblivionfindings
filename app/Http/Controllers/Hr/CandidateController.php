@@ -11,7 +11,10 @@ use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
+use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Site;
@@ -423,12 +426,27 @@ class CandidateController extends Controller
 
         $validated = $request->validate([
             'rejection_reason' => ['nullable', 'string', 'max:2000'],
+            // Opt-in only — a respectful decline email is never sent by default.
+            'send_decline_email' => ['nullable', 'boolean'],
+            'decline_message' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $application->update([
             'status' => 'rejected',
             'rejection_reason' => $validated['rejection_reason'] ?? null,
         ]);
+
+        if ($request->boolean('send_decline_email')) {
+            $candidate = $application->candidate()->first();
+            if ($candidate && $candidate->personal_email) {
+                try {
+                    Notification::route('mail', $candidate->personal_email)
+                        ->notify(new RejectionNotification($candidate, $application, $validated['decline_message'] ?? null));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+        }
 
         return redirect()->back()->with('success', 'Application rejected.');
     }
@@ -1024,6 +1042,10 @@ class CandidateController extends Controller
             'response_at' => optional($offer->response_at)->toDateTimeString(),
         ]);
 
+        // Acknowledge the candidate's response (before any convert attempt, so a
+        // convert failure never swallows the ack).
+        $this->ackOfferResponse($offer, $application->candidate, (string) $offer->response);
+
         // Accepting an offer flows straight into employment + onboarding — but
         // minting a login is a segregation-of-duties step. Only auto-convert when
         // the actor also holds hr.employees.manage; otherwise the acceptance is
@@ -1048,6 +1070,8 @@ class CandidateController extends Controller
                         'employee_profile_id' => $profile->id,
                         'converted_by' => $user->id,
                     ]);
+
+                    $this->notifyHiringManagerOfHire($application, $candidate);
 
                     return redirect()->back()->with('success', 'Offer accepted — employee profile created and onboarding started.');
                 } catch (\Throwable $exception) {
@@ -1098,7 +1122,38 @@ class CandidateController extends Controller
             'converted_by' => $user->id,
         ]);
 
+        $this->notifyHiringManagerOfHire($application, $candidate);
+
         return redirect()->back()->with('success', "Employee profile created (#{$profile->id}).");
+    }
+
+    /** Best-effort candidate acknowledgement of an accepted/declined offer. */
+    private function ackOfferResponse(HrOffer $offer, ?HrCandidate $candidate, string $response): void
+    {
+        if (! $candidate || ! $candidate->personal_email || ! in_array($response, ['accepted', 'declined'], true)) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new OfferResponseAckNotification($offer, $candidate, $response));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /** Best-effort hiring-manager notification when a candidate is converted. */
+    private function notifyHiringManagerOfHire(HrApplication $application, HrCandidate $candidate): void
+    {
+        try {
+            $requisition = $application->requisition()->with('hiringManager')->first();
+            $manager = $requisition?->hiringManager;
+            if ($manager) {
+                $manager->notify(new CandidateHiredNotification($candidate, $requisition));
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     /**
@@ -1208,12 +1263,24 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
 
+        $applicationRule = Rule::exists('hr_applications', 'id')
+            ->where(fn ($q) => $q->where('candidate_id', $candidate->id));
+
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
             'category' => ['required', 'string', Rule::in(array_keys(HrCandidateDocument::CATEGORIES))],
+            'application_id' => ['nullable', 'integer', $applicationRule],
             'notes' => ['nullable', 'string', 'max:500'],
             'expires_at' => ['nullable', 'date'],
         ]);
+
+        // Carry the application context: explicit param wins, else fall back to the
+        // candidate's most-recent active application so the doc isn't orphaned.
+        $applicationId = $validated['application_id']
+            ?? $candidate->applications()
+                ->whereNotIn('status', ['rejected', 'withdrawn'])
+                ->latest('id')
+                ->value('id');
 
         $file = $request->file('file');
         $path = $file->store("candidates/{$candidate->id}/documents", 'private');
@@ -1223,6 +1290,7 @@ class CandidateController extends Controller
         HrCandidateDocument::create([
             'tenant_id' => $candidate->tenant_id,
             'candidate_id' => $candidate->id,
+            'application_id' => $applicationId,
             'category' => $validated['category'],
             'title' => $categoryLabel . ' - ' . $file->getClientOriginalName(),
             'storage_path' => $path,

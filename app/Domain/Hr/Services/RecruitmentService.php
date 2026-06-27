@@ -264,6 +264,13 @@ class RecruitmentService
             $offer->application()->update(['status' => 'hired']);
             $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
 
+            // The work email/login is now provisioned — record it on the offer so
+            // the stubbed flag carries a real signal (idempotent on re-convert).
+            $offer->update([
+                'work_email' => $workEmail,
+                'work_email_provisioned' => true,
+            ]);
+
             return $profile->fresh();
         });
     }
