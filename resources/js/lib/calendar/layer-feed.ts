@@ -65,6 +65,16 @@ export const CALENDAR_LAYERS: readonly CalendarLayer[] = [
     'event',
 ] as const;
 
+/** Display order for UI lists (rail + legend) — editable HR events lead. */
+export const LAYER_DISPLAY_ORDER: readonly CalendarLayer[] = [
+    'event',
+    'leave',
+    'shift',
+    'holiday',
+    'compliance',
+    'milestone',
+] as const;
+
 /** Layers shown by default; compliance + milestones start hidden. */
 export const DEFAULT_ACTIVE_LAYERS: readonly CalendarLayer[] = [
     'event',
