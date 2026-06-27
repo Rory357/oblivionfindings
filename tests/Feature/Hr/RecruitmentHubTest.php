@@ -943,3 +943,35 @@ test('analytics conversion and sources honour the date window', function () {
     expect($sources->all())->toContain('referral');
     expect($sources->all())->not->toContain('seek');
 });
+
+/* ---- Saved candidate email templates (reusable bulk-email) ---- */
+
+test('a manager can save, surface and remove a candidate email template', function () {
+    $this->actingAs($this->hr)->post(route('hr.email-templates.store'), [
+        'name' => 'Interview invite',
+        'subject' => 'Invitation to interview',
+        'body' => "We'd love to meet you.\nPlease pick a time that suits.",
+    ])->assertRedirect();
+
+    $template = \App\Domain\Hr\Models\HrCandidateEmailTemplate::query()->where('name', 'Interview invite')->first();
+    expect($template)->not->toBeNull();
+    expect($template->subject)->toBe('Invitation to interview');
+    expect($template->tenant_id)->not->toBeNull();
+
+    // The hub surfaces it for the compose dialog.
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('email_templates', 1)
+            ->where('email_templates.0.name', 'Interview invite')
+            ->where('email_templates.0.subject', 'Invitation to interview'));
+
+    // Remove it.
+    $this->actingAs($this->hr)->delete(route('hr.email-templates.destroy', $template->id))->assertRedirect();
+    expect(\App\Domain\Hr\Models\HrCandidateEmailTemplate::query()->count())->toBe(0);
+
+    // Gated on hr.recruitment.manage.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.email-templates.store'), [
+        'name' => 'x', 'subject' => 'y', 'body' => 'z',
+    ])->assertForbidden();
+});

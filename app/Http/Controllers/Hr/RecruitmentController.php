@@ -66,6 +66,7 @@ class RecruitmentController extends Controller
             'analytics' => $this->buildAnalytics($tenantId, $analytics, $from, $to),
             'kits' => $this->buildKits($tenantId),
             'pool' => $this->buildPool($tenantId),
+            'email_templates' => $this->buildEmailTemplates($tenantId),
             'support' => $this->buildSupport($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.recruitment.manage'),
@@ -478,6 +479,21 @@ class RecruitmentController extends Controller
     /* ------------------------------------------------------------------ */
     /*  Kits + pool                                                       */
     /* ------------------------------------------------------------------ */
+
+    private function buildEmailTemplates(?int $tenantId): array
+    {
+        return \App\Domain\Hr\Models\HrCandidateEmailTemplate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'subject', 'body'])
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'subject' => $t->subject,
+                'body' => $t->body,
+            ])->values()->all();
+    }
 
     private function buildKits(?int $tenantId): array
     {

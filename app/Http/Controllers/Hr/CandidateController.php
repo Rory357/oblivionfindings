@@ -7,6 +7,7 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
+use App\Domain\Hr\Models\HrCandidateEmailTemplate;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrJobRequisition;
@@ -570,6 +571,42 @@ class CandidateController extends Controller
         $message .= '.';
 
         return redirect()->back()->with('success', $message);
+    }
+
+    /** Save a reusable candidate-email template for the pipeline compose dialog. */
+    public function storeEmailTemplate(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:10000'],
+        ]);
+
+        HrCandidateEmailTemplate::query()->create([
+            'tenant_id' => $tenantId,
+            'name' => $validated['name'],
+            'subject' => $validated['subject'],
+            'body' => $validated['body'],
+            'created_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Email template saved.');
+    }
+
+    public function destroyEmailTemplate(Request $request, HrCandidateEmailTemplate $template)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
+
+        $template->delete();
+
+        return redirect()->back()->with('success', 'Email template removed.');
     }
 
     /* ------------------------------------------------------------------ */

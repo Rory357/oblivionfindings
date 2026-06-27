@@ -136,6 +136,7 @@ type AnalyticsData = {
 
 type Kit = { id: number; name: string; role: string | null; is_active: boolean; criteria: { label: string; weight: number }[] };
 type PoolItem = { id: number; name: string; last_role: string; tags: string[]; reason: string };
+export type EmailTemplate = { id: number; name: string; subject: string; body: string };
 
 type Props = {
     hero: React.ComponentProps<typeof RecruitmentHero>['hero'];
@@ -147,6 +148,7 @@ type Props = {
     analytics: AnalyticsData;
     kits: Kit[];
     pool: PoolItem[];
+    email_templates: EmailTemplate[];
     support: RecruitmentSupport;
     can: { manage: boolean; manage_employees: boolean };
 };
@@ -177,7 +179,7 @@ const TAB_LABEL: Record<string, string> = {
 };
 
 export default function RecruitmentHub(props: Props) {
-    const { hero, needs, candidates, requisitions, interviews, offers, analytics, kits, pool, support, can } = props;
+    const { hero, needs, candidates, requisitions, interviews, offers, analytics, kits, pool, email_templates, support, can } = props;
     const page = usePage();
     const [tab, setTab] = useHrTab('pipeline', { param: 'tab', syncUrl: true });
     const [search, setSearch] = useState('');
@@ -564,7 +566,7 @@ export default function RecruitmentHub(props: Props) {
             {wizard ? <RecruitmentWizards state={wizard} onClose={() => setWizard(null)} support={support} /> : null}
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
             {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
-            <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} />
+            <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} templates={email_templates} canManage={can.manage} />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );

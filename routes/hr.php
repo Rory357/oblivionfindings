@@ -160,6 +160,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/candidates/bulk-email', [CandidateController::class, 'bulkEmail'])->name('candidates.bulk-email')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/email-templates', [CandidateController::class, 'storeEmailTemplate'])->name('email-templates.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::delete('/recruitment/email-templates/{template}', [CandidateController::class, 'destroyEmailTemplate'])->name('email-templates.destroy')
+            ->middleware('permission:hr.recruitment.manage');
 
         // Talent pool
         Route::post('/recruitment/candidates/{candidate}/pool', [CandidateController::class, 'addToPool'])->name('pool.add')
