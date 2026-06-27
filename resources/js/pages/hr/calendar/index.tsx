@@ -337,7 +337,7 @@ export default function CalendarIndex({
                 ends_at: (props.endRaw as string) ?? info.event.endStr ?? info.event.startStr,
                 is_all_day: !!props.isAllDay,
                 location: (props.location as string) ?? null,
-                department: (props.department as string) ?? null,
+                department_id: (props.departmentId as number) ?? null,
                 site_id: (props.siteId as number) ?? null,
             });
             setCreateDate(null);

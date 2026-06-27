@@ -206,6 +206,7 @@ class CalendarController extends Controller
             'is_all_day' => ['sometimes', 'boolean'],
             'location' => ['nullable', 'string', 'max:255'],
             'department' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ]);
 
@@ -236,6 +237,7 @@ class CalendarController extends Controller
             'is_all_day' => ['sometimes', 'boolean'],
             'location' => ['nullable', 'string', 'max:255'],
             'department' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ]);
 
@@ -266,6 +268,11 @@ class CalendarController extends Controller
             || $user->canDo('calendar.view')
             || $user->canDo('calendar.viewAny')
             || $user->canDo('calendar.manage_recurring')
+            // Leave viewers land here too (the retired Time-Off page folded into
+            // the Leave layer); they see leave/holiday layers, not event editing.
+            || $user->canDo('hr.leave.viewAny')
+            || $user->canDo('hr.leave.viewOwn')
+            || $user->canDo('hr.leave.manage')
         );
     }
 

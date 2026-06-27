@@ -59,7 +59,6 @@ use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
-use App\Http\Controllers\Hr\TimeOffCalendarController;
 use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
 use App\Http\Controllers\Hr\TrainingDashboardController;
@@ -711,13 +710,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::get('/{expenseClaim}', [ExpenseController::class, 'show'])->name('show');
     });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Time Off Calendar
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/calendar/time-off', [TimeOffCalendarController::class, 'index'])->name('calendar.time-off');
 
     /*
     |--------------------------------------------------------------------------

@@ -56,7 +56,7 @@ export interface CalendarEventInitial {
     ends_at: string;
     is_all_day: boolean;
     location: string | null;
-    department: string | null;
+    department_id: number | null;
     site_id: number | null;
 }
 
@@ -137,7 +137,7 @@ export function EventWizardDialog({
         ends_at: '',
         is_all_day: false,
         location: '',
-        department: '',
+        department_id: '',
         site_id: '',
     });
 
@@ -153,7 +153,7 @@ export function EventWizardDialog({
                 ends_at: toLocalInput(initial.ends_at, initial.is_all_day),
                 is_all_day: initial.is_all_day,
                 location: initial.location ?? '',
-                department: initial.department ?? '',
+                department_id: initial.department_id ? String(initial.department_id) : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
             });
         } else if (defaultDate) {
@@ -187,6 +187,10 @@ export function EventWizardDialog({
         () => sites.find((s) => String(s.id) === form.data.site_id)?.name ?? 'All sites',
         [sites, form.data.site_id],
     );
+    const departmentName = useMemo(
+        () => departments.find((d) => String(d.id) === form.data.department_id)?.name ?? '',
+        [departments, form.data.department_id],
+    );
 
     const setAllDay = (next: boolean) => {
         form.setData((d) => ({
@@ -201,6 +205,7 @@ export function EventWizardDialog({
         form.transform((data) => ({
             ...data,
             site_id: data.site_id === '' ? null : data.site_id,
+            department_id: data.department_id === '' ? null : data.department_id,
         }));
 
     const onError = () => {
@@ -473,15 +478,15 @@ export function EventWizardDialog({
                                     ]}
                                 />
                             </Field>
-                            <Field label="Department" error={form.errors.department}>
+                            <Field label="Department" error={form.errors.department_id}>
                                 <SelectInput
-                                    value={form.data.department || 'none'}
-                                    onChange={(v) => form.setData('department', v === 'none' ? '' : v)}
+                                    value={form.data.department_id || 'none'}
+                                    onChange={(v) => form.setData('department_id', v === 'none' ? '' : v)}
                                     placeholder="Any department"
                                     ariaLabel="Department"
                                     options={[
                                         { value: 'none', label: 'Any department' },
-                                        ...departments.map((d) => ({ value: d.name, label: d.name })),
+                                        ...departments.map((d) => ({ value: String(d.id), label: d.name })),
                                     ]}
                                 />
                             </Field>
@@ -509,7 +514,7 @@ export function EventWizardDialog({
                             <ReviewRow label="When" value={prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)} />
                             <ReviewRow label="Category" value={meta.label} />
                             <ReviewRow label="Site" value={siteName} />
-                            {form.data.department ? <ReviewRow label="Department" value={form.data.department} /> : null}
+                            {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
                             {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}
                             {form.data.description ? <ReviewRow label="Description" value={form.data.description} /> : null}
                         </ReviewCard>
