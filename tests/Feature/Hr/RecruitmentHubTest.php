@@ -8,7 +8,9 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
@@ -411,4 +413,39 @@ test('server export streams a tenant-scoped pipeline csv', function () {
     // gated on hr.recruitment.view
     $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $this->actingAs($viewer)->get(route('hr.recruitment.export', ['dataset' => 'pipeline']))->assertForbidden();
+});
+
+/* ---- A5: live-path apply notifications (#15) ---- */
+
+test('a public requisition application notifies the candidate and hiring manager', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $job = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-apply-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
+    ]);
+
+    $this->post(route('careers.apply.store', ['job' => $job->slug]), [
+        'first_name' => 'Aroha', 'last_name' => 'Ngata',
+        'personal_email' => 'aroha.ngata@example.test', 'privacy_consent' => '1',
+    ])->assertRedirect();
+
+    Notification::assertSentOnDemand(ApplicationConfirmationNotification::class);
+    Notification::assertSentTo($manager, JobApplicationReceivedNotification::class);
+});
+
+/* ---- A7 public mirror: portal offer response acks the candidate ---- */
+
+test('a public offer response acknowledges the candidate', function () {
+    Notification::fake();
+    ['application' => $application] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+
+    $resp = $this->post(route('careers.offer.respond', ['token' => $offer->candidate_portal_token]), ['response' => 'declined']);
+    $resp->assertRedirect();
+    $resp->assertSessionHasNoErrors();
+    expect($offer->fresh()->response)->toBe('declined');
+
+    Notification::assertSentOnDemand(OfferResponseAckNotification::class);
 });
