@@ -5,6 +5,13 @@
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Popover,
@@ -204,6 +211,7 @@ export default function CalendarIndex({
     const [editingEvent, setEditingEvent] = useState<CalendarEventInitial | null>(null);
     const [createDate, setCreateDate] = useState<string | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
+    const [scopePrompt, setScopePrompt] = useState<EventClickArg | null>(null);
 
     // Keep the live filter/layer state in a ref so the FullCalendar event source
     // (registered once) always reads the current values without re-registering.
@@ -323,6 +331,35 @@ export default function CalendarIndex({
 
     const refetch = () => calendarRef.current?.getApi().refetchEvents();
 
+    const buildInitial = (
+        info: EventClickArg,
+        scope: 'all' | 'this' | 'following',
+    ): CalendarEventInitial => {
+        const props = info.event.extendedProps as Record<string, unknown>;
+        return {
+            id: Number(props.eventId),
+            title: info.event.title,
+            description: (props.description as string) ?? null,
+            event_type: (props.category as string) ?? 'company',
+            starts_at: (props.startRaw as string) ?? info.event.startStr,
+            ends_at: (props.endRaw as string) ?? info.event.endStr ?? info.event.startStr,
+            is_all_day: !!props.isAllDay,
+            location: (props.location as string) ?? null,
+            department_id: (props.departmentId as number) ?? null,
+            site_id: (props.siteId as number) ?? null,
+            rrule: (props.rrule as string) ?? null,
+            recurrence_until: (props.recurrenceUntil as string) ?? null,
+            scope,
+            occurrence_date: (props.occurrenceDate as string) ?? null,
+        };
+    };
+
+    const openEdit = (initial: CalendarEventInitial) => {
+        setEditingEvent(initial);
+        setCreateDate(null);
+        setWizardOpen(true);
+    };
+
     const handleEventClick = (info: EventClickArg) => {
         const props = info.event.extendedProps as Record<string, unknown> & {
             deepLink?: string;
@@ -331,20 +368,13 @@ export default function CalendarIndex({
         // HR events open the wizard (manager only); read-only layers deep-link.
         if (props.layer === 'event') {
             if (!can.manage) return;
-            setEditingEvent({
-                id: Number(props.eventId),
-                title: info.event.title,
-                description: (props.description as string) ?? null,
-                event_type: (props.category as string) ?? 'company',
-                starts_at: (props.startRaw as string) ?? info.event.startStr,
-                ends_at: (props.endRaw as string) ?? info.event.endStr ?? info.event.startStr,
-                is_all_day: !!props.isAllDay,
-                location: (props.location as string) ?? null,
-                department_id: (props.departmentId as number) ?? null,
-                site_id: (props.siteId as number) ?? null,
-            });
-            setCreateDate(null);
-            setWizardOpen(true);
+            // A live series occurrence (has an rrule) prompts for edit scope;
+            // standalone events + exception overrides edit directly.
+            if (props.rrule && can.manageRecurring) {
+                setScopePrompt(info);
+            } else {
+                openEdit(buildInitial(info, 'all'));
+            }
             return;
         }
         if (props.deepLink) router.visit(props.deepLink);
@@ -578,6 +608,39 @@ export default function CalendarIndex({
                     onClose={() => setSubscribeOpen(false)}
                     url={ical.url}
                 />
+
+                <Dialog open={!!scopePrompt} onOpenChange={(o) => !o && setScopePrompt(null)}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Edit recurring event</DialogTitle>
+                            <DialogDescription>
+                                This event repeats. Choose which occurrences your changes apply to.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-2">
+                            {(
+                                [
+                                    { scope: 'this', label: 'This event only', hint: 'Edit just this occurrence' },
+                                    { scope: 'following', label: 'This & following events', hint: 'Split the series from here' },
+                                    { scope: 'all', label: 'All events', hint: 'Edit the whole series' },
+                                ] as const
+                            ).map((opt) => (
+                                <button
+                                    key={opt.scope}
+                                    type="button"
+                                    onClick={() => {
+                                        if (scopePrompt) openEdit(buildInitial(scopePrompt, opt.scope));
+                                        setScopePrompt(null);
+                                    }}
+                                    className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-left transition-colors hover:bg-accent"
+                                >
+                                    <span className="text-sm font-semibold">{opt.label}</span>
+                                    <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );

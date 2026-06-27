@@ -13,6 +13,7 @@ import {
     GraduationCap,
     Megaphone,
     PartyPopper,
+    Repeat,
     Trash2,
     Users,
     type LucideIcon,
@@ -58,6 +59,11 @@ export interface CalendarEventInitial {
     location: string | null;
     department_id: number | null;
     site_id: number | null;
+    rrule?: string | null;
+    recurrence_until?: string | null;
+    /** Set when editing a single occurrence of a recurring series. */
+    scope?: 'all' | 'this' | 'following';
+    occurrence_date?: string | null;
 }
 
 type IdName = { id: number; name: string };
@@ -95,6 +101,30 @@ const metaFor = (cat: EventCategoryOption): CategoryMeta => ({
     accent: `var(--${cat.color_token})`,
     sub: styleFor(cat.key).sub,
 });
+
+/** Recurrence presets ↔ the RFC-5545 subset the backend expands. */
+const RECUR_PRESETS: { key: string; label: string; rrule: string | null }[] = [
+    { key: 'none', label: 'Does not repeat', rrule: null },
+    { key: 'DAILY', label: 'Daily', rrule: 'FREQ=DAILY' },
+    { key: 'WEEKLY', label: 'Weekly', rrule: 'FREQ=WEEKLY' },
+    { key: 'FORTNIGHTLY', label: 'Every 2 weeks', rrule: 'FREQ=WEEKLY;INTERVAL=2' },
+    { key: 'MONTHLY', label: 'Monthly', rrule: 'FREQ=MONTHLY' },
+    { key: 'QUARTERLY', label: 'Every 3 months', rrule: 'FREQ=MONTHLY;INTERVAL=3' },
+];
+const presetFromRrule = (rrule: string | null | undefined): string =>
+    RECUR_PRESETS.find((p) => p.rrule === (rrule || null))?.key ?? 'none';
+const rruleFromPreset = (key: string): string | null =>
+    RECUR_PRESETS.find((p) => p.key === key)?.rrule ?? null;
+
+function recurrenceSummary(preset: string, until: string): string {
+    const label = RECUR_PRESETS.find((p) => p.key === preset)?.label ?? 'Does not repeat';
+    if (preset === 'none') return 'Occurs once';
+    const base = `Occurs ${label.toLowerCase()}`;
+    if (!until) return base;
+    const d = new Date(until);
+    if (Number.isNaN(d.getTime())) return base;
+    return `${base} until ${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
 
 /** Trim a server ISO string to what a datetime-local / date input wants. */
 const toLocalInput = (value: string, allDay: boolean) =>
@@ -154,6 +184,8 @@ export function EventWizardDialog({
         starts_at: '',
         ends_at: '',
         is_all_day: false,
+        rrule: '' as string,
+        recurrence_until: '' as string,
         location: '',
         department_id: '',
         site_id: '',
@@ -170,6 +202,8 @@ export function EventWizardDialog({
                 starts_at: toLocalInput(initial.starts_at, initial.is_all_day),
                 ends_at: toLocalInput(initial.ends_at, initial.is_all_day),
                 is_all_day: initial.is_all_day,
+                rrule: initial.rrule ?? '',
+                recurrence_until: initial.recurrence_until ? initial.recurrence_until.substring(0, 10) : '',
                 location: initial.location ?? '',
                 department_id: initial.department_id ? String(initial.department_id) : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
@@ -228,6 +262,11 @@ export function EventWizardDialog({
             ...data,
             site_id: data.site_id === '' ? null : data.site_id,
             department_id: data.department_id === '' ? null : data.department_id,
+            rrule: data.rrule === '' ? null : data.rrule,
+            recurrence_until: data.recurrence_until === '' ? null : data.recurrence_until,
+            ...(isEdit && initial?.scope
+                ? { scope: initial.scope, occurrence_date: initial.occurrence_date ?? null }
+                : {}),
         }));
 
     const onError = () => {
@@ -481,6 +520,42 @@ export function EventWizardDialog({
                             <AlarmClock className="h-4 w-4" />
                             {prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)}
                         </div>
+
+                        {/* Recurrence */}
+                        <div className="mt-5">
+                            <SubHead icon={Repeat}>Repeats</SubHead>
+                            <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                                <Field label="Repeat">
+                                    <SelectInput
+                                        value={presetFromRrule(form.data.rrule)}
+                                        onChange={(v) =>
+                                            form.setData((d) => ({
+                                                ...d,
+                                                rrule: rruleFromPreset(v) ?? '',
+                                                recurrence_until: v === 'none' ? '' : d.recurrence_until,
+                                            }))
+                                        }
+                                        placeholder="Does not repeat"
+                                        ariaLabel="Repeat"
+                                        options={RECUR_PRESETS.map((p) => ({ value: p.key, label: p.label }))}
+                                    />
+                                </Field>
+                                {form.data.rrule ? (
+                                    <Field label="Until (optional)">
+                                        <Input
+                                            type="date"
+                                            value={form.data.recurrence_until}
+                                            onChange={(e) => form.setData('recurrence_until', e.target.value)}
+                                        />
+                                    </Field>
+                                ) : null}
+                            </div>
+                            {form.data.rrule ? (
+                                <p className="mt-2 text-[12px] font-medium text-primary">
+                                    {recurrenceSummary(presetFromRrule(form.data.rrule), form.data.recurrence_until)}
+                                </p>
+                            ) : null}
+                        </div>
                     </WizardStepPane>
                 )}
 
@@ -535,6 +610,12 @@ export function EventWizardDialog({
                             title={form.data.title || 'Untitled event'}
                         >
                             <ReviewRow label="When" value={prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)} />
+                            {form.data.rrule ? (
+                                <ReviewRow
+                                    label="Repeats"
+                                    value={recurrenceSummary(presetFromRrule(form.data.rrule), form.data.recurrence_until)}
+                                />
+                            ) : null}
                             <ReviewRow label="Category" value={meta.label} />
                             <ReviewRow label="Site" value={siteName} />
                             {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
