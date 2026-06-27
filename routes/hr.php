@@ -172,13 +172,16 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/resend', [CandidateController::class, 'resendOffer'])->name('offers.resend')
+            ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
             ->middleware('permission:hr.recruitment.manage');
+        // Segregation of duties: minting a login account additionally requires hr.employees.manage.
         Route::post('/recruitment/offers/{offer}/convert', [CandidateController::class, 'convertToEmployee'])->name('offers.convert')
-            ->middleware('permission:hr.recruitment.manage');
+            ->middleware('permission:hr.recruitment.manage', 'permission:hr.employees.manage');
 
         // Jobs & ATS setup
         Route::post('/recruitment/jobs', [RecruitmentJobController::class, 'store'])->name('jobs.store')

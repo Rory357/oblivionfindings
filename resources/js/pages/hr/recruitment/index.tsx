@@ -454,7 +454,8 @@ export default function RecruitmentHub(props: Props) {
                             <OffersTab
                                 offers={offers}
                                 canManage={can.manage}
-                                onSend={(o) => sendOffer(o)}
+                                onSend={(o) => sendOffer(o, false)}
+                                onResend={(o) => sendOffer(o, true)}
                                 onConvert={(o) => openWizard('convert', { offerId: o.id, candidateName: o.candidate, role: o.role })}
                             />
                         ) : null}
@@ -481,13 +482,14 @@ export default function RecruitmentHub(props: Props) {
         </AppLayout>
     );
 
-    function sendOffer(o: OfferRow) {
-        router.post(`/hr/recruitment/offers/${o.id}/send`, {}, {
+    function sendOffer(o: OfferRow, resend: boolean) {
+        const url = resend ? `/hr/recruitment/offers/${o.id}/resend` : `/hr/recruitment/offers/${o.id}/send`;
+        router.post(url, {}, {
             preserveScroll: true,
             onSuccess: (pg) => {
                 const f = (pg.props as { flash?: { error?: string } }).flash;
                 if (f?.error) toast.error(f.error);
-                else toast.success(`Offer sent to ${o.candidate}`);
+                else toast.success(resend ? `Offer link resent to ${o.candidate}` : `Offer emailed to ${o.candidate}`);
             },
         });
     }
@@ -940,11 +942,13 @@ function OffersTab({
     offers,
     canManage,
     onSend,
+    onResend,
     onConvert,
 }: {
     offers: { summary: { key: string; label: string; count: number; color: string }[]; list: OfferRow[] };
     canManage: boolean;
     onSend: (o: OfferRow) => void;
+    onResend: (o: OfferRow) => void;
     onConvert: (o: OfferRow) => void;
 }) {
     return (
@@ -979,7 +983,7 @@ function OffersTab({
                                 ) : o.status === 'draft' || o.status === 'approved' ? (
                                     <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Send</button>
                                 ) : o.status === 'sent' ? (
-                                    <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
+                                    <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
                                 ) : (
                                     <span className="w-[60px]" />
                                 )

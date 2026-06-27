@@ -36,15 +36,19 @@ export const STAGE_DEFS: Record<string, StageDef> = {
     withdrawn: { label: 'Withdrawn', hue: 277 },
 };
 
-/** Active stages rendered as board columns, in order. */
+/** Active stages rendered as board columns, in order. Includes offer_pending and
+ *  onboarding so a candidate with a drafted-but-unsent offer (or mid-onboarding)
+ *  is never unrenderable — every non-terminal stage maps to a visible column. */
 export const BOARD_STAGES: StageKey[] = [
     'new',
     'screening',
     'interview_scheduled',
     'interview_completed',
     'reference_check',
+    'offer_pending',
     'offer_sent',
     'offer_accepted',
+    'onboarding',
 ];
 
 /** Linear forward flow used to compute "advance to next stage". */

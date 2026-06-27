@@ -11,12 +11,14 @@ use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
+use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -830,13 +832,72 @@ class CandidateController extends Controller
             'sent_at' => optional($offer->sent_at)->toDateTimeString(),
         ]);
 
-        return redirect()->back()->with('success', 'Offer sent to candidate.');
+        $this->emailOfferLink($offer->fresh(), $application->candidate);
+
+        return redirect()->back()->with('success', 'Offer sent — portal link emailed to the candidate.');
+    }
+
+    /**
+     * Re-deliver the offer portal link (refreshing expiry) without re-advancing
+     * the pipeline. Used when the original email bounced or expired.
+     */
+    public function resendOffer(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $application = $offer->application()->with('candidate')->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if (! $offer->sent_at) {
+            return redirect()->back()->with('error', 'Send the offer before resending the link.');
+        }
+
+        if ($offer->response !== null) {
+            return redirect()->back()->with('error', 'This offer has already been responded to.');
+        }
+
+        $offer->update([
+            'candidate_portal_token' => $offer->candidate_portal_token ?: Str::random(64),
+            'portal_expires_at' => now()->addDays(14),
+            'updated_by' => $user->id,
+        ]);
+
+        $this->emailOfferLink($offer->fresh(), $application->candidate);
+
+        return redirect()->back()->with('success', 'Offer link resent to the candidate.');
+    }
+
+    /**
+     * Best-effort delivery of the offer-portal link to the (non-User) candidate.
+     * A mail failure must not 500 the manager's request — the Resend action
+     * exists precisely to recover from a failed send.
+     */
+    private function emailOfferLink(?HrOffer $offer, ?HrCandidate $candidate): void
+    {
+        if (! $offer || ! $candidate || ! $candidate->personal_email || ! $offer->candidate_portal_token) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new OfferSentNotification($offer, $candidate));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function downloadOfferLetter(Request $request, HrOffer $offer)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // Tenant guard — every sibling offer action asserts this; the letter
+        // download must not be a cross-tenant IDOR hole.
+        $application = $offer->application()->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         abort_unless($offer->offer_letter_path, 404);
 
@@ -963,9 +1024,16 @@ class CandidateController extends Controller
             'response_at' => optional($offer->response_at)->toDateTimeString(),
         ]);
 
-        // Accepting an offer flows straight into employment + onboarding. The
-        // conversion is idempotent (firstOrCreate user / updateOrCreate profile /
-        // onboarding generated at most once), so a later manual "Convert" is safe.
+        // Accepting an offer flows straight into employment + onboarding — but
+        // minting a login is a segregation-of-duties step. Only auto-convert when
+        // the actor also holds hr.employees.manage; otherwise the acceptance is
+        // saved and the hire waits at offer_accepted for account provisioning.
+        // The conversion is idempotent (firstOrCreate user / updateOrCreate
+        // profile / onboarding generated at most once), so a later Convert is safe.
+        if ($offer->response === 'accepted' && ! $user->canDo('hr.employees.manage')) {
+            return redirect()->back()->with('success', 'Offer accepted. Account provisioning is pending — a user with employee-management rights can Convert to finish the hire.');
+        }
+
         if ($offer->response === 'accepted') {
             $candidate = $application->candidate?->fresh();
 
@@ -1002,7 +1070,9 @@ class CandidateController extends Controller
     public function convertToEmployee(Request $request, HrOffer $offer)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        // Converting mints a User login — gated by hr.employees.manage in addition
+        // to hr.recruitment.manage (segregation of duties; the route enforces both).
+        abort_unless($user && $user->canDo('hr.recruitment.manage') && $user->canDo('hr.employees.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $offer->application()->with('candidate')->firstOrFail();

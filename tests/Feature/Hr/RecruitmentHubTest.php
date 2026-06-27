@@ -2,13 +2,44 @@
 
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Notifications\OfferSentNotification;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\Notification;
+
+function makeOffer(array $ctx, string $state, int $hrId, int $siteId): HrOffer
+{
+    $base = [
+        'application_id' => $ctx['application']->id,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(),
+        'employment_type' => 'full_time',
+        'hours_per_week' => 40,
+        'hourly_rate' => 28.50,
+        'primary_site_id' => $siteId,
+        'approval_status' => 'approved',
+        'created_by' => $hrId,
+    ];
+    if ($state === 'sent' || $state === 'accepted') {
+        $base['sent_at'] = now();
+        $base['candidate_portal_token'] = 'tok-'.uniqid();
+        $base['portal_expires_at'] = now()->addDays(14);
+    }
+    if ($state === 'accepted') {
+        $base['response'] = 'accepted';
+        $base['response_at'] = now();
+    }
+
+    return HrOffer::create($base);
+}
 
 /**
  * End-to-end coverage for the unified Recruitment hub (`hr/recruitment/index`):
@@ -184,4 +215,76 @@ test('a view-only user cannot drive manager actions', function () {
     $this->actingAs($viewer)
         ->post(route('hr.applications.advance', $application->id), ['target_stage' => 'interview_scheduled'])
         ->assertForbidden();
+});
+
+/* ---- A2: offer email + resend (#14) ---- */
+
+test('sending an offer emails the candidate the portal link', function () {
+    Notification::fake();
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'interview_completed');
+    $offer = makeOffer(['application' => $application], 'draft_approved', $this->hr->id, $this->site->id);
+
+    $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();
+
+    Notification::assertSentOnDemand(
+        OfferSentNotification::class,
+        fn ($notification, $channels, $notifiable) => ($notifiable->routes['mail'] ?? null) === $candidate->personal_email,
+    );
+    expect($offer->fresh()->sent_at)->not->toBeNull();
+});
+
+test('resend re-delivers the offer link without re-advancing the stage', function () {
+    Notification::fake();
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+
+    $this->actingAs($this->hr)->post(route('hr.offers.resend', $offer->id))->assertRedirect();
+
+    Notification::assertSentOnDemand(OfferSentNotification::class);
+    // unsent offer cannot be resent
+    $unsent = makeOffer(['application' => makeApplicant($this->hr->id)['application']], 'draft_approved', $this->hr->id, $this->site->id);
+    $this->actingAs($this->hr)->post(route('hr.offers.resend', $unsent->id))->assertRedirect();
+    expect($unsent->fresh()->sent_at)->toBeNull();
+});
+
+/* ---- A1: segregation of duties on convert (#9) ---- */
+
+test('converting to an employee requires hr.employees.manage', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'offer_accepted');
+    $offer = makeOffer(['application' => $application], 'accepted', $this->hr->id, $this->site->id);
+
+    // Deny employees.manage for this recruiter while keeping recruitment.manage.
+    $deny = Permission::where('key', 'hr.employees.manage')->first();
+    $this->hr->permissionOverrides()->attach($deny->id, ['allowed' => false]);
+
+    $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertForbidden();
+    expect(HrEmployeeProfile::query()->count())->toBe(0);
+});
+
+test('respondOffer does not auto-mint a login without hr.employees.manage', function () {
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+
+    $deny = Permission::where('key', 'hr.employees.manage')->first();
+    $this->hr->permissionOverrides()->attach($deny->id, ['allowed' => false]);
+
+    $this->actingAs($this->hr)
+        ->post(route('hr.offers.respond', $offer->id), ['response' => 'accepted'])
+        ->assertRedirect();
+
+    expect($offer->fresh()->response)->toBe('accepted');
+    expect($candidate->fresh()->status)->toBe('offer_accepted');
+    expect(HrEmployeeProfile::query()->count())->toBe(0);
+});
+
+/* ---- A4: offer-letter download is tenant-scoped ---- */
+
+test('offer letter download is tenant-scoped', function () {
+    $foreign = HrCandidate::factory()->create(['tenant_id' => 2, 'status' => 'offer_sent', 'created_by' => $this->hr->id]);
+    $foreignApp = HrApplication::factory()->create(['tenant_id' => 2, 'candidate_id' => $foreign->id, 'position_title' => 'Nurse', 'status' => 'active']);
+    $foreignOffer = makeOffer(['application' => $foreignApp], 'sent', $this->hr->id, $this->site->id);
+    $foreignOffer->update(['offer_letter_path' => 'offers/x/letter.pdf', 'offer_letter_name' => 'letter.pdf']);
+
+    // hr user resolves to tenant 1 → cross-tenant letter is not reachable.
+    $this->actingAs($this->hr)->get(route('hr.offers.letter', $foreignOffer->id))->assertNotFound();
 });
