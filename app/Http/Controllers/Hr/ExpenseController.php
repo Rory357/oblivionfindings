@@ -6,10 +6,12 @@ use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
 use App\Domain\Hr\Services\CompensationService;
 use App\Domain\Hr\Services\ExpenseService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -74,6 +76,8 @@ class ExpenseController extends Controller
             // line (distance × rate) instead of hard-coding anything.
             'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
             'categories' => ExpenseService::CATEGORIES,
+            // Managers can file on behalf of any employee in the tenant.
+            'employees' => $canManage ? $this->onBehalfEmployees($tenantId) : [],
             'can' => [
                 'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,
@@ -93,7 +97,27 @@ class ExpenseController extends Controller
 
         return Inertia::render('hr/compensation/expenses/create', [
             'categories' => ExpenseService::CATEGORIES,
+            'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
+            'employees' => $this->onBehalfEmployees($this->resolveHrTenantIdForUser($user)),
         ]);
+    }
+
+    /**
+     * Active employees a manager can file an expense on behalf of (user id + name).
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function onBehalfEmployees(int $tenantId): array
+    {
+        return HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->with('user:id,name')
+            ->get(['id', 'user_id'])
+            ->filter(fn ($p) => $p->user !== null)
+            ->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user->name])
+            ->values()
+            ->all();
     }
 
     /* ------------------------------------------------------------------ */
@@ -105,6 +129,22 @@ class ExpenseController extends Controller
         $user = $request->user();
 
         $validated = $request->validated();
+
+        // On-behalf filing: a manager may file for another employee in the tenant.
+        // Resolve the owner here (gate + same-tenant guard); ignore the field for
+        // non-managers so a self-filer can never reassign ownership.
+        $onBehalfOf = null;
+        $onBehalfId = $validated['on_behalf_user_id'] ?? null;
+        unset($validated['on_behalf_user_id']);
+        if ($onBehalfId && $user->canDo('hr.expenses.manage') && (int) $onBehalfId !== (int) $user->id) {
+            $tenantId = $this->resolveHrTenantIdForUser($user);
+            $inTenant = HrEmployeeProfile::query()
+                ->where('user_id', $onBehalfId)
+                ->where('tenant_id', $tenantId)
+                ->exists();
+            abort_unless($inTenant, 422, 'That employee is not in your organisation.');
+            $onBehalfOf = User::find($onBehalfId);
+        }
 
         // Persist any uploaded per-item receipts to the private disk and replace the
         // raw upload with its stored path — addItem() consumes receipt_path, and the
@@ -120,7 +160,7 @@ class ExpenseController extends Controller
         }
 
         try {
-            $claim = $this->expenseService->createClaim($user, $validated);
+            $claim = $this->expenseService->createClaim($user, $validated, $onBehalfOf);
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -290,5 +330,43 @@ class ExpenseController extends Controller
         }
 
         return redirect()->back()->with('success', 'Expense claim marked as paid.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Bulk approve                                                       */
+    /* ------------------------------------------------------------------ */
+
+    public function bulkApprove(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $data = $request->validate([
+            'claim_ids' => ['required', 'array', 'min:1'],
+            'claim_ids.*' => ['integer'],
+        ]);
+
+        // Approve only this-tenant, still-submitted claims; skip the rest silently
+        // so a stale id in the batch can't 500 the whole action.
+        $claims = HrExpenseClaim::forTenant($tenantId)
+            ->whereIn('id', $data['claim_ids'])
+            ->where('status', 'submitted')
+            ->get();
+
+        $approved = 0;
+        foreach ($claims as $claim) {
+            try {
+                $this->expenseService->approveClaim($claim, $user);
+                $approved++;
+            } catch (\LogicException) {
+                // Skip a claim that raced out of the submitted state.
+            }
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $approved === 1 ? '1 claim approved.' : "{$approved} claims approved.",
+        );
     }
 }

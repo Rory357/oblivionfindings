@@ -39,6 +39,7 @@ import {
     type EventCategoryOption,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
+import { CalendarMonthGrid } from '@/components/hr/calendar/calendar-month-grid';
 import {
     CalendarDetailPopover,
     type EventDetail,
@@ -61,10 +62,8 @@ import {
 } from '@/lib/calendar/layer-feed';
 import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
-import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import type {
     EventClickArg,
     EventInput,
@@ -124,21 +123,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Calendar', href: '/hr/calendar' },
 ];
 
-type FcView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
-
-const VIEW_PARAM: Record<string, FcView> = {
-    month: 'dayGridMonth',
-    week: 'timeGridWeek',
-    day: 'timeGridDay',
-    agenda: 'listWeek',
-};
-const PARAM_FOR_VIEW: Record<FcView, string> = {
-    dayGridMonth: 'month',
-    timeGridWeek: 'week',
-    timeGridDay: 'day',
-    listWeek: 'agenda',
-};
-
 const LAYERS_STORAGE_KEY = 'hrCalendar.layers';
 
 /** One-time page-scoped styling for layer-specific event treatments. */
@@ -170,11 +154,6 @@ function readInitialLayers(): CalendarLayer[] {
     return parsed.length ? parsed : [...DEFAULT_ACTIVE_LAYERS];
 }
 
-function readInitialView(): FcView {
-    if (typeof window === 'undefined') return 'dayGridMonth';
-    const v = new URLSearchParams(window.location.search).get('view');
-    return (v && VIEW_PARAM[v]) || 'dayGridMonth';
-}
 
 /** Map one feed row to a FullCalendar event, applying per-layer styling. */
 function toFcEvent(e: CalendarLayerFeed): EventInput {
@@ -235,7 +214,6 @@ export default function CalendarIndex({
 
     const [tab, setTab] = useState<'calendar' | 'agenda' | 'renewals'>('calendar');
     const [activeLayers, setActiveLayers] = useState<CalendarLayer[]>(readInitialLayers);
-    const [view, setView] = useState<FcView>(readInitialView);
     const [siteFilter, setSiteFilter] = useState<string>('all');
     const [deptFilter, setDeptFilter] = useState<string>('all');
     const [teamFilter, setTeamFilter] = useState<string>('all');
@@ -256,6 +234,10 @@ export default function CalendarIndex({
     const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
     const clickedInfoRef = useRef<EventClickArg | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
+    // Month-grid (Calendar tab) state — the grid is a rostering-style month view.
+    const [cursor, setCursor] = useState<Date>(() => new Date());
+    const [monthEvents, setMonthEvents] = useState<CalendarLayerFeed[]>([]);
+    const [dayDetail, setDayDetail] = useState<{ label: string; events: CalendarLayerFeed[] } | null>(null);
 
     // Keep the live filter/layer state in a ref so the FullCalendar event source
     // (registered once) always reads the current values without re-registering.
@@ -273,13 +255,6 @@ export default function CalendarIndex({
         window.history.replaceState(window.history.state, '', url.toString());
         calendarRef.current?.getApi().refetchEvents();
     }, [activeLayers]);
-
-    // Persist view to ?view=
-    useEffect(() => {
-        const url = new URL(window.location.href);
-        url.searchParams.set('view', PARAM_FOR_VIEW[view]);
-        window.history.replaceState(window.history.state, '', url.toString());
-    }, [view]);
 
     const buildFeedUrl = useCallback((from: string, to: string, layers: string) => {
         const { siteFilter: s, deptFilter: d, teamFilter: t } = filtersRef.current;
@@ -338,12 +313,6 @@ export default function CalendarIndex({
         calendarRef.current?.getApi().refetchEvents();
     }, [siteFilter, deptFilter, teamFilter, search]);
 
-    // Keep FullCalendar's view in sync with our state.
-    useEffect(() => {
-        const api = calendarRef.current?.getApi();
-        if (api && api.view.type !== view) api.changeView(view);
-    }, [view]);
-
     // Load the renewals list when that tab opens.
     useEffect(() => {
         if (tab !== 'renewals' || renewals !== null) return;
@@ -374,7 +343,7 @@ export default function CalendarIndex({
                 setQuickAdd(null);
                 return;
             }
-            if (typing || tab !== 'calendar') return;
+            if (typing || tab === 'renewals') return;
             const api = calendarRef.current?.getApi();
             switch (e.key) {
                 case '/':
@@ -385,24 +354,15 @@ export default function CalendarIndex({
                     if (can.manage) openCreate();
                     break;
                 case 't':
+                    setCursor(new Date());
                     api?.today();
                     break;
-                case '1':
-                    setView('dayGridMonth');
-                    break;
-                case '2':
-                    setView('timeGridWeek');
-                    break;
-                case '3':
-                    setView('timeGridDay');
-                    break;
-                case '4':
-                    setView('listWeek');
-                    break;
                 case 'ArrowLeft':
+                    setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
                     api?.prev();
                     break;
                 case 'ArrowRight':
+                    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
                     api?.next();
                     break;
                 default:
@@ -420,7 +380,10 @@ export default function CalendarIndex({
         );
     };
 
-    const goToday = () => calendarRef.current?.getApi().today();
+    const goToday = () => {
+        setCursor(new Date());
+        calendarRef.current?.getApi().today();
+    };
 
     const openCreate = (date?: string | null) => {
         setEditingEvent(null);
@@ -428,7 +391,97 @@ export default function CalendarIndex({
         setWizardOpen(true);
     };
 
-    const refetch = () => calendarRef.current?.getApi().refetchEvents();
+    const refetch = () => {
+        calendarRef.current?.getApi().refetchEvents();
+        void fetchMonth();
+    };
+
+    // Fetch the 6-week matrix around `cursor` for the month grid (Calendar tab).
+    const fetchMonth = useCallback(async () => {
+        const { activeLayers: layers } = filtersRef.current;
+        const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+        const offset = (monthStart.getDay() + 6) % 7;
+        const from = new Date(monthStart);
+        from.setDate(1 - offset);
+        const to = new Date(from);
+        to.setDate(from.getDate() + 41);
+        const iso = (d: Date) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (layers.length === 0) {
+            setMonthEvents([]);
+            setCounts({});
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await fetch(buildFeedUrl(iso(from), iso(to), layers.join(',')), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            const data: { events: CalendarLayerFeed[] } = await res.json();
+            setFeedError(false);
+            const tally: Record<string, number> = {};
+            for (const e of data.events) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
+            setCounts(tally);
+            setMonthEvents(data.events);
+        } catch {
+            setFeedError(true);
+        } finally {
+            setLoading(false);
+        }
+    }, [cursor, buildFeedUrl]);
+
+    // (Re)fetch the month grid on month / filter / layer change while on a grid tab.
+    useEffect(() => {
+        if (tab === 'renewals') return;
+        void fetchMonth();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cursor, tab, activeLayers, siteFilter, deptFilter, teamFilter]);
+
+    // The visible month's events, after the client-side title search.
+    const visibleMonthEvents = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return q ? monthEvents.filter((e) => e.title.toLowerCase().includes(q)) : monthEvents;
+    }, [monthEvents, search]);
+
+    /** Adapt a feed chip into the EventClickArg shape the shared handlers expect. */
+    const feedToInfo = (e: CalendarLayerFeed, x = 200, y = 200): EventClickArg =>
+        ({
+            event: {
+                id: e.id,
+                title: e.title,
+                startStr: e.start,
+                endStr: e.end,
+                allDay: e.allDay,
+                extendedProps: { ...e.extendedProps, layer: e.layer, deepLink: e.deepLink },
+            },
+            jsEvent: { clientX: x, clientY: y } as MouseEvent,
+        }) as unknown as EventClickArg;
+
+    const moveEvent = (eventId: number, dateKey: string) => {
+        const ev = monthEvents.find((e) => Number(e.extendedProps.eventId) === eventId);
+        if (!ev || !ev.start) return;
+        const oldStart = new Date(ev.start);
+        const oldEnd = ev.end ? new Date(ev.end) : oldStart;
+        const durationMs = Math.max(0, oldEnd.getTime() - oldStart.getTime());
+        const [y, m, d] = dateKey.split('-').map(Number);
+        const newStart = new Date(oldStart);
+        newStart.setFullYear(y, m - 1, d);
+        const newEnd = new Date(newStart.getTime() + durationMs);
+        const fmt = (dt: Date) =>
+            `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        router.put(
+            `/hr/calendar/events/${eventId}`,
+            { starts_at: fmt(newStart), ends_at: fmt(newEnd), scope: 'all' },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => refetch(),
+                onError: () => toast.error('Could not move the event'),
+            },
+        );
+    };
 
     const buildInitial = (
         info: EventClickArg,
@@ -534,31 +587,6 @@ export default function CalendarIndex({
         setDeleteTarget(null);
     };
 
-    // Drag-move / resize a standalone HR event → optimistic PUT, revert on fail.
-    const handleEventMutate = (info: { event: { id: string; startStr: string; endStr: string; extendedProps: Record<string, unknown> }; revert: () => void }) => {
-        const id = Number(info.event.extendedProps.eventId);
-        if (!id) {
-            info.revert();
-            return;
-        }
-        router.put(
-            `/hr/calendar/events/${id}`,
-            {
-                starts_at: info.event.startStr,
-                ends_at: info.event.endStr || info.event.startStr,
-                scope: 'all',
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onError: () => {
-                    info.revert();
-                    toast.error('Could not move the event');
-                },
-            },
-        );
-    };
-
     const buildEntryMenu = (info: EventClickArg, x: number, y: number) => {
         const props = info.event.extendedProps as Record<string, unknown>;
         const layer = (props.layer as CalendarLayer) ?? 'event';
@@ -579,28 +607,15 @@ export default function CalendarIndex({
         setCtxMenu({ x, y, tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4), meta: info.event.title, items });
     };
 
-    const buildDayMenu = (dateStr: string, x: number, y: number) => {
-        if (!can.manage) return;
-        setCtxMenu({
-            x,
-            y,
-            tag: 'DAY',
-            meta: new Date(dateStr).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }),
-            items: [
-                { icon: <CalendarPlus className="h-3.5 w-3.5" />, label: 'New event here', onClick: () => openCreate(dateStr) },
-            ],
-        });
-    };
-
     const onUpNext = (entry: UpNextEntry) => {
         if (entry.deepLink) {
             router.visit(entry.deepLink);
             return;
         }
-        const api = calendarRef.current?.getApi();
-        if (api) {
-            api.gotoDate(entry.start);
-            setView('timeGridDay');
+        const d = new Date(entry.start);
+        if (!Number.isNaN(d.getTime())) {
+            setTab('calendar');
+            setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
         }
     };
 
@@ -635,11 +650,8 @@ export default function CalendarIndex({
         [counts.event, totalCount, stats.renewalsSoon],
     );
 
-    // Switching to the Agenda tab forces the list view; back to Calendar restores a grid.
     const handleTabChange = (next: string) => {
         setTab(next as 'calendar' | 'agenda' | 'renewals');
-        if (next === 'agenda') setView('listWeek');
-        else if (next === 'calendar' && view === 'listWeek') setView('dayGridMonth');
     };
 
     return (
@@ -660,7 +672,7 @@ export default function CalendarIndex({
                                       label: `${stats.coverageGapsToday} coverage gap${stats.coverageGapsToday === 1 ? '' : 's'} today`,
                                       onClick: () => {
                                           if (!activeLayers.includes('shift')) toggleLayer('shift');
-                                          setView('timeGridDay');
+                                          setTab('calendar');
                                           goToday();
                                       },
                                   },
@@ -687,17 +699,15 @@ export default function CalendarIndex({
                         onSubscribe: () => setSubscribeOpen(true),
                         onStatEvents: () => {
                             setTab('calendar');
-                            setView('timeGridWeek');
+                            goToday();
                         },
                         onStatLeave: () => {
-                            setTab('calendar');
                             if (!activeLayers.includes('leave')) toggleLayer('leave');
-                            setView('listWeek');
+                            setTab('agenda');
                         },
                         onStatGaps: () => {
                             setTab('calendar');
                             if (!activeLayers.includes('shift')) toggleLayer('shift');
-                            setView('timeGridDay');
                             goToday();
                         },
                         onStatRenewals: () => setTab('renewals'),
@@ -765,126 +775,78 @@ export default function CalendarIndex({
                                 />
                             ) : null}
 
-                            <div className="ml-auto">
-                                <ViewSwitch view={view} onChange={setView} />
-                            </div>
                         </div>
 
                         {/* Legend */}
                         <Legend activeLayers={activeLayers} counts={counts} />
 
-                        <Card>
-                            <CardContent className="p-4">
-                                {feedError ? (
+                        {feedError ? (
+                            <Card>
+                                <CardContent className="p-4">
                                     <ErrorState
                                         title="Couldn't load the calendar"
                                         message="The calendar feed failed to load."
                                         onRetry={() => {
                                             setFeedError(false);
+                                            void fetchMonth();
                                             calendarRef.current?.getApi().refetchEvents();
                                         }}
                                     />
-                                ) : null}
-                                <div className={feedError ? 'hidden' : 'relative'}>
-                                    {loading ? (
-                                        <div className="pointer-events-none absolute inset-0 z-10 grid grid-rows-6 gap-1 rounded-xl bg-card/60 p-2 backdrop-blur-[1px]">
-                                            {Array.from({ length: 6 }).map((_, r) => (
-                                                <div key={r} className="grid grid-cols-7 gap-1">
-                                                    {Array.from({ length: 7 }).map((_, c) => (
-                                                        <div key={c} className="animate-pulse rounded-lg bg-muted/50" />
-                                                    ))}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : null}
+                                </CardContent>
+                            </Card>
+                        ) : tab === 'calendar' ? (
+                            <CalendarMonthGrid
+                                events={visibleMonthEvents}
+                                cursor={cursor}
+                                canManage={can.manage}
+                                loading={loading}
+                                handlers={{
+                                    onPrev: () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1)),
+                                    onNext: () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1)),
+                                    onToday: () => setCursor(new Date()),
+                                    onTitleClick: () => setYearPickerOpen(true),
+                                    onChipClick: (e, x, y) => handleEventClick(feedToInfo(e, x, y)),
+                                    onChipCtx: (e, x, y) => buildEntryMenu(feedToInfo(e, x, y), x, y),
+                                    onQuickAdd: (dateKey, x, y) => setQuickAdd({ date: dateKey, x, y }),
+                                    onMoreClick: (dateKey) => {
+                                        const sameDay = visibleMonthEvents.filter((e) => {
+                                            if (!e.start || e.layer === 'holiday') return false;
+                                            const d = new Date(e.start);
+                                            const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                            return k === dateKey;
+                                        });
+                                        setDayDetail({
+                                            label: new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-NZ', {
+                                                weekday: 'long',
+                                                day: 'numeric',
+                                                month: 'long',
+                                            }),
+                                            events: sameDay,
+                                        });
+                                    },
+                                    onMoveEvent: can.manage ? moveEvent : undefined,
+                                }}
+                            />
+                        ) : (
+                            <Card>
+                                <CardContent className="p-4">
                                     <CalendarView
                                         calendarRef={calendarRef}
-                                        plugins={[
-                                            dayGridPlugin,
-                                            timeGridPlugin,
-                                            listPlugin,
-                                            interactionPlugin,
-                                        ]}
-                                        initialView={view}
+                                        plugins={[listPlugin, interactionPlugin]}
+                                        initialView="listWeek"
                                         events={fetchEvents}
                                         eventClick={handleEventClick}
-                                        selectable={can.manage}
-                                        selectMirror={can.manage}
-                                        select={
-                                            can.manage
-                                                ? (arg: { startStr: string; jsEvent: MouseEvent | null }) => {
-                                                      setQuickAdd({
-                                                          date: arg.startStr.slice(0, 10),
-                                                          x: arg.jsEvent?.clientX ?? 240,
-                                                          y: arg.jsEvent?.clientY ?? 240,
-                                                      });
-                                                  }
-                                                : undefined
-                                        }
-                                        editable={can.manage}
-                                        eventDrop={handleEventMutate}
-                                        eventResize={handleEventMutate}
-                                        eventDidMount={(arg) => {
-                                            // Right-click an entry → context menu; native title = hover preview.
-                                            const props = arg.event.extendedProps as Record<string, unknown>;
-                                            const when = arg.event.start
-                                                ? arg.event.start.toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: arg.event.allDay ? undefined : 'short' })
-                                                : '';
-                                            const bits = [arg.event.title, when, props.location, props.person].filter(Boolean);
-                                            arg.el.setAttribute('title', bits.join('\n'));
-                                            arg.el.addEventListener('contextmenu', (e) => {
-                                                e.preventDefault();
-                                                buildEntryMenu(
-                                                    { event: arg.event, jsEvent: e } as unknown as EventClickArg,
-                                                    (e as MouseEvent).clientX,
-                                                    (e as MouseEvent).clientY,
-                                                );
-                                            });
-                                        }}
-                                        dayCellDidMount={(arg) => {
-                                            arg.el.addEventListener('contextmenu', (e) => {
-                                                e.preventDefault();
-                                                buildDayMenu(
-                                                    `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`,
-                                                    (e as MouseEvent).clientX,
-                                                    (e as MouseEvent).clientY,
-                                                );
-                                            });
-                                        }}
-                                        datesSet={(arg) => {
-                                            if (arg.view.type !== view) {
-                                                setView(arg.view.type as FcView);
-                                            }
-                                            // Make the month/year title open the year picker (caret affordance).
-                                            const titleEl = document.querySelector<HTMLElement>(
-                                                '.fc-toolbar-title',
-                                            );
-                                            if (titleEl && !titleEl.dataset.jump) {
-                                                titleEl.dataset.jump = '1';
-                                                titleEl.style.cursor = 'pointer';
-                                                titleEl.setAttribute('title', 'Jump to month / day');
-                                                titleEl.addEventListener('click', () => setYearPickerOpen(true));
-                                            }
-                                        }}
                                         headerToolbar={{
                                             left: 'prev,next today',
                                             center: 'title',
                                             right: '',
                                         }}
-                                        buttonText={{
-                                            today: 'Today',
-                                            month: 'Month',
-                                            week: 'Week',
-                                            day: 'Day',
-                                            list: 'Agenda',
-                                        }}
-                                        eventDisplay="block"
-                                        dayMaxEvents={4}
-                                        nowIndicator
+                                        buttonText={{ today: 'Today' }}
+                                        noEventsContent="Nothing scheduled this week."
                                     />
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        )}
                         </div>
                     </div>
                 ) : (
@@ -1012,24 +974,59 @@ export default function CalendarIndex({
 
                 <CalendarYearPicker
                     open={yearPickerOpen}
-                    initialYear={
-                        calendarRef.current?.getApi().getDate().getFullYear() ?? new Date().getFullYear()
-                    }
+                    initialYear={cursor.getFullYear()}
                     activeDate={null}
                     onClose={() => setYearPickerOpen(false)}
                     onPickMonth={(date) => {
                         setYearPickerOpen(false);
                         setTab('calendar');
-                        setView('dayGridMonth');
-                        calendarRef.current?.getApi().gotoDate(date);
+                        const d = new Date(`${date}T00:00:00`);
+                        setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
                     }}
                     onPickDay={(date) => {
                         setYearPickerOpen(false);
                         setTab('calendar');
-                        setView('timeGridDay');
-                        calendarRef.current?.getApi().gotoDate(date);
+                        const d = new Date(`${date}T00:00:00`);
+                        setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
                     }}
                 />
+
+                <Dialog open={!!dayDetail} onOpenChange={(o) => !o && setDayDetail(null)}>
+                    <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>{dayDetail?.label}</DialogTitle>
+                            <DialogDescription>
+                                {dayDetail?.events.length} item{dayDetail?.events.length === 1 ? '' : 's'} on this day.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex max-h-[60vh] flex-col gap-1.5 overflow-y-auto">
+                            {dayDetail?.events.map((e) => (
+                                <button
+                                    key={e.id}
+                                    type="button"
+                                    onClick={(ev) => {
+                                        const x = ev.clientX;
+                                        const y = ev.clientY;
+                                        setDayDetail(null);
+                                        handleEventClick(feedToInfo(e, x, y));
+                                    }}
+                                    className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
+                                    style={{ borderLeftWidth: 3, borderLeftColor: `var(--${e.color})` }}
+                                >
+                                    <span className="h-2 w-2 flex-none rounded-full" style={{ background: `var(--${e.color})` }} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-[13px] font-semibold">{e.title}</span>
+                                        <span className="block text-[11px] text-muted-foreground">
+                                            {e.allDay
+                                                ? 'All day'
+                                                : new Date(e.start).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                        </span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
                     <AlertDialogContent>
@@ -1159,35 +1156,6 @@ function QuickAddPopover({
             </div>
         </div>,
         document.body,
-    );
-}
-
-function ViewSwitch({ view, onChange }: { view: FcView; onChange: (v: FcView) => void }) {
-    const opts: { v: FcView; label: string }[] = [
-        { v: 'dayGridMonth', label: 'Month' },
-        { v: 'timeGridWeek', label: 'Week' },
-        { v: 'timeGridDay', label: 'Day' },
-        { v: 'listWeek', label: 'Agenda' },
-    ];
-    return (
-        <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
-            {opts.map((o) => (
-                <button
-                    key={o.v}
-                    type="button"
-                    onClick={() => onChange(o.v)}
-                    aria-pressed={view === o.v}
-                    className={
-                        'h-7 rounded-md px-2.5 text-[12px] font-semibold transition-colors ' +
-                        (view === o.v
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:text-foreground')
-                    }
-                >
-                    {o.label}
-                </button>
-            ))}
-        </div>
     );
 }
 

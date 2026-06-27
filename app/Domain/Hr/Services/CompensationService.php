@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrCompensationReviewItem;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrSalaryBand;
@@ -276,6 +277,39 @@ class CompensationService
             // lives on each line-item; the review only tracks its status.
             $review->update(['status' => 'approved']);
         });
+    }
+
+    /**
+     * Approve a single review line-item (pending → approved). Lets a reviewer
+     * sign off lines individually before approving the whole review; apply only
+     * touches approved items.
+     */
+    public function approveReviewItem(HrCompensationReviewItem $item, int $approverId): void
+    {
+        if ($item->status !== 'pending') {
+            throw new \LogicException("Only a pending line can be approved (this one is '{$item->status}').");
+        }
+
+        $item->update(['status' => 'approved', 'approved_by' => $approverId]);
+    }
+
+    /**
+     * Reject a single review line-item (pending → rejected) so it is excluded
+     * from apply. The reason is recorded on the line's justification trail.
+     */
+    public function rejectReviewItem(HrCompensationReviewItem $item, int $approverId, ?string $reason = null): void
+    {
+        if ($item->status !== 'pending') {
+            throw new \LogicException("Only a pending line can be rejected (this one is '{$item->status}').");
+        }
+
+        $item->update([
+            'status' => 'rejected',
+            'approved_by' => $approverId,
+            'justification' => $reason !== null && $reason !== ''
+                ? trim(($item->justification ? $item->justification."\n" : '')."Rejected: {$reason}")
+                : $item->justification,
+        ]);
     }
 
     /**

@@ -121,12 +121,17 @@ export function ExpenseClaimDialog({
     mileageRatePerKm = 0,
     categories = DEFAULT_CATEGORIES,
     currency = 'NZD',
+    /** Managers only: employees the claim can be filed on behalf of. */
+    employees = [],
+    canFileOnBehalf = false,
 }: {
     open: boolean;
     onClose: () => void;
     mileageRatePerKm?: number;
     categories?: string[];
     currency?: string;
+    employees?: { id: number; name: string }[];
+    canFileOnBehalf?: boolean;
 }) {
     const wiz = useWizard(STEPS.length);
 
@@ -135,6 +140,8 @@ export function ExpenseClaimDialog({
         new Date().toISOString().slice(0, 10),
     );
     const [notes, setNotes] = useState('');
+    // '' = file as myself; otherwise the target employee's user id (string).
+    const [onBehalfOf, setOnBehalfOf] = useState('');
     const [items, setItems] = useState<LineItem[]>([blankItem()]);
 
     // Mileage line is a config-driven computed item — the user enters distance,
@@ -268,6 +275,7 @@ export function ExpenseClaimDialog({
                 title,
                 notes: notes || null,
                 currency,
+                on_behalf_user_id: canFileOnBehalf && onBehalfOf ? Number(onBehalfOf) : null,
                 items: payloadItems,
             },
             {
@@ -393,6 +401,23 @@ export function ExpenseClaimDialog({
                         blurb="Give the claim a title and the period it covers."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
+                        {canFileOnBehalf && employees.length > 0 ? (
+                            <Field label="File on behalf of" hint="defaults to you" span>
+                                <SelectInput
+                                    value={onBehalfOf}
+                                    onChange={setOnBehalfOf}
+                                    placeholder="Myself"
+                                    ariaLabel="File on behalf of"
+                                    options={[
+                                        { value: '', label: 'Myself' },
+                                        ...employees.map((e) => ({
+                                            value: String(e.id),
+                                            label: e.name,
+                                        })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
                         <Field label="Title" required span>
                             <Input
                                 value={title}

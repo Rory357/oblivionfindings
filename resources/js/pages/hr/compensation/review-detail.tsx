@@ -168,6 +168,32 @@ export default function CompensationReviewDetail({
         }
     };
 
+    const approveItem = (itemId: number) => {
+        if (!review) return;
+        router.post(
+            `/hr/compensation/reviews/${review.id}/items/${itemId}/approve`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
+    const rejectItem = (itemId: number) => {
+        if (!review) return;
+        const reason = window.prompt('Reason for rejecting this line (optional):');
+        if (reason === null) return; // cancelled
+        router.post(
+            `/hr/compensation/reviews/${review.id}/items/${itemId}/reject`,
+            reason.trim() ? { reason: reason.trim() } : {},
+            { preserveScroll: true },
+        );
+    };
+
+    // Per-line sign-off is only offered while the review is still being built.
+    const itemActionable =
+        can.manage &&
+        !!review &&
+        (review.status === 'planning' || review.status === 'in_progress');
+
     // Create mode — a guided 3-step builder wizard replaces the long inline form.
     if (isNew) {
         return (
@@ -327,6 +353,9 @@ export default function CompensationReviewDetail({
                                     <TableHead>Justification</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Approved By</TableHead>
+                                    {itemActionable && (
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -378,12 +407,37 @@ export default function CompensationReviewDetail({
                                         <TableCell className="text-sm text-muted-foreground">
                                             {item.approver?.name ?? '-'}
                                         </TableCell>
+                                        {itemActionable && (
+                                            <TableCell className="text-right">
+                                                {item.status === 'pending' ? (
+                                                    <div className="flex justify-end gap-1.5">
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => approveItem(item.id)}
+                                                        >
+                                                            Approve
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="text-status-critical hover:text-status-critical"
+                                                            onClick={() => rejectItem(item.id)}
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                ) : null}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))}
                                 {!review.items.length && (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={7}
+                                            colSpan={itemActionable ? 8 : 7}
                                             className="py-8 text-center text-sm text-muted-foreground"
                                         >
                                             No employees in this review.
