@@ -905,6 +905,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::put('/events/{event}', [CalendarController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [CalendarController::class, 'destroy'])->name('events.destroy');
         Route::post('/events/{event}/rsvp', [CalendarController::class, 'rsvp'])->name('events.rsvp');
+        Route::post('/events/{event}/attachments', [CalendarController::class, 'storeAttachment'])->name('events.attachments.store');
+        Route::delete('/attachments/{attachment}', [CalendarController::class, 'destroyAttachment'])->name('attachments.destroy');
+        Route::get('/attachments/{attachment}/download', [CalendarController::class, 'downloadAttachment'])->name('attachments.download');
     });
 
     /*

@@ -355,6 +355,7 @@ export default function CalendarIndex({
             audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'people') ?? 'org',
             audience_user_ids: (props.attendeeUserIds as number[]) ?? [],
             reminders: (props.reminders as { offset_minutes: number; channel: string }[]) ?? [],
+            attachments: (props.attachments as CalendarEventInitial['attachments']) ?? [],
             scope,
             occurrence_date: (props.occurrenceDate as string) ?? null,
         };

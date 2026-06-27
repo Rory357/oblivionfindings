@@ -82,6 +82,11 @@ class HrCalendarEvent extends Model
         return $this->hasMany(HrCalendarEventReminder::class, 'event_id');
     }
 
+    public function attachments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(HrCalendarEventAttachment::class, 'event_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

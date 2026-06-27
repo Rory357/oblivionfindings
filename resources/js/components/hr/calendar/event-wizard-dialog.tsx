@@ -13,6 +13,7 @@ import {
     ClipboardCheck,
     GraduationCap,
     Megaphone,
+    Paperclip,
     PartyPopper,
     Repeat,
     Trash2,
@@ -33,6 +34,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -68,6 +70,7 @@ export interface CalendarEventInitial {
     audience_type?: 'org' | 'site' | 'department' | 'people' | null;
     audience_user_ids?: number[];
     reminders?: { offset_minutes: number; channel: string }[];
+    attachments?: EventAttachment[];
     /** Set when editing a single occurrence of a recurring series. */
     scope?: 'all' | 'this' | 'following';
     occurrence_date?: string | null;
@@ -81,6 +84,20 @@ export interface EventCategoryOption {
     label: string;
     icon: string | null;
     color_token: string;
+}
+
+export interface EventAttachment {
+    id: number;
+    name: string;
+    mime: string | null;
+    size: number;
+    url: string;
+}
+
+/** Read Laravel's XSRF cookie for non-Inertia multipart uploads. */
+function xsrfToken(): string {
+    const match = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+    return match ? decodeURIComponent(match.split('=')[1]) : '';
 }
 
 const STEPS: readonly WizardStep[] = [
@@ -197,6 +214,9 @@ export function EventWizardDialog({
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [keepAdding, setKeepAdding] = useState(false);
     const [reminderChannel, setReminderChannel] = useState<'notification' | 'email'>('notification');
+    const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+    const [existingAttachments, setExistingAttachments] = useState<EventAttachment[]>([]);
+    const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([]);
 
     const form = useForm({
         title: '',
@@ -238,6 +258,7 @@ export function EventWizardDialog({
             setReminderChannel(
                 (initial.reminders?.[0]?.channel as 'notification' | 'email') ?? 'notification',
             );
+            setExistingAttachments(initial.attachments ?? []);
         } else if (defaultDate) {
             form.setData((d) => ({
                 ...d,
@@ -248,6 +269,9 @@ export function EventWizardDialog({
         }
         wizard.reset();
         setSubmitted(false);
+        setStagedFiles([]);
+        setRemovedAttachmentIds([]);
+        if (!initial) setExistingAttachments([]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -256,7 +280,31 @@ export function EventWizardDialog({
         form.clearErrors();
         wizard.reset();
         setSubmitted(false);
+        setStagedFiles([]);
+        setExistingAttachments([]);
+        setRemovedAttachmentIds([]);
         onClose();
+    };
+
+    const uploadStagedFiles = async (eventId: number): Promise<void> => {
+        const token = xsrfToken();
+        for (const file of stagedFiles) {
+            const body = new FormData();
+            body.append('file', file);
+            await fetch(`/hr/calendar/events/${eventId}/attachments`, {
+                method: 'POST',
+                body,
+                credentials: 'same-origin',
+                headers: { 'X-XSRF-TOKEN': token, Accept: 'application/json' },
+            }).catch(() => undefined);
+        }
+        for (const id of removedAttachmentIds) {
+            await fetch(`/hr/calendar/attachments/${id}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: { 'X-XSRF-TOKEN': token, Accept: 'application/json' },
+            }).catch(() => undefined);
+        }
     };
 
     const selectedCategory =
@@ -329,29 +377,44 @@ export function EventWizardDialog({
         else if (form.errors.starts_at || form.errors.ends_at) wizard.goTo(1);
     };
 
+    const finishSave = async (eventId: number | undefined, addAnother: boolean) => {
+        if ((stagedFiles.length > 0 || removedAttachmentIds.length > 0) && eventId) {
+            await uploadStagedFiles(eventId);
+        }
+        onSaved();
+        if (addAnother) {
+            form.reset();
+            form.clearErrors();
+            wizard.reset();
+            setStagedFiles([]);
+            setRemovedAttachmentIds([]);
+            setKeepAdding(true);
+            toast.success('Event saved — add another');
+        } else {
+            setSubmitted(true);
+        }
+    };
+
     const submit = (addAnother = false) => {
         transform();
         const opts = {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => {
-                onSaved();
-                if (addAnother) {
-                    form.reset();
-                    form.clearErrors();
-                    wizard.reset();
-                    setKeepAdding(true);
-                    toast.success('Event saved — add another');
-                } else {
-                    setSubmitted(true);
-                }
-            },
             onError,
         };
         if (isEdit && initial) {
-            form.put(`/hr/calendar/events/${initial.id}`, opts);
+            form.put(`/hr/calendar/events/${initial.id}`, {
+                ...opts,
+                onSuccess: () => void finishSave(initial.id, addAnother),
+            });
         } else {
-            form.post('/hr/calendar/events', opts);
+            form.post('/hr/calendar/events', {
+                ...opts,
+                onSuccess: (page) => {
+                    const flash = (page.props as { flash?: { createdEventId?: number } }).flash;
+                    void finishSave(flash?.createdEventId, addAnother);
+                },
+            });
         }
     };
 
@@ -776,6 +839,60 @@ export function EventWizardDialog({
                                 ? 'No reminders — attendees just see it on the calendar.'
                                 : `${form.data.reminders.length} reminder${form.data.reminders.length === 1 ? '' : 's'} via ${reminderChannel === 'email' ? 'email' : 'in-app notification'}.`}
                         </p>
+
+                        {/* Attachments */}
+                        <div className="mt-5">
+                            <SubHead icon={Paperclip}>Attachments</SubHead>
+                            {existingAttachments.length > 0 ? (
+                                <div className="mt-2 space-y-1.5">
+                                    {existingAttachments.map((a) => (
+                                        <div
+                                            key={a.id}
+                                            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px]"
+                                        >
+                                            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                                            <a
+                                                href={a.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="min-w-0 flex-1 truncate font-medium hover:underline"
+                                            >
+                                                {a.name}
+                                            </a>
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove ${a.name}`}
+                                                onClick={() => {
+                                                    setRemovedAttachmentIds((prev) => [...prev, a.id]);
+                                                    setExistingAttachments((prev) => prev.filter((x) => x.id !== a.id));
+                                                }}
+                                                className="text-muted-foreground hover:text-status-critical"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
+
+                            <div className="mt-2">
+                                <FileDropzone
+                                    onFiles={(files) => setStagedFiles((prev) => [...prev, ...files])}
+                                    hint="PDF, Word, Excel, images — up to 10 MB each"
+                                />
+                            </div>
+                            {stagedFiles.length > 0 ? (
+                                <div className="mt-2 space-y-1.5">
+                                    {stagedFiles.map((file, i) => (
+                                        <StagedFileCard
+                                            key={`${file.name}-${i}`}
+                                            file={file}
+                                            onRemove={() => setStagedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                        />
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
                     </WizardStepPane>
                 )}
 
@@ -804,6 +921,12 @@ export function EventWizardDialog({
                                     value={form.data.reminders
                                         .map((r) => reminderLabel(r.offset_minutes))
                                         .join(', ')}
+                                />
+                            ) : null}
+                            {existingAttachments.length + stagedFiles.length > 0 ? (
+                                <ReviewRow
+                                    label="Attachments"
+                                    value={`${existingAttachments.length + stagedFiles.length} file${existingAttachments.length + stagedFiles.length === 1 ? '' : 's'}`}
                                 />
                             ) : null}
                             {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}

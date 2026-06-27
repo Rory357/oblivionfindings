@@ -1,13 +1,16 @@
 <?php
 
 use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Domain\Hr\Models\HrCalendarEventReminder;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -242,6 +245,66 @@ test('reminders are stored and the scheduler dispatches them at lead time', func
 
     $reminder = HrCalendarEventReminder::query()->where('event_id', $event->id)->firstOrFail();
     expect($reminder->last_sent_at)->not->toBeNull();
+});
+
+test('an attachment uploads to the private disk, surfaces in the feed and downloads', function () {
+    Storage::fake('private');
+
+    $event = HrCalendarEvent::query()->create([
+        'tenant_id' => 1,
+        'created_by' => $this->hr->id,
+        'title' => 'Board meeting',
+        'event_type' => 'company',
+        'starts_at' => now()->addDays(2),
+        'ends_at' => now()->addDays(2)->addHour(),
+        'is_all_day' => false,
+    ]);
+
+    $response = $this->actingAs($this->hr)
+        ->post("/hr/calendar/events/{$event->id}/attachments", [
+            'file' => UploadedFile::fake()->create('agenda.pdf', 80, 'application/pdf'),
+        ])
+        ->assertOk();
+
+    $attachmentId = $response->json('attachment.id');
+    $attachment = HrCalendarEventAttachment::query()->findOrFail($attachmentId);
+    Storage::disk('private')->assertExists($attachment->path);
+
+    $from = now()->startOfMonth()->toDateString();
+    $to = now()->endOfMonth()->addMonth()->toDateString();
+    $row = collect(
+        $this->actingAs($this->hr)
+            ->getJson("/hr/calendar/feed?from={$from}&to={$to}&layers=event")
+            ->json('events')
+    )->firstWhere('id', 'event-'.$event->id);
+
+    expect($row['extendedProps']['attachments'])->toHaveCount(1);
+
+    $this->actingAs($this->hr)
+        ->get("/hr/calendar/attachments/{$attachmentId}/download")
+        ->assertOk();
+});
+
+test('the attachment upload rejects disallowed mime types', function () {
+    Storage::fake('private');
+
+    $event = HrCalendarEvent::query()->create([
+        'tenant_id' => 1,
+        'created_by' => $this->hr->id,
+        'title' => 'Board meeting',
+        'event_type' => 'company',
+        'starts_at' => now()->addDays(2),
+        'ends_at' => now()->addDays(2)->addHour(),
+        'is_all_day' => false,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/calendar/events/{$event->id}/attachments", [
+            'file' => UploadedFile::fake()->create('malware.exe', 10),
+        ])
+        ->assertSessionHasErrors('file');
+
+    expect(HrCalendarEventAttachment::query()->count())->toBe(0);
 });
 
 test('unknown layer keys are ignored and default layers apply', function () {
