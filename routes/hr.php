@@ -655,7 +655,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/bands', [CompensationController::class, 'bands'])->name('bands');
         Route::get('/bands/export', [CompensationController::class, 'exportBands'])->name('bands.export');
         Route::get('/reviews', [CompensationController::class, 'reviews'])->name('reviews');
+        Route::get('/history', [CompensationController::class, 'historyIndex'])->name('history.index');
         Route::get('/history/{profile}', [CompensationController::class, 'history'])->name('history');
+        Route::get('/settings', [CompensationController::class, 'settings'])->name('settings');
         Route::get('/bonuses', [BonusController::class, 'index'])->name('bonuses');
 
         Route::middleware('permission:hr.compensation.manage')->group(function () {

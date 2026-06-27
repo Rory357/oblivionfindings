@@ -3,6 +3,7 @@ export * from './add-employee-dialog';
 export * from './my-hr-around-modal';
 export * from './my-hr-shoutout-spotlight';
 export * from './compensation-tabs';
+export * from './compensation-hero';
 export * from './compliance-tabs';
 export * from './department-dialog';
 export * from './department-view-dialog';

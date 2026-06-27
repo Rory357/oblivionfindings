@@ -3,7 +3,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuShortcut,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -25,7 +24,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { CompensationTabs } from '@/components/hr';
+import { CompensationTabs, CompensationHero } from '@/components/hr';
+import type { CompensationQuickAction } from '@/components/hr';
 import { StatusBadge, type StatusTone } from '@/components/hr/status-badge';
 import {
     Field,
@@ -41,13 +41,15 @@ import {
     type WizardStep,
     useWizard,
 } from '@/components/hr/wizard';
-import { PageHero, PageLayout } from '@/components/page';
+import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Banknote,
     CalendarRange,
+    ClipboardCheck,
     ClipboardList,
     Copy,
     DollarSign,
@@ -55,6 +57,7 @@ import {
     Layers,
     Pencil,
     Plus,
+    Receipt,
     Search,
     Tag,
     Users,
@@ -94,14 +97,20 @@ type Stats = {
     bands_total: number;
     roles_covered: number;
     people_placed: number;
+    people_in_band: number;
     people_out_of_band: number;
+    band_health: number;
+    reviews_in_flight: number;
+    awaiting_approval: number;
+    reimbursed_this_month: number;
+    claims_overdue: number;
 };
 
 type Props = {
     bands: { data: SalaryBand[]; links: { url: string | null; label: string; active: boolean }[] };
-    filters: { role: string | null; active_only: boolean };
+    filters: { role: string | null; active_only: boolean; as_of: string };
     stats: Stats;
-    can: { manage: boolean };
+    can: { manage: boolean; benefits?: boolean; expenses?: boolean };
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -159,9 +168,11 @@ function bandLifecycle(band: SalaryBand): { status: string; tone: StatusTone } {
     return { status: 'active', tone: 'success' };
 }
 
+// Plotted-employee dot colours match the mockup legend: in-band reads as the
+// brand blue, anyone outside the band (under OR over) reads critical/red.
 const POSITION_DOT: Record<Placement['position'], string> = {
-    under: 'bg-status-warning ring-status-warning/30',
-    in: 'bg-status-success ring-status-success/30',
+    under: 'bg-status-critical ring-status-critical/30',
+    in: 'bg-primary ring-primary/30',
     over: 'bg-status-critical ring-status-critical/30',
 };
 
@@ -173,6 +184,7 @@ function RangeBar({
     band,
     placements,
     showDots = true,
+    showLabels = true,
 }: {
     band: {
         min_salary: string | number;
@@ -182,6 +194,7 @@ function RangeBar({
     };
     placements?: Placement[];
     showDots?: boolean;
+    showLabels?: boolean;
 }) {
     const min = num(band.min_salary);
     const mid = num(band.mid_salary);
@@ -249,20 +262,22 @@ function RangeBar({
                       })
                     : null}
             </div>
-            <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-                <span>{formatCurrency(band.min_salary, band.currency)}</span>
-                <span className="font-medium text-primary">{formatCurrency(band.mid_salary, band.currency)}</span>
-                <span>{formatCurrency(band.max_salary, band.currency)}</span>
-            </div>
+            {showLabels ? (
+                <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
+                    <span>{formatCurrency(band.min_salary, band.currency)}</span>
+                    <span className="font-medium text-primary">{formatCurrency(band.mid_salary, band.currency)}</span>
+                    <span>{formatCurrency(band.max_salary, band.currency)}</span>
+                </div>
+            ) : null}
         </div>
     );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Band card                                                          */
+/*  Band row (full-width, mockup layout)                              */
 /* ------------------------------------------------------------------ */
 
-function BandCard({
+function BandRow({
     band,
     canManage,
     onView,
@@ -277,123 +292,94 @@ function BandCard({
 }) {
     const life = bandLifecycle(band);
     const count = band.employee_count ?? 0;
-    const inB = band.in_band ?? 0;
-    const under = band.under_band ?? 0;
-    const over = band.over_band ?? 0;
+    const outOfBand = (band.under_band ?? 0) + (band.over_band ?? 0);
 
     return (
-        // eslint-disable-next-line no-restricted-syntax -- interactive band card surface (hover group + drawer trigger), not a plain Card.
-        <div className="group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
-            <div className="flex items-start justify-between gap-3">
-                {/* eslint-disable-next-line no-restricted-syntax -- card header doubles as the drawer-open hit target. */}
-                <button
-                    type="button"
-                    onClick={onView}
-                    className="min-w-0 text-left"
-                >
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold">{band.position_role}</h3>
-                        <StatusBadge status={life.status} tone={life.tone} />
-                    </div>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Tag className="h-3 w-3" />
+        // eslint-disable-next-line no-restricted-syntax -- interactive band row surface (hover group + drawer trigger), not a plain Card.
+        <div className="group flex flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 lg:flex-row lg:items-center">
+            {/* Identity column */}
+            {/* eslint-disable-next-line no-restricted-syntax -- row identity doubles as the drawer-open hit target. */}
+            <button
+                type="button"
+                onClick={onView}
+                className="flex w-full shrink-0 items-start gap-3 text-left lg:w-64"
+            >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-[11px] font-bold text-primary">
+                    {initials(band.position_role)}
+                </span>
+                <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold">{band.position_role}</span>
+                        {life.status !== 'active' ? (
+                            <StatusBadge status={life.status} tone={life.tone} />
+                        ) : null}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                         {band.band_name}
-                    </p>
-                </button>
-
-                <div className="flex shrink-0 items-center gap-1">
-                    <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground"
-                                    aria-label="View people in band"
-                                    onClick={onView}
-                                >
-                                    <Users className="h-3.5 w-3.5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>People in this band</TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    {canManage ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100"
-                                    aria-label="Band actions"
-                                >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuItem onClick={onEdit}>
-                                    <Pencil className="h-3.5 w-3.5" /> Edit band
-                                    <DropdownMenuShortcut>E</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onDuplicate}>
-                                    <Copy className="h-3.5 w-3.5" /> Duplicate
-                                    <DropdownMenuShortcut>D</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={onView}>
-                                    <Users className="h-3.5 w-3.5" /> View people
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : null}
-                </div>
-            </div>
-
-            <div className="mt-4">
-                <RangeBar band={band} placements={band.placements} />
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" />
-                    {count} {count === 1 ? 'person' : 'people'}
-                </span>
-                {count > 0 ? (
-                    <>
-                        <span className="inline-flex items-center gap-1">
-                            <span className="h-2 w-2 rounded-full bg-status-success" />
-                            {inB} in band
+                    </span>
+                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] text-muted-foreground">
+                            {count} {count === 1 ? 'person' : 'people'}
                         </span>
-                        {under > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                                <span className="h-2 w-2 rounded-full bg-status-warning" />
-                                {under} under
-                            </span>
+                        {count > 0 ? (
+                            <StatusBadge
+                                status={outOfBand > 0 ? 'out' : 'in'}
+                                tone={outOfBand > 0 ? 'critical' : 'success'}
+                                label={outOfBand > 0 ? `${outOfBand} out of band` : 'all in band'}
+                            />
                         ) : null}
-                        {over > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                                <span className="h-2 w-2 rounded-full bg-status-critical" />
-                                {over} over
-                            </span>
-                        ) : null}
-                        {band.avg_compa_ratio != null ? (
-                            <span className="text-muted-foreground">
-                                avg compa{' '}
-                                <span className="font-semibold text-foreground tabular-nums">
-                                    {compaLabel(band.avg_compa_ratio)}
-                                </span>
-                            </span>
-                        ) : null}
-                    </>
-                ) : null}
-                <span className="ml-auto inline-flex items-center gap-1.5 text-muted-foreground">
-                    <CalendarRange className="h-3.5 w-3.5" />
-                    {formatDate(band.effective_from)}
-                    {band.effective_to ? ` → ${formatDate(band.effective_to)}` : ''}
+                    </span>
+                    <span className="mt-1 block text-[11px] tabular-nums text-muted-foreground">
+                        {formatCurrency(band.min_hourly, band.currency)}–
+                        {formatCurrency(band.max_hourly, band.currency)}/hr · eff.{' '}
+                        {formatDate(band.effective_from)}
+                    </span>
                 </span>
+            </button>
+
+            {/* Range column */}
+            <div className="min-w-0 flex-1">
+                <div className="mb-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
+                    <span>{formatCurrency(band.min_salary, band.currency)}</span>
+                    <span className="font-medium text-foreground">
+                        mid {formatCurrency(band.mid_salary, band.currency)}
+                    </span>
+                    <span>{formatCurrency(band.max_salary, band.currency)}</span>
+                </div>
+                <RangeBar band={band} placements={band.placements} showLabels={false} />
             </div>
+
+            {/* Actions */}
+            {canManage ? (
+                <div className="shrink-0 self-start lg:self-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100"
+                                aria-label={`Actions for ${band.position_role} ${band.band_name}`}
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onClick={onView}>
+                                <Users className="h-3.5 w-3.5" /> View people
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onEdit}>
+                                <Pencil className="h-3.5 w-3.5" /> Edit band
+                                <DropdownMenuShortcut>E</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onDuplicate}>
+                                <Copy className="h-3.5 w-3.5" /> Duplicate
+                                <DropdownMenuShortcut>D</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -1054,91 +1040,102 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
         return `/hr/compensation/bands/export${qs ? `?${qs}` : ''}`;
     }, [roleQuery, filters.role, filters.active_only]);
 
+    const heroActions: CompensationQuickAction[] = [
+        ...(can.manage ? [{ label: 'New band', icon: Plus, onClick: openCreate }] : []),
+        ...(can.manage
+            ? [{ label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews/create' }]
+            : []),
+        ...(can.manage ? [{ label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' }] : []),
+        ...(can.expenses
+            ? [{ label: 'New claim', icon: Receipt, href: '/hr/compensation/expenses/create' }]
+            : []),
+        { label: 'Export', icon: Download, href: exportUrl },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Salary bands" />
+            <Head title="Compensation & Benefits" />
 
             <PageLayout
-                hero={
-                    <PageHero
-                        category="hr"
-                        icon={Layers}
-                        title="Salary bands"
-                        description="Pay ranges by position role, with live compa-ratio placement across your people."
-                        stats={[
-                            { label: 'Active bands', value: stats.bands_total, icon: Layers },
-                            { label: 'Roles covered', value: stats.roles_covered, icon: Tag },
-                            {
-                                label: 'People placed',
-                                value: stats.people_placed,
-                                icon: Users,
-                                tone: 'info',
-                            },
-                            {
-                                label: 'Out of band',
-                                value: stats.people_out_of_band,
-                                icon: AlertTriangle,
-                                tone: stats.people_out_of_band > 0 ? 'warning' : 'success',
-                            },
-                        ]}
-                        actions={
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    asChild
-                                >
-                                    <a href={exportUrl}>
-                                        <Download className="mr-1.5 h-4 w-4" />
-                                        Export
-                                    </a>
-                                </Button>
-                                {can.manage ? (
-                                    <Button size="sm" onClick={openCreate}>
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New band
-                                    </Button>
-                                ) : null}
-                            </div>
-                        }
-                    />
-                }
+                hero={<CompensationHero stats={stats} quickActions={heroActions} />}
             >
                 <CompensationTabs active="bands" />
 
                 {/* Toolbar */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="relative w-full sm:max-w-xs">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={roleQuery}
-                            onChange={(e) => setRoleQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') onFilter({ role: roleQuery || null });
-                            }}
-                            onBlur={() => {
-                                if ((filters.role ?? '') !== roleQuery) onFilter({ role: roleQuery || null });
-                            }}
-                            placeholder="Filter by role…"
-                            className="pl-8"
-                            aria-label="Filter by position role"
-                        />
+                    <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="relative w-full sm:max-w-xs">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={roleQuery}
+                                onChange={(e) => setRoleQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onFilter({ role: roleQuery || null });
+                                }}
+                                onBlur={() => {
+                                    if ((filters.role ?? '') !== roleQuery) onFilter({ role: roleQuery || null });
+                                }}
+                                placeholder="Filter by role…"
+                                className="pl-8"
+                                aria-label="Filter by position role"
+                            />
+                        </div>
+                        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+                            <Switch
+                                checked={filters.active_only}
+                                onCheckedChange={(checked) => onFilter({ active_only: checked })}
+                                aria-label="Active bands only"
+                            />
+                            Active bands only
+                        </label>
+                        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+                            As of
+                            <Input
+                                type="date"
+                                value={filters.as_of ?? ''}
+                                onChange={(e) => onFilter({ as_of: e.target.value })}
+                                className="h-9 w-auto"
+                                aria-label="Bands active as of date"
+                            />
+                        </label>
                     </div>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Switch
-                            checked={filters.active_only}
-                            onCheckedChange={(checked) => onFilter({ active_only: checked })}
-                            aria-label="Active bands only"
-                        />
-                        Active bands only
-                    </label>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={exportUrl}>
+                                <Download className="mr-1.5 h-4 w-4" />
+                                Export
+                            </a>
+                        </Button>
+                        {can.manage ? (
+                            <Button size="sm" onClick={openCreate}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New band
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
 
-                {/* Band grid */}
+                {/* Legend */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-primary" /> In band
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-status-critical" /> Under / over band
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-0.5 rounded bg-primary" /> Midpoint (compa-ratio 1.0)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-6 rounded-full bg-primary/25" /> Target zone (0.9–1.1)
+                    </span>
+                </div>
+
+                {/* Band rows */}
                 {bands.data.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="flex flex-col gap-3">
                         {bands.data.map((band) => (
-                            <BandCard
+                            <BandRow
                                 key={band.id}
                                 band={band}
                                 canManage={can.manage}
