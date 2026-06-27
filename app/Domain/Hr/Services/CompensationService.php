@@ -52,6 +52,50 @@ class CompensationService
     }
 
     /**
+     * Compute where a salary sits within a band: compa-ratio (pay ÷ midpoint) and
+     * a position bucket (under / in / over). Salary fields are encrypted, so this
+     * runs in PHP rather than SQL. Prefers annual salary against the salary range;
+     * falls back to the hourly rate against the hourly range when annual is absent.
+     *
+     * @return array{compa_ratio: float|null, position: 'under'|'in'|'over'|null}
+     */
+    public function bandPlacement(HrEmployeeProfile $profile, HrSalaryBand $band): array
+    {
+        $annual = $profile->annual_salary !== null ? (float) $profile->annual_salary : null;
+        $hourly = $profile->hourly_rate !== null ? (float) $profile->hourly_rate : null;
+
+        if ($annual !== null && $annual > 0) {
+            return $this->placeWithin(
+                $annual,
+                (float) $band->min_salary,
+                (float) $band->mid_salary,
+                (float) $band->max_salary,
+            );
+        }
+
+        if ($hourly !== null && $hourly > 0) {
+            $minH = (float) $band->min_hourly;
+            $maxH = (float) $band->max_hourly;
+
+            return $this->placeWithin($hourly, $minH, ($minH + $maxH) / 2, $maxH);
+        }
+
+        return ['compa_ratio' => null, 'position' => null];
+    }
+
+    /**
+     * @return array{compa_ratio: float|null, position: 'under'|'in'|'over'|null}
+     */
+    private function placeWithin(float $pay, float $min, float $mid, float $max): array
+    {
+        $compa = $mid > 0 ? round($pay / $mid, 4) : null;
+
+        $position = $pay < $min ? 'under' : ($pay > $max ? 'over' : 'in');
+
+        return ['compa_ratio' => $compa, 'position' => $position];
+    }
+
+    /**
      * Create a new compensation review cycle.
      */
     public function createCompensationReview(array $data): HrCompensationReview

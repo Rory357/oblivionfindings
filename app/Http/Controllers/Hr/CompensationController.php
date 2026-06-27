@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CompensationController extends Controller
@@ -30,12 +31,79 @@ class CompensationController extends Controller
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
 
         $bands = HrSalaryBand::query()
-            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', $role))
+            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$role.'%'))
             ->when($request->query('active_only'), fn ($q) => $q->active())
             ->orderBy('position_role')
             ->orderBy('band_name')
             ->paginate(20)
             ->withQueryString();
+
+        // Active employees grouped by role, used to plot people onto each band's
+        // range and to compute true (non-page-limited) hero aggregates. Salary
+        // fields are encrypted → placement is computed in PHP, not SQL.
+        $employees = HrEmployeeProfile::query()
+            ->active()
+            ->with('user:id,name')
+            ->get(['id', 'user_id', 'position_role', 'annual_salary', 'hourly_rate']);
+
+        $byRole = $employees->groupBy('position_role');
+
+        // Per-band placements for the rows currently on the page.
+        $bands->getCollection()->transform(function (HrSalaryBand $band) use ($byRole) {
+            $people = $byRole->get($band->position_role, collect());
+
+            $placements = $people
+                ->map(function (HrEmployeeProfile $p) use ($band) {
+                    $placed = $this->compensationService->bandPlacement($p, $band);
+                    if ($placed['position'] === null) {
+                        return null;
+                    }
+
+                    return [
+                        'name' => $p->user?->name ?? 'Unknown',
+                        'compa_ratio' => $placed['compa_ratio'],
+                        'position' => $placed['position'],
+                    ];
+                })
+                ->filter()
+                ->sortByDesc('compa_ratio')
+                ->values();
+
+            $compas = $placements->pluck('compa_ratio')->filter()->values();
+
+            $band->setAttribute('employee_count', $placements->count());
+            $band->setAttribute('in_band', $placements->where('position', 'in')->count());
+            $band->setAttribute('under_band', $placements->where('position', 'under')->count());
+            $band->setAttribute('over_band', $placements->where('position', 'over')->count());
+            $band->setAttribute('avg_compa_ratio', $compas->count() ? round($compas->avg(), 4) : null);
+            $band->setAttribute('placements', $placements->all());
+
+            return $band;
+        });
+
+        // True hero aggregates across ALL active bands (one active band per role),
+        // independent of pagination.
+        $activeBands = HrSalaryBand::query()->active()->get();
+        $activeByRole = $activeBands->groupBy('position_role');
+
+        $peoplePlaced = 0;
+        $peopleOutOfBand = 0;
+        foreach ($byRole as $role => $people) {
+            $band = $activeByRole->get($role)?->first();
+            if (! $band) {
+                continue;
+            }
+            foreach ($people as $p) {
+                $placed = $this->compensationService->bandPlacement($p, $band);
+                if ($placed['position'] === null) {
+                    continue;
+                }
+                $peoplePlaced++;
+                if ($placed['position'] !== 'in') {
+                    $peopleOutOfBand++;
+                }
+            }
+        }
 
         return Inertia::render('hr/compensation/bands', [
             'bands' => $bands,
@@ -43,10 +111,63 @@ class CompensationController extends Controller
                 'role' => $request->query('role'),
                 'active_only' => $request->boolean('active_only'),
             ],
+            'stats' => [
+                'bands_total' => $activeBands->count(),
+                'roles_covered' => $activeByRole->keys()->filter()->count(),
+                'people_placed' => $peoplePlaced,
+                'people_out_of_band' => $peopleOutOfBand,
+            ],
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
             ],
         ]);
+    }
+
+    /**
+     * Stream salary bands as a CSV (respects the same role / active filters).
+     */
+    public function exportBands(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+
+        $bands = HrSalaryBand::query()
+            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$role.'%'))
+            ->when($request->query('active_only'), fn ($q) => $q->active())
+            ->orderBy('position_role')
+            ->orderBy('band_name')
+            ->get();
+
+        $filename = 'salary-bands-'.now()->format('Y-m-d').'.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ];
+
+        return response()->streamDownload(function () use ($bands) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, [
+                'Position role', 'Band', 'Currency',
+                'Min salary', 'Mid salary', 'Max salary',
+                'Min hourly', 'Max hourly',
+                'Effective from', 'Effective to',
+            ]);
+            foreach ($bands as $band) {
+                fputcsv($out, [
+                    $band->position_role,
+                    $band->band_name,
+                    $band->currency,
+                    $band->min_salary,
+                    $band->mid_salary,
+                    $band->max_salary,
+                    $band->min_hourly,
+                    $band->max_hourly,
+                    $band->effective_from?->toDateString(),
+                    $band->effective_to?->toDateString(),
+                ]);
+            }
+            fclose($out);
+        }, $filename, $headers);
     }
 
     /**
@@ -69,6 +190,8 @@ class CompensationController extends Controller
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after:effective_from'],
         ]);
+
+        $this->assertBandOrdering($data);
 
         HrSalaryBand::create([
             'tenant_id' => $this->resolveHrTenantIdForUser($user),
@@ -97,12 +220,49 @@ class CompensationController extends Controller
             'max_hourly' => ['sometimes', 'numeric', 'min:0'],
             'currency' => ['sometimes', 'string', 'max:3'],
             'effective_from' => ['sometimes', 'date'],
-            'effective_to' => ['nullable', 'date'],
+            'effective_to' => ['nullable', 'date', 'after:effective_from'],
+        ]);
+
+        // Validate min ≤ mid ≤ max against the merged (existing + incoming) values,
+        // since updates may patch only a subset of the range fields.
+        $this->assertBandOrdering([
+            'min_salary' => $data['min_salary'] ?? $band->min_salary,
+            'mid_salary' => $data['mid_salary'] ?? $band->mid_salary,
+            'max_salary' => $data['max_salary'] ?? $band->max_salary,
+            'min_hourly' => $data['min_hourly'] ?? $band->min_hourly,
+            'max_hourly' => $data['max_hourly'] ?? $band->max_hourly,
         ]);
 
         $band->update($data);
 
         return redirect()->back()->with('success', 'Salary band updated.');
+    }
+
+    /**
+     * Guard the salary-band invariant: min ≤ mid ≤ max (and min ≤ max hourly).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertBandOrdering(array $data): void
+    {
+        $min = (float) $data['min_salary'];
+        $mid = (float) $data['mid_salary'];
+        $max = (float) $data['max_salary'];
+
+        $errors = [];
+        if ($min > $mid) {
+            $errors['mid_salary'] = 'Mid salary must be at least the minimum.';
+        }
+        if ($mid > $max) {
+            $errors['max_salary'] = 'Max salary must be at least the mid salary.';
+        }
+        if ((float) $data['min_hourly'] > (float) $data['max_hourly']) {
+            $errors['max_hourly'] = 'Max hourly rate must be at least the minimum.';
+        }
+
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**
