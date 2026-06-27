@@ -14,6 +14,7 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
@@ -475,7 +476,7 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'action' => ['required', 'string', Rule::in(['advance', 'reject'])],
+            'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool'])],
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['integer'],
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
@@ -494,6 +495,8 @@ class CandidateController extends Controller
             try {
                 if ($validated['action'] === 'advance') {
                     $this->recruitmentService->advanceStage($candidate, $validated['target_stage'] ?? null, $user->id);
+                } elseif ($validated['action'] === 'pool') {
+                    $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', null, null);
                 } else {
                     $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
                     $candidate->applications()
@@ -506,8 +509,57 @@ class CandidateController extends Controller
             }
         }
 
-        $verb = $validated['action'] === 'advance' ? 'advanced' : 'rejected';
+        $verb = match ($validated['action']) {
+            'advance' => 'advanced',
+            'pool' => 'added to the talent pool',
+            default => 'rejected',
+        };
         $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Send a one-off message to every selected candidate's personal email
+     * (timeline updates, info requests, etc.). Best-effort per candidate.
+     */
+    public function bulkEmail(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'candidate_ids' => ['required', 'array', 'min:1'],
+            'candidate_ids.*' => ['integer'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:10000'],
+        ]);
+
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $validated['candidate_ids'])
+            ->get();
+
+        $sent = 0;
+        $skipped = 0;
+        foreach ($candidates as $candidate) {
+            if (! $candidate->personal_email) {
+                $skipped++;
+
+                continue;
+            }
+            try {
+                Notification::route('mail', $candidate->personal_email)
+                    ->notify(new CandidateMessageNotification($candidate, $validated['subject'], $validated['body']));
+                $sent++;
+            } catch (\Throwable $exception) {
+                report($exception);
+                $skipped++;
+            }
+        }
+
+        $message = "Message sent to {$sent} candidate(s)".($skipped > 0 ? ", {$skipped} skipped (no email)" : '').'.';
 
         return redirect()->back()->with('success', $message);
     }

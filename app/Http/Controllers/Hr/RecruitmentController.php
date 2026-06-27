@@ -451,6 +451,7 @@ class RecruitmentController extends Controller
                 ['key' => 'rate', 'label' => 'Sourced → hired', 'value' => $hireRate.'%', 'trend' => ''],
             ],
             'funnel' => $conversion->map(fn ($row) => [
+                'stage' => $row['stage'],
                 'label' => str($row['stage'])->headline()->toString(),
                 'count' => (int) $row['count'],
                 'rate' => ($row['percentage'] ?? 0).'%',

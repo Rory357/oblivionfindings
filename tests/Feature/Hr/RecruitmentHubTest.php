@@ -15,6 +15,7 @@ use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
@@ -748,6 +749,46 @@ test('bulk reject closes out every selected candidate', function () {
     expect($a['candidate']->fresh()->status)->toBe('rejected');
     expect($b['candidate']->fresh()->status)->toBe('rejected');
     expect($a['application']->fresh()->status)->toBe('rejected');
+});
+
+test('bulk email sends a message to every selected candidate', function () {
+    Notification::fake();
+    $a = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'a.cand@example.test', 'created_by' => $this->hr->id]);
+    $b = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'b.cand@example.test', 'created_by' => $this->hr->id]);
+
+    $this->actingAs($this->hr)->post(route('hr.candidates.bulk-email'), [
+        'candidate_ids' => [$a->id, $b->id],
+        'subject' => 'An update on your application',
+        'body' => "Thanks for your patience.\nWe will be in touch next week.",
+    ])->assertRedirect();
+
+    Notification::assertSentOnDemand(CandidateMessageNotification::class);
+    Notification::assertCount(2);
+
+    // subject + body are required
+    $this->actingAs($this->hr)->post(route('hr.candidates.bulk-email'), [
+        'candidate_ids' => [$a->id], 'subject' => '', 'body' => '',
+    ])->assertSessionHasErrors(['subject', 'body']);
+
+    // gated on hr.recruitment.manage
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.candidates.bulk-email'), [
+        'candidate_ids' => [$a->id], 'subject' => 'x', 'body' => 'y',
+    ])->assertForbidden();
+});
+
+test('bulk pool warm-banks every selected candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'interview_completed')['candidate'];
+
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'pool',
+        'candidate_ids' => [$a->id, $b->id],
+        'reason' => 'Strong but no seat right now',
+    ])->assertRedirect();
+
+    expect(HrTalentPool::query()->where('candidate_id', $a->id)->exists())->toBeTrue();
+    expect(HrTalentPool::query()->where('candidate_id', $b->id)->exists())->toBeTrue();
 });
 
 test('the interview reminder command sends once for tomorrow', function () {

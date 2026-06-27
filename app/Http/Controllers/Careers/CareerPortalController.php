@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
+use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class CareerPortalController extends Controller
 {
     public function __construct(
         private readonly RecruitmentService $recruitmentService,
+        private readonly HrWebhookService $webhookService,
     ) {}
 
     public function index(Request $request)
@@ -382,6 +384,20 @@ class CareerPortalController extends Controller
                     report($exception);
                 }
             }
+        }
+
+        // Same domain event the in-app respondOffer path emits, so both
+        // acceptance routes are observable identically by integrations.
+        try {
+            $this->webhookService->publish($offer->application?->tenant_id, 'recruitment.offer.responded', [
+                'offer_id' => $offer->id,
+                'application_id' => $application?->id,
+                'candidate_id' => $candidate?->id,
+                'response' => $offer->response,
+                'response_at' => optional($offer->response_at)->toDateTimeString(),
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
         }
 
         return redirect()

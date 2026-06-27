@@ -346,6 +346,24 @@ class RecruitmentJobController extends Controller
         return redirect()->back()->with('success', 'External posting channels synced.');
     }
 
+    public function unpublishPosting(Request $request, HrJobRequisition $job)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+
+        $job->update([
+            'external_posting_status' => 'not_posted',
+            'external_sync_at' => now(),
+            'external_sync_error' => null,
+            'external_reference' => null,
+            'updated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'External posting channels removed.');
+    }
+
     private function generateUniqueSlug(string $title, ?int $tenantId, ?int $ignoreId = null): string
     {
         $base = Str::slug($title);

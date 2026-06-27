@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog';
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
+import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import {
     RecruitmentWizards,
@@ -127,7 +128,7 @@ type OfferRow = {
 
 type AnalyticsData = {
     kpis: { key: string; label: string; value: string; trend: string }[];
-    funnel: { label: string; count: number; rate: string; width: number }[];
+    funnel: { stage: string; label: string; count: number; rate: string; width: number }[];
     sources: { name: string; total: number; hired: number; detail: string; width: number }[];
     open_positions: { requisition_id: number | null; title: string; applications: number; days_open: number }[];
     range?: { from: string | null; to: string | null };
@@ -182,6 +183,7 @@ export default function RecruitmentHub(props: Props) {
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('all');
     const [selected, setSelected] = useState<number[]>([]);
+    const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [moreOpen, setMoreOpen] = useState(false);
     const [sheetId, setSheetId] = useState<number | null>(null);
@@ -257,7 +259,7 @@ export default function RecruitmentHub(props: Props) {
         );
     };
 
-    const bulkAction = (action: 'advance' | 'reject') => {
+    const bulkAction = (action: 'advance' | 'reject' | 'pool') => {
         if (selected.length === 0) return;
         router.post(
             '/hr/recruitment/applications/bulk',
@@ -267,7 +269,7 @@ export default function RecruitmentHub(props: Props) {
                 onSuccess: (pg) => {
                     const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
                     if (f?.error) toast.error(f.error);
-                    else toast.success(f?.success ?? `${selected.length} candidates ${action === 'advance' ? 'advanced' : 'rejected'}`);
+                    else toast.success(f?.success ?? `${selected.length} candidates updated`);
                     setSelected([]);
                 },
             },
@@ -442,6 +444,8 @@ export default function RecruitmentHub(props: Props) {
                                 onCtx={openCandidateCtx}
                                 onBulkAdvance={() => bulkAction('advance')}
                                 onBulkReject={() => bulkAction('reject')}
+                                onBulkPool={() => bulkAction('pool')}
+                                onBulkEmail={() => setBulkEmailOpen(true)}
                                 canManage={can.manage}
                             />
                         ) : null}
@@ -503,7 +507,7 @@ export default function RecruitmentHub(props: Props) {
                             />
                         ) : null}
 
-                        {tab === 'analytics' ? <AnalyticsTab data={analytics} /> : null}
+                        {tab === 'analytics' ? <AnalyticsTab data={analytics} onDrill={(stage) => { setStageFilter(stage); setTab('pipeline'); }} /> : null}
                         {tab === 'kits' ? (
                             <KitsTab
                                 kits={kits}
@@ -560,6 +564,7 @@ export default function RecruitmentHub(props: Props) {
             {wizard ? <RecruitmentWizards state={wizard} onClose={() => setWizard(null)} support={support} /> : null}
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
             {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
+            <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -626,6 +631,8 @@ function PipelineTab({
     onCtx,
     onBulkAdvance,
     onBulkReject,
+    onBulkPool,
+    onBulkEmail,
     canManage,
 }: {
     rows: HubCandidate[];
@@ -644,6 +651,8 @@ function PipelineTab({
     onCtx: (e: MouseEvent, c: HubCandidate) => void;
     onBulkAdvance: () => void;
     onBulkReject: () => void;
+    onBulkPool: () => void;
+    onBulkEmail: () => void;
     canManage: boolean;
 }) {
     const chips = [
@@ -696,6 +705,12 @@ function PipelineTab({
                     <div className="h-4 w-px bg-border" />
                     <button type="button" onClick={onBulkAdvance} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
                         Advance stage
+                    </button>
+                    <button type="button" onClick={onBulkEmail} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Email
+                    </button>
+                    <button type="button" onClick={onBulkPool} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Add to pool
                     </button>
                     <button type="button" onClick={onBulkReject} className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-2.5 py-1 text-[12.5px] font-semibold text-status-critical">
                         Reject
@@ -1120,7 +1135,7 @@ function OffersTab({
 /*  Analytics                                                         */
 /* ================================================================== */
 
-function AnalyticsTab({ data }: { data: AnalyticsData }) {
+function AnalyticsTab({ data, onDrill }: { data: AnalyticsData; onDrill: (stage: string) => void }) {
     const [from, setFrom] = useState(data.range?.from ?? '');
     const [to, setTo] = useState(data.range?.to ?? '');
     const hasFilter = Boolean(data.range?.from || data.range?.to);
@@ -1171,13 +1186,19 @@ function AnalyticsTab({ data }: { data: AnalyticsData }) {
                         <p className="py-6 text-center text-[13px] text-muted-foreground">Not enough data yet.</p>
                     ) : (
                         data.funnel.map((f) => (
-                            <div key={f.label} className="mb-2.5 flex items-center gap-3">
+                            <button
+                                key={f.label}
+                                type="button"
+                                onClick={() => f.count > 0 && onDrill(f.stage)}
+                                title={f.count > 0 ? `View ${f.count} in the pipeline` : undefined}
+                                className={`mb-2.5 flex w-full items-center gap-3 rounded-lg text-left ${f.count > 0 ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default'}`}
+                            >
                                 <span className="w-24 flex-none text-[12px] font-semibold">{f.label}</span>
                                 <div className="relative h-[30px] flex-1 overflow-hidden rounded-lg bg-muted">
                                     <div className="flex h-full items-center rounded-lg bg-primary px-2.5 text-[12px] font-bold text-primary-foreground" style={{ width: `${Math.max(8, f.width)}%` }}>{f.count}</div>
                                 </div>
                                 <span className="w-14 flex-none text-right text-[11.5px] font-semibold text-muted-foreground">{f.rate}</span>
-                            </div>
+                            </button>
                         ))
                     )}
                 </div>

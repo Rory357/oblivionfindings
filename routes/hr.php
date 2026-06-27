@@ -158,6 +158,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/applications/bulk', [CandidateController::class, 'bulkAction'])->name('applications.bulk')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/bulk-email', [CandidateController::class, 'bulkEmail'])->name('candidates.bulk-email')
+            ->middleware('permission:hr.recruitment.manage');
 
         // Talent pool
         Route::post('/recruitment/candidates/{candidate}/pool', [CandidateController::class, 'addToPool'])->name('pool.add')
@@ -206,6 +208,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/recruitment/jobs/{job}/close', [RecruitmentJobController::class, 'close'])->name('jobs.close')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/sync-posting', [RecruitmentJobController::class, 'syncPosting'])->name('jobs.sync-posting')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/unpublish-posting', [RecruitmentJobController::class, 'unpublishPosting'])->name('jobs.unpublish-posting')
             ->middleware('permission:hr.recruitment.manage');
 
         // Interview kits
