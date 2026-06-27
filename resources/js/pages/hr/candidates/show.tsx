@@ -993,19 +993,6 @@ export default function CandidateShow({
                                 Candidate
                             </Link>
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start"
-                            asChild
-                        >
-                            <Link
-                                href={`/hr/recruitment/applications/${app.id}/scorecard-summary`}
-                            >
-                                <Star className="mr-2 h-3.5 w-3.5" /> View
-                                Scorecards
-                            </Link>
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -1536,19 +1523,6 @@ export default function CandidateShow({
                                                                                     </Button>
                                                                                 </>
                                                                             )}
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline"
-                                                                                className="h-7 text-xs"
-                                                                                asChild
-                                                                            >
-                                                                                <Link
-                                                                                    href={`/hr/recruitment/interviews/${interview.id}/scorecard`}
-                                                                                >
-                                                                                    <Star className="mr-1 h-3 w-3" />{' '}
-                                                                                    Score
-                                                                                </Link>
-                                                                            </Button>
                                                                         </div>
                                                                     )}
                                                                 </div>
