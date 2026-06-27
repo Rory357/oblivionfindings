@@ -482,6 +482,12 @@ class RecruitmentController extends Controller
 
     private function buildEmailTemplates(?int $tenantId): array
     {
+        // Resilient to the deploy window where new code is live before the
+        // migration has created the table — never 500 the whole hub for it.
+        if (! \Illuminate\Support\Facades\Schema::hasTable('hr_candidate_email_templates')) {
+            return [];
+        }
+
         return \App\Domain\Hr\Models\HrCandidateEmailTemplate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->orderBy('name')
