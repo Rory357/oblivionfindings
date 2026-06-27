@@ -56,7 +56,6 @@ use App\Http\Controllers\Hr\RecruitmentController;
 use App\Http\Controllers\Hr\RecruitmentExportController;
 use App\Http\Controllers\Hr\RecruitmentJobController;
 use App\Http\Controllers\Hr\ReportBuilderController;
-use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
@@ -1102,18 +1101,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/reports/saved/{report}/export', [ReportBuilderController::class, 'export'])->name('reports.saved.export');
         Route::delete('/reports/saved/{report}', [ReportBuilderController::class, 'destroy'])->name('reports.saved.destroy');
         Route::post('/reports/saved/{report}/schedule', [ReportBuilderController::class, 'schedule'])->name('reports.saved.schedule');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Recruitment Scorecards
-    |--------------------------------------------------------------------------
-    */
-    Route::middleware('permission:hr.recruitment.view')->group(function () {
-        Route::get('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'create'])->name('scorecards.create');
-        Route::post('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'store'])->name('scorecards.store')
-            ->middleware('permission:hr.recruitment.manage');
-        Route::get('/recruitment/applications/{application}/scorecard-summary', [ScorecardController::class, 'summary'])->name('scorecards.summary');
     });
 
     /*

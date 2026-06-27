@@ -28,7 +28,9 @@ import { useMemo, useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 
 import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
+import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog';
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
+import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import {
     RecruitmentWizards,
     type RecruitmentSupport,
@@ -96,6 +98,9 @@ type WeekInterview = {
     type: string;
     status: string;
     scheduled_at?: string | null;
+    scored?: boolean;
+    kit_name?: string | null;
+    criteria?: { label: string; weight: number }[];
 };
 
 type Consensus = {
@@ -180,6 +185,8 @@ export default function RecruitmentHub(props: Props) {
     const [moreOpen, setMoreOpen] = useState(false);
     const [sheetId, setSheetId] = useState<number | null>(null);
     const [wizard, setWizard] = useState<WizardState | null>(null);
+    const [kitDialog, setKitDialog] = useState<{ kit: KitDraft | null } | null>(null);
+    const [scoreTarget, setScoreTarget] = useState<ScoreTarget | null>(null);
     const [dragId, setDragId] = useState<number | null>(null);
     const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -477,7 +484,12 @@ export default function RecruitmentHub(props: Props) {
                         ) : null}
 
                         {tab === 'interviews' ? (
-                            <InterviewsTab data={interviews} canManage={can.manage} onNew={() => setTab('pipeline')} />
+                            <InterviewsTab
+                                data={interviews}
+                                canManage={can.manage}
+                                onNew={() => setTab('pipeline')}
+                                onScore={(iv) => setScoreTarget({ id: iv.id, candidate: iv.candidate, kit_name: iv.kit_name, criteria: iv.criteria ?? [] })}
+                            />
                         ) : null}
 
                         {tab === 'offers' ? (
@@ -491,7 +503,24 @@ export default function RecruitmentHub(props: Props) {
                         ) : null}
 
                         {tab === 'analytics' ? <AnalyticsTab data={analytics} /> : null}
-                        {tab === 'kits' ? <KitsTab kits={kits} /> : null}
+                        {tab === 'kits' ? (
+                            <KitsTab
+                                kits={kits}
+                                canManage={can.manage}
+                                onNew={() => setKitDialog({ kit: null })}
+                                onEdit={(k) => setKitDialog({ kit: k })}
+                                onToggle={(id) => {
+                                    router.post(`/hr/recruitment/kits/${id}/toggle-active`, {}, {
+                                        preserveScroll: true,
+                                        onSuccess: (pg) => {
+                                            const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                                            if (f?.error) toast.error(f.error);
+                                            else toast.success(f?.success ?? 'Kit updated');
+                                        },
+                                    });
+                                }}
+                            />
+                        ) : null}
                         {tab === 'pool' ? (
                             <PoolTab
                                 pool={pool}
@@ -528,6 +557,8 @@ export default function RecruitmentHub(props: Props) {
             ) : null}
 
             {wizard ? <RecruitmentWizards state={wizard} onClose={() => setWizard(null)} support={support} /> : null}
+            {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
+            {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -937,7 +968,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 /*  Interviews                                                        */
 /* ================================================================== */
 
-function InterviewsTab({ data, canManage, onNew }: { data: { week: WeekInterview[]; consensus: Consensus }; canManage: boolean; onNew: () => void }) {
+function InterviewsTab({ data, canManage, onNew, onScore }: { data: { week: WeekInterview[]; consensus: Consensus }; canManage: boolean; onNew: () => void; onScore: (iv: WeekInterview) => void }) {
     return (
         <div>
             <div className="mb-4 flex items-center gap-3">
@@ -966,6 +997,15 @@ function InterviewsTab({ data, canManage, onNew }: { data: { week: WeekInterview
                                         <div className="text-[12px] font-semibold">{iv.scheduled_at ? new Date(iv.scheduled_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}</div>
                                         <div className="text-[11px] text-muted-foreground">{iv.scheduled_at ? new Date(iv.scheduled_at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }) : ''}</div>
                                     </div>
+                                    {canManage ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onScore(iv)}
+                                            className={`h-8 shrink-0 rounded-md border px-2.5 text-[12px] font-bold ${iv.scored ? 'border-border bg-card text-muted-foreground hover:bg-muted' : 'border-primary bg-primary/10 text-primary'}`}
+                                        >
+                                            {iv.scored ? 'Re-score' : 'Score'}
+                                        </button>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
@@ -1154,13 +1194,44 @@ function AnalyticsTab({ data }: { data: AnalyticsData }) {
 /*  Kits + Pool                                                       */
 /* ================================================================== */
 
-function KitsTab({ kits }: { kits: Kit[] }) {
+function KitsTab({
+    kits,
+    canManage,
+    onNew,
+    onEdit,
+    onToggle,
+}: {
+    kits: Kit[];
+    canManage: boolean;
+    onNew: () => void;
+    onEdit: (k: KitDraft) => void;
+    onToggle: (id: number) => void;
+}) {
     const [active, setActive] = useState<number | null>(kits[0]?.id ?? null);
     const current = kits.find((k) => k.id === active) ?? kits[0];
-    if (kits.length === 0) return <EmptyCard icon={ListChecks} title="No interview kits yet" sub="Interview kits hold the weighted scorecard criteria your panel scores against." />;
+    const newKitBtn = canManage ? (
+        <button type="button" onClick={onNew} className="inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-primary-foreground">
+            <ListChecks className="h-3.5 w-3.5" /> New kit
+        </button>
+    ) : null;
+    if (kits.length === 0) {
+        return (
+            <div>
+                <div className="mb-4 flex items-center gap-3">
+                    <p className="text-[13px] text-muted-foreground">Interview kits hold the weighted scorecard criteria your panel scores against.</p>
+                    {newKitBtn ? <div className="ml-auto">{newKitBtn}</div> : null}
+                </div>
+                <EmptyCard icon={ListChecks} title="No interview kits yet" sub="Create a kit to give your panel a consistent, weighted rubric." />
+            </div>
+        );
+    }
+    const toDraft = (k: Kit): KitDraft => ({ id: k.id, name: k.name, role: k.role, is_active: k.is_active, criteria: k.criteria });
     return (
         <div>
-            <p className="mb-4 text-[13px] text-muted-foreground">Reusable scorecards with weighted criteria — interviewers score candidates against this rubric.</p>
+            <div className="mb-4 flex items-center gap-3">
+                <p className="text-[13px] text-muted-foreground">Reusable scorecards with weighted criteria — interviewers score candidates against this rubric.</p>
+                {newKitBtn ? <div className="ml-auto">{newKitBtn}</div> : null}
+            </div>
             <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
                 <div className="flex flex-col gap-2">
                     {kits.map((k) => {
@@ -1183,8 +1254,20 @@ function KitsTab({ kits }: { kits: Kit[] }) {
                 </div>
                 {current ? (
                     <div className="rounded-[14px] border border-border bg-card p-5">
-                        <div className="text-[14px] font-bold">{current.name}</div>
-                        <div className="mb-4 text-[12px] text-muted-foreground">Weighted criteria · total {current.criteria.reduce((a, c) => a + c.weight, 0)}%</div>
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <div className="text-[14px] font-bold">{current.name}</div>
+                                <div className="mb-4 text-[12px] text-muted-foreground">Weighted criteria · total {current.criteria.reduce((a, c) => a + c.weight, 0)}%</div>
+                            </div>
+                            {canManage ? (
+                                <div className="flex items-center gap-2">
+                                    <button type="button" onClick={() => onToggle(current.id)} className="h-8 rounded-md border border-border bg-card px-2.5 text-[12px] font-semibold hover:bg-muted">
+                                        {current.is_active ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                    <button type="button" onClick={() => onEdit(toDraft(current))} className="h-8 rounded-md border border-primary bg-primary/10 px-2.5 text-[12px] font-bold text-primary">Edit</button>
+                                </div>
+                            ) : null}
+                        </div>
                         <div className="flex flex-col gap-2">
                             {current.criteria.map((c) => (
                                 <div key={c.label} className="flex items-center gap-2.5 rounded-[10px] border border-border px-3 py-2">

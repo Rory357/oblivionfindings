@@ -253,13 +253,14 @@ class RecruitmentController extends Controller
     {
         $week = HrInterview::query()
             ->whereBetween('scheduled_at', [now()->startOfWeek(), now()->endOfWeek()->addDays(2)])
-            ->with(['application.candidate:id,first_name,last_name,tenant_id'])
+            ->with(['application.candidate:id,first_name,last_name,tenant_id', 'application.interviewKit:id,name,criteria', 'scores:id,interview_id'])
             ->when($tenantId !== null, fn ($q) => $q->whereHas('application.candidate', fn ($c) => $c->where('tenant_id', $tenantId)))
             ->orderBy('scheduled_at')
             ->limit(40)
             ->get()
             ->map(function (HrInterview $i) {
                 $cand = $i->application?->candidate;
+                $kit = $i->application?->interviewKit;
 
                 return [
                     'id' => $i->id,
@@ -268,6 +269,11 @@ class RecruitmentController extends Controller
                     'type' => $i->interview_type,
                     'status' => $i->status,
                     'scheduled_at' => optional($i->scheduled_at)->toIso8601String(),
+                    'scored' => $i->scores->isNotEmpty(),
+                    'kit_name' => $kit?->name,
+                    'criteria' => collect($kit?->criteria ?? [])
+                        ->map(fn ($c) => ['label' => $c['label'] ?? 'Criterion', 'weight' => (int) ($c['weight'] ?? 0)])
+                        ->values()->all(),
                 ];
             })->values()->all();
 
