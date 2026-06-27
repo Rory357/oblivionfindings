@@ -247,6 +247,23 @@ export default function RecruitmentHub(props: Props) {
         );
     };
 
+    const bulkAction = (action: 'advance' | 'reject') => {
+        if (selected.length === 0) return;
+        router.post(
+            '/hr/recruitment/applications/bulk',
+            { action, candidate_ids: selected },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else toast.success(f?.success ?? `${selected.length} candidates ${action === 'advance' ? 'advanced' : 'rejected'}`);
+                    setSelected([]);
+                },
+            },
+        );
+    };
+
     const toggleSelect = (id: number) =>
         setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
     const toggleAll = () => {
@@ -413,10 +430,8 @@ export default function RecruitmentHub(props: Props) {
                                 onExport={() => exportData('pipeline')}
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
-                                onBulkReject={() => {
-                                    const first = candidates.find((c) => c.id === selected[0]);
-                                    if (first) openWizard('reject', candidateCtx(first));
-                                }}
+                                onBulkAdvance={() => bulkAction('advance')}
+                                onBulkReject={() => bulkAction('reject')}
                                 canManage={can.manage}
                             />
                         ) : null}
@@ -535,6 +550,7 @@ function PipelineTab({
     onExport,
     onOpen,
     onCtx,
+    onBulkAdvance,
     onBulkReject,
     canManage,
 }: {
@@ -552,6 +568,7 @@ function PipelineTab({
     onExport: () => void;
     onOpen: (c: HubCandidate) => void;
     onCtx: (e: MouseEvent, c: HubCandidate) => void;
+    onBulkAdvance: () => void;
     onBulkReject: () => void;
     canManage: boolean;
 }) {
@@ -603,8 +620,11 @@ function PipelineTab({
                 <div className="mb-3.5 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2.5 motion-safe:animate-in motion-safe:fade-in-0">
                     <span className="text-[13px] font-bold text-primary">{selected.length} selected</span>
                     <div className="h-4 w-px bg-border" />
+                    <button type="button" onClick={onBulkAdvance} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Advance stage
+                    </button>
                     <button type="button" onClick={onBulkReject} className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-2.5 py-1 text-[12.5px] font-semibold text-status-critical">
-                        Reject…
+                        Reject
                     </button>
                     <button type="button" onClick={clearSelection} className="ml-auto text-[12.5px] font-semibold text-muted-foreground">
                         Clear

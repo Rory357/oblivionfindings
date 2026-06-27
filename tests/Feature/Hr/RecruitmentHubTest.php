@@ -473,6 +473,42 @@ test('scheduling an interview emails the candidate and panel a calendar invite',
     expect($interview->invite_sent_at)->not->toBeNull();
 });
 
+/* ---- D4: bulk actions (#21) ---- */
+
+test('bulk advance moves every selected candidate and skips terminal ones', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $terminal = makeApplicant($this->hr->id, 'hired')['candidate'];
+
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'advance',
+        'candidate_ids' => [$a->id, $b->id, $terminal->id],
+    ])->assertRedirect();
+
+    expect($a->fresh()->status)->not->toBe('screening');
+    expect($b->fresh()->status)->not->toBe('screening');
+    expect($terminal->fresh()->status)->toBe('hired'); // skipped, not crashed
+
+    // gated on hr.recruitment.manage
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.applications.bulk'), ['action' => 'advance', 'candidate_ids' => [$a->id]])->assertForbidden();
+});
+
+test('bulk reject closes out every selected candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening');
+    $b = makeApplicant($this->hr->id, 'interview_scheduled');
+
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'reject',
+        'candidate_ids' => [$a['candidate']->id, $b['candidate']->id],
+        'reason' => 'Role filled',
+    ])->assertRedirect();
+
+    expect($a['candidate']->fresh()->status)->toBe('rejected');
+    expect($b['candidate']->fresh()->status)->toBe('rejected');
+    expect($a['application']->fresh()->status)->toBe('rejected');
+});
+
 test('the interview reminder command sends once for tomorrow', function () {
     $tz = config('app.worker_timezone', 'Pacific/Auckland');
     ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');

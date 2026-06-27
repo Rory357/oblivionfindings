@@ -159,6 +159,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         // Application Actions
         Route::post('/recruitment/applications/{application}/reject', [CandidateController::class, 'rejectApplication'])->name('applications.reject')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/applications/bulk', [CandidateController::class, 'bulkAction'])->name('applications.bulk')
+            ->middleware('permission:hr.recruitment.manage');
 
         // Candidate Documents
         Route::post('/recruitment/candidates/{candidate}/documents', [CandidateController::class, 'storeDocument'])->name('candidate.documents.store')

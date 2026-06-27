@@ -451,6 +451,55 @@ class CandidateController extends Controller
         return redirect()->back()->with('success', 'Application rejected.');
     }
 
+    /**
+     * Bulk advance/reject N selected candidates. Per-row (a prerequisite failure
+     * on one candidate doesn't abort the batch) with a summary flash. Tenant-scoped
+     * — foreign-tenant ids are silently excluded by the scoped query.
+     */
+    public function bulkAction(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', Rule::in(['advance', 'reject'])],
+            'candidate_ids' => ['required', 'array', 'min:1'],
+            'candidate_ids.*' => ['integer'],
+            'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $validated['candidate_ids'])
+            ->get();
+
+        $done = 0;
+        $skipped = 0;
+
+        foreach ($candidates as $candidate) {
+            try {
+                if ($validated['action'] === 'advance') {
+                    $this->recruitmentService->advanceStage($candidate, $validated['target_stage'] ?? null, $user->id);
+                } else {
+                    $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
+                    $candidate->applications()
+                        ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
+                        ->update(['status' => 'rejected', 'rejection_reason' => $validated['reason'] ?? null]);
+                }
+                $done++;
+            } catch (\Throwable $exception) {
+                $skipped++;
+            }
+        }
+
+        $verb = $validated['action'] === 'advance' ? 'advanced' : 'rejected';
+        $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Interviews                                                         */
     /* ------------------------------------------------------------------ */
