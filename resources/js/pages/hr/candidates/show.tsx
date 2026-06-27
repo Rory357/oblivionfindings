@@ -133,6 +133,7 @@ interface Offer {
     portal_url: string | null;
     offer_letter_name: string | null;
     offer_letter_id: number | null;
+    offer_letter_generated?: boolean;
     primary_site: { id: number; name: string } | null;
 }
 
@@ -1767,13 +1768,16 @@ export default function CandidateShow({
                                                         .offer_letter_name && (
                                                         <a
                                                             href={`/hr/recruitment/offers/${app.offer.id}/letter`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
                                                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                                         >
                                                             <FileText className="h-3 w-3" />{' '}
-                                                            {
-                                                                app.offer
-                                                                    .offer_letter_name
-                                                            }
+                                                            {app.offer
+                                                                .offer_letter_generated
+                                                                ? 'Offer letter (generated)'
+                                                                : app.offer
+                                                                      .offer_letter_name}
                                                         </a>
                                                     )}
                                                 </div>

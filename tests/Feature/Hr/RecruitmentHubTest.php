@@ -307,6 +307,17 @@ test('offer letter download is tenant-scoped', function () {
     $this->actingAs($this->hr)->get(route('hr.offers.letter', $foreignOffer->id))->assertNotFound();
 });
 
+test('an offer with no uploaded letter generates a branded PDF on download', function () {
+    ['application' => $application] = makeApplicant($this->hr->id, 'offer_sent');
+    $offer = makeOffer(['application' => $application], 'sent', $this->hr->id, $this->site->id);
+    expect($offer->offer_letter_path)->toBeNull();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.offers.letter', $offer->id));
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('application/pdf');
+});
+
 /* ---- A7: offer-response acks (#19) + hire notify ---- */
 
 test('responding to an offer acknowledges the candidate', function () {
