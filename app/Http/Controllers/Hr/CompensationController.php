@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrBenefitEnrollment;
+use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -31,10 +35,19 @@ class CompensationController extends Controller
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        // "Active as of" date: which bands are in effect on the chosen date
+        // (defaults to today). Drives both the active filter and the labelled
+        // date picker in the toolbar.
+        $asOf = $request->query('as_of') ? Carbon::parse($request->query('as_of')) : Carbon::today();
+        $activeAsOf = function ($q) use ($asOf) {
+            $q->where('effective_from', '<=', $asOf)
+                ->where(fn ($qq) => $qq->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf));
+        };
+
         $bands = HrSalaryBand::query()
             ->forTenant($tenantId)
             ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
-            ->when($request->query('active_only'), fn ($q) => $q->active())
+            ->when($request->boolean('active_only'), $activeAsOf)
             ->orderBy('position_role')
             ->orderBy('band_name')
             ->paginate(20)
@@ -113,22 +126,145 @@ class CompensationController extends Controller
             }
         }
 
+        $hub = $this->hubAggregates($tenantId, $user);
+
         return Inertia::render('hr/compensation/bands', [
             'bands' => $bands,
             'filters' => [
                 'role' => $request->query('role'),
                 'active_only' => $request->boolean('active_only'),
+                'as_of' => $asOf->toDateString(),
             ],
             'stats' => [
                 'bands_total' => $activeBands->count(),
                 'roles_covered' => $activeByRole->keys()->filter()->count(),
                 'people_placed' => $peoplePlaced,
+                'people_in_band' => max(0, $peoplePlaced - $peopleOutOfBand),
                 'people_out_of_band' => $peopleOutOfBand,
+                'band_health' => $peoplePlaced > 0
+                    ? (int) round((($peoplePlaced - $peopleOutOfBand) / $peoplePlaced) * 100)
+                    : 100,
+                ...$hub,
             ],
+            'tabCounts' => $this->tabCounts($tenantId, $activeBands->count()),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
+                'benefits' => $user->canDo('hr.benefits.view'),
+                'expenses' => $user->canDo('hr.expenses.view'),
             ],
         ]);
+    }
+
+    /**
+     * Full hub-hero stat set (band-health placement + cross-hub aggregates),
+     * shared by the Bands, History and Settings surfaces so the hero is identical
+     * across the hub. Salary fields are encrypted → placement runs in PHP.
+     *
+     * @return array<string, int|float>
+     */
+    private function heroStats(int $tenantId, User $user): array
+    {
+        $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->active()
+            ->get(['id', 'position_role', 'annual_salary', 'hourly_rate']);
+
+        $activeBands = HrSalaryBand::query()->forTenant($tenantId)->active()
+            ->orderByDesc('effective_from')->get();
+        $activeByRole = $activeBands->groupBy('position_role');
+
+        $placed = 0;
+        $outOfBand = 0;
+        foreach ($employees->groupBy('position_role') as $role => $people) {
+            $band = $activeByRole->get($role)?->first();
+            if (! $band) {
+                continue;
+            }
+            foreach ($people as $p) {
+                $pos = $this->compensationService->bandPlacement($p, $band)['position'];
+                if ($pos === null) {
+                    continue;
+                }
+                $placed++;
+                if ($pos !== 'in') {
+                    $outOfBand++;
+                }
+            }
+        }
+
+        return [
+            'bands_total' => $activeBands->count(),
+            'roles_covered' => $activeByRole->keys()->filter()->count(),
+            'people_placed' => $placed,
+            'people_in_band' => max(0, $placed - $outOfBand),
+            'people_out_of_band' => $outOfBand,
+            'band_health' => $placed > 0 ? (int) round((($placed - $outOfBand) / $placed) * 100) : 100,
+            ...$this->hubAggregates($tenantId, $user),
+        ];
+    }
+
+    /**
+     * Cross-hub hero aggregates: reviews in flight, items awaiting approval,
+     * reimbursed this month, claims overdue. Counts respect the viewer's gates so
+     * a comp-only user never sees benefits/expenses numbers they can't open.
+     *
+     * @return array<string, int|float>
+     */
+    private function hubAggregates(int $tenantId, User $user): array
+    {
+        $reviewsInFlight = HrCompensationReview::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['planning', 'in_progress', 'approved'])
+            ->count();
+
+        $canExpenses = $user->canDo('hr.expenses.view');
+        $awaitingClaims = $canExpenses
+            ? HrExpenseClaim::query()->where('tenant_id', $tenantId)->where('status', 'submitted')->count()
+            : 0;
+        $pendingBonuses = HrBonusPayment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'pending')
+            ->count();
+
+        $monthStart = Carbon::now()->startOfMonth();
+        $reimbursed = $canExpenses
+            ? (float) HrExpenseClaim::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('paid_at')
+                ->where('paid_at', '>=', $monthStart)
+                ->sum('total_amount')
+            : 0.0;
+
+        $claimsOverdue = $canExpenses
+            ? HrExpenseClaim::query()
+                ->where('tenant_id', $tenantId)
+                ->where('status', 'submitted')
+                ->where('submitted_at', '<', Carbon::now()->subDays(7))
+                ->count()
+            : 0;
+
+        return [
+            'reviews_in_flight' => $reviewsInFlight,
+            'awaiting_approval' => $awaitingClaims + $pendingBonuses,
+            'reimbursed_this_month' => round($reimbursed, 2),
+            'claims_overdue' => $claimsOverdue,
+        ];
+    }
+
+    /**
+     * Per-tab record counts for the hub tab-strip badges.
+     *
+     * @return array<string, int>
+     */
+    private function tabCounts(int $tenantId, int $bandsTotal): array
+    {
+        return [
+            'bands' => $bandsTotal,
+            'reviews' => HrCompensationReview::query()->where('tenant_id', $tenantId)->count(),
+            'bonuses' => HrBonusPayment::query()->where('tenant_id', $tenantId)->count(),
+            'benefits' => HrBenefitEnrollment::query()->where('tenant_id', $tenantId)->where('status', 'active')->count(),
+            'expenses' => HrExpenseClaim::query()->where('tenant_id', $tenantId)->count(),
+        ];
     }
 
     /**
@@ -317,6 +453,59 @@ class CompensationController extends Controller
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
             ],
+        ]);
+    }
+
+    /**
+     * Company-wide compensation change log (the History hub tab).
+     */
+    public function historyIndex(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $history = HrCompensationHistory::query()
+            ->where('tenant_id', $tenantId)
+            ->when($request->query('change_type'), fn ($q, $t) => $q->where('change_type', $t))
+            ->with(['employeeProfile.user:id,name', 'approver:id,name'])
+            ->orderByDesc('effective_date')
+            ->paginate(25)
+            ->withQueryString();
+
+        return Inertia::render('hr/compensation/history-index', [
+            'history' => $history,
+            'filters' => ['change_type' => $request->query('change_type')],
+            'stats' => $this->heroStats($tenantId, $user),
+            'tabCounts' => $this->tabCounts($tenantId, HrSalaryBand::query()->forTenant($tenantId)->active()->count()),
+            'can' => ['manage' => $user->canDo('hr.compensation.manage')],
+        ]);
+    }
+
+    /**
+     * Read-only compensation settings (mileage rate + GL map) — the Settings tab.
+     */
+    public function settings(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        return Inertia::render('hr/compensation/settings', [
+            'settings' => [
+                'mileage_rate_per_km' => (float) config('finance.mileage_rate_per_km'),
+                'currency' => 'NZD',
+                'gl_accounts' => collect((array) config('finance.event_accounts', []))
+                    ->map(fn ($a, $k) => [
+                        'key' => $k,
+                        'account' => is_array($a) ? ($a['debit'] ?? null) : $a,
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+            'stats' => $this->heroStats($tenantId, $user),
+            'tabCounts' => $this->tabCounts($tenantId, HrSalaryBand::query()->forTenant($tenantId)->active()->count()),
+            'can' => ['manage' => $user->canDo('hr.compensation.manage')],
         ]);
     }
 

@@ -66,12 +66,29 @@ test('bands page exposes true compa-ratio aggregates and per-band placements', f
             ->where('stats.bands_total', 1)
             ->where('stats.roles_covered', 1)
             ->where('stats.people_placed', 3)
+            ->where('stats.people_in_band', 1)
             ->where('stats.people_out_of_band', 2)
+            ->where('stats.band_health', 33)
+            ->has('stats.reviews_in_flight')
+            ->has('stats.awaiting_approval')
+            ->has('stats.reimbursed_this_month')
+            ->where('tabCounts.bands', 1)
             ->where('bands.data.0.employee_count', 3)
             ->where('bands.data.0.in_band', 1)
             ->where('bands.data.0.under_band', 1)
             ->where('bands.data.0.over_band', 1)
         );
+});
+
+test('the compensation history index and settings hub tabs render', function () {
+    $this->actingAs($this->hr)->get('/hr/compensation/history')->assertOk()
+        ->assertInertia(fn ($page) => $page->component('hr/compensation/history-index')->has('stats'));
+
+    $this->actingAs($this->hr)->get('/hr/compensation/settings')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/compensation/settings')
+            ->has('settings.mileage_rate_per_km')
+            ->has('settings.gl_accounts'));
 });
 
 test('storing a band with min greater than mid is rejected', function () {
