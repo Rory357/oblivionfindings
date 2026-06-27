@@ -980,21 +980,21 @@ export default function CandidateShow({
                     )}
 
                     {/* Persistent action links */}
-                    <div className="space-y-2 border-t pt-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start"
-                            asChild
-                        >
-                            <Link
-                                href={`/hr/recruitment/candidates/${candidate.id}`}
+                    {candidate.personal_email && (
+                        <div className="space-y-2 border-t pt-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full justify-start"
+                                asChild
                             >
-                                <Mail className="mr-2 h-3.5 w-3.5" /> Email
-                                Candidate
-                            </Link>
-                        </Button>
-                    </div>
+                                <a href={`mailto:${candidate.personal_email}`}>
+                                    <Mail className="mr-2 h-3.5 w-3.5" /> Email
+                                    Candidate
+                                </a>
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         );
