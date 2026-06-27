@@ -401,6 +401,38 @@ test('a manual sleepover entry persists the disturbance log', function () {
     expect((int) $entry->sleepover_disturbances[0]['minutes'])->toBe(30);
 });
 
+test('syncEntryFromSession backfills a closed session that has no time entry', function () {
+    // Mirrors the §5 backfill migration: a legacy closed session with no
+    // HrTimeEntry should get one created (submitted, hours computed) so it
+    // surfaces in the Time Entries tab + KPIs.
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($staff);
+
+    $attendance = app(\App\Domain\Hr\Services\AttendanceService::class);
+    $session = $attendance->clockIn($staff, ['tenant_id' => 1]);
+    $this->travel(3)->hours();
+    $session = $attendance->clockOut($staff, $session, ['break_minutes' => 30]);
+
+    // Simulate a legacy session by removing the auto-created entry.
+    \App\Domain\Hr\Models\HrTimeEntry::query()
+        ->where('attendance_session_id', $session->id)
+        ->forceDelete();
+    expect(
+        \App\Domain\Hr\Models\HrTimeEntry::query()->where('attendance_session_id', $session->id)->exists()
+    )->toBeFalse();
+
+    app(\App\Domain\Hr\Services\TimeTrackingService::class)
+        ->syncEntryFromSession($session->fresh(), $staff);
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+        ->where('attendance_session_id', $session->id)
+        ->firstOrFail();
+
+    expect($entry->status)->toBe('submitted');
+    expect($entry->clock_out)->not->toBeNull();
+    expect((float) $entry->total_hours)->toBeGreaterThan(2.0);
+});
+
 test('hr clock out rejects break_minutes above the shared 240 cap', function () {
     // D4 — break cap unified to 240 across the HR module too, matching the
     // frontline /attendance + /timesheets surfaces (this path was 480 before).
