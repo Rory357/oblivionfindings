@@ -59,7 +59,8 @@ class BonusController extends Controller
             'created_at' => $bonus->created_at?->toDateTimeString(),
         ]);
 
-        $employees = HrEmployeeProfile::where('is_active', true)
+        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('is_active', true)
             ->with('user:id,name,email')
             ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title', 'department']);

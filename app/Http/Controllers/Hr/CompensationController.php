@@ -120,10 +120,15 @@ class CompensationController extends Controller
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        // Mirror the list's "active as of" semantics so the CSV matches the screen.
+        $asOf = $request->query('as_of') ? Carbon::parse($request->query('as_of')) : Carbon::today();
+
         $bands = HrSalaryBand::query()
             ->forTenant($tenantId)
             ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
-            ->when($request->query('active_only'), fn ($q) => $q->active())
+            ->when($request->boolean('active_only'), fn ($q) => $q
+                ->where('effective_from', '<=', $asOf)
+                ->where(fn ($qq) => $qq->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf)))
             ->orderBy('position_role')
             ->orderBy('band_name')
             ->get();
@@ -391,8 +396,10 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $employees = HrEmployeeProfile::with('user:id,name')
+        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->with('user:id,name')
             ->active()
             ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate']);
 
@@ -448,6 +455,8 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
         $review->load([
             'items.employeeProfile.user:id,name',
@@ -455,7 +464,8 @@ class CompensationController extends Controller
             'creator:id,name',
         ]);
 
-        $employees = HrEmployeeProfile::with('user:id,name')
+        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->with('user:id,name')
             ->active()
             ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate']);
 
