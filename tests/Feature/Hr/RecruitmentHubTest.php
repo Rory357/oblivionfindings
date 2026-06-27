@@ -5,11 +5,13 @@ use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
@@ -448,4 +450,47 @@ test('a public offer response acknowledges the candidate', function () {
     expect($offer->fresh()->response)->toBe('declined');
 
     Notification::assertSentOnDemand(OfferResponseAckNotification::class);
+});
+
+/* ---- A6: interview invites + .ics + reminder (#16) ---- */
+
+test('scheduling an interview emails the candidate and panel a calendar invite', function () {
+    Notification::fake();
+    $panelist = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    ['application' => $application] = makeApplicant($this->hr->id, 'screening');
+
+    $this->actingAs($this->hr)->post(route('hr.interviews.store', $application->id), [
+        'scheduled_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+        'duration_minutes' => 45,
+        'interview_type' => 'in_person',
+        'interviewers' => [$panelist->id],
+    ])->assertRedirect();
+
+    Notification::assertSentOnDemand(InterviewInviteNotification::class);
+    Notification::assertSentTo($panelist, InterviewInviteNotification::class);
+
+    $interview = HrInterview::query()->where('application_id', $application->id)->first();
+    expect($interview->invite_sent_at)->not->toBeNull();
+});
+
+test('the interview reminder command sends once for tomorrow', function () {
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+    ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
+    $interview = HrInterview::query()->create([
+        'application_id' => $application->id,
+        'scheduled_at' => now($tz)->addDay()->setTime(10, 0)->utc(),
+        'duration_minutes' => 45,
+        'interview_type' => 'in_person',
+        'status' => 'scheduled',
+    ]);
+
+    Notification::fake();
+    $this->artisan('recruitment:send-interview-reminders')->assertSuccessful();
+    Notification::assertSentOnDemand(InterviewInviteNotification::class);
+    expect($interview->fresh()->reminder_sent_at)->not->toBeNull();
+
+    // Re-running must not double-send.
+    Notification::fake();
+    $this->artisan('recruitment:send-interview-reminders')->assertSuccessful();
+    Notification::assertNothingSent();
 });

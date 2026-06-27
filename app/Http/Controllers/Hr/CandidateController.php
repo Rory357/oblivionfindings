@@ -473,7 +473,7 @@ class CandidateController extends Controller
             'notes'            => ['nullable', 'string', 'max:5000'],
         ]);
 
-        HrInterview::create([
+        $interview = HrInterview::create([
             'application_id'   => $application->id,
             'scheduled_at'     => $validated['scheduled_at'],
             'duration_minutes' => $validated['duration_minutes'],
@@ -484,7 +484,13 @@ class CandidateController extends Controller
             'notes'            => $validated['notes'] ?? null,
         ]);
 
-        return redirect()->back()->with('success', 'Interview scheduled successfully.');
+        try {
+            app(\App\Domain\Hr\Services\InterviewNotificationService::class)->sendInvites($interview);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return redirect()->back()->with('success', 'Interview scheduled — calendar invites emailed to the candidate and panel.');
     }
 
     public function updateInterview(Request $request, HrInterview $interview)
