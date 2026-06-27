@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrICalToken;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -11,10 +12,13 @@ use Illuminate\Support\Str;
 
 class ICalController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function feed(Request $request, string $token)
     {
         $icalToken = HrICalToken::where('token', $token)->firstOrFail();
         $user = $icalToken->user;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $events = [];
 
@@ -33,8 +37,9 @@ class ICalController extends Controller
             );
         }
 
-        // Calendar events
-        $calEvents = HrCalendarEvent::where('starts_at', '>=', now()->subMonths(3))
+        // Calendar events — tenant-scoped (previously leaked across tenants).
+        $calEvents = HrCalendarEvent::forTenant($tenantId)
+            ->where('starts_at', '>=', now()->subMonths(3))
             ->orderBy('starts_at')
             ->limit(100)
             ->get();
