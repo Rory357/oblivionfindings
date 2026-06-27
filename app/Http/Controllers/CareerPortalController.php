@@ -61,7 +61,12 @@ class CareerPortalController extends Controller
     public function applicationStatus(string $token)
     {
         $application = HrApplication::where('candidate_tracking_token', $token)
-            ->with(['candidate:id,first_name,last_name,status', 'jobPosting:id,title,slug,department,location'])
+            ->with([
+                'candidate:id,first_name,last_name,status',
+                'requisition:id,title',
+                'jobPosting:id,title,department,location',
+                'targetSite:id,name',
+            ])
             ->firstOrFail();
 
         $stageLabels = [
@@ -89,10 +94,12 @@ class CareerPortalController extends Controller
                 'applied_at' => $application->created_at?->toDateString(),
                 'status' => $candidateStage,
                 'status_label' => $stageLabels[$candidateStage] ?? 'Processing',
-                'posting' => $application->jobPosting ? [
-                    'title' => $application->jobPosting->title,
-                    'department' => $application->jobPosting->department,
-                    'location' => $application->jobPosting->location,
+                // Prefer the requisition (the live flow); fall back to the legacy
+                // job posting until it is retired.
+                'posting' => ($role = $application->requisition ?? $application->jobPosting) ? [
+                    'title' => $role->title,
+                    'department' => $application->jobPosting?->department,
+                    'location' => $application->jobPosting?->location ?? $application->targetSite?->name,
                 ] : null,
             ],
         ]);

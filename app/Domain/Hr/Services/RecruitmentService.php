@@ -122,6 +122,7 @@ class RecruitmentService
             'cv_original_name' => $data['cv_original_name'] ?? null,
             'cover_letter' => $data['cover_letter'] ?? null,
             'screening_answers' => $data['screening_answers'] ?? $data['answers'] ?? null,
+            'candidate_tracking_token' => $data['candidate_tracking_token'] ?? null,
             'status' => 'active',
         ]);
     }
