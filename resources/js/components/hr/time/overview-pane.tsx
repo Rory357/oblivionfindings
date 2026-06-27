@@ -10,6 +10,7 @@ import {
     Coffee,
     Moon,
     TimerReset,
+    Unlink,
 } from 'lucide-react';
 import { type MouseEvent } from 'react';
 
@@ -29,6 +30,7 @@ const EXCEPTION_ICON: Record<string, typeof AlertTriangle> = {
     missed_clock_out: TimerReset,
     break_fail: Coffee,
     overtime: AlertTriangle,
+    unlinked: Unlink,
     loadings: Moon,
 };
 
