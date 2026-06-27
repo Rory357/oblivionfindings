@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Domain\Hr\Models\HrCalendarEventCategory;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -12,11 +14,16 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Models\Site;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class CalendarController extends Controller
 {
     use ResolvesHrTenant;
+    use ServesPrivateAttachments;
+
+    /** Upload mime allowlist (stored-XSS defence — see ServesPrivateAttachments). */
+    private const ATTACHMENT_MIMES = 'jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,csv,txt';
 
     public function __construct(
         private readonly HrCalendarAggregator $aggregator,
@@ -256,7 +263,80 @@ class CalendarController extends Controller
         $this->syncAttendees($event, $audienceType, $audienceUserIds);
         $this->syncReminders($event, $reminders);
 
-        return redirect()->back()->with('success', 'Calendar event created.');
+        // Flash the new id so the wizard can upload any staged attachments to it.
+        return redirect()->back()
+            ->with('success', 'Calendar event created.')
+            ->with('createdEventId', $event->id);
+    }
+
+    /**
+     * Upload one attachment to an event (multipart, single file). The wizard
+     * uploads staged files here after the event is saved.
+     */
+    public function storeAttachment(Request $request, HrCalendarEvent $event)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+
+        $request->validate([
+            'file' => ['required', 'file', 'max:10240', 'mimes:'.self::ATTACHMENT_MIMES],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('hr/calendar/'.($event->tenant_id ?? 'shared'), 'private');
+
+        $attachment = $event->attachments()->create([
+            'tenant_id' => $event->tenant_id,
+            'uploaded_by' => $user->id,
+            'disk' => 'private',
+            'original_name' => $file->getClientOriginalName(),
+            'path' => $path,
+            'mime' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+        ]);
+
+        return response()->json(['attachment' => $this->attachmentPayload($attachment)]);
+    }
+
+    /** Remove an attachment (file + row). */
+    public function destroyAttachment(Request $request, HrCalendarEventAttachment $attachment)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $attachment->tenant_id);
+
+        Storage::disk($attachment->disk ?: 'private')->delete($attachment->path);
+        $attachment->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Stream an attachment from the private disk (hardened headers). */
+    public function downloadAttachment(Request $request, HrCalendarEventAttachment $attachment)
+    {
+        $user = $request->user();
+        abort_unless($this->canView($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $attachment->tenant_id);
+
+        return $this->streamPrivateAttachment(
+            $attachment->disk,
+            $attachment->path,
+            $attachment->original_name,
+            $attachment->mime,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function attachmentPayload(HrCalendarEventAttachment $attachment): array
+    {
+        return [
+            'id' => $attachment->id,
+            'name' => $attachment->original_name,
+            'mime' => $attachment->mime,
+            'size' => $attachment->size,
+            'url' => url('/hr/calendar/attachments/'.$attachment->id.'/download'),
+        ];
     }
 
     /**
