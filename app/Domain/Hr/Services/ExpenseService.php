@@ -18,16 +18,21 @@ class ExpenseService
 
     /**
      * Create a new expense claim with optional items.
+     *
+     * @param  User|null  $onBehalfOf  When a manager files for another employee,
+     *                                 the claim is OWNED by them but created_by
+     *                                 records the manager. Tenant is the actor's.
      */
-    public function createClaim(User $user, array $data): HrExpenseClaim
+    public function createClaim(User $user, array $data, ?User $onBehalfOf = null): HrExpenseClaim
     {
-        return DB::transaction(function () use ($user, $data) {
+        return DB::transaction(function () use ($user, $data, $onBehalfOf) {
             $tenantId = $this->resolveTenantId($user);
             $claimNumber = $this->generateClaimNumber($tenantId);
+            $owner = $onBehalfOf ?? $user;
 
             $claim = HrExpenseClaim::create([
                 'tenant_id' => $tenantId,
-                'user_id' => $user->id,
+                'user_id' => $owner->id,
                 'claim_number' => $claimNumber,
                 'title' => $data['title'],
                 'status' => 'draft',

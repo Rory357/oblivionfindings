@@ -686,6 +686,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
             Route::post('/reviews/{review}/approve', [CompensationController::class, 'approveReview'])->name('reviews.approve');
             Route::post('/reviews/{review}/apply', [CompensationController::class, 'applyReview'])->name('reviews.apply');
+            Route::post('/reviews/{review}/items/{item}/approve', [CompensationController::class, 'approveReviewItem'])->name('reviews.items.approve');
+            Route::post('/reviews/{review}/items/{item}/reject', [CompensationController::class, 'rejectReviewItem'])->name('reviews.items.reject');
             Route::post('/bonuses', [BonusController::class, 'store'])->name('bonuses.store');
             Route::post('/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('bonuses.approve');
         });
@@ -724,6 +726,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         });
 
         Route::middleware('permission:hr.expenses.approve')->group(function () {
+            Route::post('/bulk-approve', [ExpenseController::class, 'bulkApprove'])->name('bulk-approve');
             Route::post('/{expenseClaim}/approve', [ExpenseController::class, 'approve'])->name('approve');
             Route::post('/{expenseClaim}/reject', [ExpenseController::class, 'reject'])->name('reject');
             Route::post('/{expenseClaim}/pay', [ExpenseController::class, 'pay'])->name('pay');
