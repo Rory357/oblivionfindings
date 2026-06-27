@@ -34,6 +34,7 @@ import {
     type EventCategoryOption,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
+import { type PersonOption } from '@/components/hr/people-picker';
 import { HrTabs } from '@/components/hr';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import {
@@ -80,6 +81,7 @@ interface Props {
     departments: IdName[];
     teams: string[];
     categories: EventCategoryOption[];
+    staff: PersonOption[];
     stats: HeroStats;
     upNext: UpNextEntry[];
     ical: { url: string | null };
@@ -189,6 +191,7 @@ export default function CalendarIndex({
     departments,
     teams,
     categories,
+    staff,
     stats,
     upNext,
     ical,
@@ -349,6 +352,8 @@ export default function CalendarIndex({
             site_id: (props.siteId as number) ?? null,
             rrule: (props.rrule as string) ?? null,
             recurrence_until: (props.recurrenceUntil as string) ?? null,
+            audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'people') ?? 'org',
+            audience_user_ids: (props.attendeeUserIds as number[]) ?? [],
             scope,
             occurrence_date: (props.occurrenceDate as string) ?? null,
         };
@@ -598,6 +603,7 @@ export default function CalendarIndex({
                         sites={sites}
                         departments={departments}
                         categories={categories}
+                        staff={staff}
                         initial={editingEvent}
                         defaultDate={createDate}
                     />

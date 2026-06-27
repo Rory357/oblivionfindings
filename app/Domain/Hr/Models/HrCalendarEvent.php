@@ -72,6 +72,11 @@ class HrCalendarEvent extends Model
         return $this->belongsTo(HrCalendarEventCategory::class, 'category_id');
     }
 
+    public function attendees(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(HrCalendarEventAttendee::class, 'event_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

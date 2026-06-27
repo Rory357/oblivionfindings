@@ -144,6 +144,71 @@ test('editing one occurrence of a series stores an override', function () {
     expect($titles)->not->toContain('Weekly standup');
 });
 
+test('an event can invite specific people who can then RSVP', function () {
+    $invitee = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $invitee->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/calendar/events', [
+            'title' => 'Team lunch',
+            'event_type' => 'social',
+            'starts_at' => now()->addWeek()->toDateTimeString(),
+            'ends_at' => now()->addWeek()->addHour()->toDateTimeString(),
+            'audience_type' => 'people',
+            'audience_user_ids' => [$invitee->id],
+        ])
+        ->assertRedirect();
+
+    $event = HrCalendarEvent::query()->where('title', 'Team lunch')->firstOrFail();
+
+    $this->assertDatabaseHas('hr_calendar_event_attendees', [
+        'event_id' => $event->id,
+        'user_id' => $invitee->id,
+        'audience_type' => 'person',
+        'rsvp_status' => 'none',
+    ]);
+
+    $from = now()->startOfMonth()->toDateString();
+    $to = now()->endOfMonth()->addMonth()->toDateString();
+    $row = collect(
+        $this->actingAs($this->hr)
+            ->getJson("/hr/calendar/feed?from={$from}&to={$to}&layers=event")
+            ->json('events')
+    )->firstWhere('id', 'event-'.$event->id);
+
+    expect($row['extendedProps']['attendeeCount'])->toBe(1);
+
+    // The invitee responds.
+    $this->actingAs($invitee)
+        ->post("/hr/calendar/events/{$event->id}/rsvp", ['status' => 'yes'])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('hr_calendar_event_attendees', [
+        'event_id' => $event->id,
+        'user_id' => $invitee->id,
+        'rsvp_status' => 'yes',
+    ]);
+});
+
+test('a user who was not invited cannot RSVP', function () {
+    $outsider = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $outsider->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+
+    $event = HrCalendarEvent::query()->create([
+        'tenant_id' => 1,
+        'created_by' => $this->hr->id,
+        'title' => 'Private review',
+        'event_type' => 'company',
+        'starts_at' => now()->addWeek(),
+        'ends_at' => now()->addWeek()->addHour(),
+        'is_all_day' => false,
+    ]);
+
+    $this->actingAs($outsider)
+        ->post("/hr/calendar/events/{$event->id}/rsvp", ['status' => 'yes'])
+        ->assertForbidden();
+});
+
 test('unknown layer keys are ignored and default layers apply', function () {
     $from = now()->startOfMonth()->toDateString();
     $to = now()->endOfMonth()->toDateString();
