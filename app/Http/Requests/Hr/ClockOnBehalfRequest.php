@@ -20,8 +20,17 @@ class ClockOnBehalfRequest extends FormRequest
             'clock_in' => ['required', 'date'],
             'clock_out' => ['nullable', 'date', 'after:clock_in'],
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'pay_type' => ['nullable', 'string', Rule::in(['standard', 'sleepover', 'on_call', 'public_holiday', 'night', 'weekend', 'evening'])],
+            'is_sleepover' => ['nullable', 'boolean'],
+            'is_on_call' => ['nullable', 'boolean'],
+            'is_public_holiday' => ['nullable', 'boolean'],
+            // The rebuilt "Clock on behalf" wizard requires a reason — it is
+            // persisted to the entry notes + an audit amendment row by the service.
+            'reason' => ['required', 'string', 'max:2000'],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }

@@ -23,7 +23,10 @@ class UpdateTimeEntryRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'is_sleepover' => ['nullable', 'boolean'],
             'is_on_call' => ['nullable', 'boolean'],
+            'is_public_holiday' => ['nullable', 'boolean'],
             'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'cost_centre' => ['nullable', 'string', 'max:50'],
+            'project_code' => ['nullable', 'string', 'max:50'],
             'amendment_reason' => ['required', 'string', 'max:2000'],
         ];
     }
