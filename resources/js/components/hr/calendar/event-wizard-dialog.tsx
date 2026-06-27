@@ -56,11 +56,19 @@ export interface CalendarEventInitial {
     ends_at: string;
     is_all_day: boolean;
     location: string | null;
-    department: string | null;
+    department_id: number | null;
     site_id: number | null;
 }
 
 type IdName = { id: number; name: string };
+
+export interface EventCategoryOption {
+    id: number;
+    key: string;
+    label: string;
+    icon: string | null;
+    color_token: string;
+}
 
 const STEPS: readonly WizardStep[] = [
     { key: 'basics', label: 'Basics', blurb: 'Title & type', icon: Megaphone },
@@ -69,16 +77,24 @@ const STEPS: readonly WizardStep[] = [
     { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
 ];
 
+/** Client-side icon + sublabel per known category key (DB stores icon by name). */
+const CATEGORY_STYLE: Record<string, { icon: LucideIcon; sub: string }> = {
+    company: { icon: Building2, sub: 'Org-wide notice' },
+    team: { icon: Users, sub: 'For a team or site' },
+    training: { icon: GraduationCap, sub: 'Course or session' },
+    social: { icon: PartyPopper, sub: 'Get-together' },
+    holiday: { icon: CalendarRange, sub: 'Closure or obs.' },
+};
+const styleFor = (key: string) => CATEGORY_STYLE[key] ?? { icon: CalendarRange, sub: '' };
+
 type CategoryMeta = { value: string; label: string; icon: LucideIcon; accent: string; sub: string };
-const CATEGORIES: CategoryMeta[] = [
-    { value: 'company', label: 'Company', icon: Building2, accent: 'var(--category-hr)', sub: 'Org-wide notice' },
-    { value: 'team', label: 'Team', icon: Users, accent: 'var(--category-ops)', sub: 'For a team or site' },
-    { value: 'training', label: 'Training', icon: GraduationCap, accent: 'var(--status-info)', sub: 'Course or session' },
-    { value: 'social', label: 'Social', icon: PartyPopper, accent: 'var(--category-finance)', sub: 'Get-together' },
-    { value: 'holiday', label: 'Holiday / closure', icon: CalendarRange, accent: 'var(--status-warning)', sub: 'Closure or obs.' },
-];
-const categoryMeta = (value: string): CategoryMeta =>
-    CATEGORIES.find((c) => c.value === value) ?? CATEGORIES[0];
+const metaFor = (cat: EventCategoryOption): CategoryMeta => ({
+    value: cat.key,
+    label: cat.label,
+    icon: styleFor(cat.key).icon,
+    accent: `var(--${cat.color_token})`,
+    sub: styleFor(cat.key).sub,
+});
 
 /** Trim a server ISO string to what a datetime-local / date input wants. */
 const toLocalInput = (value: string, allDay: boolean) =>
@@ -110,6 +126,7 @@ export function EventWizardDialog({
     onSaved,
     sites,
     departments,
+    categories,
     initial,
     defaultDate,
 }: {
@@ -119,6 +136,7 @@ export function EventWizardDialog({
     onSaved: () => void;
     sites: IdName[];
     departments: IdName[];
+    categories: EventCategoryOption[];
     initial?: CalendarEventInitial | null;
     /** Click-to-create prefill (YYYY-MM-DD) when creating a new event. */
     defaultDate?: string | null;
@@ -137,7 +155,7 @@ export function EventWizardDialog({
         ends_at: '',
         is_all_day: false,
         location: '',
-        department: '',
+        department_id: '',
         site_id: '',
     });
 
@@ -153,7 +171,7 @@ export function EventWizardDialog({
                 ends_at: toLocalInput(initial.ends_at, initial.is_all_day),
                 is_all_day: initial.is_all_day,
                 location: initial.location ?? '',
-                department: initial.department ?? '',
+                department_id: initial.department_id ? String(initial.department_id) : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
             });
         } else if (defaultDate) {
@@ -177,7 +195,11 @@ export function EventWizardDialog({
         onClose();
     };
 
-    const meta = categoryMeta(form.data.event_type);
+    const selectedCategory =
+        categories.find((c) => c.key === form.data.event_type) ?? categories[0];
+    const meta = selectedCategory
+        ? metaFor(selectedCategory)
+        : { value: 'company', label: 'Company', icon: Building2, accent: 'var(--category-hr)', sub: '' };
     const canSubmit =
         form.data.title.trim() !== '' &&
         form.data.starts_at !== '' &&
@@ -186,6 +208,10 @@ export function EventWizardDialog({
     const siteName = useMemo(
         () => sites.find((s) => String(s.id) === form.data.site_id)?.name ?? 'All sites',
         [sites, form.data.site_id],
+    );
+    const departmentName = useMemo(
+        () => departments.find((d) => String(d.id) === form.data.department_id)?.name ?? '',
+        [departments, form.data.department_id],
     );
 
     const setAllDay = (next: boolean) => {
@@ -201,6 +227,7 @@ export function EventWizardDialog({
         form.transform((data) => ({
             ...data,
             site_id: data.site_id === '' ? null : data.site_id,
+            department_id: data.department_id === '' ? null : data.department_id,
         }));
 
     const onError = () => {
@@ -378,15 +405,16 @@ export function EventWizardDialog({
 
                         <SubHead icon={CalendarRange}>Category</SubHead>
                         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            {CATEGORIES.map((c) => {
-                                const Icon = c.icon;
-                                const active = form.data.event_type === c.value;
+                            {categories.map((c) => {
+                                const m = metaFor(c);
+                                const Icon = m.icon;
+                                const active = form.data.event_type === c.key;
                                 return (
                                     <button
-                                        key={c.value}
+                                        key={c.key}
                                         type="button"
-                                        onClick={() => form.setData('event_type', c.value)}
-                                        style={active ? { borderColor: c.accent } : undefined}
+                                        onClick={() => form.setData('event_type', c.key)}
+                                        style={active ? { borderColor: m.accent } : undefined}
                                         className={cn(
                                             'flex items-start gap-2.5 rounded-xl border p-3 text-left transition-colors',
                                             active ? 'bg-accent' : 'border-border hover:bg-muted/50',
@@ -394,13 +422,13 @@ export function EventWizardDialog({
                                     >
                                         <span
                                             className="grid h-9 w-9 flex-none place-items-center rounded-lg"
-                                            style={{ background: `color-mix(in oklch, ${c.accent} 16%, transparent)`, color: c.accent }}
+                                            style={{ background: `color-mix(in oklch, ${m.accent} 16%, transparent)`, color: m.accent }}
                                         >
                                             <Icon className="h-[18px] w-[18px]" />
                                         </span>
                                         <span className="min-w-0">
                                             <span className="block text-[13px] font-semibold">{c.label}</span>
-                                            <span className="block text-[11px] text-muted-foreground">{c.sub}</span>
+                                            <span className="block text-[11px] text-muted-foreground">{m.sub}</span>
                                         </span>
                                     </button>
                                 );
@@ -473,15 +501,15 @@ export function EventWizardDialog({
                                     ]}
                                 />
                             </Field>
-                            <Field label="Department" error={form.errors.department}>
+                            <Field label="Department" error={form.errors.department_id}>
                                 <SelectInput
-                                    value={form.data.department || 'none'}
-                                    onChange={(v) => form.setData('department', v === 'none' ? '' : v)}
+                                    value={form.data.department_id || 'none'}
+                                    onChange={(v) => form.setData('department_id', v === 'none' ? '' : v)}
                                     placeholder="Any department"
                                     ariaLabel="Department"
                                     options={[
                                         { value: 'none', label: 'Any department' },
-                                        ...departments.map((d) => ({ value: d.name, label: d.name })),
+                                        ...departments.map((d) => ({ value: String(d.id), label: d.name })),
                                     ]}
                                 />
                             </Field>
@@ -509,7 +537,7 @@ export function EventWizardDialog({
                             <ReviewRow label="When" value={prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)} />
                             <ReviewRow label="Category" value={meta.label} />
                             <ReviewRow label="Site" value={siteName} />
-                            {form.data.department ? <ReviewRow label="Department" value={form.data.department} /> : null}
+                            {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
                             {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}
                             {form.data.description ? <ReviewRow label="Description" value={form.data.description} /> : null}
                         </ReviewCard>

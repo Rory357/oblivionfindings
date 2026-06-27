@@ -213,12 +213,12 @@ test('hr assets create page loads', function () {
     });
 });
 
-test('hr calendar time-off page loads', function () {
+test('hr calendar page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/calendar/time-off')
-            ->waitForText('Time', 10)
+            ->visit('/hr/calendar')
+            ->waitForText('Calendar', 10)
             ->assertPathBeginsWith('/hr/calendar');
     });
 });

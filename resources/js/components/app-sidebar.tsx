@@ -2155,9 +2155,7 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     ) {
         timeAndLeave.items.push({
             title: 'Calendar',
-            href: can?.hr?.calendar?.view
-                ? '/hr/calendar'
-                : '/hr/calendar/time-off',
+            href: '/hr/calendar',
             icon: CalendarDays,
         });
     }

@@ -1,6 +1,5 @@
 // Shared HR design-spine primitives. Import from '@/components/hr'.
 export * from './add-employee-dialog';
-export * from './calendar-tabs';
 export * from './my-hr-around-modal';
 export * from './my-hr-shoutout-spotlight';
 export * from './compensation-tabs';

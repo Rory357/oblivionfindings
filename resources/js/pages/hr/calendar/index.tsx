@@ -24,6 +24,7 @@ import { CalendarHero, type UpNextEntry } from '@/components/hr/calendar/calenda
 import {
     EventWizardDialog,
     type CalendarEventInitial,
+    type EventCategoryOption,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
 import { HrTabs } from '@/components/hr';
@@ -71,6 +72,7 @@ interface Props {
     sites: IdName[];
     departments: IdName[];
     teams: string[];
+    categories: EventCategoryOption[];
     stats: HeroStats;
     upNext: UpNextEntry[];
     ical: { url: string | null };
@@ -179,6 +181,7 @@ export default function CalendarIndex({
     sites,
     departments,
     teams,
+    categories,
     stats,
     upNext,
     ical,
@@ -337,7 +340,7 @@ export default function CalendarIndex({
                 ends_at: (props.endRaw as string) ?? info.event.endStr ?? info.event.startStr,
                 is_all_day: !!props.isAllDay,
                 location: (props.location as string) ?? null,
-                department: (props.department as string) ?? null,
+                department_id: (props.departmentId as number) ?? null,
                 site_id: (props.siteId as number) ?? null,
             });
             setCreateDate(null);
@@ -564,6 +567,7 @@ export default function CalendarIndex({
                         onSaved={refetch}
                         sites={sites}
                         departments={departments}
+                        categories={categories}
                         initial={editingEvent}
                         defaultDate={createDate}
                     />

@@ -94,15 +94,12 @@ class HrCalendarAggregator
 
     private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
     {
-        // NOTE: events carry a free-text `department` today, not a `department_id`
-        // FK — so the department filter doesn't constrain events yet (it does
-        // constrain the people-derived milestone layer). Binding events to
-        // HrDepartment is tracked as a follow-up (see the gap analysis).
         return HrCalendarEvent::query()
             ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
             ->inRange($start->toDateString(), $end->toDateString())
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
-            ->with(['creator:id,name', 'site:id,name'])
+            ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
+            ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name'])
             ->orderBy('starts_at')
             ->get()
             ->map(fn (HrCalendarEvent $e) => [
@@ -119,7 +116,8 @@ class HrCalendarAggregator
                     'category' => $e->event_type,
                     'site' => $e->site?->name,
                     'siteId' => $e->site_id,
-                    'department' => $e->department,
+                    'department' => $e->departmentRef?->name ?? $e->department,
+                    'departmentId' => $e->department_id,
                     'location' => $e->location,
                     'description' => $e->description,
                     'isAllDay' => (bool) $e->is_all_day,

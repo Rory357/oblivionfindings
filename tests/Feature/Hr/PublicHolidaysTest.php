@@ -70,7 +70,7 @@ test('hr leave managers can create edit and delete public holidays', function ()
     expect(HrPublicHoliday::query()->whereKey($holiday->id)->exists())->toBeFalse();
 });
 
-test('time off calendar includes public holidays for each day', function () {
+test('the calendar feed surfaces public holidays on the holiday layer', function () {
     HrPublicHoliday::query()->updateOrCreate(
         [
             'tenant_id' => 1,
@@ -84,16 +84,19 @@ test('time off calendar includes public holidays for each day', function () {
         ],
     );
 
-    $response = $this->actingAs($this->hr)->get('/hr/calendar/time-off?month=2026-07');
+    $events = collect(
+        $this->actingAs($this->hr)
+            ->getJson('/hr/calendar/feed?from=2026-07-01&to=2026-07-31&layers=holiday')
+            ->assertOk()
+            ->json('events')
+    );
 
-    $response->assertOk();
+    $matariki = $events->firstWhere('id', 'holiday-2026-07-10');
 
-    $matariki = collect($response->inertiaProps('calendarDays'))->firstWhere('date', '2026-07-10');
-
-    $holidayNames = collect($matariki['public_holidays'])->pluck('name')->all();
-
-    expect($holidayNames)->toContain('Matariki')
-        ->and(collect($matariki['public_holidays'])->pluck('region')->all())->toContain('national');
+    expect($matariki)->not->toBeNull();
+    expect($matariki['layer'])->toBe('holiday');
+    expect($matariki['title'])->toBe('Matariki');
+    expect($matariki['extendedProps']['isNational'])->toBeTrue();
 });
 
 test('production database seeding includes the durable public holidays seeder', function () {
