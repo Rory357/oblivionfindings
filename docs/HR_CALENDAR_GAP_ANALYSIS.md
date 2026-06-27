@@ -112,6 +112,24 @@ colours are token references / `color-mix()`), `php -l` clean on all PHP.
 
 ---
 
+## Follow-up progress (shipped 2026-06-27)
+
+The deferred backlog below has since been worked through and merged to `main`
+(each with feature tests — the calendar suite is **11 tests / 44 assertions green**):
+
+- ✅ **D1** Duplicate Time-Off calendar retired (controller/route/page/legacy tabs
+  deleted; `canView` broadened so leave viewers land on the unified page).
+- ✅ **D2** Events bound to `HrDepartment` (FK + backfill; event department filter live).
+- ✅ **D3** `hr_calendar_event_categories` table + `category_id` FK; wizard tiles from DB.
+- ✅ **D4** Recurrence (rrule expansion, override children, "this / this & following /
+  all" edit-scope gated on `calendar.manage_recurring`).
+- ✅ **D5** Attendees + RSVP (audience selector + people picker; RSVP endpoint).
+- ✅ **D6** Reminders + every-minute `hr:dispatch-calendar-reminders` dispatch job.
+- ✅ **D7** Attachments on the private disk (mime allowlist, hardened serving).
+- ⛔ **D8** Rich interactions (context menu, hover/detail popover, year picker,
+  drag/resize, keyboard shortcuts, quick-add escalation, skeleton) — **remaining**.
+- ⛔ Pixel-diff vs `HR Calendar.dc.html` (still not provided).
+
 ## Deferred — recommended follow-up passes
 
 These are genuinely large and/or need schema + browser verification. None block
