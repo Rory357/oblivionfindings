@@ -7,6 +7,7 @@ import { useForm } from '@inertiajs/react';
 import {
     AlarmClock,
     ArrowRight,
+    Bell,
     Building2,
     CalendarRange,
     ClipboardCheck,
@@ -66,6 +67,7 @@ export interface CalendarEventInitial {
     recurrence_until?: string | null;
     audience_type?: 'org' | 'site' | 'department' | 'people' | null;
     audience_user_ids?: number[];
+    reminders?: { offset_minutes: number; channel: string }[];
     /** Set when editing a single occurrence of a recurring series. */
     scope?: 'all' | 'this' | 'following';
     occurrence_date?: string | null;
@@ -85,8 +87,19 @@ const STEPS: readonly WizardStep[] = [
     { key: 'basics', label: 'Basics', blurb: 'Title & type', icon: Megaphone },
     { key: 'when', label: 'When', blurb: 'Dates & times', icon: CalendarRange },
     { key: 'who', label: 'Who & where', blurb: 'Audience & place', icon: Users },
+    { key: 'details', label: 'Details', blurb: 'Reminders & files', icon: Bell },
     { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
 ];
+
+/** Reminder lead-time presets the user can toggle. */
+const REMINDER_PRESETS: { minutes: number; label: string }[] = [
+    { minutes: 0, label: 'At start' },
+    { minutes: 10, label: '10 min before' },
+    { minutes: 60, label: '1 hour before' },
+    { minutes: 1440, label: '1 day before' },
+];
+const reminderLabel = (m: number): string =>
+    REMINDER_PRESETS.find((p) => p.minutes === m)?.label ?? `${m} min before`;
 
 /** Client-side icon + sublabel per known category key (DB stores icon by name). */
 const CATEGORY_STYLE: Record<string, { icon: LucideIcon; sub: string }> = {
@@ -183,6 +196,7 @@ export function EventWizardDialog({
     const [submitted, setSubmitted] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [keepAdding, setKeepAdding] = useState(false);
+    const [reminderChannel, setReminderChannel] = useState<'notification' | 'email'>('notification');
 
     const form = useForm({
         title: '',
@@ -195,6 +209,7 @@ export function EventWizardDialog({
         recurrence_until: '' as string,
         audience_type: 'org' as 'org' | 'site' | 'department' | 'people',
         audience_user_ids: [] as number[],
+        reminders: [] as { offset_minutes: number; channel: string }[],
         location: '',
         department_id: '',
         site_id: '',
@@ -215,10 +230,14 @@ export function EventWizardDialog({
                 recurrence_until: initial.recurrence_until ? initial.recurrence_until.substring(0, 10) : '',
                 audience_type: initial.audience_type ?? 'org',
                 audience_user_ids: initial.audience_user_ids ?? [],
+                reminders: initial.reminders ?? [],
                 location: initial.location ?? '',
                 department_id: initial.department_id ? String(initial.department_id) : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
             });
+            setReminderChannel(
+                (initial.reminders?.[0]?.channel as 'notification' | 'email') ?? 'notification',
+            );
         } else if (defaultDate) {
             form.setData((d) => ({
                 ...d,
@@ -700,8 +719,68 @@ export function EventWizardDialog({
                     </WizardStepPane>
                 )}
 
-                {/* ── Step 4 · Review ── */}
+                {/* ── Step 4 · Details (reminders & files) ── */}
                 {wizard.index === 3 && (
+                    <WizardStepPane>
+                        <StepHead icon={Bell} title="Reminders & files" blurb="Nudge attendees ahead of time and attach anything useful." />
+
+                        <SubHead icon={Bell}>Reminders</SubHead>
+                        <div className="mt-2">
+                            <Segmented
+                                value={reminderChannel}
+                                onChange={(v) => {
+                                    const ch = v as 'notification' | 'email';
+                                    setReminderChannel(ch);
+                                    form.setData(
+                                        'reminders',
+                                        form.data.reminders.map((r) => ({ ...r, channel: ch })),
+                                    );
+                                }}
+                                options={[
+                                    { value: 'notification', label: 'In-app' },
+                                    { value: 'email', label: 'Email' },
+                                ]}
+                            />
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {REMINDER_PRESETS.map((p) => {
+                                const active = form.data.reminders.some((r) => r.offset_minutes === p.minutes);
+                                return (
+                                    <button
+                                        key={p.minutes}
+                                        type="button"
+                                        onClick={() =>
+                                            form.setData(
+                                                'reminders',
+                                                active
+                                                    ? form.data.reminders.filter((r) => r.offset_minutes !== p.minutes)
+                                                    : [...form.data.reminders, { offset_minutes: p.minutes, channel: reminderChannel }],
+                                            )
+                                        }
+                                        aria-pressed={active}
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors',
+                                            active
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border text-muted-foreground hover:bg-muted/50',
+                                        )}
+                                    >
+                                        {active ? <Bell className="h-3.5 w-3.5" /> : null}
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-2 text-[12px] text-muted-foreground">
+                            {form.data.reminders.length === 0
+                                ? 'No reminders — attendees just see it on the calendar.'
+                                : `${form.data.reminders.length} reminder${form.data.reminders.length === 1 ? '' : 's'} via ${reminderChannel === 'email' ? 'email' : 'in-app notification'}.`}
+                        </p>
+                    </WizardStepPane>
+                )}
+
+                {/* ── Step 5 · Review ── */}
+                {wizard.index === 4 && (
                     <WizardStepPane>
                         <StepHead icon={ClipboardCheck} title="Review & save" blurb="Check the details, then save the event." />
                         <ReviewCard
@@ -719,6 +798,14 @@ export function EventWizardDialog({
                             <ReviewRow label="Site" value={siteName} />
                             {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
                             <ReviewRow label="Audience" value={reachText} />
+                            {form.data.reminders.length > 0 ? (
+                                <ReviewRow
+                                    label="Reminders"
+                                    value={form.data.reminders
+                                        .map((r) => reminderLabel(r.offset_minutes))
+                                        .join(', ')}
+                                />
+                            ) : null}
                             {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}
                             {form.data.description ? <ReviewRow label="Description" value={form.data.description} /> : null}
                         </ReviewCard>

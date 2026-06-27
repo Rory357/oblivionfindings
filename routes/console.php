@@ -86,6 +86,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:30');
 
+// HR calendar event reminders: every minute, fire any reminder whose lead time
+// lands in the last minute (de-duped via last_sent_at).
+app(Schedule::class)
+    ->command('hr:dispatch-calendar-reminders')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // High severity incidents that have not been reviewed: hourly (internal ops)
 app(Schedule::class)
     ->command('incidents:remind-high-unreviewed')

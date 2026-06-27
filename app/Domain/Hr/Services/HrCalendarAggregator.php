@@ -117,7 +117,7 @@ class HrCalendarAggregator
                         ->where(fn ($q3) => $q3->whereNull('recurrence_until')->orWhere('recurrence_until', '>=', $start));
                 });
             })
-            ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name'])
+            ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders'])
             ->orderBy('starts_at')
             ->get();
 
@@ -128,7 +128,7 @@ class HrCalendarAggregator
             : HrCalendarEvent::query()
                 ->whereIn('recurrence_parent_id', $recurringIds->all())
                 ->where('is_exception', true)
-                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name'])
+                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders'])
                 ->get()
                 ->groupBy('recurrence_parent_id');
 
@@ -202,6 +202,12 @@ class HrCalendarAggregator
                 'attendeeUserIds' => $audience['userIds'],
                 'rsvp' => $audience['rsvp'],
                 'myRsvp' => $audience['myRsvp'],
+                'reminders' => $e->relationLoaded('reminders')
+                    ? $e->reminders->map(fn ($r) => [
+                        'offset_minutes' => (int) $r->offset_minutes,
+                        'channel' => $r->channel,
+                    ])->values()->all()
+                    : [],
             ],
         ];
     }
