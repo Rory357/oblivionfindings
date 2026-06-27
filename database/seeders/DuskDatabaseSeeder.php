@@ -591,9 +591,6 @@ class DuskDatabaseSeeder extends Seeder
         // ──────────────────────────────────────────────
         $this->seed(fn () => \App\Domain\Hr\Models\HrPosition::factory()->create());
         $this->seed(fn () => \App\Domain\Hr\Models\HrPolicy::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrJobPosting::factory()->create([
-            'created_by' => $admin->id,
-        ]));
         $this->seed(fn () => \App\Domain\Hr\Models\HrLeaveRequest::factory()->create([
             'user_id' => $staffUser->id,
         ]));

@@ -91,9 +91,9 @@ Route::get('/smart-monitoring', function () {
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store']);
 // Career Portal — public surface lives on the requisition-backed Careers
-// controller; legacy posting-backed routes (`show`, `applicationStatus`) stay
-// on the original controller until the HrJobPosting → HrJobRequisition
-// migration is complete.
+// controller. The legacy posting-backed job-detail page has been retired; only
+// the candidate application-status tracker (`applicationStatus`) remains on the
+// original controller, now sourced from requisitions.
 Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.index');
 Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->name('careers.application.status');
 Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->name('careers.offer.show');
@@ -103,7 +103,7 @@ Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 's
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
 Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->name('careers.reference.show');
 Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->name('careers.reference.submit');
-Route::get('/careers/{slug}', [App\Http\Controllers\CareerPortalController::class, 'show'])->name('careers.show');
+Route::get('/careers/{slug}', fn () => redirect()->route('careers.index'))->where('slug', '^(?!application|offers|jobs|references).*$')->name('careers.show');
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
