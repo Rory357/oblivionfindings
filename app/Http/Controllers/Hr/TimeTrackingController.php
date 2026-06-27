@@ -45,6 +45,27 @@ class TimeTrackingController extends Controller
         ];
     }
 
+    /**
+     * Guard a single-entry write/read: the entry must belong to the actor's
+     * tenant, and an approve-only (non-admin) manager may only touch their own
+     * or their direct reports' entries — mirrors clockOnBehalf()'s team check so
+     * a team lead can't rewrite arbitrary staff's payroll-bound time.
+     */
+    private function assertEntryAccess(HrTimeEntry $entry, User $user): void
+    {
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $entry->tenant_id);
+
+        if ($user->canDo('timesheets.manageAny')) {
+            return;
+        }
+
+        $teamUserIds = $this->timeTrackingService->getTeamUserIds($user);
+        if ($entry->user_id !== $user->id && ! in_array($entry->user_id, $teamUserIds, true)) {
+            abort(403);
+        }
+    }
+
     private function applyAccessScope($query, $user, array $access)
     {
         if ($access['canManage']) {
@@ -527,7 +548,26 @@ class TimeTrackingController extends Controller
             ];
         }
 
-        // 4. Today's loadings (sleepover / on-call / public holiday).
+        // 4. Roster-unlinked clock entries this week (no shift_id) — aggregated.
+        $unlinkedQuery = HrTimeEntry::forTenant($tenantId)
+            ->forDateRange($weekStart, $weekEnd)
+            ->where('entry_type', 'clock')
+            ->whereNull('shift_id');
+        $this->applyAccessScope($unlinkedQuery, $user, $access);
+        $unlinkedCount = (clone $unlinkedQuery)->count();
+        if ($unlinkedCount > 0) {
+            $exceptions[] = [
+                'id' => 'unlinked-week',
+                'kind' => 'unlinked',
+                'severity' => 'info',
+                'title' => $unlinkedCount.' '.($unlinkedCount === 1 ? 'entry' : 'entries').' not linked to a roster shift',
+                'detail' => 'Clock entries this week with no rostered shift — confirm they were worked as planned.',
+                'badge' => 'Unlinked',
+                'action' => 'view_entries',
+            ];
+        }
+
+        // 5. Today's loadings (sleepover / on-call / public holiday).
         $loadingQuery = HrTimeEntry::forTenant($tenantId)
             ->where('entry_date', now()->toDateString())
             ->where(fn ($q) => $q->where('is_sleepover', true)->orWhere('is_on_call', true)->orWhere('is_public_holiday', true));
@@ -645,6 +685,7 @@ class TimeTrackingController extends Controller
     public function updateEntry(UpdateTimeEntryRequest $request, HrTimeEntry $entry)
     {
         $user = $request->user();
+        $this->assertEntryAccess($entry, $user);
         $validated = $request->validated();
         $reason = $validated['amendment_reason'];
         unset($validated['amendment_reason']);
@@ -662,8 +703,10 @@ class TimeTrackingController extends Controller
     /*  Entry Amendments — audit trail */
     /* ------------------------------------------------------------------ */
 
-    public function entryAmendments(HrTimeEntry $entry)
+    public function entryAmendments(Request $request, HrTimeEntry $entry)
     {
+        $this->assertEntryAccess($entry, $request->user());
+
         $amendments = $entry->amendments()
             ->with('amendedByUser:id,name')
             ->orderByDesc('created_at')
@@ -689,6 +732,7 @@ class TimeTrackingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve')), 403);
+        $this->assertEntryAccess($entry, $user);
 
         $validated = $request->validate([
             'clock_out' => ['required', 'date', 'after:'.$entry->clock_in->toDateTimeString()],
@@ -719,6 +763,7 @@ class TimeTrackingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('timesheets.manageAny'), 403);
+        $this->assertEntryAccess($entry, $user);
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:2000'],

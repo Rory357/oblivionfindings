@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- Mirrors the Add-Client wizard chrome:
  * styled native toggles for the loading flags and a token-tinted summary card.
  * Every colour is a semantic design token. */
+import { type Page } from '@inertiajs/core';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -221,10 +222,8 @@ export function TimeEntryDialog({
         const key = steps[idx].key;
         const errs: Record<string, string> = {};
         if (key === 'staff') {
+            // Staff step only owns the person — clock times live on the Times step.
             if (!form.data.user_id) errs.user_id = 'Pick a staff member.';
-            if (!form.data.clock_in) errs.clock_in = 'Set a clock-in time.';
-            if (activeMode === 'add' && !form.data.clock_out)
-                errs.clock_out = 'Set a clock-out time.';
         }
         if (key === 'times' || key === 'finish') {
             if (!form.data.clock_in) errs.clock_in = 'Set a clock-in time.';
@@ -261,17 +260,29 @@ export function TimeEntryDialog({
         // last-step guard
         if (!validateStep(wizard.index)) return;
 
-        const onOk = (kind: string) => {
-            toast.success(kind);
-            if (addAnother && (activeMode === 'add' || activeMode === 'behalf')) {
-                form.reset();
-                form.clearErrors();
-                wizard.reset();
-                setSavedAnother(true);
-            } else {
-                setSubmitted(true);
-            }
-        };
+        // Domain rejections (approved-entry void, edit-after-approval, etc.) come
+        // back as back()->with('error') — a 200 redirect that fires Inertia's
+        // onSuccess. Gate the success pane/toast on the absence of flash.error so
+        // we don't show a false "saved" while nothing persisted.
+        const onOk =
+            (kind: string) =>
+            (page: Page) => {
+                const flashError = (page.props as { flash?: { error?: string } })
+                    .flash?.error;
+                if (flashError) {
+                    toast.error('Could not save', { description: flashError });
+                    return;
+                }
+                toast.success(kind);
+                if (addAnother && (activeMode === 'add' || activeMode === 'behalf')) {
+                    form.reset();
+                    form.clearErrors();
+                    wizard.reset();
+                    setSavedAnother(true);
+                } else {
+                    setSubmitted(true);
+                }
+            };
         const common = {
             preserveScroll: true,
             onError: () => {
@@ -298,7 +309,7 @@ export function TimeEntryDialog({
                 project_code: d.project_code || undefined,
                 notes: d.notes || undefined,
             }));
-            form.post('/hr/time/entries', { ...common, onSuccess: () => onOk('Time entry created.') });
+            form.post('/hr/time/entries', { ...common, onSuccess: onOk('Time entry created.') });
         } else if (activeMode === 'behalf') {
             form.transform((d) => ({
                 target_user_id: d.user_id,
@@ -315,7 +326,7 @@ export function TimeEntryDialog({
                 reason: d.reason,
                 notes: d.notes || undefined,
             }));
-            form.post('/hr/time/clock-on-behalf', { ...common, onSuccess: () => onOk('Entry created on behalf.') });
+            form.post('/hr/time/clock-on-behalf', { ...common, onSuccess: onOk('Entry created on behalf.') });
         } else if (activeMode === 'edit' && entry) {
             form.transform((d) => ({
                 clock_in: d.clock_in,
@@ -331,17 +342,17 @@ export function TimeEntryDialog({
                 notes: d.notes || undefined,
                 amendment_reason: d.amendment_reason,
             }));
-            form.put(`/hr/time/entries/${entry.id}`, { ...common, onSuccess: () => onOk('Time entry updated.') });
+            form.put(`/hr/time/entries/${entry.id}`, { ...common, onSuccess: onOk('Time entry updated.') });
         } else if (activeMode === 'correct' && entry) {
             form.transform((d) => ({
                 clock_out: d.clock_out,
                 break_minutes: Number(d.break_minutes) || 0,
                 reason: d.reason,
             }));
-            form.post(`/hr/time/entries/${entry.id}/correct`, { ...common, onSuccess: () => onOk('Clock-out corrected.') });
+            form.post(`/hr/time/entries/${entry.id}/correct`, { ...common, onSuccess: onOk('Clock-out corrected.') });
         } else if (activeMode === 'void' && entry) {
             form.transform((d) => ({ reason: d.reason }));
-            form.post(`/hr/time/entries/${entry.id}/void`, { ...common, onSuccess: () => onOk('Time entry voided.') });
+            form.post(`/hr/time/entries/${entry.id}/void`, { ...common, onSuccess: onOk('Time entry voided.') });
         }
     }
 
@@ -458,11 +469,11 @@ export function TimeEntryDialog({
                 <WizardStepPane>
                     <StepHead
                         icon={UserPlus}
-                        title={activeMode === 'behalf' ? "Who's this for?" : 'Staff & date'}
+                        title={activeMode === 'behalf' ? "Who's this for?" : 'Who is this for?'}
                         blurb={
                             activeMode === 'behalf'
-                                ? 'Pick the team member you are clocking for.'
-                                : 'Pick the staff member and set the clock times.'
+                                ? 'Pick the team member you are clocking for — you’ll set the times next.'
+                                : 'Pick the staff member — you’ll set the clock times next.'
                         }
                     />
                     <div className="max-w-[560px] space-y-4">
@@ -474,24 +485,6 @@ export function TimeEntryDialog({
                                 placeholder="Select a staff member…"
                             />
                         </Field>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Clock in" required error={form.errors.clock_in}>
-                                <DateTimeInput
-                                    value={form.data.clock_in}
-                                    onChange={(v) => form.setData('clock_in', v)}
-                                />
-                            </Field>
-                            <Field
-                                label="Clock out"
-                                hint={activeMode === 'behalf' ? '— leave blank if still on shift' : undefined}
-                                error={form.errors.clock_out}
-                            >
-                                <DateTimeInput
-                                    value={form.data.clock_out}
-                                    onChange={(v) => form.setData('clock_out', v)}
-                                />
-                            </Field>
-                        </div>
                     </div>
                 </WizardStepPane>
             ) : null}
@@ -625,34 +618,39 @@ export function TimeEntryDialog({
                             </div>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            {sites.length > 0 ? (
-                                <Field label="Site" hint="— optional">
-                                    <SelectInput
-                                        value={form.data.site_id}
-                                        onChange={(v) => form.setData('site_id', v)}
-                                        placeholder="No site"
-                                        options={sites.map((s) => ({
-                                            value: String(s.id),
-                                            label: s.name,
-                                        }))}
-                                    />
-                                </Field>
-                            ) : null}
-                            {clients.length > 0 ? (
-                                <Field label="Client" hint="— optional">
-                                    <SelectInput
-                                        value={form.data.client_id}
-                                        onChange={(v) => form.setData('client_id', v)}
-                                        placeholder="No client"
-                                        options={clients.map((c) => ({
-                                            value: String(c.id),
-                                            label: c.name,
-                                        }))}
-                                    />
-                                </Field>
-                            ) : null}
-                        </div>
+                        {/* Site/Client are only persisted on create paths — the
+                            edit/amend route doesn't accept them, so hide them in
+                            edit mode rather than show controls that silently no-op. */}
+                        {activeMode !== 'edit' ? (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {sites.length > 0 ? (
+                                    <Field label="Site" hint="— optional">
+                                        <SelectInput
+                                            value={form.data.site_id}
+                                            onChange={(v) => form.setData('site_id', v)}
+                                            placeholder="No site"
+                                            options={sites.map((s) => ({
+                                                value: String(s.id),
+                                                label: s.name,
+                                            }))}
+                                        />
+                                    </Field>
+                                ) : null}
+                                {clients.length > 0 ? (
+                                    <Field label="Client" hint="— optional">
+                                        <SelectInput
+                                            value={form.data.client_id}
+                                            onChange={(v) => form.setData('client_id', v)}
+                                            placeholder="No client"
+                                            options={clients.map((c) => ({
+                                                value: String(c.id),
+                                                label: c.name,
+                                            }))}
+                                        />
+                                    </Field>
+                                ) : null}
+                            </div>
+                        ) : null}
 
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field label="Cost centre" hint="— optional">
@@ -739,6 +737,10 @@ export function TimeEntryDialog({
                                 </div>
                             </div>
                         )}
+
+                        {activeMode === 'edit' && entry ? (
+                            <EditDiff entry={entry} data={form.data} />
+                        ) : null}
 
                         {activeMode === 'edit' ? (
                             <Field
@@ -835,6 +837,59 @@ function ToggleChip({
             {active ? <Check className="h-3 w-3" /> : null}
             {label}
         </button>
+    );
+}
+
+/** Field-level old→new diff for the edit/amend review step. */
+function EditDiff({ entry, data }: { entry: TimeEntry; data: FormShape }) {
+    const boolLabel = (b: boolean) => (b ? 'Yes' : 'No');
+    const rows: { label: string; from: string; to: string }[] = [];
+    const push = (label: string, from: string, to: string) => {
+        if (from !== to) rows.push({ label, from: from || '—', to: to || '—' });
+    };
+    push('Clock in', entry.clock_in.replace('T', ' '), data.clock_in.replace('T', ' '));
+    push('Clock out', (entry.clock_out ?? '').replace('T', ' '), data.clock_out.replace('T', ' '));
+    push('Break (min)', String(entry.break_minutes ?? 0), data.break_minutes);
+    push('Pay type', payTypeLabel(entry.pay_type), payTypeLabel(data.pay_type));
+    push('Sleepover', boolLabel(entry.is_sleepover), boolLabel(data.is_sleepover));
+    push('On-call', boolLabel(entry.is_on_call), boolLabel(data.is_on_call));
+    push('Public holiday', boolLabel(entry.is_public_holiday), boolLabel(data.is_public_holiday));
+    push('Mileage (km)', entry.mileage_km != null ? String(entry.mileage_km) : '', data.mileage_km);
+    push('Cost centre', entry.cost_centre ?? '', data.cost_centre);
+    push('Project code', entry.project_code ?? '', data.project_code);
+    push('Notes', entry.notes ?? '', data.notes);
+
+    if (rows.length === 0) {
+        return (
+            <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
+                No field changes yet — adjust the times, pay or context to amend.
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-border">
+            <div className="border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                {rows.length} {rows.length === 1 ? 'change' : 'changes'}
+            </div>
+            <div className="divide-y divide-border">
+                {rows.map((r) => (
+                    <div
+                        key={r.label}
+                        className="flex flex-wrap items-center gap-2 px-4 py-2 text-[12.5px]"
+                    >
+                        <span className="w-28 shrink-0 text-muted-foreground">{r.label}</span>
+                        <span className="rounded-md bg-status-critical-bg px-2 py-0.5 font-semibold text-status-critical line-through">
+                            {r.from}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="rounded-md bg-status-success-bg px-2 py-0.5 font-semibold text-status-success">
+                            {r.to}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 

@@ -255,6 +255,61 @@ test('approved entries cannot be voided', function () {
     expect(\App\Domain\Hr\Models\HrTimeEntry::find($entry->id))->not->toBeNull();
 });
 
+test('an approve-only manager cannot amend an entry outside their team', function () {
+    // team_lead has timesheets.approve but NOT manageAny (RbacSeeder) — they may
+    // only touch their own or their direct reports' entries.
+    $lead = hrRoleUser('team_lead');
+    $stranger = hrRoleUser('support_worker');
+    hrTimeProfile($lead);
+    hrTimeProfile($stranger); // NOT managed by $lead
+    grantHrTimePermission($lead, 'timesheets.viewAny');
+    grantHrTimePermission($lead, 'timesheets.approve');
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $stranger->id,
+        'status' => 'submitted',
+    ]);
+
+    $this->actingAs($lead)
+        ->put("/hr/time/entries/{$entry->id}", [
+            'clock_in' => '2026-04-20 09:00',
+            'clock_out' => '2026-04-20 16:00',
+            'break_minutes' => 30,
+            'amendment_reason' => 'Trying to amend a stranger entry.',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($lead)
+        ->post("/hr/time/entries/{$entry->id}/correct", [
+            'clock_out' => '2026-04-20 17:00',
+            'reason' => 'Trying to correct a stranger entry.',
+        ])
+        ->assertForbidden();
+});
+
+test('an approve-only manager can amend their direct report\'s entry', function () {
+    $lead = hrRoleUser('team_lead');
+    $report = hrRoleUser('support_worker');
+    hrTimeProfile($lead);
+    hrTimeProfile($report, $lead); // managed by $lead
+    grantHrTimePermission($lead, 'timesheets.viewAny');
+    grantHrTimePermission($lead, 'timesheets.approve');
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $report->id,
+        'status' => 'submitted',
+    ]);
+
+    $this->actingAs($lead)
+        ->put("/hr/time/entries/{$entry->id}", [
+            'clock_in' => '2026-04-20 09:00',
+            'clock_out' => '2026-04-20 16:00',
+            'break_minutes' => 30,
+            'amendment_reason' => 'Corrected the recorded finish time.',
+        ])
+        ->assertSessionHasNoErrors();
+});
+
 test('correcting a missed clock-out closes the entry and records the reason', function () {
     $manager = hrRoleUser('hr');
     $staff = hrRoleUser('support_worker');

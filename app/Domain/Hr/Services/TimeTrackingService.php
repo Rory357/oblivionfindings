@@ -258,7 +258,15 @@ class TimeTrackingService
             $breakMinutes = $data['break_minutes'] ?? $entry->break_minutes;
 
             if ($clockIn && $clockOut) {
-                $totalMinutes = Carbon::parse($clockIn)->diffInMinutes(Carbon::parse($clockOut)) - (int) $breakMinutes;
+                $elapsedMinutes = (int) Carbon::parse($clockIn)->diffInMinutes(Carbon::parse($clockOut));
+                if ((int) $breakMinutes > 0 && (int) $breakMinutes >= $elapsedMinutes) {
+                    throw new \LogicException(sprintf(
+                        'Break duration (%d min) must be less than the session duration (%d min).',
+                        (int) $breakMinutes,
+                        $elapsedMinutes,
+                    ));
+                }
+                $totalMinutes = $elapsedMinutes - (int) $breakMinutes;
                 $data['total_hours'] = max(0, round($totalMinutes / 60, 2));
 
                 // NZ break compliance check
@@ -416,6 +424,17 @@ class TimeTrackingService
 
         $clockOutLocal = $this->parseWorkerLocalDateTime($clockOut);
         $clockOutUtc = $clockOutLocal->copy()->utc();
+
+        // Mirror AttendanceService::correctSession's guard for non-attendance
+        // entries too, so a break ≥ the worked span can't silently floor hours to 0.
+        $elapsedMinutes = (int) $entry->clock_in->diffInMinutes($clockOutUtc);
+        if ($breakMinutes > 0 && $breakMinutes >= $elapsedMinutes) {
+            throw new \LogicException(sprintf(
+                'Break duration (%d min) must be less than the session duration (%d min).',
+                $breakMinutes,
+                $elapsedMinutes,
+            ));
+        }
 
         if ($entry->attendance_session_id) {
             $session = HrAttendanceSession::find($entry->attendance_session_id);
