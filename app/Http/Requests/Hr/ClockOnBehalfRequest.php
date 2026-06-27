@@ -28,6 +28,10 @@ class ClockOnBehalfRequest extends FormRequest
             'is_sleepover' => ['nullable', 'boolean'],
             'is_on_call' => ['nullable', 'boolean'],
             'is_public_holiday' => ['nullable', 'boolean'],
+            'sleepover_disturbances' => ['nullable', 'array', 'max:50'],
+            'sleepover_disturbances.*.start' => ['required_with:sleepover_disturbances', 'string', 'max:5'],
+            'sleepover_disturbances.*.end' => ['required_with:sleepover_disturbances', 'string', 'max:5'],
+            'sleepover_disturbances.*.minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
             // The rebuilt "Clock on behalf" wizard requires a reason — it is
             // persisted to the entry notes + an audit amendment row by the service.
             'reason' => ['required', 'string', 'max:2000'],

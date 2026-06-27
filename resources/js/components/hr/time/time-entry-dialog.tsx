@@ -12,8 +12,10 @@ import {
     Clock,
     FileText,
     Moon,
+    Plus,
     Trash2,
     UserPlus,
+    X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -35,6 +37,7 @@ import { cn } from '@/lib/utils';
 import {
     PAY_TYPE_OPTIONS,
     payTypeLabel,
+    type Disturbance,
     type NamedOption,
     type TimeEntry,
 } from './types';
@@ -51,6 +54,7 @@ type FormShape = {
     is_sleepover: boolean;
     is_on_call: boolean;
     is_public_holiday: boolean;
+    disturbances: Disturbance[];
     mileage_km: string;
     site_id: string;
     client_id: string;
@@ -71,6 +75,7 @@ const EMPTY: FormShape = {
     is_sleepover: false,
     is_on_call: false,
     is_public_holiday: false,
+    disturbances: [],
     mileage_km: '',
     site_id: '',
     client_id: '',
@@ -140,6 +145,24 @@ function requiredBreak(a: string, b: string): number {
     return worked >= 4 ? 30 : worked >= 2 ? 10 : 0;
 }
 
+/** Minutes between two HH:MM strings (wraps past midnight). */
+function disturbanceMinutes(start: string, end: string): number {
+    if (!start || !end) return 0;
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    if ([sh, sm, eh, em].some(Number.isNaN)) return 0;
+    let mins = eh * 60 + em - (sh * 60 + sm);
+    if (mins < 0) mins += 24 * 60;
+    return mins;
+}
+
+/** Drop incomplete rows and stamp each with computed minutes for the server. */
+function buildDisturbances(list: Disturbance[]): Disturbance[] {
+    return list
+        .filter((d) => d.start && d.end)
+        .map((d) => ({ start: d.start, end: d.end, minutes: disturbanceMinutes(d.start, d.end) }));
+}
+
 export function TimeEntryDialog({
     mode,
     entry,
@@ -181,6 +204,7 @@ export function TimeEntryDialog({
                 is_sleepover: entry.is_sleepover,
                 is_on_call: entry.is_on_call,
                 is_public_holiday: entry.is_public_holiday,
+                disturbances: entry.sleepover_disturbances ?? [],
                 mileage_km: entry.mileage_km != null ? String(entry.mileage_km) : '',
                 cost_centre: entry.cost_centre ?? '',
                 project_code: entry.project_code ?? '',
@@ -302,6 +326,7 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
+                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
                 mileage_km: d.mileage_km || undefined,
                 site_id: d.site_id || undefined,
                 client_id: d.client_id || undefined,
@@ -320,6 +345,7 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
+                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
                 mileage_km: d.mileage_km || undefined,
                 site_id: d.site_id || undefined,
                 client_id: d.client_id || undefined,
@@ -336,6 +362,7 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
+                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
                 mileage_km: d.mileage_km || undefined,
                 cost_centre: d.cost_centre || undefined,
                 project_code: d.project_code || undefined,
@@ -617,6 +644,91 @@ export function TimeEntryDialog({
                                 />
                             </div>
                         </div>
+
+                        {form.data.is_sleepover ? (
+                            <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <div className="text-[13px] font-semibold">
+                                        Sleepover disturbance log
+                                    </div>
+                                    <span className="text-[11.5px] text-muted-foreground">
+                                        {form.data.disturbances.filter((d) => d.start && d.end).length}{' '}
+                                        {form.data.disturbances.filter((d) => d.start && d.end).length === 1
+                                            ? 'disturbance'
+                                            : 'disturbances'}{' '}
+                                        ·{' '}
+                                        {form.data.disturbances.reduce(
+                                            (sum, d) => sum + disturbanceMinutes(d.start, d.end),
+                                            0,
+                                        )}{' '}
+                                        min paid as active time
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    {form.data.disturbances.map((d, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input
+                                                type="time"
+                                                aria-label={`Wake-up ${i + 1} start`}
+                                                value={d.start}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'disturbances',
+                                                        form.data.disturbances.map((x, idx) =>
+                                                            idx === i ? { ...x, start: e.target.value } : x,
+                                                        ),
+                                                    )
+                                                }
+                                                className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            />
+                                            <span className="text-muted-foreground">→</span>
+                                            <input
+                                                type="time"
+                                                aria-label={`Wake-up ${i + 1} end`}
+                                                value={d.end}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'disturbances',
+                                                        form.data.disturbances.map((x, idx) =>
+                                                            idx === i ? { ...x, end: e.target.value } : x,
+                                                        ),
+                                                    )
+                                                }
+                                                className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            />
+                                            <span className="w-12 text-[12px] font-semibold tabular-nums text-muted-foreground">
+                                                {disturbanceMinutes(d.start, d.end)}m
+                                            </span>
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove wake-up ${i + 1}`}
+                                                onClick={() =>
+                                                    form.setData(
+                                                        'disturbances',
+                                                        form.data.disturbances.filter((_, idx) => idx !== i),
+                                                    )
+                                                }
+                                                className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            form.setData('disturbances', [
+                                                ...form.data.disturbances,
+                                                { start: '', end: '' },
+                                            ])
+                                        }
+                                        className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                                    >
+                                        <Plus className="h-3.5 w-3.5" /> Add wake-up
+                                    </button>
+                                </div>
+                            </div>
+                        ) : null}
 
                         {/* Site/Client are only persisted on create paths — the
                             edit/amend route doesn't accept them, so hide them in

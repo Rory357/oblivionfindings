@@ -43,26 +43,132 @@ class TimeTrackingService
             'source' => 'hr_module',
         ]);
 
-        return HrTimeEntry::create([
-            'tenant_id' => $tenantId,
-            'user_id' => $user->id,
-            'shift_id' => $session->shift_id,
-            'attendance_session_id' => $session->id,
-            'site_id' => $session->site_id,
-            'client_id' => $session->shift?->client_id,
-            'entry_date' => $session->clock_in_at->toDateString(),
-            'clock_in' => $session->clock_in_at,
-            'entry_type' => 'clock',
-            'status' => 'active',
-            'source_type' => 'attendance',
-            'source_id' => $session->id,
-            'pay_type' => $session->shift?->is_sleepover ? 'sleepover' : ($session->shift?->is_on_call ? 'on_call' : 'standard'),
-            'is_sleepover' => (bool) $session->shift?->is_sleepover,
-            'is_on_call' => (bool) $session->shift?->is_on_call,
+        $entry = $this->syncEntryFromSession($session, $user, [
             'notes' => $notes,
             'project_code' => $projectCode,
-            'created_by' => $user->id,
         ]);
+
+        if (! $entry) {
+            throw new \LogicException('Could not record the time entry — your account has no resolvable HR tenant.');
+        }
+
+        return $entry;
+    }
+
+    /**
+     * Single idempotent owner of the attendance-backed HrTimeEntry lifecycle
+     * (backend handoff §5/§6/§14). Given an HrAttendanceSession — open or closed —
+     * create-or-update the one matching HrTimeEntry (keyed on the now-unique
+     * attendance_session_id). Every clock source (/my-day, /hr/my, /hr/time)
+     * routes through here so the NZ break formula + payload live in ONE place and
+     * every clocker produces a consistent HrTimeEntry. Returns null only when the
+     * actor has no resolvable tenant (frontline edge) — callers that need the
+     * entry treat that as an error; the clock itself never breaks.
+     */
+    public function syncEntryFromSession(HrAttendanceSession $session, User $actor, array $extra = []): ?HrTimeEntry
+    {
+        $tenantId = $session->tenant_id;
+        if (! is_numeric($tenantId)) {
+            try {
+                $tenantId = $this->resolveTenantId($actor);
+            } catch (\LogicException) {
+                return null;
+            }
+        }
+
+        $session->loadMissing('shift');
+        $clockIn = $session->clock_in_at;
+        $clockOut = $session->clock_out_at;
+
+        $entry = HrTimeEntry::query()
+            ->where('attendance_session_id', $session->id)
+            ->first();
+
+        if (! $entry) {
+            $entry = new HrTimeEntry([
+                'tenant_id' => (int) $tenantId,
+                'user_id' => $session->user_id,
+                'shift_id' => $session->shift_id,
+                'attendance_session_id' => $session->id,
+                'site_id' => $session->site_id,
+                'client_id' => $session->shift?->client_id,
+                'entry_date' => $clockIn->toDateString(),
+                'clock_in' => $clockIn,
+                'entry_type' => 'clock',
+                'status' => 'active',
+                'source_type' => 'attendance',
+                'source_id' => $session->id,
+                'pay_type' => $session->shift?->is_sleepover ? 'sleepover' : ($session->shift?->is_on_call ? 'on_call' : 'standard'),
+                'is_sleepover' => (bool) $session->shift?->is_sleepover,
+                'is_on_call' => (bool) $session->shift?->is_on_call,
+                'notes' => $extra['notes'] ?? $session->notes,
+                'project_code' => $extra['project_code'] ?? null,
+                'created_by' => $actor->id,
+            ]);
+            $entry->save();
+        }
+
+        // Close it once the session has a clock-out (idempotent — skip if already closed).
+        if ($clockOut && ! $entry->clock_out) {
+            $this->applyClockOut(
+                $entry,
+                $clockOut,
+                (int) ($session->break_minutes ?? 0),
+                $extra['mileage_km'] ?? null,
+                $extra['notes'] ?? null,
+            );
+        }
+
+        return $entry->fresh();
+    }
+
+    /**
+     * Close every still-open entry for a user through the one shared close path.
+     * Used by the self-service clock-out to self-heal orphaned actives without
+     * re-implementing the NZ break formula. Returns the number closed.
+     */
+    public function closeOpenEntries(User $user, int $tenantId, Carbon $clockOut, int $breakMinutes, ?float $mileageKm = null, ?string $notes = null): int
+    {
+        $open = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->get();
+
+        foreach ($open as $entry) {
+            $this->applyClockOut($entry, $clockOut, $breakMinutes, $mileageKm, $notes);
+        }
+
+        return $open->count();
+    }
+
+    /** Apply a clock-out to an entry: hours, NZ break compliance, status. */
+    private function applyClockOut(HrTimeEntry $entry, Carbon $clockOut, int $breakMinutes, ?float $mileageKm, ?string $notes): void
+    {
+        $totalMinutes = max(0, (int) $entry->clock_in->diffInMinutes($clockOut) - $breakMinutes);
+
+        $entry->clock_out = $clockOut;
+        $entry->break_minutes = $breakMinutes;
+        $entry->total_hours = round($totalMinutes / 60, 2);
+        if ($mileageKm !== null) {
+            $entry->mileage_km = $mileageKm;
+        }
+        $entry->break_compliance_met = $this->meetsNzBreak($totalMinutes, $breakMinutes);
+        if ($notes !== null) {
+            $entry->notes = $notes;
+        }
+        if (in_array($entry->status, ['active', null], true)) {
+            $entry->status = 'submitted';
+        }
+        $entry->save();
+    }
+
+    /** NZ break rule: worked ≥4h → 30m meal, ≥2h → 10m rest. */
+    private function meetsNzBreak(int $totalMinutes, int $breakMinutes): bool
+    {
+        $workedHours = $totalMinutes / 60;
+        $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+
+        return $breakMinutes >= $requiredBreak;
     }
 
     /**
@@ -82,30 +188,31 @@ class TimeTrackingService
             throw new \LogicException('No active clock-in found.');
         }
 
-        // Clock out via attendance service (creates Operations Timesheet too)
+        // Clock out via attendance service (creates Operations Timesheet too).
         $session = $this->attendanceService->clockOut($user, null, [
             'break_minutes' => $breakMinutes,
             'notes' => $notes,
         ]);
 
-        $clockOut = $session->clock_out_at ?? now();
-        $totalMinutes = $entry->clock_in->diffInMinutes($clockOut) - $breakMinutes;
-        $totalHours = max(0, round($totalMinutes / 60, 2));
+        // Close through the one shared path so the NZ break formula lives in a
+        // single place. Prefer syncing from the closed session when linked.
+        if ($session && (int) $entry->attendance_session_id === (int) $session->id) {
+            $synced = $this->syncEntryFromSession($session, $user, [
+                'mileage_km' => $mileageKm,
+                'notes' => $notes,
+            ]);
+            if ($synced) {
+                return $synced;
+            }
+        }
 
-        // NZ break compliance check
-        $workedHours = $totalMinutes / 60;
-        $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
-        $breakCompliant = $breakMinutes >= $requiredBreak;
-
-        $entry->update([
-            'clock_out' => $clockOut,
-            'break_minutes' => $breakMinutes,
-            'total_hours' => $totalHours,
-            'mileage_km' => $mileageKm,
-            'break_compliance_met' => $breakCompliant,
-            'notes' => $notes ?? $entry->notes,
-            'status' => 'submitted',
-        ]);
+        $this->applyClockOut(
+            $entry,
+            $session?->clock_out_at ?? now(),
+            (int) ($session?->break_minutes ?? $breakMinutes),
+            $mileageKm,
+            $notes,
+        );
 
         return $entry->fresh();
     }
@@ -145,6 +252,7 @@ class TimeTrackingService
                 'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
                 'is_on_call' => (bool) ($data['is_on_call'] ?? false),
                 'is_public_holiday' => (bool) ($data['is_public_holiday'] ?? false),
+                'sleepover_disturbances' => $data['sleepover_disturbances'] ?? null,
                 'mileage_km' => $data['mileage_km'] ?? null,
                 'created_by' => $user->id,
             ]);
@@ -238,7 +346,12 @@ class TimeTrackingService
                 ]);
             }
 
-            if (empty($originalValues)) {
+            // The sleepover disturbance log is a JSON sub-record, not a scalar
+            // diff field, so it's persisted directly rather than through the
+            // amendment-diff loop above.
+            $disturbancesProvided = array_key_exists('sleepover_disturbances', $data);
+
+            if (empty($originalValues) && ! $disturbancesProvided) {
                 return $entry;
             }
 
@@ -341,6 +454,7 @@ class TimeTrackingService
                 'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
                 'is_on_call' => (bool) ($data['is_on_call'] ?? false),
                 'is_public_holiday' => (bool) ($data['is_public_holiday'] ?? false),
+                'sleepover_disturbances' => $data['sleepover_disturbances'] ?? null,
                 'mileage_km' => $data['mileage_km'] ?? null,
                 'break_compliance_met' => $breakCompliant,
                 'notes' => $data['notes'] ?? null,
@@ -404,6 +518,28 @@ class TimeTrackingService
 
             $entry->delete(); // soft-delete (deleted_at)
         });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Add note */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Append a team-visible, timestamped note to an entry. Recorded on the
+     * amendment trail (field "note") so it surfaces in the history drawer
+     * timeline without a separate notes table.
+     */
+    public function addNote(HrTimeEntry $entry, User $actor, string $note): HrTimeEntryAmendment
+    {
+        return HrTimeEntryAmendment::create([
+            'tenant_id' => $entry->tenant_id,
+            'hr_time_entry_id' => $entry->id,
+            'amended_by' => $actor->id,
+            'field_name' => 'note',
+            'old_value' => null,
+            'new_value' => null,
+            'reason' => $note,
+        ]);
     }
 
     /* ------------------------------------------------------------------ */

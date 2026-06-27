@@ -2,6 +2,12 @@
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
 import type { StatusVariant } from '@/components/ui/status-badge';
 
+export interface Disturbance {
+    start: string;
+    end: string;
+    minutes?: number;
+}
+
 export interface TimeEntry {
     id: number;
     user_name: string;
@@ -21,6 +27,7 @@ export interface TimeEntry {
     is_sleepover: boolean;
     is_on_call: boolean;
     is_public_holiday: boolean;
+    sleepover_disturbances: Disturbance[];
     break_compliance_met: boolean | null;
     mileage_km: number | null;
     notes: string | null;
@@ -104,6 +111,19 @@ export interface RecentActivityItem {
     action: string;
     time: string;
     on_behalf: boolean;
+}
+
+export interface TimeReport {
+    week_start: string;
+    week_end: string;
+    kpis: {
+        total_hours: number;
+        overtime_hours: number;
+        break_fails: number;
+        mileage_km: number;
+    };
+    by_site: Array<{ name: string; hours: number }>;
+    by_staff: Array<{ user_id: number; name: string; hours: number; overtime: number }>;
 }
 
 export interface KpiStats {

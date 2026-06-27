@@ -23,7 +23,7 @@ HR period timekeeping remains under `hr.time.*`, but the HR page links to the op
 | Timesheet workflow      | `resources/js/pages/operations/timesheets/edit.tsx`   | `operations.timesheets.submit/approve/return/reject`      | `@/routes/operations/timesheets`           | `/operations/timesheets/{timesheet}/...`  |
 | Timesheet bulk workflow | `resources/js/pages/operations/timesheets/index.tsx`  | `operations.timesheets.bulkApprove/bulkReturn/bulkReject` | `@/routes/operations/timesheets`           | `/operations/timesheets/bulk-*`           |
 | HR timekeeping          | `resources/js/pages/hr/time/index.tsx`                | `hr.time.index`                                           | direct HR time route                       | `/hr/time`                                |
-| HR period approvals     | `resources/js/pages/hr/time/index.tsx`                | `hr.time.timesheets.*`                                    | direct HR time route                       | `/hr/time/timesheets/*`                   |
+| HR time entry actions   | `resources/js/pages/hr/time/index.tsx`                | `hr.time.entries.{store,update,correct,void,amendments}` | direct HR time route                       | `/hr/time/entries/*`                      |
 
 ## Frontline Routes To Preserve
 

@@ -1123,25 +1123,10 @@ class MyHrController extends Controller
                 'source' => 'self_service',
             ]);
 
-            // Create corresponding HrTimeEntry
-            HrTimeEntry::create([
-                'tenant_id' => $tenantId,
-                'user_id' => $user->id,
-                'shift_id' => $session->shift_id,
-                'attendance_session_id' => $session->id,
-                'site_id' => $session->site_id,
-                'client_id' => $session->shift?->client_id,
-                'entry_date' => $session->clock_in_at->toDateString(),
-                'clock_in' => $session->clock_in_at,
-                'entry_type' => 'clock',
-                'status' => 'active',
-                'source_type' => 'attendance',
-                'source_id' => $session->id,
-                'pay_type' => $session->shift?->is_sleepover ? 'sleepover' : ($session->shift?->is_on_call ? 'on_call' : 'standard'),
-                'is_sleepover' => (bool) $session->shift?->is_sleepover,
-                'is_on_call' => (bool) $session->shift?->is_on_call,
+            // Single owner of the HrTimeEntry payload + NZ break formula lives in
+            // TimeTrackingService (de-forked from this controller, handoff §6).
+            $this->timeTrackingService->syncEntryFromSession($session, $user, [
                 'notes' => $validated['notes'] ?? null,
-                'created_by' => $user->id,
             ]);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -1178,36 +1163,29 @@ class MyHrController extends Controller
         }
 
         $clockOutAt = $session?->clock_out_at ?? now();
+        $breakMinutes = (int) ($session?->break_minutes ?? $requestedBreak);
 
-        // Close every open (clock_out IS NULL) entry for this user — normally
-        // exactly one, but closing all self-heals any duplicate/orphaned actives
-        // so `activeClock` reliably resolves to null after clocking out.
-        $openEntries = HrTimeEntry::forTenant($tenantId)
-            ->forUser($user->id)
-            ->active()
-            ->get();
-
-        foreach ($openEntries as $entry) {
-            $breakMinutes = $session?->break_minutes ?? $requestedBreak;
-            $totalMinutes = max(0, $entry->clock_in->diffInMinutes($clockOutAt) - $breakMinutes);
-            $totalHours = round($totalMinutes / 60, 2);
-
-            // NZ break compliance (10min rest per 2h, 30min meal per 4h).
-            $workedHours = $totalMinutes / 60;
-            $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
-
-            $entry->update([
-                'clock_out' => $clockOutAt,
-                'break_minutes' => $breakMinutes,
-                'total_hours' => $totalHours,
+        // Sync the session-linked entry (creating it for any legacy in-flight
+        // session that predates the unified clock paths), then self-heal any
+        // remaining orphaned actives — all through the one shared close path so
+        // the NZ break formula is de-forked (handoff §6).
+        if ($session) {
+            $this->timeTrackingService->syncEntryFromSession($session, $user, [
                 'mileage_km' => $validated['mileage_km'] ?? null,
-                'break_compliance_met' => $breakMinutes >= $requiredBreak,
-                'notes' => $validated['notes'] ?? $entry->notes,
-                'status' => 'submitted',
+                'notes' => $validated['notes'] ?? null,
             ]);
         }
 
-        if (! $session && $openEntries->isEmpty()) {
+        $closed = $this->timeTrackingService->closeOpenEntries(
+            $user,
+            $tenantId,
+            $clockOutAt,
+            $breakMinutes,
+            $validated['mileage_km'] ?? null,
+            $validated['notes'] ?? null,
+        );
+
+        if (! $session && $closed === 0) {
             return redirect()->back()->with('error', 'You are not currently clocked in.');
         }
 
