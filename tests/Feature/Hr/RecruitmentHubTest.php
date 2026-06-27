@@ -975,3 +975,34 @@ test('a manager can save, surface and remove a candidate email template', functi
         'name' => 'x', 'subject' => 'y', 'body' => 'z',
     ])->assertForbidden();
 });
+
+/* ---- Candidate ranking by interview score ---- */
+
+test('the pipeline surfaces a candidate average interview score for ranking', function () {
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'interview_completed');
+    $interview = HrInterview::query()->create([
+        'application_id' => $application->id,
+        'scheduled_at' => now()->subDay()->utc(),
+        'duration_minutes' => 30, 'interview_type' => 'phone', 'status' => 'completed',
+    ]);
+    HrInterviewScore::query()->create([
+        'interview_id' => $interview->id, 'interviewer_user_id' => $this->hr->id,
+        'overall_score' => 80, 'submitted_at' => now(),
+    ]);
+    $other = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    HrInterviewScore::query()->create([
+        'interview_id' => $interview->id, 'interviewer_user_id' => $other->id,
+        'overall_score' => 60, 'submitted_at' => now(),
+    ]);
+
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('candidates', function ($candidates) use ($candidate) {
+            $row = collect($candidates)->firstWhere('id', $candidate->id);
+            // Average of 80 and 60 across two scorecards.
+            expect($row['score'])->toBe(70);
+            expect($row['score_count'])->toBe(2);
+
+            return true;
+        }));
+});

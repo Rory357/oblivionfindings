@@ -182,9 +182,22 @@ class RecruitmentController extends Controller
             ->limit(300)
             ->get();
 
-        return $candidates->map(function (HrCandidate $c) use ($staleDays) {
+        // Average interview scorecard rating per candidate (across all their
+        // applications' interviews) — lets recruiters rank/shortlist.
+        $scoreByCandidate = \App\Domain\Hr\Models\HrInterviewScore::query()
+            ->join('hr_interviews', 'hr_interview_scores.interview_id', '=', 'hr_interviews.id')
+            ->join('hr_applications', 'hr_interviews.application_id', '=', 'hr_applications.id')
+            ->whereIn('hr_applications.candidate_id', $candidates->pluck('id'))
+            ->whereNotNull('hr_interview_scores.overall_score')
+            ->groupBy('hr_applications.candidate_id')
+            ->selectRaw('hr_applications.candidate_id, AVG(hr_interview_scores.overall_score) as avg_score, COUNT(*) as score_count')
+            ->get()
+            ->keyBy('candidate_id');
+
+        return $candidates->map(function (HrCandidate $c) use ($staleDays, $scoreByCandidate) {
             $app = $c->applications->first();
             $days = $c->current_stage_entered_at ? (int) $c->current_stage_entered_at->diffInDays(now()) : 0;
+            $scoreRow = $scoreByCandidate->get($c->id);
 
             return [
                 'id' => $c->id,
@@ -197,6 +210,8 @@ class RecruitmentController extends Controller
                 'stage' => $c->status,
                 'days' => $days,
                 'stale' => $days > $staleDays,
+                'score' => $scoreRow ? (int) round((float) $scoreRow->avg_score) : null,
+                'score_count' => $scoreRow ? (int) $scoreRow->score_count : 0,
                 'requisition' => $app?->requisition ? ['id' => $app->requisition->id, 'title' => $app->requisition->title] : null,
             ];
         })->values()->all();

@@ -74,6 +74,8 @@ type HubCandidate = {
     stage: string;
     days: number;
     stale: boolean;
+    score?: number | null;
+    score_count?: number;
     requisition?: { id: number; title: string } | null;
 };
 
@@ -662,6 +664,10 @@ function PipelineTab({
         ...BOARD_STAGES.map((s) => ({ key: s, label: stageLabel(s) })),
     ];
     const allChecked = rows.length > 0 && rows.every((c) => selected.includes(c.id));
+    const [sortByScore, setSortByScore] = useState(false);
+    const displayRows = sortByScore
+        ? [...rows].sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+        : rows;
 
     return (
         <div>
@@ -694,8 +700,16 @@ function PipelineTab({
                 </div>
                 <button
                     type="button"
+                    onClick={() => setSortByScore((s) => !s)}
+                    aria-pressed={sortByScore}
+                    className={`ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors ${sortByScore ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:bg-muted'}`}
+                >
+                    <BarChart3 className="h-3.5 w-3.5" /> {sortByScore ? 'Top scored' : 'Sort by score'}
+                </button>
+                <button
+                    type="button"
                     onClick={onExport}
-                    className="ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] border border-border bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
+                    className="inline-flex h-[38px] items-center gap-2 rounded-[10px] border border-border bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
                 >
                     <Download className="h-3.5 w-3.5" /> Export
                 </button>
@@ -724,7 +738,7 @@ function PipelineTab({
             ) : null}
 
             <div className="overflow-hidden rounded-[14px] border border-border bg-card">
-                <div className="grid grid-cols-[36px_2.4fr_1.4fr_1.4fr_1fr_0.7fr_32px] items-center gap-2.5 border-b border-border bg-muted px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                <div className="grid grid-cols-[36px_2.4fr_1.2fr_1.4fr_1fr_0.7fr_0.7fr_32px] items-center gap-2.5 border-b border-border bg-muted px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     {canManage ? (
                         <button type="button" onClick={toggleAll} aria-label="Select all" className={`grid h-[18px] w-[18px] place-items-center rounded border ${allChecked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>
                             {allChecked ? '✓' : ''}
@@ -736,6 +750,7 @@ function PipelineTab({
                     <span>Stage</span>
                     <span>Requisition</span>
                     <span>Source</span>
+                    <span title="Average interview scorecard rating">Score</span>
                     <span>Days</span>
                     <span />
                 </div>
@@ -749,11 +764,11 @@ function PipelineTab({
                         <p className="text-[13px] text-muted-foreground">Try clearing the stage filter or search term.</p>
                     </div>
                 ) : (
-                    rows.map((c) => (
+                    displayRows.map((c) => (
                         <div
                             key={c.id}
                             onContextMenu={(e) => onCtx(e, c)}
-                            className="grid grid-cols-[36px_2.4fr_1.4fr_1.4fr_1fr_0.7fr_32px] items-center gap-2.5 border-b border-border px-4 py-2.5 last:border-0 hover:bg-muted/40"
+                            className="grid grid-cols-[36px_2.4fr_1.2fr_1.4fr_1fr_0.7fr_0.7fr_32px] items-center gap-2.5 border-b border-border px-4 py-2.5 last:border-0 hover:bg-muted/40"
                         >
                             {canManage ? (
                                 <button type="button" onClick={() => toggleSelect(c.id)} aria-label={`Select ${c.full_name}`} className={`grid h-[18px] w-[18px] place-items-center rounded border ${selected.includes(c.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>
@@ -777,6 +792,18 @@ function PipelineTab({
                             </span>
                             <span className="truncate text-[12.5px] text-muted-foreground">{c.requisition?.title ?? '—'}</span>
                             <span className="truncate text-[12.5px] capitalize text-muted-foreground">{c.source?.replace(/_/g, ' ')}</span>
+                            <span>
+                                {c.score != null ? (
+                                    <span
+                                        title={`${c.score_count ?? 0} scorecard${(c.score_count ?? 0) === 1 ? '' : 's'}`}
+                                        className={`rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums ${c.score >= 70 ? 'bg-status-success-bg text-status-success' : c.score >= 50 ? 'bg-muted text-foreground' : 'bg-status-warning-bg text-status-warning'}`}
+                                    >
+                                        {c.score}
+                                    </span>
+                                ) : (
+                                    <span className="text-[12px] text-muted-foreground">—</span>
+                                )}
+                            </span>
                             <span>
                                 <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums ${c.stale ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'}`}>
                                     {daysLabel(c.days)}
