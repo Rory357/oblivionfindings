@@ -126,9 +126,16 @@ The deferred backlog below has since been worked through and merged to `main`
 - ✅ **D5** Attendees + RSVP (audience selector + people picker; RSVP endpoint).
 - ✅ **D6** Reminders + every-minute `hr:dispatch-calendar-reminders` dispatch job.
 - ✅ **D7** Attachments on the private disk (mime allowlist, hardened serving).
-- ⛔ **D8** Rich interactions (context menu, hover/detail popover, year picker,
-  drag/resize, keyboard shortcuts, quick-add escalation, skeleton) — **remaining**.
+- ✅ **D8** Rich interactions — click → detail popover (deep-link / Edit-Dup-Delete);
+  right-click context menu on entries + day cells; drag-move/resize for standalone
+  events (optimistic PUT, revert); 12-mini-month year picker; keyboard shortcuts
+  (`/ n t 1-4 ←→ Esc`); quick-add popover with "More options →" escalation; hover
+  preview + loading skeleton + delete confirm. Build clean; browser-verified.
 - ⛔ Pixel-diff vs `HR Calendar.dc.html` (still not provided).
+
+**All deferred work (D1–D8) is now shipped to `main`.** Backend suite: 11 tests /
+44 assertions green; frontend: clean `tsc`/`eslint`/`vite build`; `/hr/calendar`
+browser-verified (page, feed/layers, hero, wizard, iCal, year picker).
 
 ## Deferred — recommended follow-up passes
 
