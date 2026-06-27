@@ -411,6 +411,10 @@ class CompensationController extends Controller
                 ['value' => 'mid_year', 'label' => 'Mid-Year'],
                 ['value' => 'ad_hoc', 'label' => 'Ad Hoc'],
             ],
+            // Active bands for the builder's per-line in/under/over placement.
+            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()
+                ->orderByDesc('effective_from')
+                ->get(['id', 'position_role', 'min_salary', 'mid_salary', 'max_salary']),
             'can' => [
                 'manage' => true,
             ],

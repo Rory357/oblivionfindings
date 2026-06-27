@@ -80,6 +80,36 @@ test('bands page exposes true compa-ratio aggregates and per-band placements', f
         );
 });
 
+test('expenses index exposes the mileage rate + categories for the claim dialog', function () {
+    $this->actingAs($this->hr)->get('/hr/compensation/expenses')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/compensation/expenses/index')
+            ->has('mileageRatePerKm')
+            ->has('categories')
+            ->where('can.approve', true));
+});
+
+test('the pay-review builder receives active bands for placement', function () {
+    HrSalaryBand::query()->create([
+        'tenant_id' => 1,
+        'created_by' => $this->hr->id,
+        'position_role' => 'support_worker',
+        'band_name' => 'Band A',
+        'min_salary' => 50000,
+        'mid_salary' => 60000,
+        'max_salary' => 70000,
+        'min_hourly' => 25,
+        'max_hourly' => 35,
+        'currency' => 'NZD',
+        'effective_from' => now()->subMonth()->toDateString(),
+    ]);
+
+    $this->actingAs($this->hr)->get('/hr/compensation/reviews/create')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/compensation/review-detail')
+            ->has('bands', 1));
+});
+
 test('the compensation history index and settings hub tabs render', function () {
     $this->actingAs($this->hr)->get('/hr/compensation/history')->assertOk()
         ->assertInertia(fn ($page) => $page->component('hr/compensation/history-index')->has('stats'));
