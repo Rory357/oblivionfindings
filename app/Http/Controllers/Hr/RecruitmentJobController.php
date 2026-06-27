@@ -121,9 +121,12 @@ class RecruitmentJobController extends Controller
         $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
         $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
 
+        $positionRule = Rule::exists('hr_positions', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId));
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
+            'position_id' => ['nullable', 'integer', $positionRule],
             'site_id' => ['nullable', 'integer', $siteRule],
             'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'openings' => ['required', 'integer', 'min:1', 'max:100'],
@@ -165,9 +168,12 @@ class RecruitmentJobController extends Controller
         $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
         $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
 
+        $positionRule = Rule::exists('hr_positions', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId));
+
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
+            'position_id' => ['nullable', 'integer', $positionRule],
             'site_id' => ['nullable', 'integer', $siteRule],
             'employment_type' => ['sometimes', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'openings' => ['sometimes', 'integer', 'min:1', 'max:100'],

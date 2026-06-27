@@ -124,10 +124,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.recruitment.view')->group(function () {
         Route::get('/recruitment', [RecruitmentController::class, 'index'])->name('recruitment.index');
         Route::get('/recruitment/candidates', [RecruitmentController::class, 'index'])->name('candidates.index');
-        Route::get('/recruitment/kanban', [RecruitmentController::class, 'kanban'])->name('recruitment.kanban');
-        Route::get('/recruitment/analytics', [RecruitmentController::class, 'analytics'])->name('recruitment.analytics');
-        Route::get('/recruitment/jobs', [RecruitmentJobController::class, 'index'])->name('jobs.index');
-        Route::get('/recruitment/kits', [InterviewKitController::class, 'index'])->name('kits.index');
+        // Retired standalone tab pages — collapsed into the unified Recruitment hub.
+        Route::get('/recruitment/kanban', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'board']))->name('recruitment.kanban');
+        Route::get('/recruitment/analytics', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'analytics']))->name('recruitment.analytics');
+        Route::get('/recruitment/jobs', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'requisitions']))->name('jobs.index');
+        Route::get('/recruitment/kits', fn () => redirect()->route('hr.recruitment.index', ['tab' => 'kits']))->name('kits.index');
 
         Route::get('/recruitment/candidates/create', [CandidateController::class, 'create'])->name('candidates.create')
             ->middleware('permission:hr.recruitment.manage');
