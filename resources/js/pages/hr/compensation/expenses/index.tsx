@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -58,6 +59,7 @@ type Props = {
     // controller passes them (see backendNeeded) — the dialog falls back safely.
     mileageRatePerKm?: number;
     categories?: string[];
+    employees?: { id: number; name: string }[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -102,6 +104,7 @@ export default function ExpenseIndex({
     can,
     mileageRatePerKm = 0,
     categories,
+    employees = [],
 }: Props) {
     // Managers see the inline approval actions; prefer the dedicated `approve`
     // grant when the backend provides it, otherwise fall back to `manage`.
@@ -111,6 +114,24 @@ export default function ExpenseIndex({
     const [rejectTarget, setRejectTarget] = useState<ExpenseClaim | null>(null);
     const [rejectionReason, setRejectionReason] = useState('');
     const [busyId, setBusyId] = useState<number | null>(null);
+    const [selected, setSelected] = useState<number[]>([]);
+
+    // Only submitted (awaiting) claims are bulk-approvable.
+    const pendingIds = claims.data
+        .filter((c) => c.status === 'submitted')
+        .map((c) => c.id);
+    const toggleOne = (id: number) =>
+        setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    const toggleAll = () =>
+        setSelected((s) => (s.length === pendingIds.length ? [] : [...pendingIds]));
+    const bulkApprove = () => {
+        if (!selected.length) return;
+        router.post(
+            '/hr/compensation/expenses/bulk-approve',
+            { claim_ids: selected },
+            { preserveScroll: true, onSuccess: () => setSelected([]) },
+        );
+    };
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -152,7 +173,8 @@ export default function ExpenseIndex({
         );
     };
 
-    const colSpan = can.manage ? 8 : 7;
+    // Base 7 cols + Employee (manage) + leading checkbox (canDecide).
+    const colSpan = 7 + (can.manage ? 1 : 0) + (canDecide ? 1 : 0);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -224,12 +246,43 @@ export default function ExpenseIndex({
                     )}
                 </div>
 
+                {/* Bulk-approve bar — only when awaiting claims are selected */}
+                {canDecide && selected.length > 0 ? (
+                    <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5">
+                        <span className="text-sm font-medium">
+                            {selected.length} claim{selected.length === 1 ? '' : 's'} selected
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+                                Clear
+                            </Button>
+                            <Button size="sm" onClick={bulkApprove}>
+                                <CheckCircle className="mr-1.5 h-4 w-4" />
+                                Approve selected
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+
                 {/* Claims Table */}
                 <Card>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    {canDecide && (
+                                        <TableHead className="w-px">
+                                            <Checkbox
+                                                aria-label="Select all awaiting claims"
+                                                checked={
+                                                    pendingIds.length > 0 &&
+                                                    selected.length === pendingIds.length
+                                                }
+                                                disabled={pendingIds.length === 0}
+                                                onCheckedChange={toggleAll}
+                                            />
+                                        </TableHead>
+                                    )}
                                     <TableHead>Claim #</TableHead>
                                     <TableHead>Title</TableHead>
                                     {can.manage && (
@@ -253,6 +306,17 @@ export default function ExpenseIndex({
                                     const busy = busyId === claim.id;
                                     return (
                                         <TableRow key={claim.id}>
+                                            {canDecide && (
+                                                <TableCell className="w-px">
+                                                    {isPending ? (
+                                                        <Checkbox
+                                                            aria-label={`Select claim ${claim.claim_number}`}
+                                                            checked={selected.includes(claim.id)}
+                                                            onCheckedChange={() => toggleOne(claim.id)}
+                                                        />
+                                                    ) : null}
+                                                </TableCell>
+                                            )}
                                             <TableCell className="font-mono text-sm">
                                                 {claim.claim_number}
                                             </TableCell>
@@ -368,6 +432,8 @@ export default function ExpenseIndex({
                     onClose={() => setClaimOpen(false)}
                     mileageRatePerKm={mileageRatePerKm}
                     categories={categories}
+                    employees={employees}
+                    canFileOnBehalf={can.manage}
                 />
             ) : null}
 

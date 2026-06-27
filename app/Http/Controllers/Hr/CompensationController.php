@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrCompensationReviewItem;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
@@ -519,5 +520,47 @@ class CompensationController extends Controller
         }
 
         return redirect()->back()->with('success', 'Compensation review applied successfully. Employee profiles have been updated.');
+    }
+
+    /**
+     * Approve a single review line-item.
+     */
+    public function approveReviewItem(Request $request, HrCompensationReview $review, HrCompensationReviewItem $item)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        abort_unless((int) $item->compensation_review_id === (int) $review->id, 404);
+
+        try {
+            $this->compensationService->approveReviewItem($item, $user->id);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Line approved.');
+    }
+
+    /**
+     * Reject a single review line-item (reason optional, recorded on the line).
+     */
+    public function rejectReviewItem(Request $request, HrCompensationReview $review, HrCompensationReviewItem $item)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        abort_unless((int) $item->compensation_review_id === (int) $review->id, 404);
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->compensationService->rejectReviewItem($item, $user->id, $data['reason'] ?? null);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Line rejected.');
     }
 }
