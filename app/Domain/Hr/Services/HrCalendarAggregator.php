@@ -94,40 +94,172 @@ class HrCalendarAggregator
 
     private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
     {
-        return HrCalendarEvent::query()
+        // Top-level events only (exception/override children are folded into
+        // their parent's expansion below). Pull non-recurring events overlapping
+        // the range plus any recurring base whose window touches the range.
+        $base = HrCalendarEvent::query()
             ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
-            ->inRange($start->toDateString(), $end->toDateString())
+            ->whereNull('recurrence_parent_id')
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
             ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
+            ->where(function ($q) use ($start, $end) {
+                $q->where(function ($q2) use ($start, $end) {
+                    $q2->whereNull('rrule')
+                        ->where('starts_at', '<=', $end)
+                        ->where('ends_at', '>=', $start);
+                })->orWhere(function ($q2) use ($start) {
+                    $q2->whereNotNull('rrule')
+                        ->where(fn ($q3) => $q3->whereNull('recurrence_until')->orWhere('recurrence_until', '>=', $start));
+                });
+            })
             ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name'])
             ->orderBy('starts_at')
-            ->get()
-            ->map(fn (HrCalendarEvent $e) => [
-                'layer' => 'event',
-                'id' => 'event-'.$e->id,
-                'title' => $e->title,
-                'start' => optional($e->starts_at)->toIso8601String(),
-                'end' => optional($e->ends_at)->toIso8601String(),
-                'allDay' => (bool) $e->is_all_day,
-                'color' => self::EVENT_CATEGORY_TOKENS[$e->event_type] ?? 'category-hr',
-                'editable' => true,
-                'extendedProps' => [
-                    'eventId' => $e->id,
-                    'category' => $e->event_type,
-                    'site' => $e->site?->name,
-                    'siteId' => $e->site_id,
-                    'department' => $e->departmentRef?->name ?? $e->department,
-                    'departmentId' => $e->department_id,
-                    'location' => $e->location,
-                    'description' => $e->description,
-                    'isAllDay' => (bool) $e->is_all_day,
-                    'startRaw' => optional($e->starts_at)->toIso8601String(),
-                    'endRaw' => optional($e->ends_at)->toIso8601String(),
-                    'createdBy' => $e->creator?->name,
-                    'recurring' => false,
-                    'attendeeCount' => 0,
-                ],
-            ]);
+            ->get();
+
+        // Override children for the recurring bases in scope.
+        $recurringIds = $base->whereNotNull('rrule')->pluck('id');
+        $exceptions = $recurringIds->isEmpty()
+            ? collect()
+            : HrCalendarEvent::query()
+                ->whereIn('recurrence_parent_id', $recurringIds->all())
+                ->where('is_exception', true)
+                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name'])
+                ->get()
+                ->groupBy('recurrence_parent_id');
+
+        $out = collect();
+        foreach ($base as $e) {
+            if (! $e->rrule) {
+                $out->push($this->eventRow($e, $e->starts_at, $e->ends_at));
+                continue;
+            }
+
+            $children = $exceptions->get($e->id) ?? collect();
+            $skip = $children->pluck('exception_date')->filter()
+                ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : (string) $d)->all();
+
+            foreach ($this->occurrences($e, $start, $end) as $occ) {
+                if (in_array($occ['date'], $skip, true)) {
+                    continue;
+                }
+                $out->push($this->eventRow($e, $occ['start'], $occ['end'], $occ['date']));
+            }
+
+            // Render override children that land in range as their own events.
+            foreach ($children as $child) {
+                if ($child->starts_at && $child->ends_at
+                    && $child->starts_at->lte($end) && $child->ends_at->gte($start)) {
+                    $out->push($this->eventRow($child, $child->starts_at, $child->ends_at, null, true));
+                }
+            }
+        }
+
+        return $out->values();
+    }
+
+    /** Build one feed row for an event (or one expanded occurrence of it). */
+    private function eventRow(HrCalendarEvent $e, ?Carbon $start, ?Carbon $end, ?string $occurrenceDate = null, bool $isException = false): array
+    {
+        $recurring = (bool) $e->rrule || $isException || $occurrenceDate !== null;
+
+        return [
+            'layer' => 'event',
+            'id' => $occurrenceDate ? 'event-'.$e->id.'-'.$occurrenceDate : 'event-'.$e->id,
+            'title' => $e->title,
+            'start' => optional($start)->toIso8601String(),
+            'end' => optional($end)->toIso8601String(),
+            'allDay' => (bool) $e->is_all_day,
+            'color' => self::EVENT_CATEGORY_TOKENS[$e->event_type] ?? 'category-hr',
+            'editable' => true,
+            'extendedProps' => [
+                'eventId' => $e->id,
+                'category' => $e->event_type,
+                'site' => $e->site?->name,
+                'siteId' => $e->site_id,
+                'department' => $e->departmentRef?->name ?? $e->department,
+                'departmentId' => $e->department_id,
+                'location' => $e->location,
+                'description' => $e->description,
+                'isAllDay' => (bool) $e->is_all_day,
+                'startRaw' => optional($start)->toIso8601String(),
+                'endRaw' => optional($end)->toIso8601String(),
+                'createdBy' => $e->creator?->name,
+                'recurring' => $recurring,
+                'rrule' => $e->rrule,
+                'recurrenceUntil' => optional($e->recurrence_until)->toDateString(),
+                'occurrenceDate' => $occurrenceDate,
+                'isException' => $isException,
+                'recurrenceParentId' => $e->recurrence_parent_id,
+                'attendeeCount' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * Expand a recurring base event's occurrences within [rangeStart, rangeEnd].
+     * Supports a small RFC-5545 subset: FREQ=DAILY|WEEKLY|MONTHLY, INTERVAL,
+     * COUNT; the optional UNTIL is carried on the `recurrence_until` column.
+     *
+     * @return list<array{date: string, start: Carbon, end: Carbon}>
+     */
+    private function occurrences(HrCalendarEvent $e, Carbon $rangeStart, Carbon $rangeEnd): array
+    {
+        $rule = $this->parseRrule($e->rrule);
+        if (! $rule || ! $e->starts_at) {
+            return [];
+        }
+
+        $durationSec = $e->ends_at ? max(0, $e->ends_at->getTimestamp() - $e->starts_at->getTimestamp()) : 0;
+        $hardEnd = $e->recurrence_until ? $rangeEnd->copy()->min($e->recurrence_until) : $rangeEnd->copy();
+
+        $cursor = $e->starts_at->copy();
+        $out = [];
+        $index = 0;
+        while ($cursor->lte($hardEnd) && $index < 400) {
+            $index++;
+            if ($rule['count'] !== null && $index > $rule['count']) {
+                break;
+            }
+            if ($cursor->gte($rangeStart)) {
+                $occStart = $cursor->copy();
+                $out[] = [
+                    'date' => $occStart->toDateString(),
+                    'start' => $occStart,
+                    'end' => $occStart->copy()->addSeconds($durationSec),
+                ];
+            }
+            match ($rule['freq']) {
+                'DAILY' => $cursor->addDays($rule['interval']),
+                'WEEKLY' => $cursor->addWeeks($rule['interval']),
+                'MONTHLY' => $cursor->addMonthsNoOverflow($rule['interval']),
+                default => $cursor->addYears(1000),
+            };
+        }
+
+        return $out;
+    }
+
+    /** @return array{freq: string, interval: int, count: int|null}|null */
+    private function parseRrule(?string $rrule): ?array
+    {
+        if (! $rrule) {
+            return null;
+        }
+        $parts = [];
+        foreach (explode(';', $rrule) as $kv) {
+            [$k, $v] = array_pad(explode('=', $kv, 2), 2, null);
+            $parts[strtoupper(trim((string) $k))] = trim((string) $v);
+        }
+        $freq = $parts['FREQ'] ?? null;
+        if (! in_array($freq, ['DAILY', 'WEEKLY', 'MONTHLY'], true)) {
+            return null;
+        }
+
+        return [
+            'freq' => $freq,
+            'interval' => max(1, (int) ($parts['INTERVAL'] ?? 1)),
+            'count' => isset($parts['COUNT']) ? max(1, (int) $parts['COUNT']) : null,
+        ];
     }
 
     /* ── Leave + holidays (read-only; reuse the hub feed + redaction) ─────── */

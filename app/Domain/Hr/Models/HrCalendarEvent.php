@@ -22,6 +22,11 @@ class HrCalendarEvent extends Model
         'starts_at',
         'ends_at',
         'is_all_day',
+        'rrule',
+        'recurrence_until',
+        'recurrence_parent_id',
+        'is_exception',
+        'exception_date',
         'location',
         'department',
         'department_id',
@@ -34,6 +39,9 @@ class HrCalendarEvent extends Model
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'is_all_day' => 'boolean',
+        'recurrence_until' => 'datetime',
+        'is_exception' => 'boolean',
+        'exception_date' => 'date',
     ];
 
     /* ------------------------------------------------------------------ */
