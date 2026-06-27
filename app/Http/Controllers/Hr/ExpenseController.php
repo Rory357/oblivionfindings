@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrExpenseItem;
 use App\Domain\Hr\Services\CompensationService;
 use App\Domain\Hr\Services\ExpenseService;
 use Illuminate\Http\Request;
@@ -13,7 +15,7 @@ use Inertia\Inertia;
 
 class ExpenseController extends Controller
 {
-    use ResolvesHrTenant;
+    use ResolvesHrTenant, ServesPrivateAttachments;
 
     public function __construct(
         private readonly ExpenseService $expenseService,
@@ -175,6 +177,37 @@ class ExpenseController extends Controller
                     && $expenseClaim->gl_posted_at !== null,
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Receipt — stream a stored per-item receipt (private disk)           */
+    /* ------------------------------------------------------------------ */
+
+    public function downloadReceipt(Request $request, HrExpenseClaim $expenseClaim, HrExpenseItem $item)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        // Staff without manage may only open receipts on their own claims.
+        abort_unless($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id, 403);
+        abort_unless((int) $item->expense_claim_id === (int) $expenseClaim->id, 404);
+        abort_unless($item->receipt_path, 404);
+
+        $ext = strtolower(pathinfo($item->receipt_path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            default => null,
+        };
+
+        return $this->streamPrivateAttachment(
+            'private',
+            $item->receipt_path,
+            "receipt-{$expenseClaim->claim_number}-{$item->id}".($ext ? ".{$ext}" : ''),
+            $mime,
+            'inline',
+        );
     }
 
     /* ------------------------------------------------------------------ */

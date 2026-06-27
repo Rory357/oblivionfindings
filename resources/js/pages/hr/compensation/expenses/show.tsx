@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle, DollarSign, Send, XCircle } from 'lucide-react';
+import { CheckCircle, DollarSign, Eye, Send, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 type ExpenseItem = {
@@ -366,12 +366,15 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         </TableCell>
                                         <TableCell>
                                             {item.receipt_path ? (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="border-status-success/30 text-status-success"
+                                                <a
+                                                    href={`/hr/compensation/expenses/${claim.id}/items/${item.id}/receipt`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 rounded-full border border-status-success/30 px-2 py-0.5 text-xs font-semibold text-status-success transition-colors hover:bg-status-success-bg"
                                                 >
-                                                    Attached
-                                                </Badge>
+                                                    <Eye className="h-3 w-3" />
+                                                    View
+                                                </a>
                                             ) : (
                                                 <span className="text-sm text-muted-foreground">
                                                     -
