@@ -457,6 +457,39 @@ test('a public requisition application notifies the candidate and hiring manager
     Notification::assertSentTo($manager, JobApplicationReceivedNotification::class);
 });
 
+test('a public application captures screening answers against the requisition questions', function () {
+    $job = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-screen-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published',
+        'screening_questions' => ['Do you hold a current NZ driver licence?', 'Are you available for weekend shifts?'],
+        'created_by' => $this->hr->id,
+    ]);
+
+    $this->post(route('careers.apply.store', ['job' => $job->slug]), [
+        'first_name' => 'Mere', 'last_name' => 'Rangi',
+        'personal_email' => 'mere.rangi@example.test', 'privacy_consent' => '1',
+        'screening_answers' => [
+            ['question' => 'Do you hold a current NZ driver licence?', 'answer' => 'Yes, full licence'],
+            ['question' => 'Are you available for weekend shifts?', 'answer' => 'Saturdays only'],
+            // A rogue client-injected question must be ignored — answers are
+            // rebuilt server-side from the requisition's configured questions.
+            ['question' => 'Injected rogue question', 'answer' => 'should be dropped'],
+        ],
+    ])->assertRedirect();
+
+    $application = HrApplication::query()->where('requisition_id', $job->id)->first();
+    expect($application)->not->toBeNull();
+    // Order matches the requisition's configured questions; the rogue injected
+    // question is dropped. toEqual (not toBe) — inner key order is immaterial.
+    expect($application->screening_answers)->toEqual([
+        ['question' => 'Do you hold a current NZ driver licence?', 'answer' => 'Yes, full licence'],
+        ['question' => 'Are you available for weekend shifts?', 'answer' => 'Saturdays only'],
+    ]);
+    expect(collect($application->screening_answers)->pluck('question')->all())
+        ->not->toContain('Injected rogue question');
+});
+
 /* ---- A7 public mirror: portal offer response acks the candidate ---- */
 
 test('a public offer response acknowledges the candidate', function () {
