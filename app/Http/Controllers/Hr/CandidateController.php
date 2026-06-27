@@ -708,10 +708,16 @@ class CandidateController extends Controller
         }
 
 
+        $positionRule = Rule::exists('hr_positions', 'id');
+        if ($tenantId !== null) {
+            $positionRule = $positionRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
+        }
+
         $validated = $request->validate([
             'application_id'     => ['required', 'integer', $applicationRule],
             'position_title'     => ['required', 'string', 'max:255'],
             'position_role'      => ['nullable', 'string', 'max:100'],
+            'position_id'        => ['nullable', 'integer', $positionRule],
             'proposed_start_date' => ['required', 'date', 'after_or_equal:today'],
             'employment_type'    => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'hours_per_week'     => ['required', 'numeric', 'min:1', 'max:60'],
@@ -750,7 +756,8 @@ class CandidateController extends Controller
         HrOffer::create([
             'application_id'      => $application->id,
             'position_title'      => $validated['position_title'],
-            'position_role'       => $validated['position_role'] ?: ($application->position_role ?: 'support_worker'),
+            'position_role'       => ($validated['position_role'] ?? null) ?: ($application->position_role ?: 'support_worker'),
+            'position_id'         => $validated['position_id'] ?? $application->requisition?->position_id,
             'proposed_start_date' => $validated['proposed_start_date'],
             'employment_type'     => $validated['employment_type'],
             'hours_per_week'      => $validated['hours_per_week'],
@@ -772,9 +779,7 @@ class CandidateController extends Controller
             }
         }
 
-        return redirect()
-            ->route('hr.candidates.show', $application->candidate->id)
-            ->with('success', 'Offer created successfully.');
+        return redirect()->back()->with('success', 'Offer created successfully.');
     }
 
     public function sendOffer(Request $request, HrOffer $offer)
