@@ -904,6 +904,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::prefix('calendar')->name('calendar.')->group(function () {
         Route::get('/', [CalendarController::class, 'index'])->name('index');
+        Route::get('/feed', [CalendarController::class, 'feed'])->name('feed');
         Route::post('/events', [CalendarController::class, 'store'])->name('events.store');
         Route::put('/events/{event}', [CalendarController::class, 'update'])->name('events.update');
         Route::delete('/events/{event}', [CalendarController::class, 'destroy'])->name('events.destroy');

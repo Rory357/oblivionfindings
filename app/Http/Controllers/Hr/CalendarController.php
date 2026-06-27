@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
+use App\Domain\Hr\Models\HrDepartment;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,8 +17,15 @@ class CalendarController extends Controller
 {
     use ResolvesHrTenant;
 
+    public function __construct(
+        private readonly HrCalendarAggregator $aggregator,
+    ) {}
+
     /**
-     * Combined calendar view showing events and approved leave.
+     * The unified, layered organisation calendar. Events themselves are
+     * range-fetched client-side from feed(); index() bootstraps the page chrome:
+     * filter options, permissions, the hero's headline stats, and the "Up next"
+     * rail. (The Renewals tab consumes the compliance layer of the same feed.)
      */
     public function index(Request $request)
     {
@@ -23,46 +33,159 @@ class CalendarController extends Controller
         abort_unless($this->canView($user), 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
-        $start = $request->query('start', now()->startOfMonth()->toDateString());
-        $end = $request->query('end', now()->endOfMonth()->toDateString());
 
-        $events = HrCalendarEvent::forTenant($tenantId)
-            ->inRange($start, $end)
-            ->with(['creator:id,name', 'site:id,name'])
-            ->orderBy('starts_at')
-            ->get();
+        $sites = Site::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
 
-        // Merge approved leave as calendar events
-        $leaveEvents = HrLeaveRequest::where('tenant_id', $tenantId)
-            ->where('status', 'approved')
-            ->where('starts_at', '<=', $end)
-            ->where('ends_at', '>=', $start)
-            ->with('user:id,name')
-            ->get()
-            ->map(fn ($leave) => [
-                'id' => 'leave-' . $leave->id,
-                'title' => ($leave->user->name ?? 'Staff') . ' - ' . ucfirst($leave->leave_type ?? 'Leave'),
-                'start' => $leave->starts_at,
-                'end' => $leave->ends_at,
-                'allDay' => true,
-                'event_type' => 'leave',
-                'color' => '#94a3b8',
-            ]);
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
-        $sites = Site::where('tenant_id', $tenantId)->get(['id', 'name']);
+        $teams = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('team')
+            ->distinct()
+            ->orderBy('team')
+            ->pluck('team')
+            ->values();
+
+        $icalToken = \App\Domain\Hr\Models\HrICalToken::query()
+            ->where('user_id', $user->id)
+            ->value('token');
 
         return Inertia::render('hr/calendar/index', [
-            'events' => $events,
-            'leaveEvents' => $leaveEvents,
             'sites' => $sites,
-            'filters' => [
-                'start' => $start,
-                'end' => $end,
+            'departments' => $departments,
+            'teams' => $teams,
+            'stats' => $this->heroStats($tenantId, $user),
+            'upNext' => $this->upNext($tenantId, $user),
+            'ical' => [
+                'url' => $icalToken ? url('/hr/ical/'.$icalToken) : null,
             ],
             'can' => [
                 'manage' => $this->canManage($user),
+                'manageRecurring' => (bool) $user->canDo('calendar.manage_recurring'),
+                'seeSensitive' => (bool) $user->canDo('hr.leave.manage'),
             ],
         ]);
+    }
+
+    /** Headline stats for the hero band (each click-filters / deep-links). */
+    private function heroStats(int $tenantId, $user): array
+    {
+        $weekStart = now()->startOfWeek();
+        $weekEnd = now()->endOfWeek();
+        $today = now()->startOfDay();
+        $todayEnd = now()->endOfDay();
+
+        $eventsThisWeek = HrCalendarEvent::forTenant($tenantId)
+            ->inRange($weekStart->toDateString(), $weekEnd->toDateString())
+            ->count();
+
+        $onLeaveToday = HrLeaveRequest::where('tenant_id', $tenantId)
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', $todayEnd)
+            ->where('ends_at', '>=', $today)
+            ->distinct('user_id')
+            ->count('user_id');
+
+        $coverageGapsToday = 0;
+        if ($user->canDo('rostering.viewAny')) {
+            $coverageGapsToday = collect(
+                app(\App\Services\ShiftCoverageService::class)->buildRangeCoverage($today, $todayEnd, null)
+            )->filter(fn (array $w) => ! empty($w['has_actionable_gap']))->count();
+        }
+
+        $renewalSoon = \App\Domain\Hr\Models\HrStaffComplianceStatus::query()
+            ->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [$today, now()->copy()->addDays(30)])
+            ->count();
+
+        return [
+            'eventsThisWeek' => $eventsThisWeek,
+            'onLeaveToday' => $onLeaveToday,
+            'coverageGapsToday' => $coverageGapsToday,
+            'renewalsSoon' => $renewalSoon,
+        ];
+    }
+
+    /** Next ~5 upcoming entries across the default layers, for the hero rail. */
+    private function upNext(int $tenantId, $user): array
+    {
+        $from = now()->toDateString();
+        $to = now()->copy()->addDays(30)->toDateString();
+
+        $feed = $this->aggregator->feed(
+            $tenantId,
+            $from,
+            $to,
+            ['event', 'leave', 'shift', 'holiday'],
+            [],
+            $user,
+        );
+
+        return collect($feed)
+            ->filter(fn ($e) => ! empty($e['start']) && empty($e['extendedProps']['gap']))
+            ->sortBy('start')
+            ->take(5)
+            ->map(fn ($e) => [
+                'id' => $e['id'],
+                'layer' => $e['layer'],
+                'title' => $e['title'],
+                'start' => $e['start'],
+                'allDay' => $e['allDay'] ?? false,
+                'deepLink' => $e['deepLink'] ?? null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Unified layered feed for the rebuilt /hr/calendar page. Returns one flat
+     * list of CalendarLayerFeed rows (see resources/js/lib/calendar/layer-feed.ts)
+     * across every requested layer, range-fetched on FullCalendar's datesSet.
+     */
+    public function feed(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($this->canView($user), 403);
+
+        $data = $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+            'layers' => ['nullable', 'string'],
+            'site' => ['nullable', 'integer'],
+            'team' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'integer'],
+        ]);
+
+        $allLayers = ['event', 'leave', 'shift', 'holiday', 'compliance', 'milestone'];
+        $layers = array_values(array_intersect(
+            $allLayers,
+            array_filter(explode(',', (string) ($data['layers'] ?? ''))),
+        ));
+        if ($layers === []) {
+            $layers = ['event', 'leave', 'shift', 'holiday'];
+        }
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $events = $this->aggregator->feed(
+            $tenantId,
+            $data['from'],
+            $data['to'],
+            $layers,
+            [
+                'site_id' => $data['site'] ?? null,
+                'team' => $data['team'] ?? null,
+                'department_id' => $data['department'] ?? null,
+            ],
+            $user,
+        );
+
+        return response()->json(['events' => $events]);
     }
 
     /**
