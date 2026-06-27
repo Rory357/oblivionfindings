@@ -317,6 +317,35 @@ export function EventWizardDialog({
         form.data.starts_at !== '' &&
         form.data.ends_at !== '';
 
+    // Completeness meter (matches the prototype) — required basics + nice-to-haves.
+    const completeness = useMemo(() => {
+        const checks = [
+            form.data.title.trim() !== '',
+            form.data.starts_at !== '' && form.data.ends_at !== '',
+            !!form.data.event_type,
+            !!(form.data.location || form.data.site_id || form.data.department_id),
+            !!(
+                form.data.description ||
+                form.data.reminders.length ||
+                form.data.audience_user_ids.length ||
+                stagedFiles.length
+            ),
+        ];
+        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+    }, [
+        form.data.title,
+        form.data.starts_at,
+        form.data.ends_at,
+        form.data.event_type,
+        form.data.location,
+        form.data.site_id,
+        form.data.department_id,
+        form.data.description,
+        form.data.reminders.length,
+        form.data.audience_user_ids.length,
+        stagedFiles.length,
+    ]);
+
     const siteName = useMemo(
         () => sites.find((s) => String(s.id) === form.data.site_id)?.name ?? 'All sites',
         [sites, form.data.site_id],
@@ -446,7 +475,7 @@ export function EventWizardDialog({
                 steps={STEPS}
                 stepIndex={wizard.index}
                 onStepClick={wizard.goTo}
-                pct={null}
+                pct={completeness}
                 maxWidth="min(96vw, 980px)"
                 maxHeight="min(86vh, 724px)"
                 success={

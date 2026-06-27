@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Services\CompensationService;
 use App\Domain\Hr\Services\ExpenseService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,6 +17,7 @@ class ExpenseController extends Controller
 
     public function __construct(
         private readonly ExpenseService $expenseService,
+        private readonly CompensationService $compensationService,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -63,9 +65,17 @@ class ExpenseController extends Controller
                 'status' => $status,
                 'q' => $search,
             ],
+            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            // Surfaced for the New-claim dialog: IRD mileage rate (read-only) +
+            // the category list, so the dialog renders the config-driven mileage
+            // line (distance × rate) instead of hard-coding anything.
+            'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
+            'categories' => ExpenseService::CATEGORIES,
             'can' => [
                 'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,
+                'approve' => $user->canDo('hr.expenses.approve'),
             ],
         ]);
     }

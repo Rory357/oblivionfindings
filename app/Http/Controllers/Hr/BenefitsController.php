@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\BenefitsService;
+use App\Domain\Hr\Services\CompensationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,6 +18,7 @@ class BenefitsController extends Controller
 
     public function __construct(
         protected BenefitsService $benefitsService,
+        protected CompensationService $compensationService,
     ) {}
 
     /**
@@ -58,6 +60,8 @@ class BenefitsController extends Controller
                 'status' => $request->query('status'),
                 'plan_id' => $request->query('plan_id'),
             ],
+            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            'tabCounts' => $this->compensationService->tabCounts($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.benefits.manage'),
             ],
@@ -160,7 +164,7 @@ class BenefitsController extends Controller
         $data = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,opted_out,suspended,terminated'],
             'employee_contribution_rate' => ['sometimes', 'numeric', 'min:0', 'max:100'],
-            'employer_contribution_rate' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'employer_contribution_rate' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
             'opt_out_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);

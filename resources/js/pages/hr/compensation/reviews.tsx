@@ -18,11 +18,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
-import { CompensationTabs } from '@/components/hr';
+import { PageLayout } from '@/components/page';
+import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { DollarSign, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -40,6 +40,7 @@ type CompensationReview = {
 type Props = {
     reviews: { data: CompensationReview[]; links: any[] };
     filters: { status: string | null };
+    stats: CompensationHeroStats;
     can: { manage: boolean };
 };
 
@@ -91,7 +92,7 @@ const getCycleLabel = (cycle: string) => {
 
 const statuses = ['planning', 'in_progress', 'approved', 'applied'];
 
-export default function CompensationReviews({ reviews, filters, can }: Props) {
+export default function CompensationReviews({ reviews, filters, stats, can }: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
@@ -106,40 +107,19 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compensation Reviews" />
 
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={DollarSign}
-                        title="Compensation Reviews"
-                        description="Manage compensation review cycles and bulk salary adjustments."
-                        stats={[
-                            { label: 'Reviews', value: reviews.data.length },
-                        ]}
-                        actions={
-                            <>
-                                <Link href="/hr/compensation/bands">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    >
-                                        Salary Bands
-                                    </Button>
-                                </Link>
-                                {can.manage && (
-                                    <Link href="/hr/compensation/reviews/create">
-                                        <Button size="sm">
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            New Review
-                                        </Button>
-                                    </Link>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
+            <PageLayout hero={<CompensationHero stats={stats} />}>
                 <CompensationTabs active="reviews" />
+
+                {can.manage ? (
+                    <div className="flex justify-end">
+                        <Link href="/hr/compensation/reviews/create">
+                            <Button size="sm">
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New review
+                            </Button>
+                        </Link>
+                    </div>
+                ) : null}
 
                 <Card>
                     <CardHeader>

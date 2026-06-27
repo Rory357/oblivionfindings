@@ -1,5 +1,3 @@
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,8 +8,17 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero } from '@/components/page';
-import { CompensationTabs } from '@/components/hr';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import { StatusBadge } from '@/components/hr/status-badge';
+import { PageLayout } from '@/components/page';
 import {
     Select,
     SelectContent,
@@ -22,8 +29,15 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Banknote, CheckCircle2, DollarSign, Plus } from 'lucide-react';
+import { CheckCircle2, DollarSign, Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
+
+const formatMoney = (value: number, currency = 'NZD') =>
+    new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: currency || 'NZD',
+        minimumFractionDigits: 2,
+    }).format(Number(value) || 0);
 
 type Bonus = {
     id: number;
@@ -49,6 +63,7 @@ type Props = {
         links: any[];
     };
     employees: Employee[];
+    stats: CompensationHeroStats;
     can: { manage?: boolean };
 };
 
@@ -57,25 +72,6 @@ const breadcrumbs = [
     { title: 'Compensation', href: '/hr/compensation/bands' },
     { title: 'Bonuses', href: '/hr/compensation/bonuses' },
 ];
-const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: {
-        className: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-        label: 'Pending',
-    },
-    approved: {
-        className: 'border-status-info/30 bg-status-info-bg text-status-info',
-        label: 'Approved',
-    },
-    paid: {
-        className: 'border-status-success/30 bg-status-success-bg text-status-success',
-        label: 'Paid',
-    },
-    cancelled: {
-        className: 'border-border/30 text-muted-foreground',
-        label: 'Cancelled',
-    },
-};
-
 const BONUS_TYPES = [
     { value: 'performance', label: 'Performance' },
     { value: 'signing', label: 'Signing' },
@@ -95,7 +91,7 @@ const emptyForm = {
     reason: '',
 };
 
-export default function BonusIndex({ bonuses, employees, can }: Props) {
+export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
@@ -126,33 +122,17 @@ export default function BonusIndex({ bonuses, employees, can }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Bonus Payments" />
-            <PageShell>
-                <PageHero category="hr"
-                    icon={Banknote}
-                    title="Bonus Payments"
-                    description="Track and manage employee bonuses and incentives."
-                    stats={[
-                        { label: 'Total', value: bonuses.total },
-                        {
-                            label: 'Pending',
-                            value: bonuses.data.filter((b) => b.status === 'pending').length,
-                        },
-                        {
-                            label: 'Paid',
-                            value: bonuses.data.filter((b) => b.status === 'paid').length,
-                        },
-                    ]}
-                    actions={
-                        can.manage ? (
-                            <Button size="sm" onClick={openCreate}>
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Record Bonus
-                            </Button>
-                        ) : null
-                    }
-                />
+            <Head title="Compensation & Benefits" />
+            <PageLayout hero={<CompensationHero stats={stats} />}>
                 <CompensationTabs active="bonuses" />
+                {can.manage ? (
+                    <div className="flex justify-end">
+                        <Button size="sm" onClick={openCreate}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Record bonus
+                        </Button>
+                    </div>
+                ) : null}
                 <Card>
                     <CardHeader>
                         <CardTitle>All Bonuses ({bonuses.total})</CardTitle>
@@ -175,98 +155,65 @@ export default function BonusIndex({ bonuses, employees, can }: Props) {
                                 )}
                             </div>
                         ) : (
-                            <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left">
-                                            Employee
-                                        </th>
-                                        <th className="px-4 py-3 text-left">
-                                            Type
-                                        </th>
-                                        <th className="px-4 py-3 text-right">
-                                            Amount
-                                        </th>
-                                        <th className="px-4 py-3 text-left">
-                                            Date
-                                        </th>
-                                        <th className="px-4 py-3 text-left">
-                                            Reason
-                                        </th>
-                                        <th className="px-4 py-3 text-center">
-                                            Status
-                                        </th>
-                                        {can.manage && (
-                                            <th className="px-4 py-3 text-right">
-                                                Actions
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {bonuses.data.map((b) => {
-                                        const sc =
-                                            statusConfig[b.status] ||
-                                            statusConfig.pending;
-                                        return (
-                                            <tr
-                                                key={b.id}
-                                                className="border-b hover:bg-muted/50"
-                                            >
-                                                <td className="px-4 py-3 font-medium">
-                                                    {b.employee_name}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground capitalize">
-                                                    {b.bonus_type.replace(
-                                                        '_',
-                                                        ' ',
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Employee</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Reason</TableHead>
+                                        <TableHead className="text-center">Status</TableHead>
+                                        {can.manage && <TableHead className="text-right">Actions</TableHead>}
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {bonuses.data.map((b) => (
+                                        <TableRow key={b.id}>
+                                            <TableCell className="font-medium">
+                                                {b.employee_name}
+                                            </TableCell>
+                                            <TableCell className="capitalize text-muted-foreground">
+                                                {b.bonus_type.replace('_', ' ')}
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium tabular-nums">
+                                                {formatMoney(b.amount, b.currency)}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {b.payment_date}
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                                                {b.reason || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <StatusBadge status={b.status} />
+                                            </TableCell>
+                                            {can.manage && (
+                                                <TableCell className="text-right">
+                                                    {b.status === 'pending' && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                router.post(
+                                                                    `/hr/compensation/bonuses/${b.id}/approve`,
+                                                                )
+                                                            }
+                                                        >
+                                                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                            Approve
+                                                        </Button>
                                                     )}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-medium">
-                                                    ${Number(b.amount).toFixed(2)}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {b.payment_date}
-                                                </td>
-                                                <td className="max-w-[200px] truncate px-4 py-3 text-muted-foreground">
-                                                    {b.reason || '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={sc.className}
-                                                    >
-                                                        {sc.label}
-                                                    </Badge>
-                                                </td>
-                                                {can.manage && (
-                                                    <td className="px-4 py-3 text-right">
-                                                        {b.status ===
-                                                            'pending' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        `/hr/compensation/bonuses/${b.id}/approve`,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                                Approve
-                                                            </Button>
-                                                        )}
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                                </TableCell>
+                                            )}
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
                         )}
                     </CardContent>
                 </Card>
-            </PageShell>
+            </PageLayout>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-lg">

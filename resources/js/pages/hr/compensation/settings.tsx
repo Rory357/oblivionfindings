@@ -13,6 +13,7 @@ import {
     type CompensationHeroStats,
     type CompensationQuickAction,
 } from '@/components/hr';
+import { InfoCard } from '@/components/hr/wizard';
 import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
@@ -54,15 +55,13 @@ export default function CompensationSettings({ settings, stats }: Props) {
             <PageLayout hero={<CompensationHero stats={stats} quickActions={heroActions} />}>
                 <CompensationTabs active="settings" />
 
-                <div className="rounded-lg border border-primary/35 bg-primary/10 p-3 text-[13px] leading-relaxed text-foreground">
-                    <span className="inline-flex items-center gap-2 font-semibold text-primary">
-                        <Info className="h-4 w-4" /> Read-only
-                    </span>{' '}
-                    These values are configured in the application config (and, for the
-                    mileage rate, consolidated with Operations & Fleet in a future pass).
-                    They are shown here so payroll and finance can see what every claim
-                    surface uses.
-                </div>
+                <InfoCard icon={Info} tone="info">
+                    <span className="font-semibold">Read-only.</span> These values are
+                    configured in the application config (and, for the mileage rate,
+                    consolidated with Operations &amp; Fleet in a future pass). They are
+                    shown here so payroll and finance can see what every claim surface
+                    uses.
+                </InfoCard>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <Card>

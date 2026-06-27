@@ -131,11 +131,18 @@ The deferred backlog below has since been worked through and merged to `main`
   events (optimistic PUT, revert); 12-mini-month year picker; keyboard shortcuts
   (`/ n t 1-4 ←→ Esc`); quick-add popover with "More options →" escalation; hover
   preview + loading skeleton + delete confirm. Build clean; browser-verified.
-- ⛔ Pixel-diff vs `HR Calendar.dc.html` (still not provided).
+- ✅ **Fidelity pass** vs the (now-provided) `HR-Calendar-prototype.html`: layers
+  moved from a popover to the prototype's **persistent left "LAYERS" rail** ("one
+  grid replacing four calendars" — toggle cards with origin sublabels + counts +
+  the read-only explainer); **Agenda** is now a real tab (Calendar · Agenda ·
+  Renewals) with count badges + "right-click to pin/set default" hint; the
+  month/year **title opens the year picker** (caret); the wizard gained the
+  **Completeness** meter; rail/legend lead with editable HR events. Browser-diffed
+  against the prototype.
 
-**All deferred work (D1–D8) is now shipped to `main`.** Backend suite: 11 tests /
-44 assertions green; frontend: clean `tsc`/`eslint`/`vite build`; `/hr/calendar`
-browser-verified (page, feed/layers, hero, wizard, iCal, year picker).
+**All deferred work (D1–D8) + the prototype fidelity pass are shipped to `main`.**
+Backend suite: 11 tests / 44 assertions green; frontend: clean
+`tsc`/`eslint`/`vite build`; `/hr/calendar` browser-verified against the prototype.
 
 ## Deferred — recommended follow-up passes
 

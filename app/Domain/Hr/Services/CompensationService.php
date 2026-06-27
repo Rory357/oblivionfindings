@@ -2,10 +2,15 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrBenefitEnrollment;
+use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrSalaryBand;
+use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CompensationService
@@ -93,6 +98,122 @@ class CompensationService
         $position = $pay < $min ? 'under' : ($pay > $max ? 'over' : 'in');
 
         return ['compa_ratio' => $compa, 'position' => $position];
+    }
+
+    /**
+     * Full hub-hero stat set (band-health placement + cross-hub aggregates),
+     * shared by every Compensation & Benefits surface so the hero is identical
+     * across the hub. Salary fields are encrypted → placement runs in PHP.
+     *
+     * @return array<string, int|float>
+     */
+    public function heroStats(int $tenantId, User $user): array
+    {
+        $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->active()
+            ->get(['id', 'position_role', 'annual_salary', 'hourly_rate']);
+
+        $activeBands = HrSalaryBand::query()->forTenant($tenantId)->active()
+            ->orderByDesc('effective_from')->get();
+        $activeByRole = $activeBands->groupBy('position_role');
+
+        $placed = 0;
+        $outOfBand = 0;
+        foreach ($employees->groupBy('position_role') as $role => $people) {
+            $band = $activeByRole->get($role)?->first();
+            if (! $band) {
+                continue;
+            }
+            foreach ($people as $p) {
+                $pos = $this->bandPlacement($p, $band)['position'];
+                if ($pos === null) {
+                    continue;
+                }
+                $placed++;
+                if ($pos !== 'in') {
+                    $outOfBand++;
+                }
+            }
+        }
+
+        return [
+            'bands_total' => $activeBands->count(),
+            'roles_covered' => $activeByRole->keys()->filter()->count(),
+            'people_placed' => $placed,
+            'people_in_band' => max(0, $placed - $outOfBand),
+            'people_out_of_band' => $outOfBand,
+            'band_health' => $placed > 0 ? (int) round((($placed - $outOfBand) / $placed) * 100) : 100,
+            ...$this->hubAggregates($tenantId, $user),
+        ];
+    }
+
+    /**
+     * Cross-hub hero aggregates: reviews in flight, items awaiting approval,
+     * reimbursed this month, claims overdue. Counts respect the viewer's gates so
+     * a comp-only user never sees benefits/expenses numbers they can't open.
+     *
+     * @return array<string, int|float>
+     */
+    public function hubAggregates(int $tenantId, User $user): array
+    {
+        $reviewsInFlight = HrCompensationReview::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['planning', 'in_progress', 'approved'])
+            ->count();
+
+        $canExpenses = $user->canDo('hr.expenses.view');
+        // "Awaiting my approval" must count only what this viewer can actually
+        // approve — expense approval is a distinct perm from view, and bonus
+        // approval rides on compensation.manage.
+        $awaitingClaims = $user->canDo('hr.expenses.approve')
+            ? HrExpenseClaim::query()->where('tenant_id', $tenantId)->where('status', 'submitted')->count()
+            : 0;
+        $pendingBonuses = $user->canDo('hr.compensation.manage')
+            ? HrBonusPayment::query()->where('tenant_id', $tenantId)->where('status', 'pending')->count()
+            : 0;
+
+        // Month boundary in the worker timezone (paid_at is stored UTC), so the
+        // "this month" KPI doesn't slip by ~13h at month edges in NZ.
+        $monthStart = Carbon::now(config('app.worker_timezone'))->startOfMonth()->utc();
+        $reimbursed = $canExpenses
+            ? (float) HrExpenseClaim::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('paid_at')
+                ->where('paid_at', '>=', $monthStart)
+                ->sum('total_amount')
+            : 0.0;
+
+        $claimsOverdue = $canExpenses
+            ? HrExpenseClaim::query()
+                ->where('tenant_id', $tenantId)
+                ->where('status', 'submitted')
+                ->where('submitted_at', '<', Carbon::now()->subDays(7))
+                ->count()
+            : 0;
+
+        return [
+            'reviews_in_flight' => $reviewsInFlight,
+            'awaiting_approval' => $awaitingClaims + $pendingBonuses,
+            'reimbursed_this_month' => round($reimbursed, 2),
+            'claims_overdue' => $claimsOverdue,
+        ];
+    }
+
+    /**
+     * Per-tab record counts for the hub tab-strip badges.
+     *
+     * @return array<string, int>
+     */
+    public function tabCounts(int $tenantId): array
+    {
+        return [
+            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()->count(),
+            'reviews' => HrCompensationReview::query()->where('tenant_id', $tenantId)->count(),
+            'bonuses' => HrBonusPayment::query()->where('tenant_id', $tenantId)->count(),
+            'benefits' => HrBenefitEnrollment::query()->where('tenant_id', $tenantId)->where('status', 'active')->count(),
+            'expenses' => HrExpenseClaim::query()->where('tenant_id', $tenantId)->count(),
+        ];
     }
 
     /**

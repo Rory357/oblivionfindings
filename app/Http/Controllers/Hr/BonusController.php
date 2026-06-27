@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\CompensationService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ class BonusController extends Controller
 {
     use ResolvesHrTenant;
 
+    public function __construct(
+        protected CompensationService $compensationService,
+    ) {}
+
     /**
      * List bonus payments with filters.
      */
@@ -21,8 +26,10 @@ class BonusController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $bonuses = HrBonusPayment::query()
+            ->where('tenant_id', $tenantId)
             ->with([
                 'employeeProfile.user:id,name,email',
                 'approver:id,name',
@@ -52,7 +59,8 @@ class BonusController extends Controller
             'created_at' => $bonus->created_at?->toDateTimeString(),
         ]);
 
-        $employees = HrEmployeeProfile::where('is_active', true)
+        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('is_active', true)
             ->with('user:id,name,email')
             ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title', 'department']);
@@ -61,6 +69,8 @@ class BonusController extends Controller
             'bonuses' => $bonuses,
             'employees' => $employees,
             'filters' => $request->only(['bonus_type', 'status', 'date_from', 'date_to']),
+            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            'tabCounts' => $this->compensationService->tabCounts($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
             ],
