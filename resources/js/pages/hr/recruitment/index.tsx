@@ -85,6 +85,8 @@ type Requisition = {
     employment_type: string;
     position: string;
     position_id?: number | null;
+    requires_approval?: boolean;
+    pay?: string | null;
 };
 
 type WeekInterview = {
@@ -451,7 +453,27 @@ export default function RecruitmentHub(props: Props) {
                         ) : null}
 
                         {tab === 'requisitions' ? (
-                            <RequisitionsTab requisitions={requisitions} canManage={can.manage} onNew={() => openWizard('requisition')} />
+                            <RequisitionsTab
+                                requisitions={requisitions}
+                                canManage={can.manage}
+                                onNew={() => openWizard('requisition')}
+                                onAction={(jobId, action) => {
+                                    const urls: Record<string, string> = {
+                                        submit: `/hr/recruitment/jobs/${jobId}/submit-approval`,
+                                        approve: `/hr/recruitment/jobs/${jobId}/approve`,
+                                        reject: `/hr/recruitment/jobs/${jobId}/reject-approval`,
+                                        publish: `/hr/recruitment/jobs/${jobId}/publish`,
+                                    };
+                                    router.post(urls[action], {}, {
+                                        preserveScroll: true,
+                                        onSuccess: (pg) => {
+                                            const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                                            if (f?.error) toast.error(f.error);
+                                            else toast.success(f?.success ?? 'Done');
+                                        },
+                                    });
+                                }}
+                            />
                         ) : null}
 
                         {tab === 'interviews' ? (
@@ -834,7 +856,17 @@ const REQ_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'i
     pending_approval: 'warning',
 };
 
-function RequisitionsTab({ requisitions, canManage, onNew }: { requisitions: Requisition[]; canManage: boolean; onNew: () => void }) {
+function RequisitionsTab({
+    requisitions,
+    canManage,
+    onNew,
+    onAction,
+}: {
+    requisitions: Requisition[];
+    canManage: boolean;
+    onNew: () => void;
+    onAction: (jobId: number, action: 'submit' | 'approve' | 'reject' | 'publish') => void;
+}) {
     return (
         <div>
             <div className="mb-4 flex items-center gap-3">
@@ -866,10 +898,24 @@ function RequisitionsTab({ requisitions, canManage, onNew }: { requisitions: Req
                                 <Stat value={r.openings} label="Openings" />
                                 <Stat value={r.applicants} label="Applicants" />
                                 <div className="flex-1 text-right">
-                                    <div className="text-[13px] font-bold capitalize">{r.employment_type?.replace(/_/g, ' ')}</div>
+                                    <div className="text-[13px] font-bold capitalize">{r.pay ?? r.employment_type?.replace(/_/g, ' ')}</div>
                                     <div className="text-[10.5px] text-muted-foreground">{r.hiring_manager ?? 'Unassigned'}</div>
                                 </div>
                             </div>
+                            {canManage ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {r.status === 'pending_approval' ? (
+                                        <>
+                                            <button type="button" onClick={() => onAction(r.id, 'approve')} className="h-8 rounded-md bg-status-success px-3 text-[12px] font-bold text-white">Approve</button>
+                                            <button type="button" onClick={() => onAction(r.id, 'reject')} className="h-8 rounded-md border border-status-critical/30 bg-status-critical-bg px-3 text-[12px] font-semibold text-status-critical">Reject</button>
+                                        </>
+                                    ) : r.status === 'draft' && r.requires_approval ? (
+                                        <button type="button" onClick={() => onAction(r.id, 'submit')} className="h-8 rounded-md border border-primary bg-primary/10 px-3 text-[12px] font-bold text-primary">Submit for approval</button>
+                                    ) : r.status === 'draft' || r.status === 'paused' ? (
+                                        <button type="button" onClick={() => onAction(r.id, 'publish')} className="h-8 rounded-md border border-primary bg-primary/10 px-3 text-[12px] font-bold text-primary">Publish</button>
+                                    ) : null}
+                                </div>
+                            ) : null}
                         </div>
                     ))}
                 </div>

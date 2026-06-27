@@ -19,6 +19,7 @@ use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
+use App\Domain\Hr\Notifications\RequisitionApprovalRequestNotification;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -474,6 +475,54 @@ test('scheduling an interview emails the candidate and panel a calendar invite',
 
     $interview = HrInterview::query()->where('application_id', $application->id)->first();
     expect($interview->invite_sent_at)->not->toBeNull();
+});
+
+/* ---- D7: requisition salary + approval workflow (#5) ---- */
+
+test('a requisition stores salary, screening and approval fields', function () {
+    $this->actingAs($this->hr)->post(route('hr.jobs.store'), [
+        'title' => 'Support Worker — Pay',
+        'employment_type' => 'full_time',
+        'openings' => 1,
+        'description' => 'Provide person-centred support.',
+        'salary_range_min' => 26,
+        'salary_range_max' => 30,
+        'show_salary' => true,
+        'requires_approval' => true,
+        'screening_questions' => ['Do you hold a current NZ driver licence?'],
+    ])->assertRedirect();
+
+    $req = HrJobRequisition::query()->where('title', 'Support Worker — Pay')->first();
+    expect((float) $req->salary_range_min)->toBe(26.0);
+    expect($req->show_salary)->toBeTrue();
+    expect($req->requires_approval)->toBeTrue();
+    expect($req->screening_questions)->toBe(['Do you hold a current NZ driver licence?']);
+});
+
+test('the requisition approval workflow transitions and notifies', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $req = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Team Leader', 'slug' => 'tl-'.uniqid(),
+        'position_role' => 'lead', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'draft', 'requires_approval' => true, 'hiring_manager_user_id' => $manager->id,
+        'created_by' => $this->hr->id,
+    ]);
+
+    $this->actingAs($this->hr)->post(route('hr.jobs.submit-approval', $req->id))->assertRedirect();
+    expect($req->fresh()->status)->toBe('pending_approval');
+    Notification::assertSentTo($manager, RequisitionApprovalRequestNotification::class);
+
+    $this->actingAs($this->hr)->post(route('hr.jobs.approve', $req->id))->assertRedirect();
+    expect($req->fresh()->status)->toBe('published');
+
+    $req2 = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'BSP', 'slug' => 'bsp-'.uniqid(),
+        'position_role' => 'bsp', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'pending_approval', 'created_by' => $this->hr->id,
+    ]);
+    $this->actingAs($this->hr)->post(route('hr.jobs.reject-approval', $req2->id))->assertRedirect();
+    expect($req2->fresh()->status)->toBe('draft');
 });
 
 /* ---- D3: reference questionnaire (#17) ---- */

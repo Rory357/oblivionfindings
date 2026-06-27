@@ -22,6 +22,11 @@ class HrJobRequisition extends Model
         'position_id',
         'site_id',
         'employment_type',
+        'salary_range_min',
+        'salary_range_max',
+        'show_salary',
+        'screening_questions',
+        'requires_approval',
         'openings',
         'status',
         'summary',
@@ -50,6 +55,11 @@ class HrJobRequisition extends Model
         'closing_at' => 'date',
         'external_posted_at' => 'datetime',
         'external_sync_at' => 'datetime',
+        'salary_range_min' => 'decimal:2',
+        'salary_range_max' => 'decimal:2',
+        'show_salary' => 'boolean',
+        'screening_questions' => 'array',
+        'requires_approval' => 'boolean',
     ];
 
     public function site(): BelongsTo

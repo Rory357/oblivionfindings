@@ -211,7 +211,7 @@ class RecruitmentController extends Controller
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->with(['site:id,name', 'position:id,title', 'hiringManager:id,name'])
             ->withCount('applications')
-            ->orderByRaw("FIELD(status, 'published', 'draft', 'paused', 'closed')")
+            ->orderByRaw("FIELD(status, 'pending_approval', 'published', 'draft', 'paused', 'closed')")
             ->orderByDesc('created_at')
             ->limit(60)
             ->get();
@@ -227,7 +227,22 @@ class RecruitmentController extends Controller
             'employment_type' => $r->employment_type,
             'position' => $r->position?->title ?? $r->title,
             'position_id' => $r->position_id,
+            'requires_approval' => (bool) $r->requires_approval,
+            'pay' => $this->payRange($r),
         ])->values()->all();
+    }
+
+    private function payRange(HrJobRequisition $r): ?string
+    {
+        if (! $r->show_salary || ($r->salary_range_min === null && $r->salary_range_max === null)) {
+            return null;
+        }
+        $fmt = fn ($v) => '$'.number_format((float) $v, 0);
+        if ($r->salary_range_min !== null && $r->salary_range_max !== null) {
+            return $fmt($r->salary_range_min).' – '.$fmt($r->salary_range_max);
+        }
+
+        return $fmt($r->salary_range_min ?? $r->salary_range_max);
     }
 
     /* ------------------------------------------------------------------ */

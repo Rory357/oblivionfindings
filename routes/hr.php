@@ -200,6 +200,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/publish', [RecruitmentJobController::class, 'publish'])->name('jobs.publish')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/submit-approval', [RecruitmentJobController::class, 'submitForApproval'])->name('jobs.submit-approval')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/approve', [RecruitmentJobController::class, 'approve'])->name('jobs.approve')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/reject-approval', [RecruitmentJobController::class, 'rejectApproval'])->name('jobs.reject-approval')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/close', [RecruitmentJobController::class, 'close'])->name('jobs.close')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/sync-posting', [RecruitmentJobController::class, 'syncPosting'])->name('jobs.sync-posting')
