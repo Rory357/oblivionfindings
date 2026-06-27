@@ -73,6 +73,51 @@ test('a claim with no receipt leaves receipt_path null', function () {
     expect($item->receipt_path)->toBeNull();
 });
 
+test('a stored receipt can be streamed back through the hardened route', function () {
+    Storage::fake('private');
+
+    $this->actingAs($this->hr)
+        ->post('/hr/compensation/expenses', [
+            'title' => 'Downloadable Receipt',
+            'items' => [
+                baseExpenseItem([
+                    'receipt' => UploadedFile::fake()->create('receipt.pdf', 100, 'application/pdf'),
+                ]),
+            ],
+        ])
+        ->assertRedirect();
+
+    $claim = HrExpenseClaim::query()->where('title', 'Downloadable Receipt')->firstOrFail();
+    $item = $claim->items()->firstOrFail();
+
+    $response = $this->actingAs($this->hr)
+        ->get("/hr/compensation/expenses/{$claim->id}/items/{$item->id}/receipt");
+
+    $response->assertOk();
+    expect($response->headers->get('content-security-policy'))->toContain('sandbox');
+});
+
+test('a receipt request for an item on another claim 404s', function () {
+    Storage::fake('private');
+
+    foreach (['Claim A', 'Claim B'] as $title) {
+        $this->actingAs($this->hr)->post('/hr/compensation/expenses', [
+            'title' => $title,
+            'items' => [baseExpenseItem([
+                'receipt' => UploadedFile::fake()->create('r.pdf', 50, 'application/pdf'),
+            ])],
+        ])->assertRedirect();
+    }
+
+    $claimA = HrExpenseClaim::query()->where('title', 'Claim A')->firstOrFail();
+    $itemB = HrExpenseClaim::query()->where('title', 'Claim B')->firstOrFail()->items()->firstOrFail();
+
+    // Item B does not belong to Claim A → 404 (closes the IDOR path).
+    $this->actingAs($this->hr)
+        ->get("/hr/compensation/expenses/{$claimA->id}/items/{$itemB->id}/receipt")
+        ->assertNotFound();
+});
+
 test('a receipt with a disallowed mime type is rejected', function () {
     Storage::fake('private');
 
