@@ -4,6 +4,16 @@
  * shadcn <Button>/<Card>. Colours stay token-based throughout. */
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
@@ -34,7 +44,16 @@ import {
     type EventCategoryOption,
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
+import {
+    CalendarDetailPopover,
+    type EventDetail,
+} from '@/components/hr/calendar/calendar-detail-popover';
+import { CalendarYearPicker } from '@/components/hr/calendar/calendar-year-picker';
 import { type PersonOption } from '@/components/hr/people-picker';
+import {
+    ShiftContextMenu,
+    type ShiftCtxState,
+} from '@/components/rostering/shift-context-menu';
 import { HrTabs } from '@/components/hr';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import {
@@ -60,10 +79,25 @@ import {
     AlertTriangle,
     CalendarClock,
     CalendarDays,
+    CalendarPlus,
+    CalendarSearch,
+    Copy,
+    ExternalLink,
     Layers,
+    Pencil,
     Search,
+    Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -154,7 +188,9 @@ function toFcEvent(e: CalendarLayerFeed): EventInput {
         start: e.start,
         end: e.end,
         allDay: e.allDay,
-        editable: e.editable,
+        // Only standalone HR events are drag/resize editable; recurring
+        // occurrences are edited through the scope prompt, not by dragging.
+        editable: e.editable && !e.extendedProps.recurring,
         extendedProps: ext,
     };
 
@@ -215,6 +251,14 @@ export default function CalendarIndex({
     const [createDate, setCreateDate] = useState<string | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
     const [scopePrompt, setScopePrompt] = useState<EventClickArg | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [detail, setDetail] = useState<EventDetail | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<ShiftCtxState | null>(null);
+    const [quickAdd, setQuickAdd] = useState<{ date: string; x: number; y: number } | null>(null);
+    const [yearPickerOpen, setYearPickerOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
+    const clickedInfoRef = useRef<EventClickArg | null>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
 
     // Keep the live filter/layer state in a ref so the FullCalendar event source
     // (registered once) always reads the current values without re-registering.
@@ -261,6 +305,7 @@ export default function CalendarIndex({
                 success([]);
                 return;
             }
+            setLoading(true);
             fetch(buildFeedUrl(info.startStr.slice(0, 10), info.endStr.slice(0, 10), layers.join(',')), {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
@@ -271,6 +316,7 @@ export default function CalendarIndex({
                 })
                 .then((data: { events: CalendarLayerFeed[] }) => {
                     setFeedError(false);
+                    setLoading(false);
                     const tally: Record<string, number> = {};
                     for (const e of data.events) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
                     setCounts(tally);
@@ -283,6 +329,7 @@ export default function CalendarIndex({
                 })
                 .catch((err: Error) => {
                     setFeedError(true);
+                    setLoading(false);
                     failure(err);
                 });
         },
@@ -317,6 +364,58 @@ export default function CalendarIndex({
             )
             .catch(() => setRenewals([]));
     }, [tab, renewals]);
+
+    // Keyboard shortcuts: / search · n new · t today · 1-4 views · ←/→ period · Esc.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const el = e.target as HTMLElement | null;
+            const typing =
+                el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
+            if (e.key === 'Escape') {
+                setDetail(null);
+                setCtxMenu(null);
+                setQuickAdd(null);
+                return;
+            }
+            if (typing || tab !== 'calendar') return;
+            const api = calendarRef.current?.getApi();
+            switch (e.key) {
+                case '/':
+                    e.preventDefault();
+                    searchRef.current?.focus();
+                    break;
+                case 'n':
+                    if (can.manage) openCreate();
+                    break;
+                case 't':
+                    api?.today();
+                    break;
+                case '1':
+                    setView('dayGridMonth');
+                    break;
+                case '2':
+                    setView('timeGridWeek');
+                    break;
+                case '3':
+                    setView('timeGridDay');
+                    break;
+                case '4':
+                    setView('listWeek');
+                    break;
+                case 'ArrowLeft':
+                    api?.prev();
+                    break;
+                case 'ArrowRight':
+                    api?.next();
+                    break;
+                default:
+                    break;
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, can.manage]);
 
     const toggleLayer = (layer: CalendarLayer) => {
         setActiveLayers((prev) =>
@@ -367,24 +466,133 @@ export default function CalendarIndex({
         setWizardOpen(true);
     };
 
-    const handleEventClick = (info: EventClickArg) => {
-        const props = info.event.extendedProps as Record<string, unknown> & {
-            deepLink?: string;
-            layer?: CalendarLayer;
+    const detailFromInfo = (info: EventClickArg, x: number, y: number): EventDetail => {
+        const props = info.event.extendedProps as Record<string, unknown>;
+        return {
+            x,
+            y,
+            id: info.event.id,
+            title: info.event.title,
+            start: info.event.startStr || null,
+            end: info.event.endStr || null,
+            allDay: info.event.allDay,
+            layer: (props.layer as CalendarLayer) ?? 'event',
+            deepLink: (props.deepLink as string) ?? null,
+            props,
         };
-        // HR events open the wizard (manager only); read-only layers deep-link.
-        if (props.layer === 'event') {
-            if (!can.manage) return;
-            // A live series occurrence (has an rrule) prompts for edit scope;
-            // standalone events + exception overrides edit directly.
-            if (props.rrule && can.manageRecurring) {
-                setScopePrompt(info);
-            } else {
-                openEdit(buildInitial(info, 'all'));
-            }
+    };
+
+    // Left-click any entry → detail popover (read any layer; deep-link or edit).
+    const handleEventClick = (info: EventClickArg) => {
+        clickedInfoRef.current = info;
+        const e = info.jsEvent as MouseEvent;
+        setCtxMenu(null);
+        setDetail(detailFromInfo(info, e?.clientX ?? 200, e?.clientY ?? 200));
+    };
+
+    const editFromInfo = (info: EventClickArg) => {
+        const props = info.event.extendedProps as Record<string, unknown>;
+        if (props.layer !== 'event' || !can.manage) {
+            if (props.deepLink) router.visit(props.deepLink as string);
             return;
         }
-        if (props.deepLink) router.visit(props.deepLink);
+        if (props.rrule && can.manageRecurring) {
+            setScopePrompt(info);
+        } else {
+            openEdit(buildInitial(info, 'all'));
+        }
+    };
+
+    const duplicateFromInfo = (info: EventClickArg) => {
+        const init = buildInitial(info, 'all');
+        router.post(
+            '/hr/calendar/events',
+            {
+                title: `${init.title} (copy)`,
+                description: init.description,
+                event_type: init.event_type,
+                starts_at: init.starts_at,
+                ends_at: init.ends_at,
+                is_all_day: init.is_all_day,
+                location: init.location,
+                department_id: init.department_id,
+                site_id: init.site_id,
+            },
+            { preserveScroll: true, preserveState: true, onSuccess: () => refetch() },
+        );
+    };
+
+    const deleteFromInfo = (info: EventClickArg) => {
+        const id = Number((info.event.extendedProps as Record<string, unknown>).eventId);
+        if (id) setDeleteTarget({ id, title: info.event.title });
+    };
+
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        router.delete(`/hr/calendar/events/${deleteTarget.id}`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => refetch(),
+        });
+        setDeleteTarget(null);
+    };
+
+    // Drag-move / resize a standalone HR event → optimistic PUT, revert on fail.
+    const handleEventMutate = (info: { event: { id: string; startStr: string; endStr: string; extendedProps: Record<string, unknown> }; revert: () => void }) => {
+        const id = Number(info.event.extendedProps.eventId);
+        if (!id) {
+            info.revert();
+            return;
+        }
+        router.put(
+            `/hr/calendar/events/${id}`,
+            {
+                starts_at: info.event.startStr,
+                ends_at: info.event.endStr || info.event.startStr,
+                scope: 'all',
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => {
+                    info.revert();
+                    toast.error('Could not move the event');
+                },
+            },
+        );
+    };
+
+    const buildEntryMenu = (info: EventClickArg, x: number, y: number) => {
+        const props = info.event.extendedProps as Record<string, unknown>;
+        const layer = (props.layer as CalendarLayer) ?? 'event';
+        const meta = LAYER_META[layer];
+        const items =
+            layer === 'event' && can.manage
+                ? [
+                      { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit', kbd: '↵', onClick: () => editFromInfo(info) },
+                      { icon: <Copy className="h-3.5 w-3.5" />, label: 'Duplicate', onClick: () => duplicateFromInfo(info) },
+                      { sep: true as const },
+                      { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Delete', tone: 'critical' as const, onClick: () => deleteFromInfo(info) },
+                  ]
+                : props.deepLink
+                  ? [{ icon: <ExternalLink className="h-3.5 w-3.5" />, label: 'Open in ' + meta.label.split(' ')[0], onClick: () => router.visit(props.deepLink as string) }]
+                  : [];
+        if (items.length === 0) return;
+        setDetail(null);
+        setCtxMenu({ x, y, tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4), meta: info.event.title, items });
+    };
+
+    const buildDayMenu = (dateStr: string, x: number, y: number) => {
+        if (!can.manage) return;
+        setCtxMenu({
+            x,
+            y,
+            tag: 'DAY',
+            meta: new Date(dateStr).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }),
+            items: [
+                { icon: <CalendarPlus className="h-3.5 w-3.5" />, label: 'New event here', onClick: () => openCreate(dateStr) },
+            ],
+        });
     };
 
     const onUpNext = (entry: UpNextEntry) => {
@@ -493,9 +701,10 @@ export default function CalendarIndex({
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
+                                    ref={searchRef}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search events…"
+                                    placeholder="Search events…  ( / )"
                                     className="h-9 w-[200px] pl-8"
                                 />
                             </div>
@@ -523,6 +732,15 @@ export default function CalendarIndex({
 
                             <div className="ml-auto flex items-center gap-2">
                                 <ViewSwitch view={view} onChange={setView} />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-9 gap-1.5"
+                                    onClick={() => setYearPickerOpen(true)}
+                                >
+                                    <CalendarSearch className="h-4 w-4" />
+                                    Jump to…
+                                </Button>
                                 <LayerPopover
                                     activeLayers={activeLayers}
                                     counts={counts}
@@ -546,7 +764,18 @@ export default function CalendarIndex({
                                         }}
                                     />
                                 ) : null}
-                                <div className={feedError ? 'hidden' : undefined}>
+                                <div className={feedError ? 'hidden' : 'relative'}>
+                                    {loading ? (
+                                        <div className="pointer-events-none absolute inset-0 z-10 grid grid-rows-6 gap-1 rounded-xl bg-card/60 p-2 backdrop-blur-[1px]">
+                                            {Array.from({ length: 6 }).map((_, r) => (
+                                                <div key={r} className="grid grid-cols-7 gap-1">
+                                                    {Array.from({ length: 7 }).map((_, c) => (
+                                                        <div key={c} className="animate-pulse rounded-lg bg-muted/50" />
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                     <CalendarView
                                         calendarRef={calendarRef}
                                         plugins={[
@@ -562,12 +791,45 @@ export default function CalendarIndex({
                                         selectMirror={can.manage}
                                         select={
                                             can.manage
-                                                ? (arg: { startStr: string }) => {
-                                                      openCreate(arg.startStr.slice(0, 10));
-                                                      calendarRef.current?.getApi().unselect();
+                                                ? (arg: { startStr: string; jsEvent: MouseEvent | null }) => {
+                                                      setQuickAdd({
+                                                          date: arg.startStr.slice(0, 10),
+                                                          x: arg.jsEvent?.clientX ?? 240,
+                                                          y: arg.jsEvent?.clientY ?? 240,
+                                                      });
                                                   }
                                                 : undefined
                                         }
+                                        editable={can.manage}
+                                        eventDrop={handleEventMutate}
+                                        eventResize={handleEventMutate}
+                                        eventDidMount={(arg) => {
+                                            // Right-click an entry → context menu; native title = hover preview.
+                                            const props = arg.event.extendedProps as Record<string, unknown>;
+                                            const when = arg.event.start
+                                                ? arg.event.start.toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: arg.event.allDay ? undefined : 'short' })
+                                                : '';
+                                            const bits = [arg.event.title, when, props.location, props.person].filter(Boolean);
+                                            arg.el.setAttribute('title', bits.join('\n'));
+                                            arg.el.addEventListener('contextmenu', (e) => {
+                                                e.preventDefault();
+                                                buildEntryMenu(
+                                                    { event: arg.event, jsEvent: e } as unknown as EventClickArg,
+                                                    (e as MouseEvent).clientX,
+                                                    (e as MouseEvent).clientY,
+                                                );
+                                            });
+                                        }}
+                                        dayCellDidMount={(arg) => {
+                                            arg.el.addEventListener('contextmenu', (e) => {
+                                                e.preventDefault();
+                                                buildDayMenu(
+                                                    `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`,
+                                                    (e as MouseEvent).clientX,
+                                                    (e as MouseEvent).clientY,
+                                                );
+                                            });
+                                        }}
                                         datesSet={(arg) => {
                                             if (arg.view.type !== view) {
                                                 setView(arg.view.type as FcView);
@@ -649,6 +911,113 @@ export default function CalendarIndex({
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                {detail ? (
+                    <CalendarDetailPopover
+                        detail={detail}
+                        canManage={can.manage}
+                        onClose={() => setDetail(null)}
+                        onEdit={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current) editFromInfo(clickedInfoRef.current);
+                        }}
+                        onDuplicate={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current) duplicateFromInfo(clickedInfoRef.current);
+                        }}
+                        onDelete={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current) deleteFromInfo(clickedInfoRef.current);
+                        }}
+                        onDeepLink={(href) => {
+                            setDetail(null);
+                            router.visit(href);
+                        }}
+                    />
+                ) : null}
+
+                {ctxMenu ? <ShiftContextMenu ctx={ctxMenu} onClose={() => setCtxMenu(null)} /> : null}
+
+                {quickAdd ? (
+                    <QuickAddPopover
+                        date={quickAdd.date}
+                        x={quickAdd.x}
+                        y={quickAdd.y}
+                        onClose={() => {
+                            setQuickAdd(null);
+                            calendarRef.current?.getApi().unselect();
+                        }}
+                        onCreate={(title) => {
+                            router.post(
+                                '/hr/calendar/events',
+                                {
+                                    title,
+                                    event_type: 'company',
+                                    starts_at: `${quickAdd.date}T09:00`,
+                                    ends_at: `${quickAdd.date}T10:00`,
+                                    is_all_day: false,
+                                },
+                                {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                    onSuccess: () => {
+                                        refetch();
+                                        toast.success('Event added');
+                                    },
+                                },
+                            );
+                            setQuickAdd(null);
+                            calendarRef.current?.getApi().unselect();
+                        }}
+                        onMore={() => {
+                            const d = quickAdd.date;
+                            setQuickAdd(null);
+                            calendarRef.current?.getApi().unselect();
+                            openCreate(d);
+                        }}
+                    />
+                ) : null}
+
+                <CalendarYearPicker
+                    open={yearPickerOpen}
+                    initialYear={
+                        calendarRef.current?.getApi().getDate().getFullYear() ?? new Date().getFullYear()
+                    }
+                    activeDate={null}
+                    onClose={() => setYearPickerOpen(false)}
+                    onPickMonth={(date) => {
+                        setYearPickerOpen(false);
+                        setTab('calendar');
+                        setView('dayGridMonth');
+                        calendarRef.current?.getApi().gotoDate(date);
+                    }}
+                    onPickDay={(date) => {
+                        setYearPickerOpen(false);
+                        setTab('calendar');
+                        setView('timeGridDay');
+                        calendarRef.current?.getApi().gotoDate(date);
+                    }}
+                />
+
+                <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete event?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This permanently removes “{deleteTarget?.title}” from the calendar. This can't be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Keep event</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmDelete}
+                                className="bg-status-critical text-white hover:bg-status-critical/90"
+                            >
+                                Delete event
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );
@@ -681,6 +1050,83 @@ function FilterSelect({
                 ))}
             </SelectContent>
         </Select>
+    );
+}
+
+function QuickAddPopover({
+    date,
+    x,
+    y,
+    onClose,
+    onCreate,
+    onMore,
+}: {
+    date: string;
+    x: number;
+    y: number;
+    onClose: () => void;
+    onCreate: (title: string) => void;
+    onMore: () => void;
+}) {
+    const [title, setTitle] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState<{ left: number; top: number }>({ left: x, top: y });
+
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        if (left + r.width > window.innerWidth - 8) left = window.innerWidth - r.width - 8;
+        if (top + r.height > window.innerHeight - 8) top = window.innerHeight - r.height - 8;
+        setPos({ left: Math.max(8, left), top: Math.max(8, top) });
+    }, [x, y]);
+
+    useEffect(() => {
+        const onDown = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        window.addEventListener('mousedown', onDown);
+        return () => window.removeEventListener('mousedown', onDown);
+    }, [onClose]);
+
+    const niceDate = new Date(date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
+
+    return createPortal(
+        <div
+            ref={ref}
+            style={{ position: 'fixed', left: pos.left, top: pos.top, zIndex: 60 }}
+            className="w-[280px] rounded-xl border border-border bg-popover p-3 shadow-[var(--shadow-float)]"
+        >
+            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                New event · {niceDate}
+            </div>
+            <Input
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && title.trim()) onCreate(title.trim());
+                    if (e.key === 'Escape') onClose();
+                }}
+                placeholder="Add a title…"
+                className="h-9"
+            />
+            <div className="mt-2.5 flex items-center justify-between">
+                <button
+                    type="button"
+                    onClick={onMore}
+                    className="text-[12px] font-semibold text-primary hover:underline"
+                >
+                    More options →
+                </button>
+                <Button size="sm" disabled={!title.trim()} onClick={() => onCreate(title.trim())}>
+                    Add
+                </Button>
+            </div>
+        </div>,
+        document.body,
     );
 }
 
