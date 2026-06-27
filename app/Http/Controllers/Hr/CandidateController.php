@@ -14,6 +14,7 @@ use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
+use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -1284,6 +1285,7 @@ class CandidateController extends Controller
         ]);
 
         $this->notifyHiringManagerOfHire($application, $candidate);
+        $this->sendNewHireWelcome($candidate, $offer);
 
         return redirect()->back()->with('success', "Employee profile created (#{$profile->id}).");
     }
@@ -1312,6 +1314,21 @@ class CandidateController extends Controller
             if ($manager) {
                 $manager->notify(new CandidateHiredNotification($candidate, $requisition));
             }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /** Best-effort branded welcome to the new hire's personal inbox on convert. */
+    private function sendNewHireWelcome(HrCandidate $candidate, HrOffer $offer): void
+    {
+        if (! $candidate->personal_email) {
+            return;
+        }
+
+        try {
+            Notification::route('mail', $candidate->personal_email)
+                ->notify(new NewHireWelcomeNotification($candidate, $offer));
         } catch (\Throwable $exception) {
             report($exception);
         }

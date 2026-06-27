@@ -17,6 +17,7 @@ use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
+use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -328,7 +329,7 @@ test('converting notifies the hiring manager and provisions the work email', fun
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'personal_email' => 'new.hire@example.test', 'created_by' => $this->hr->id]);
     $application = HrApplication::factory()->create([
         'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $requisition->id,
         'position_title' => 'Support Worker', 'status' => 'active',
@@ -338,6 +339,8 @@ test('converting notifies the hiring manager and provisions the work email', fun
     $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertRedirect();
 
     Notification::assertSentTo($manager, CandidateHiredNotification::class);
+    // The new hire gets a branded welcome on their personal inbox.
+    Notification::assertSentOnDemand(NewHireWelcomeNotification::class);
     expect($offer->fresh()->work_email_provisioned)->toBeTrue();
     expect($offer->fresh()->work_email)->not->toBeNull();
     expect(HrEmployeeProfile::query()->count())->toBeGreaterThan(0);
