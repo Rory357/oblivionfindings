@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Services\CompensationService;
 use App\Domain\Hr\Services\ExpenseService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,6 +17,7 @@ class ExpenseController extends Controller
 
     public function __construct(
         private readonly ExpenseService $expenseService,
+        private readonly CompensationService $compensationService,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -63,6 +65,8 @@ class ExpenseController extends Controller
                 'status' => $status,
                 'q' => $search,
             ],
+            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            'tabCounts' => $this->compensationService->tabCounts($tenantId),
             'can' => [
                 'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,

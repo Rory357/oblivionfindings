@@ -10,8 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero } from '@/components/page';
-import { CompensationTabs } from '@/components/hr';
+import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
 import {
     Select,
     SelectContent,
@@ -49,6 +48,7 @@ type Props = {
         links: any[];
     };
     employees: Employee[];
+    stats: CompensationHeroStats;
     can: { manage?: boolean };
 };
 
@@ -95,7 +95,7 @@ const emptyForm = {
     reason: '',
 };
 
-export default function BonusIndex({ bonuses, employees, can }: Props) {
+export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
@@ -128,31 +128,16 @@ export default function BonusIndex({ bonuses, employees, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bonus Payments" />
             <PageShell>
-                <PageHero category="hr"
-                    icon={Banknote}
-                    title="Bonus Payments"
-                    description="Track and manage employee bonuses and incentives."
-                    stats={[
-                        { label: 'Total', value: bonuses.total },
-                        {
-                            label: 'Pending',
-                            value: bonuses.data.filter((b) => b.status === 'pending').length,
-                        },
-                        {
-                            label: 'Paid',
-                            value: bonuses.data.filter((b) => b.status === 'paid').length,
-                        },
-                    ]}
-                    actions={
-                        can.manage ? (
-                            <Button size="sm" onClick={openCreate}>
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Record Bonus
-                            </Button>
-                        ) : null
-                    }
-                />
+                <CompensationHero stats={stats} />
                 <CompensationTabs active="bonuses" />
+                {can.manage ? (
+                    <div className="flex justify-end">
+                        <Button size="sm" onClick={openCreate}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Record bonus
+                        </Button>
+                    </div>
+                ) : null}
                 <Card>
                     <CardHeader>
                         <CardTitle>All Bonuses ({bonuses.total})</CardTitle>
