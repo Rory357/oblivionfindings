@@ -477,20 +477,24 @@ class RecruitmentController extends Controller
 
     private function buildPool(?int $tenantId): array
     {
-        // Talent pool = candidates explicitly tagged (no dedicated table yet).
-        return HrCandidate::query()
+        // Durable talent pool — explicit hr_talent_pool membership (D5 / item 22),
+        // not any non-empty tags. Membership survives candidate anonymisation.
+        return \App\Domain\Hr\Models\HrTalentPool::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereNotNull('tags')
-            ->with(['applications' => fn ($q) => $q->select('id', 'candidate_id', 'position_title')->latest('id')])
-            ->limit(60)
+            ->with([
+                'candidate' => fn ($q) => $q->withTrashed()->select('id', 'first_name', 'last_name', 'deleted_at'),
+                'candidate.applications' => fn ($q) => $q->select('id', 'candidate_id', 'position_title')->latest('id'),
+            ])
+            ->latest('updated_at')
+            ->limit(80)
             ->get()
-            ->filter(fn (HrCandidate $c) => ! empty($c->tags))
-            ->map(fn (HrCandidate $c) => [
-                'id' => $c->id,
-                'name' => $c->full_name,
-                'last_role' => $c->applications->first()?->position_title ?? '—',
-                'tags' => array_values((array) $c->tags),
-                'reason' => $c->status === 'rejected' ? 'Strong but not selected' : 'Kept warm',
+            ->filter(fn ($membership) => $membership->candidate !== null)
+            ->map(fn ($membership) => [
+                'id' => $membership->candidate_id,
+                'name' => $membership->candidate->full_name,
+                'last_role' => $membership->candidate->applications->first()?->position_title ?? '—',
+                'tags' => array_values((array) ($membership->tags ?? [])),
+                'reason' => $membership->reason ?: 'Kept warm',
             ])->values()->all();
     }
 

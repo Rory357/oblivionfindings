@@ -470,7 +470,27 @@ export default function RecruitmentHub(props: Props) {
 
                         {tab === 'analytics' ? <AnalyticsTab data={analytics} /> : null}
                         {tab === 'kits' ? <KitsTab kits={kits} /> : null}
-                        {tab === 'pool' ? <PoolTab pool={pool} /> : null}
+                        {tab === 'pool' ? (
+                            <PoolTab
+                                pool={pool}
+                                requisitions={requisitions.filter((r) => r.status !== 'closed')}
+                                canManage={can.manage}
+                                onReactivate={(candidateId, requisitionId) => {
+                                    router.post(
+                                        `/hr/recruitment/candidates/${candidateId}/reactivate`,
+                                        { requisition_id: requisitionId },
+                                        {
+                                            preserveScroll: true,
+                                            onSuccess: (pg) => {
+                                                const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                                                if (f?.error) toast.error(f.error);
+                                                else toast.success(f?.success ?? 'Candidate re-activated');
+                                            },
+                                        },
+                                    );
+                                }}
+                            />
+                        ) : null}
                     </div>
                 </div>
             </PageShell>
@@ -1139,30 +1159,82 @@ function KitsTab({ kits }: { kits: Kit[] }) {
     );
 }
 
-function PoolTab({ pool }: { pool: PoolItem[] }) {
-    if (pool.length === 0) return <EmptyCard icon={Sparkles} title="Talent pool is empty" sub="Strong candidates you keep warm appear here. Tag a candidate to add them to the pool." />;
+function PoolTab({
+    pool,
+    requisitions,
+    canManage,
+    onReactivate,
+}: {
+    pool: PoolItem[];
+    requisitions: Requisition[];
+    canManage: boolean;
+    onReactivate: (candidateId: number, requisitionId: number) => void;
+}) {
+    if (pool.length === 0) return <EmptyCard icon={Sparkles} title="Talent pool is empty" sub="Strong candidates you keep warm appear here. Use a reject wizard's 'Add to talent pool' toggle to add them." />;
     return (
         <div>
-            <p className="mb-4 text-[13px] text-muted-foreground">Strong candidates kept warm. Tag, search and re-activate into a new requisition.</p>
-            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]">
+            <p className="mb-4 text-[13px] text-muted-foreground">Strong candidates kept warm, safe from data-retention purges. Re-activate into a requisition to put them back in the pipeline.</p>
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
                 {pool.map((p) => (
-                    <div key={p.id} className="rounded-[13px] border border-border bg-card p-4">
-                        <div className="flex items-center gap-2.5">
-                            <span style={avatarStyle(p.name)}>{initials(p.name)}</span>
-                            <div className="min-w-0 flex-1">
-                                <div className="text-[13.5px] font-bold">{p.name}</div>
-                                <div className="text-[11.5px] text-muted-foreground">{p.last_role}</div>
-                            </div>
-                        </div>
-                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                            {p.tags.map((t) => (
-                                <span key={t} className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">{t}</span>
-                            ))}
-                        </div>
-                        <div className="mt-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{p.reason}</div>
-                    </div>
+                    <PoolCard key={p.id} item={p} requisitions={requisitions} canManage={canManage} onReactivate={onReactivate} />
                 ))}
             </div>
+        </div>
+    );
+}
+
+function PoolCard({
+    item,
+    requisitions,
+    canManage,
+    onReactivate,
+}: {
+    item: PoolItem;
+    requisitions: Requisition[];
+    canManage: boolean;
+    onReactivate: (candidateId: number, requisitionId: number) => void;
+}) {
+    const [reqId, setReqId] = useState<string>('');
+    return (
+        <div className="rounded-[13px] border border-border bg-card p-4">
+            <div className="flex items-center gap-2.5">
+                <span style={avatarStyle(item.name)}>{initials(item.name)}</span>
+                <div className="min-w-0 flex-1">
+                    <div className="text-[13.5px] font-bold">{item.name}</div>
+                    <div className="text-[11.5px] text-muted-foreground">{item.last_role}</div>
+                </div>
+            </div>
+            {item.tags.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {item.tags.map((t) => (
+                        <span key={t} className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">{t}</span>
+                    ))}
+                </div>
+            ) : null}
+            <div className="mt-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">{item.reason}</div>
+            {canManage ? (
+                <div className="mt-3 flex items-center gap-2">
+                    <select
+                        value={reqId}
+                        onChange={(e) => setReqId(e.target.value)}
+                        aria-label="Re-activate into requisition"
+                        className="h-8 min-w-0 flex-1 rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary"
+                    >
+                        <option value="">Into requisition…</option>
+                        {requisitions.map((r) => (
+                            <option key={r.id} value={r.id}>{r.title}</option>
+                        ))}
+                    </select>
+                    <button
+                        type="button"
+                        disabled={reqId === ''}
+                        onClick={() => onReactivate(item.id, Number(reqId))}
+                        className="h-8 rounded-md border border-primary bg-primary/10 px-2.5 text-[12px] font-bold text-primary disabled:opacity-40"
+                    >
+                        Re-activate
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }

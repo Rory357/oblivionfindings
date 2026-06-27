@@ -26,7 +26,10 @@ class ArchiveCandidateDataJob implements ShouldQueue
 
         $query = HrCandidate::query()
             ->whereIn('status', ['rejected', 'withdrawn'])
-            ->where('updated_at', '<', $cutoffDate);
+            ->where('updated_at', '<', $cutoffDate)
+            // Pooled candidates are kept warm for future roles — never anonymise
+            // or soft-delete them on retention (handover item 22).
+            ->whereDoesntHave('talentPoolMembership');
 
         if ($this->tenantId) {
             $query->where('tenant_id', $this->tenantId);

@@ -9,8 +9,10 @@ use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
+use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
+use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
@@ -429,6 +431,8 @@ class CandidateController extends Controller
             // Opt-in only — a respectful decline email is never sent by default.
             'send_decline_email' => ['nullable', 'boolean'],
             'decline_message' => ['nullable', 'string', 'max:2000'],
+            // Keep a strong candidate warm in the talent pool instead of purging.
+            'add_to_pool' => ['nullable', 'boolean'],
         ]);
 
         $application->update([
@@ -436,15 +440,18 @@ class CandidateController extends Controller
             'rejection_reason' => $validated['rejection_reason'] ?? null,
         ]);
 
-        if ($request->boolean('send_decline_email')) {
-            $candidate = $application->candidate()->first();
-            if ($candidate && $candidate->personal_email) {
-                try {
-                    Notification::route('mail', $candidate->personal_email)
-                        ->notify(new RejectionNotification($candidate, $application, $validated['decline_message'] ?? null));
-                } catch (\Throwable $exception) {
-                    report($exception);
-                }
+        $candidate = $application->candidate()->first();
+
+        if ($candidate && $request->boolean('add_to_pool')) {
+            $this->poolCandidate($candidate, $user->id, 'Strong but not selected', $application->requisition_id, null);
+        }
+
+        if ($candidate && $candidate->personal_email && $request->boolean('send_decline_email')) {
+            try {
+                Notification::route('mail', $candidate->personal_email)
+                    ->notify(new RejectionNotification($candidate, $application, $validated['decline_message'] ?? null));
+            } catch (\Throwable $exception) {
+                report($exception);
             }
         }
 
@@ -498,6 +505,90 @@ class CandidateController extends Controller
         $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';
 
         return redirect()->back()->with('success', $message);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Talent pool                                                        */
+    /* ------------------------------------------------------------------ */
+
+    public function addToPool(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
+            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+            'requisition_id' => ['nullable', 'integer', $requisitionRule],
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:100'],
+        ]);
+
+        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $validated['requisition_id'] ?? null, $validated['tags'] ?? null);
+
+        return redirect()->back()->with('success', "{$candidate->full_name} added to the talent pool.");
+    }
+
+    public function reactivatePool(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
+            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+
+        $validated = $request->validate([
+            'requisition_id' => ['required', 'integer', $requisitionRule],
+        ]);
+
+        $requisition = HrJobRequisition::query()->findOrFail($validated['requisition_id']);
+
+        $duplicate = HrApplication::query()
+            ->where('candidate_id', $candidate->id)
+            ->where('requisition_id', $requisition->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->exists();
+        if ($duplicate) {
+            return redirect()->back()->with('error', 'This candidate already has an active application for that requisition.');
+        }
+
+        try {
+            $this->recruitmentService->createApplication($candidate, [
+                'position_title' => $requisition->title,
+                'position_role' => $requisition->position_role,
+                'requisition_id' => $requisition->id,
+                'target_site_id' => $requisition->site_id,
+                'interview_kit_id' => $requisition->default_interview_kit_id,
+            ]);
+        } catch (\InvalidArgumentException|\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        $candidate->update(['status' => 'new', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
+        $candidate->talentPoolMembership()->delete();
+
+        return redirect()->back()->with('success', "{$candidate->full_name} re-activated into {$requisition->title}.");
+    }
+
+    /** Idempotent pool membership write (one per candidate). */
+    private function poolCandidate(HrCandidate $candidate, int $userId, string $reason, ?int $requisitionId, ?array $tags): void
+    {
+        HrTalentPool::query()->updateOrCreate(
+            ['candidate_id' => $candidate->id],
+            [
+                'tenant_id' => $candidate->tenant_id,
+                'requisition_id' => $requisitionId,
+                'reason' => $reason,
+                'pooled_by' => $userId,
+                'tags' => $tags,
+            ],
+        );
     }
 
     /* ------------------------------------------------------------------ */

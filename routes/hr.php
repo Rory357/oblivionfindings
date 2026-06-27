@@ -162,6 +162,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/recruitment/applications/bulk', [CandidateController::class, 'bulkAction'])->name('applications.bulk')
             ->middleware('permission:hr.recruitment.manage');
 
+        // Talent pool
+        Route::post('/recruitment/candidates/{candidate}/pool', [CandidateController::class, 'addToPool'])->name('pool.add')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/{candidate}/reactivate', [CandidateController::class, 'reactivatePool'])->name('pool.reactivate')
+            ->middleware('permission:hr.recruitment.manage');
+
         // Candidate Documents
         Route::post('/recruitment/candidates/{candidate}/documents', [CandidateController::class, 'storeDocument'])->name('candidate.documents.store')
             ->middleware('permission:hr.recruitment.manage');

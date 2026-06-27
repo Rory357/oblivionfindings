@@ -1161,13 +1161,19 @@ function RejectWizard({ onClose, ctx }: WizProps) {
     const [reason, setReason] = useState('');
     const form = useForm({ rejection_reason: '' });
     const [note, setNote] = useState('');
+    const [addToPool, setAddToPool] = useState(false);
+    const [sendDecline, setSendDecline] = useState(false);
 
     const canSubmit = reason !== '' && Boolean(ctx.applicationId);
 
     const submit = () => {
         if (!ctx.applicationId) return;
         const combined = [reason, note.trim()].filter(Boolean).join(' — ');
-        form.transform(() => ({ rejection_reason: combined }));
+        form.transform(() => ({
+            rejection_reason: combined,
+            add_to_pool: addToPool,
+            send_decline_email: sendDecline,
+        }));
         form.post(`/hr/recruitment/applications/${ctx.applicationId}/reject`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -1237,6 +1243,20 @@ function RejectWizard({ onClose, ctx }: WizProps) {
                 </Field>
                 <div className="mt-3">
                     <Area label="Internal note (not shared with candidate)" value={note} onChange={setNote} />
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                    <Toggle
+                        checked={addToPool}
+                        onChange={setAddToPool}
+                        title="Add to talent pool"
+                        sub="Keep them warm for future roles instead of purging on retention."
+                    />
+                    <Toggle
+                        checked={sendDecline}
+                        onChange={setSendDecline}
+                        title="Send respectful decline email"
+                        sub="Optional — a warm, brand-consistent decline."
+                    />
                 </div>
                 {!ctx.applicationId ? <Hint msg="This candidate has no application to reject." /> : null}
             </WizardStepPane>

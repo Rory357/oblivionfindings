@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\ApplicationConfirmationNotification;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
@@ -471,6 +472,51 @@ test('scheduling an interview emails the candidate and panel a calendar invite',
 
     $interview = HrInterview::query()->where('application_id', $application->id)->first();
     expect($interview->invite_sent_at)->not->toBeNull();
+});
+
+/* ---- D5: talent pool (#22) ---- */
+
+test('a pooled candidate survives the retention archive job', function () {
+    config(['hr.candidate_retention_months' => 1]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'rejected', 'first_name' => 'Keepme', 'created_by' => $this->hr->id]);
+    HrCandidate::query()->where('id', $candidate->id)->update(['updated_at' => now()->subMonths(6)]);
+    HrTalentPool::query()->create(['tenant_id' => 1, 'candidate_id' => $candidate->id, 'reason' => 'Strong', 'pooled_by' => $this->hr->id]);
+
+    (new ArchiveCandidateDataJob(1))->handle();
+
+    // Pre-fix this candidate would be anonymised + soft-deleted; the guard spares it.
+    expect(HrCandidate::withTrashed()->find($candidate->id)?->trashed())->toBeFalse();
+    expect($candidate->fresh()->first_name)->toBe('Keepme');
+});
+
+test('rejecting with add_to_pool keeps the candidate warm and lists them in the pool', function () {
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
+
+    $this->actingAs($this->hr)->post(route('hr.applications.reject', $application->id), [
+        'rejection_reason' => 'Strong, wrong timing', 'add_to_pool' => true,
+    ])->assertRedirect();
+
+    expect(HrTalentPool::query()->where('candidate_id', $candidate->id)->exists())->toBeTrue();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+    $names = collect($response->inertiaProps('pool'))->pluck('name');
+    expect($names)->toContain($candidate->full_name);
+});
+
+test('reactivating a pooled candidate creates a fresh application and clears the pool entry', function () {
+    ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
+    HrTalentPool::query()->create(['tenant_id' => 1, 'candidate_id' => $candidate->id, 'reason' => 'x', 'pooled_by' => $this->hr->id]);
+    $requisition = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Registered Nurse', 'slug' => 'rn-'.uniqid(),
+        'position_role' => 'nurse', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'created_by' => $this->hr->id,
+    ]);
+
+    $this->actingAs($this->hr)->post(route('hr.pool.reactivate', $candidate->id), ['requisition_id' => $requisition->id])->assertRedirect();
+
+    expect(HrApplication::query()->where('candidate_id', $candidate->id)->where('requisition_id', $requisition->id)->exists())->toBeTrue();
+    expect(HrTalentPool::query()->where('candidate_id', $candidate->id)->exists())->toBeFalse();
+    expect($candidate->fresh()->status)->toBe('new');
 });
 
 /* ---- D4: bulk actions (#21) ---- */
