@@ -41,6 +41,9 @@ class HrCalendarAggregator
         'holiday' => 'status-warning',
     ];
 
+    /** The current viewer's id, set per feed() call so eventRow can surface "my RSVP". */
+    private ?int $viewerId = null;
+
     public function __construct(
         private readonly LeaveService $leaveService,
         private readonly ShiftCoverageService $shiftCoverageService,
@@ -66,7 +69,7 @@ class HrCalendarAggregator
         $out = collect();
 
         if ($want('event')) {
-            $out = $out->concat($this->events($tenantId, $start, $end, $filters));
+            $out = $out->concat($this->events($tenantId, $start, $end, $filters, $viewer));
         }
         if ($want('leave') || $want('holiday')) {
             [$leave, $holidays] = $this->leaveAndHolidays($tenantId, $start, $end, $filters, $viewer);
@@ -92,8 +95,10 @@ class HrCalendarAggregator
 
     /* ── Events (editable) ───────────────────────────────────────────────── */
 
-    private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
+    private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters, ?User $viewer = null): Collection
     {
+        $this->viewerId = $viewer?->id;
+
         // Top-level events only (exception/override children are folded into
         // their parent's expansion below). Pull non-recurring events overlapping
         // the range plus any recurring base whose window touches the range.
@@ -112,7 +117,7 @@ class HrCalendarAggregator
                         ->where(fn ($q3) => $q3->whereNull('recurrence_until')->orWhere('recurrence_until', '>=', $start));
                 });
             })
-            ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name'])
+            ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name'])
             ->orderBy('starts_at')
             ->get();
 
@@ -123,7 +128,7 @@ class HrCalendarAggregator
             : HrCalendarEvent::query()
                 ->whereIn('recurrence_parent_id', $recurringIds->all())
                 ->where('is_exception', true)
-                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name'])
+                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name'])
                 ->get()
                 ->groupBy('recurrence_parent_id');
 
@@ -161,6 +166,7 @@ class HrCalendarAggregator
     private function eventRow(HrCalendarEvent $e, ?Carbon $start, ?Carbon $end, ?string $occurrenceDate = null, bool $isException = false): array
     {
         $recurring = (bool) $e->rrule || $isException || $occurrenceDate !== null;
+        $audience = $this->attendeeSummary($e);
 
         return [
             'layer' => 'event',
@@ -190,8 +196,45 @@ class HrCalendarAggregator
                 'occurrenceDate' => $occurrenceDate,
                 'isException' => $isException,
                 'recurrenceParentId' => $e->recurrence_parent_id,
-                'attendeeCount' => 0,
+                'attendeeCount' => $audience['count'],
+                'audienceType' => $audience['type'],
+                'attendeeSample' => $audience['sample'],
+                'attendeeUserIds' => $audience['userIds'],
+                'rsvp' => $audience['rsvp'],
+                'myRsvp' => $audience['myRsvp'],
             ],
+        ];
+    }
+
+    /**
+     * Summarise an event's audience for the feed: invited-people count, a sample
+     * of names, RSVP tallies, and the current viewer's own response.
+     *
+     * @return array{count: int, type: string|null, sample: list<string>, userIds: list<int>, rsvp: array<string,int>, myRsvp: string|null}
+     */
+    private function attendeeSummary(HrCalendarEvent $e): array
+    {
+        if (! $e->relationLoaded('attendees')) {
+            return ['count' => 0, 'type' => null, 'sample' => [], 'userIds' => [], 'rsvp' => [], 'myRsvp' => null];
+        }
+
+        $people = $e->attendees->where('audience_type', 'person');
+        $group = $e->attendees->firstWhere(fn ($a) => $a->audience_type !== 'person');
+
+        $rsvp = ['yes' => 0, 'no' => 0, 'maybe' => 0, 'none' => 0];
+        foreach ($people as $p) {
+            $rsvp[$p->rsvp_status] = ($rsvp[$p->rsvp_status] ?? 0) + 1;
+        }
+
+        return [
+            'count' => $people->count(),
+            'type' => $group?->audience_type ?? ($people->isNotEmpty() ? 'people' : null),
+            'sample' => $people->take(4)->map(fn ($p) => $p->user?->name)->filter()->values()->all(),
+            'userIds' => $people->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->values()->all(),
+            'rsvp' => $rsvp,
+            'myRsvp' => $this->viewerId
+                ? $people->firstWhere('user_id', $this->viewerId)?->rsvp_status
+                : null,
         ];
     }
 

@@ -16,6 +16,7 @@ import {
     Repeat,
     Trash2,
     Users,
+    X,
     type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -34,10 +35,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { PeoplePicker, type PersonOption } from '../people-picker';
 import {
     Field,
     ReviewCard,
     ReviewRow,
+    Segmented,
     SelectInput,
     StepHead,
     SubHead,
@@ -61,6 +64,8 @@ export interface CalendarEventInitial {
     site_id: number | null;
     rrule?: string | null;
     recurrence_until?: string | null;
+    audience_type?: 'org' | 'site' | 'department' | 'people' | null;
+    audience_user_ids?: number[];
     /** Set when editing a single occurrence of a recurring series. */
     scope?: 'all' | 'this' | 'following';
     occurrence_date?: string | null;
@@ -157,6 +162,7 @@ export function EventWizardDialog({
     sites,
     departments,
     categories,
+    staff,
     initial,
     defaultDate,
 }: {
@@ -167,6 +173,7 @@ export function EventWizardDialog({
     sites: IdName[];
     departments: IdName[];
     categories: EventCategoryOption[];
+    staff: PersonOption[];
     initial?: CalendarEventInitial | null;
     /** Click-to-create prefill (YYYY-MM-DD) when creating a new event. */
     defaultDate?: string | null;
@@ -186,6 +193,8 @@ export function EventWizardDialog({
         is_all_day: false,
         rrule: '' as string,
         recurrence_until: '' as string,
+        audience_type: 'org' as 'org' | 'site' | 'department' | 'people',
+        audience_user_ids: [] as number[],
         location: '',
         department_id: '',
         site_id: '',
@@ -204,6 +213,8 @@ export function EventWizardDialog({
                 is_all_day: initial.is_all_day,
                 rrule: initial.rrule ?? '',
                 recurrence_until: initial.recurrence_until ? initial.recurrence_until.substring(0, 10) : '',
+                audience_type: initial.audience_type ?? 'org',
+                audience_user_ids: initial.audience_user_ids ?? [],
                 location: initial.location ?? '',
                 department_id: initial.department_id ? String(initial.department_id) : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
@@ -247,6 +258,31 @@ export function EventWizardDialog({
         () => departments.find((d) => String(d.id) === form.data.department_id)?.name ?? '',
         [departments, form.data.department_id],
     );
+    const reachText = useMemo(() => {
+        switch (form.data.audience_type) {
+            case 'org':
+                return 'Visible to everyone in the organisation.';
+            case 'site':
+                return form.data.site_id ? `Everyone at ${siteName}.` : 'Pick a site above to scope this.';
+            case 'department':
+                return form.data.department_id
+                    ? `Everyone in ${departmentName}.`
+                    : 'Pick a department above to scope this.';
+            case 'people': {
+                const n = form.data.audience_user_ids.length;
+                return `${n} ${n === 1 ? 'person' : 'people'} invited — they can RSVP.`;
+            }
+            default:
+                return '';
+        }
+    }, [
+        form.data.audience_type,
+        form.data.site_id,
+        form.data.department_id,
+        form.data.audience_user_ids,
+        siteName,
+        departmentName,
+    ]);
 
     const setAllDay = (next: boolean) => {
         form.setData((d) => ({
@@ -598,6 +634,69 @@ export function EventWizardDialog({
                                 />
                             </Field>
                         </div>
+
+                        {/* Audience */}
+                        <div className="mt-5">
+                            <SubHead icon={Users}>Audience</SubHead>
+                            <div className="mt-2">
+                                <Segmented
+                                    value={form.data.audience_type}
+                                    onChange={(v) => form.setData('audience_type', v as typeof form.data.audience_type)}
+                                    options={[
+                                        { value: 'org', label: 'Everyone' },
+                                        { value: 'site', label: 'This site' },
+                                        { value: 'department', label: 'This department' },
+                                        { value: 'people', label: 'Specific people' },
+                                    ]}
+                                />
+                            </div>
+
+                            {form.data.audience_type === 'people' ? (
+                                <div className="mt-3 space-y-2">
+                                    <PeoplePicker
+                                        value=""
+                                        onChange={(v) => {
+                                            const id = Number(v);
+                                            if (id && !form.data.audience_user_ids.includes(id)) {
+                                                form.setData('audience_user_ids', [...form.data.audience_user_ids, id]);
+                                            }
+                                        }}
+                                        people={staff.filter((s) => !form.data.audience_user_ids.includes(Number(s.value)))}
+                                        placeholder="Add a person…"
+                                    />
+                                    {form.data.audience_user_ids.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {form.data.audience_user_ids.map((id) => {
+                                                const person = staff.find((s) => Number(s.value) === id);
+                                                return (
+                                                    <span
+                                                        key={id}
+                                                        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[12px] font-medium"
+                                                    >
+                                                        {person?.label ?? `#${id}`}
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Remove ${person?.label ?? 'person'}`}
+                                                            onClick={() =>
+                                                                form.setData(
+                                                                    'audience_user_ids',
+                                                                    form.data.audience_user_ids.filter((x) => x !== id),
+                                                                )
+                                                            }
+                                                            className="text-muted-foreground hover:text-status-critical"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+
+                            <p className="mt-2 text-[12px] text-muted-foreground">{reachText}</p>
+                        </div>
                     </WizardStepPane>
                 )}
 
@@ -619,6 +718,7 @@ export function EventWizardDialog({
                             <ReviewRow label="Category" value={meta.label} />
                             <ReviewRow label="Site" value={siteName} />
                             {departmentName ? <ReviewRow label="Department" value={departmentName} /> : null}
+                            <ReviewRow label="Audience" value={reachText} />
                             {form.data.location ? <ReviewRow label="Location" value={form.data.location} /> : null}
                             {form.data.description ? <ReviewRow label="Description" value={form.data.description} /> : null}
                         </ReviewCard>

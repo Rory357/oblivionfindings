@@ -60,11 +60,27 @@ class CalendarController extends Controller
             ->forTenant($tenantId)
             ->get(['id', 'key', 'label', 'icon', 'color_token']);
 
+        // Staff for the wizard's "invite people" picker (active employees).
+        $staff = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->with('user:id,name')
+            ->get(['id', 'user_id', 'position_title'])
+            ->map(fn ($p) => [
+                'value' => (string) $p->user_id,
+                'label' => $p->user?->name ?? 'Staff',
+                'sub' => $p->position_title,
+            ])
+            ->filter(fn ($p) => $p['label'] !== null)
+            ->values();
+
         return Inertia::render('hr/calendar/index', [
             'sites' => $sites,
             'departments' => $departments,
             'teams' => $teams,
             'categories' => $categories,
+            'staff' => $staff,
             'stats' => $this->heroStats($tenantId, $user),
             'upNext' => $this->upNext($tenantId, $user),
             'ical' => [
@@ -216,15 +232,24 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_user_ids' => ['nullable', 'array'],
+            'audience_user_ids.*' => ['integer', 'exists:users,id'],
         ]);
+
+        $audienceType = $data['audience_type'] ?? null;
+        $audienceUserIds = $data['audience_user_ids'] ?? [];
+        unset($data['audience_type'], $data['audience_user_ids']);
 
         $data['category_id'] = $this->resolveCategoryId($tenantId, $data['event_type'] ?? null);
 
-        HrCalendarEvent::create([
+        $event = HrCalendarEvent::create([
             'tenant_id' => $tenantId,
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        $this->syncAttendees($event, $audienceType, $audienceUserIds);
 
         return redirect()->back()->with('success', 'Calendar event created.');
     }
@@ -251,6 +276,9 @@ class CalendarController extends Controller
             'department' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', 'integer', 'exists:hr_departments,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'audience_type' => ['nullable', 'in:org,site,department,people'],
+            'audience_user_ids' => ['nullable', 'array'],
+            'audience_user_ids.*' => ['integer', 'exists:users,id'],
             // Recurring-edit scope (gated on calendar.manage_recurring below).
             'scope' => ['nullable', 'in:all,this,following'],
             'occurrence_date' => ['nullable', 'date'],
@@ -258,7 +286,10 @@ class CalendarController extends Controller
 
         $scope = $data['scope'] ?? 'all';
         $occurrenceDate = $data['occurrence_date'] ?? null;
-        unset($data['scope'], $data['occurrence_date']);
+        $audienceType = $data['audience_type'] ?? null;
+        $audienceUserIds = $data['audience_user_ids'] ?? [];
+        $audienceProvided = $request->has('audience_type');
+        unset($data['scope'], $data['occurrence_date'], $data['audience_type'], $data['audience_user_ids']);
 
         if (array_key_exists('event_type', $data)) {
             $data['category_id'] = $this->resolveCategoryId($event->tenant_id, $data['event_type']);
@@ -284,7 +315,87 @@ class CalendarController extends Controller
 
         $event->update($data);
 
+        if ($audienceProvided) {
+            $this->syncAttendees($event, $audienceType, $audienceUserIds);
+        }
+
         return redirect()->back()->with('success', 'Calendar event updated.');
+    }
+
+    /**
+     * Replace an event's audience rows, preserving existing RSVPs for invitees
+     * who remain. `org`/`site`/`department` set the reach; `people` invites
+     * named users who can RSVP.
+     *
+     * @param  list<int>  $userIds
+     */
+    private function syncAttendees(HrCalendarEvent $event, ?string $audienceType, array $userIds): void
+    {
+        if ($audienceType === null) {
+            return;
+        }
+
+        if ($audienceType !== 'people') {
+            $event->attendees()->delete();
+            $ref = match ($audienceType) {
+                'site' => $event->site_id,
+                'department' => $event->department_id,
+                default => null,
+            };
+            $event->attendees()->create([
+                'audience_type' => $audienceType,
+                'audience_ref' => $ref,
+                'rsvp_status' => 'none',
+            ]);
+
+            return;
+        }
+
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+
+        // Drop non-person rows + people no longer invited; keep RSVPs for the rest.
+        $event->attendees()->where('audience_type', '!=', 'person')->delete();
+        $event->attendees()
+            ->where('audience_type', 'person')
+            ->whereNotIn('user_id', $userIds ?: [0])
+            ->delete();
+
+        $existing = $event->attendees()->where('audience_type', 'person')->pluck('user_id')->all();
+        foreach (array_diff($userIds, $existing) as $userId) {
+            $event->attendees()->create([
+                'user_id' => $userId,
+                'audience_type' => 'person',
+                'rsvp_status' => 'none',
+            ]);
+        }
+    }
+
+    /**
+     * RSVP to an event as the current user (must be an invited person attendee).
+     */
+    public function rsvp(Request $request, HrCalendarEvent $event)
+    {
+        $user = $request->user();
+        abort_unless($this->canView($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:yes,no,maybe'],
+        ]);
+
+        $attendee = $event->attendees()
+            ->where('audience_type', 'person')
+            ->where('user_id', $user->id)
+            ->first();
+
+        abort_unless($attendee !== null, 403, 'You are not on the invite list for this event.');
+
+        $attendee->update([
+            'rsvp_status' => $data['status'],
+            'responded_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Your response was saved.');
     }
 
     /**
