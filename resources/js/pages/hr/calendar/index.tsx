@@ -24,11 +24,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -63,6 +58,7 @@ import {
     type CalendarLayer,
     type CalendarLayerFeed,
 } from '@/lib/calendar/layer-feed';
+import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -80,10 +76,10 @@ import {
     CalendarClock,
     CalendarDays,
     CalendarPlus,
-    CalendarSearch,
     Copy,
     ExternalLink,
     Layers,
+    ListChecks,
     Pencil,
     Search,
     Trash2,
@@ -236,7 +232,7 @@ export default function CalendarIndex({
     useLayerStyles();
     const calendarRef = useRef<FullCalendar>(null);
 
-    const [tab, setTab] = useState<'calendar' | 'renewals'>('calendar');
+    const [tab, setTab] = useState<'calendar' | 'agenda' | 'renewals'>('calendar');
     const [activeLayers, setActiveLayers] = useState<CalendarLayer[]>(readInitialLayers);
     const [view, setView] = useState<FcView>(readInitialView);
     const [siteFilter, setSiteFilter] = useState<string>('all');
@@ -607,9 +603,26 @@ export default function CalendarIndex({
         }
     };
 
+    const totalCount = useMemo(
+        () => Object.values(counts).reduce((a, b) => a + b, 0),
+        [counts],
+    );
     const calendarTabs = useMemo(
         () => [
-            { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'primary' as const },
+            {
+                id: 'calendar',
+                label: 'Calendar',
+                icon: CalendarDays,
+                tone: 'primary' as const,
+                badge: counts.event || undefined,
+            },
+            {
+                id: 'agenda',
+                label: 'Agenda',
+                icon: ListChecks,
+                tone: 'info' as const,
+                badge: totalCount || undefined,
+            },
             {
                 id: 'renewals',
                 label: 'Renewals',
@@ -618,8 +631,15 @@ export default function CalendarIndex({
                 badge: stats.renewalsSoon || undefined,
             },
         ],
-        [stats.renewalsSoon],
+        [counts.event, totalCount, stats.renewalsSoon],
     );
+
+    // Switching to the Agenda tab forces the list view; back to Calendar restores a grid.
+    const handleTabChange = (next: string) => {
+        setTab(next as 'calendar' | 'agenda' | 'renewals');
+        if (next === 'agenda') setView('listWeek');
+        else if (next === 'calendar' && view === 'listWeek') setView('dayGridMonth');
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -687,16 +707,30 @@ export default function CalendarIndex({
                 <div className="mt-6">
                     <HrTabs
                         value={tab}
-                        onChange={(id) => setTab(id as 'calendar' | 'renewals')}
+                        onChange={handleTabChange}
                         items={calendarTabs}
                         ariaLabel="Calendar views"
                         className="mb-5"
+                        trailing={
+                            <span className="hidden text-[11px] text-muted-foreground lg:inline">
+                                Right-click a tab to pin / set default
+                            </span>
+                        }
                     />
                 </div>
 
-                {tab === 'calendar' ? (
-                    <div className="space-y-4">
-                        {/* Filter + layer bar */}
+                {tab === 'calendar' || tab === 'agenda' ? (
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                        {/* Left: persistent layer rail — one grid replacing four calendars */}
+                        <LayerRail
+                            activeLayers={activeLayers}
+                            counts={counts}
+                            onToggle={toggleLayer}
+                        />
+
+                        {/* Right: filters + legend + calendar */}
+                        <div className="min-w-0 flex-1 space-y-3">
+                        {/* Filter bar */}
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -730,22 +764,8 @@ export default function CalendarIndex({
                                 />
                             ) : null}
 
-                            <div className="ml-auto flex items-center gap-2">
+                            <div className="ml-auto">
                                 <ViewSwitch view={view} onChange={setView} />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-9 gap-1.5"
-                                    onClick={() => setYearPickerOpen(true)}
-                                >
-                                    <CalendarSearch className="h-4 w-4" />
-                                    Jump to…
-                                </Button>
-                                <LayerPopover
-                                    activeLayers={activeLayers}
-                                    counts={counts}
-                                    onToggle={toggleLayer}
-                                />
                             </div>
                         </div>
 
@@ -834,11 +854,21 @@ export default function CalendarIndex({
                                             if (arg.view.type !== view) {
                                                 setView(arg.view.type as FcView);
                                             }
+                                            // Make the month/year title open the year picker (caret affordance).
+                                            const titleEl = document.querySelector<HTMLElement>(
+                                                '.fc-toolbar-title',
+                                            );
+                                            if (titleEl && !titleEl.dataset.jump) {
+                                                titleEl.dataset.jump = '1';
+                                                titleEl.style.cursor = 'pointer';
+                                                titleEl.setAttribute('title', 'Jump to month / day');
+                                                titleEl.addEventListener('click', () => setYearPickerOpen(true));
+                                            }
                                         }}
                                         headerToolbar={{
                                             left: 'prev,next today',
                                             center: 'title',
-                                            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
+                                            right: '',
                                         }}
                                         buttonText={{
                                             today: 'Today',
@@ -854,6 +884,7 @@ export default function CalendarIndex({
                                 </div>
                             </CardContent>
                         </Card>
+                        </div>
                     </div>
                 ) : (
                     <RenewalsTab renewals={renewals} />
@@ -1168,7 +1199,22 @@ function LayerSwatch({ token }: { token: string }) {
     );
 }
 
-function LayerPopover({
+/** Per-layer source descriptor, mirroring the prototype's rail cards. */
+const LAYER_SUBLABEL: Record<CalendarLayer, string> = {
+    event: 'Editable here',
+    leave: 'From Leave hub',
+    shift: 'From Rostering',
+    holiday: 'NZ statutory',
+    compliance: 'Cert expiries',
+    milestone: 'Birthdays, anniv.',
+};
+
+/**
+ * The persistent left "LAYERS" rail — one grid replacing four calendars. Each
+ * source is a toggle card (swatch-tinted when on) with its origin sublabel and a
+ * live count; a read-only explainer notes which layers deep-link to their hub.
+ */
+function LayerRail({
     activeLayers,
     counts,
     onToggle,
@@ -1178,20 +1224,18 @@ function LayerPopover({
     onToggle: (l: CalendarLayer) => void;
 }) {
     return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-1.5">
-                    <Layers className="h-4 w-4" />
+        <aside className="w-full flex-none rounded-2xl border border-border bg-card p-3 lg:sticky lg:top-4 lg:w-[240px]">
+            <div className="mb-1 flex items-center justify-between px-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
                     Layers
-                    <span className="ml-0.5 rounded bg-muted px-1.5 text-[11px] font-semibold tabular-nums">
-                        {activeLayers.length}
-                    </span>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 p-2">
-                <p className="px-2 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                    Layers
-                </p>
+                </span>
+                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <p className="mb-2.5 px-1 text-[11.5px] leading-snug text-muted-foreground">
+                One grid replacing four calendars. Toggle a source on or off.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
                 {CALENDAR_LAYERS.map((layer) => {
                     const meta = LAYER_META[layer];
                     const active = activeLayers.includes(layer);
@@ -1200,7 +1244,19 @@ function LayerPopover({
                             key={layer}
                             type="button"
                             onClick={() => onToggle(layer)}
-                            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+                            aria-pressed={active}
+                            style={
+                                active
+                                    ? {
+                                          background: `color-mix(in oklch, var(--${meta.color}) 12%, transparent)`,
+                                          borderColor: `color-mix(in oklch, var(--${meta.color}) 45%, transparent)`,
+                                      }
+                                    : undefined
+                            }
+                            className={cn(
+                                'flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-colors',
+                                active ? '' : 'border-transparent hover:bg-muted/50',
+                            )}
                         >
                             <input
                                 type="checkbox"
@@ -1208,16 +1264,27 @@ function LayerPopover({
                                 readOnly
                                 className="pointer-events-none rounded border-border"
                             />
-                            <LayerSwatch token={meta.color} />
-                            <span className="flex-1">{meta.label}</span>
-                            <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12.5px] font-semibold">{meta.label}</span>
+                                <span className="block text-[10.5px] text-muted-foreground">{LAYER_SUBLABEL[layer]}</span>
+                            </span>
+                            <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
                                 {counts[layer] ?? 0}
                             </span>
                         </button>
                     );
                 })}
-            </PopoverContent>
-        </Popover>
+            </div>
+
+            <div className="mt-3 border-t border-border pt-2.5">
+                <p className="px-1 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    Read-only layers
+                </p>
+                <p className="mt-1 px-1 text-[11px] leading-snug text-muted-foreground">
+                    Leave, shifts &amp; renewals are view-only here — click one to open it in its home hub. Only HR events are editable on this page.
+                </p>
+            </div>
+        </aside>
     );
 }
 
