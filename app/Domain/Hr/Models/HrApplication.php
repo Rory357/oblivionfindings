@@ -24,7 +24,6 @@ class HrApplication extends Model
         'tenant_id',
         'candidate_id',
         'requisition_id',
-        'job_posting_id',
         'interview_kit_id',
         'position_title',
         'position_role',
@@ -79,10 +78,5 @@ class HrApplication extends Model
     public function offer(): HasOne
     {
         return $this->hasOne(HrOffer::class, 'application_id');
-    }
-
-    public function jobPosting(): BelongsTo
-    {
-        return $this->belongsTo(HrJobPosting::class, 'job_posting_id');
     }
 }

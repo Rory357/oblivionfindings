@@ -46,7 +46,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowRight,
@@ -1148,18 +1148,15 @@ export default function CandidateShow({
                                                         </Badge>
                                                     )}
                                                 </CardTitle>
-                                                {/* Job posting link */}
+                                                {/* Linked requisition title */}
                                                 {app.job_posting ? (
                                                     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
-                                                        <Link
-                                                            href={`/hr/job-postings/${app.job_posting.id}`}
-                                                            className="font-medium text-primary hover:underline"
-                                                        >
+                                                        <span className="font-medium">
                                                             {
                                                                 app.job_posting
                                                                     .title
                                                             }
-                                                        </Link>
+                                                        </span>
                                                         {app.job_posting
                                                             .department && (
                                                             <Badge

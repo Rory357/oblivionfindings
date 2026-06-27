@@ -36,7 +36,6 @@ use App\Http\Controllers\Hr\HrWebhookController;
 use App\Http\Controllers\Hr\ICalController;
 use App\Http\Controllers\Hr\ImportExportController;
 use App\Http\Controllers\Hr\InterviewKitController;
-use App\Http\Controllers\Hr\JobPostingController;
 use App\Http\Controllers\Hr\LeaveController;
 use App\Http\Controllers\Hr\LeaveReportController;
 use App\Http\Controllers\Hr\MyHrController;
@@ -642,27 +641,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Job Postings
+    | Job Postings (retired)
     |--------------------------------------------------------------------------
+    | The standalone HrJobPosting authoring surface was consolidated onto
+    | requisitions and removed. Keep the index path alive as a redirect (never
+    | 404) so bookmarks + the route('hr.job-postings.index') helper still resolve.
     */
-    Route::middleware('permission:hr.recruitment.view')->prefix('job-postings')->name('job-postings.')->group(function () {
-        Route::get('/', [JobPostingController::class, 'index'])->name('index');
-
-        Route::middleware('permission:hr.recruitment.manage')->group(function () {
-            Route::get('/create', [JobPostingController::class, 'create'])->name('create');
-            Route::post('/', [JobPostingController::class, 'store'])->name('store');
-            Route::get('/{posting}/edit', [JobPostingController::class, 'edit'])->name('edit');
-            Route::put('/{posting}', [JobPostingController::class, 'update'])->name('update');
-            Route::post('/{posting}/publish', [JobPostingController::class, 'publish'])->name('publish');
-            Route::post('/{posting}/close', [JobPostingController::class, 'close'])->name('close');
-            Route::post('/{posting}/duplicate', [JobPostingController::class, 'duplicate'])->name('duplicate');
-            Route::post('/{posting}/approve', [JobPostingController::class, 'approve'])->name('approve');
-            Route::post('/{posting}/reject-approval', [JobPostingController::class, 'rejectApproval'])->name('reject-approval');
-        });
-
-        Route::get('/{posting}/preview', [JobPostingController::class, 'preview'])->name('preview');
-        Route::get('/{posting}', [JobPostingController::class, 'show'])->name('show');
-    });
+    Route::middleware('permission:hr.recruitment.view')
+        ->get('/job-postings', fn () => redirect()->route('hr.jobs.index'))
+        ->name('job-postings.index');
 
     /*
     |--------------------------------------------------------------------------

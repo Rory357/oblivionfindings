@@ -490,6 +490,30 @@ test('a public application captures screening answers against the requisition qu
         ->not->toContain('Injected rogue question');
 });
 
+test('a public application is trackable via a requisition-aware status page', function () {
+    $job = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-track-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'created_by' => $this->hr->id,
+    ]);
+
+    $this->post(route('careers.apply.store', ['job' => $job->slug]), [
+        'first_name' => 'Hemi', 'last_name' => 'Tane',
+        'personal_email' => 'hemi.tane@example.test', 'privacy_consent' => '1',
+    ])->assertRedirect();
+
+    $application = HrApplication::query()->where('requisition_id', $job->id)->first();
+    // The confirmation email links to /careers/application/{token}, so the token must be set.
+    expect($application->candidate_tracking_token)->not->toBeNull();
+
+    // The public status page renders off the requisition (no job posting involved).
+    $this->get(route('careers.application.status', ['token' => $application->candidate_tracking_token]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('careers/application-status')
+            ->where('application.posting.title', 'Support Worker'));
+});
+
 /* ---- A7 public mirror: portal offer response acks the candidate ---- */
 
 test('a public offer response acknowledges the candidate', function () {

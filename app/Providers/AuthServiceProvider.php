@@ -7,7 +7,6 @@ use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
-use App\Domain\Hr\Models\HrJobPosting;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Policies\HrComplianceMatrixPolicy;
 use App\Domain\Hr\Policies\HrCoursePolicy;
@@ -20,7 +19,6 @@ use App\Domain\Clinical\Policies\ClinicalEventPolicy;
 use App\Domain\Clinical\Policies\ClinicalProtocolPolicy;
 use App\Domain\Hr\Policies\HrEmployeeProfilePolicy;
 use App\Domain\Hr\Policies\HrExpenseClaimPolicy;
-use App\Domain\Hr\Policies\HrJobPostingPolicy;
 use App\Domain\Hr\Policies\HrPerformanceReviewPolicy;
 use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\Budget;
@@ -196,7 +194,6 @@ class AuthServiceProvider extends ServiceProvider
         HrEmployeeProfile::class => HrEmployeeProfilePolicy::class,
         HrPerformanceReview::class => HrPerformanceReviewPolicy::class,
         HrExpenseClaim::class => HrExpenseClaimPolicy::class,
-        HrJobPosting::class => HrJobPostingPolicy::class,
         HrDisciplinaryAction::class => HrDisciplinaryActionPolicy::class,
         HrComplianceMatrix::class => HrComplianceMatrixPolicy::class,
         HrCourse::class => HrCoursePolicy::class,

@@ -13,6 +13,7 @@ use App\Domain\Hr\Services\RecruitmentService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -208,6 +209,9 @@ class CareerPortalController extends Controller
                 'requisition_id' => $job->id,
                 'interview_kit_id' => $job->default_interview_kit_id,
                 'screening_answers' => $screeningAnswers !== [] ? $screeningAnswers : null,
+                // Lets the candidate track their application at /careers/application/{token}
+                // (the confirmation email links here).
+                'candidate_tracking_token' => Str::random(48),
             ];
 
             if ($request->hasFile('cv')) {
