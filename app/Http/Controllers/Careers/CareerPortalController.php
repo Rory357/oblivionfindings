@@ -125,6 +125,11 @@ class CareerPortalController extends Controller
                 'description' => $job->description,
                 'requirements' => $job->requirements,
                 'responsibilities' => $job->responsibilities,
+                'screening_questions' => collect($job->screening_questions ?? [])
+                    ->map(fn ($q) => is_string($q) ? trim($q) : '')
+                    ->filter()
+                    ->values()
+                    ->all(),
                 'site' => $job->site ? [
                     'id' => $job->site->id,
                     'name' => $job->site->name,
@@ -158,7 +163,22 @@ class CareerPortalController extends Controller
             'privacy_consent' => ['accepted'],
             'source_channel' => ['nullable', 'string', Rule::in(['career_page', 'linkedin', 'seek', 'indeed', 'referral', 'agency', 'social', 'other'])],
             'source_reference' => ['nullable', 'string', 'max:255'],
+            'screening_answers' => ['nullable', 'array', 'max:50'],
+            'screening_answers.*.question' => ['required_with:screening_answers', 'string', 'max:1000'],
+            'screening_answers.*.answer' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        // Keep only configured questions, in the requisition's order — never trust
+        // the client to define which questions were asked.
+        $configuredQuestions = collect($job->screening_questions ?? [])
+            ->map(fn ($q) => is_string($q) ? trim($q) : '')
+            ->filter();
+        $submittedAnswers = collect($validated['screening_answers'] ?? [])
+            ->mapWithKeys(fn ($row) => [trim((string) ($row['question'] ?? '')) => trim((string) ($row['answer'] ?? ''))]);
+        $screeningAnswers = $configuredQuestions
+            ->map(fn ($q) => ['question' => $q, 'answer' => $submittedAnswers->get($q, '')])
+            ->values()
+            ->all();
 
         $sourceChannel = $validated['source_channel'] ?? 'career_page';
         $sourceReference = trim((string) ($validated['source_reference'] ?? ''));
@@ -187,6 +207,7 @@ class CareerPortalController extends Controller
                 'cover_letter' => $validated['cover_letter'] ?? null,
                 'requisition_id' => $job->id,
                 'interview_kit_id' => $job->default_interview_kit_id,
+                'screening_answers' => $screeningAnswers !== [] ? $screeningAnswers : null,
             ];
 
             if ($request->hasFile('cv')) {

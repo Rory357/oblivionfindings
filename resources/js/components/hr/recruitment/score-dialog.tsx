@@ -57,7 +57,8 @@ export function ScoreDialog({
             payload.criteria_scores = interview.criteria.map((c) => ({
                 label: c.label,
                 score: (ratings[c.label] ?? 3) * 20,
-                weight: c.weight || undefined,
+                // Preserve a deliberate 0 weight (?? not ||) — the backend allows min:0.
+                weight: c.weight ?? undefined,
             }));
         } else {
             payload.overall_score = Number(overall) || 0;

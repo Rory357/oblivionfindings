@@ -21,6 +21,7 @@ type Props = {
         description: string | null;
         requirements: string | null;
         responsibilities: string | null;
+        screening_questions: string[];
         site: { id: number; name: string } | null;
         closing_at: string | null;
     };
@@ -31,6 +32,8 @@ type Props = {
 
 export default function CareersApply({ job, trackingDefaults }: Props) {
     const { flash } = usePage().props as { flash?: { success?: string } };
+
+    const screeningQuestions = job.screening_questions ?? [];
 
     const form = useForm({
         first_name: '',
@@ -43,7 +46,14 @@ export default function CareersApply({ job, trackingDefaults }: Props) {
         privacy_consent: false,
         source_channel: trackingDefaults?.source_channel ?? 'career_page',
         source_reference: '',
+        screening_answers: screeningQuestions.map((q) => ({ question: q, answer: '' })),
     });
+
+    const setAnswer = (index: number, answer: string) =>
+        form.setData(
+            'screening_answers',
+            form.data.screening_answers.map((row, i) => (i === index ? { ...row, answer } : row)),
+        );
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -179,6 +189,28 @@ export default function CareersApply({ job, trackingDefaults }: Props) {
                             {form.errors.privacy_consent && <p className="text-sm text-destructive">{form.errors.privacy_consent}</p>}
                         </CardContent>
                     </Card>
+
+                    {screeningQuestions.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>A few questions</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {form.data.screening_answers.map((row, i) => (
+                                    <div key={i}>
+                                        <Label>{row.question}</Label>
+                                        <Textarea
+                                            rows={3}
+                                            value={row.answer}
+                                            onChange={(e) => setAnswer(i, e.target.value)}
+                                            className="mt-1"
+                                            placeholder="Your answer..."
+                                        />
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <div className="flex justify-end">
                         <Button type="submit" size="lg" disabled={form.processing}>
