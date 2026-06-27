@@ -18,7 +18,6 @@ class HrApplicationFactory extends Factory
             'position_title' => fake()->randomElement(['Support Worker', 'Team Leader', 'Coordinator']),
             'position_role' => fake()->randomElement(['support_worker', 'team_lead', 'coordinator']),
             'cover_letter' => fake()->optional()->paragraph(),
-            'answers' => [],
             'screening_answers' => [],
             'status' => 'active',
         ];

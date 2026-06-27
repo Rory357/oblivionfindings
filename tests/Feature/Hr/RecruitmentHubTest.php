@@ -794,3 +794,21 @@ test('scoring requires recruitment manage and rejects unknown criteria labels', 
         'overall_score' => 70,
     ])->assertForbidden();
 });
+
+/* ---- C1: screening answers persist; legacy `answers` column retired ---- */
+
+test('createApplication persists screening answers and the legacy answers column is gone', function () {
+    ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
+
+    $application = app(\App\Domain\Hr\Services\RecruitmentService::class)->createApplication(
+        $candidate->fresh(),
+        [
+            'position_title' => 'Team Leader',
+            'screening_answers' => ['drivers_licence' => 'Yes', 'availability' => 'Weekends'],
+        ],
+    );
+
+    expect($application->screening_answers)->toBe(['drivers_licence' => 'Yes', 'availability' => 'Weekends']);
+    // The dead column is dropped by migration.
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('hr_applications', 'answers'))->toBeFalse();
+});
