@@ -823,3 +823,25 @@ test('createApplication persists screening answers and the legacy answers column
     // The dead column is dropped by migration.
     expect(\Illuminate\Support\Facades\Schema::hasColumn('hr_applications', 'answers'))->toBeFalse();
 });
+
+/* ---- Analytics date-range filter (Analytics tab) ---- */
+
+test('analytics conversion and sources honour the date window', function () {
+    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'seek', 'created_at' => now()->subYear(), 'created_by' => $this->hr->id]);
+    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'referral', 'created_at' => now()->subDays(2), 'created_by' => $this->hr->id]);
+
+    $svc = app(\App\Domain\Hr\Services\RecruitmentAnalyticsService::class);
+
+    $allScreening = collect($svc->getPipelineConversion(1))->firstWhere('stage', 'screening')['count'];
+    expect($allScreening)->toBe(2);
+
+    $from = now()->subWeek()->toDateString();
+    $to = now()->addDay()->toDateString();
+
+    $windowedScreening = collect($svc->getPipelineConversion(1, $from, $to))->firstWhere('stage', 'screening')['count'];
+    expect($windowedScreening)->toBe(1);
+
+    $sources = collect($svc->getSourceEffectiveness(1, $from, $to))->pluck('source');
+    expect($sources->all())->toContain('referral');
+    expect($sources->all())->not->toContain('seek');
+});

@@ -11,10 +11,12 @@ import {
     FileText,
     Megaphone,
     PenLine,
+    Plus,
     Send,
     ShieldAlert,
     ShieldCheck,
     Sparkles,
+    Trash2,
     Upload,
     UserCheck,
     UserPlus,
@@ -389,6 +391,7 @@ function RequisitionWizard({ onClose, support }: WizProps) {
     const [done, setDone] = useState(false);
     const [positionId, setPositionId] = useState('');
     const [channels, setChannels] = useState<string[]>(['career_page']);
+    const [screeningQuestions, setScreeningQuestions] = useState<string[]>([]);
     const form = useForm({
         title: '',
         position_id: '' as string,
@@ -439,6 +442,7 @@ function RequisitionWizard({ onClose, support }: WizProps) {
             salary_range_max: d.salary_range_max || undefined,
             show_salary: showSalary,
             requires_approval: requiresApproval,
+            screening_questions: screeningQuestions.map((q) => q.trim()).filter((q) => q !== ''),
         }));
         form.post('/hr/recruitment/jobs', {
             preserveScroll: true,
@@ -540,6 +544,38 @@ function RequisitionWizard({ onClose, support }: WizProps) {
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Area label="Responsibilities" value={form.data.responsibilities} onChange={(v) => form.setData('responsibilities', v)} />
                         <Area label="Requirements" value={form.data.requirements} onChange={(v) => form.setData('requirements', v)} />
+                    </div>
+                    <div className="mt-4">
+                        <Field label="Screening questions" hint="(optional · asked on the application form)">
+                            <div className="flex flex-col gap-2">
+                                {screeningQuestions.map((q, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-muted text-[12px] font-bold text-muted-foreground">{i + 1}</span>
+                                        <input
+                                            value={q}
+                                            onChange={(e) => setScreeningQuestions((rows) => rows.map((r, idx) => (idx === i ? e.target.value : r)))}
+                                            placeholder="e.g. Do you hold a current NZ driver licence?"
+                                            className="h-9 flex-1 rounded-md border border-border bg-card px-3 text-[13px] outline-none focus:border-primary"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setScreeningQuestions((rows) => rows.filter((_, idx) => idx !== i))}
+                                            aria-label="Remove question"
+                                            className="grid h-9 w-9 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setScreeningQuestions((rows) => [...rows, ''])}
+                                    className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Add question
+                                </button>
+                            </div>
+                        </Field>
                     </div>
                 </WizardStepPane>
             ) : null}
