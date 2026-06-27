@@ -229,6 +229,7 @@ export default function ExpenseIndex({
                                     filters.status === s ? 'default' : 'outline'
                                 }
                                 size="sm"
+                                aria-pressed={filters.status === s}
                                 onClick={() => onFilter({ status: s })}
                             >
                                 <span className="capitalize">{s}</span>
@@ -394,7 +395,7 @@ export default function ExpenseIndex({
                                                     >
                                                         <Link
                                                             href={`/hr/compensation/expenses/${claim.id}`}
-                                                            aria-label="View claim"
+                                                            aria-label={`View claim ${claim.claim_number}`}
                                                         >
                                                             <Eye className="h-3.5 w-3.5" />
                                                         </Link>

@@ -20,9 +20,16 @@ import {
 } from '@/components/ui/table';
 import { PageLayout } from '@/components/page';
 import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import {
+    ReviewBuilderDialog,
+    type ReviewBuilderBand,
+    type ReviewBuilderEmployee,
+    type ReviewCycleOption,
+} from '@/components/hr/review-builder-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -41,6 +48,9 @@ type Props = {
     reviews: { data: CompensationReview[]; links: any[] };
     filters: { status: string | null };
     stats: CompensationHeroStats;
+    employees?: ReviewBuilderEmployee[];
+    reviewCycles?: ReviewCycleOption[];
+    bands?: ReviewBuilderBand[];
     can: { manage: boolean };
 };
 
@@ -92,8 +102,17 @@ const getCycleLabel = (cycle: string) => {
 
 const statuses = ['planning', 'in_progress', 'approved', 'applied'];
 
-export default function CompensationReviews({ reviews, filters, stats, can }: Props) {
+export default function CompensationReviews({
+    reviews,
+    filters,
+    stats,
+    employees = [],
+    reviewCycles = [],
+    bands,
+    can,
+}: Props) {
     const NONE = '__none__';
+    const [builderOpen, setBuilderOpen] = useState(false);
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -112,12 +131,10 @@ export default function CompensationReviews({ reviews, filters, stats, can }: Pr
 
                 {can.manage ? (
                     <div className="flex justify-end">
-                        <Link href="/hr/compensation/reviews/create">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New review
-                            </Button>
-                        </Link>
+                        <Button size="sm" onClick={() => setBuilderOpen(true)}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            New review
+                        </Button>
                     </div>
                 ) : null}
 
@@ -231,6 +248,16 @@ export default function CompensationReviews({ reviews, filters, stats, can }: Pr
                     <LaravelPagination links={reviews.links} />
                 ) : null}
             </PageLayout>
+
+            {can.manage ? (
+                <ReviewBuilderDialog
+                    open={builderOpen}
+                    onClose={() => setBuilderOpen(false)}
+                    employees={employees}
+                    reviewCycles={reviewCycles}
+                    bands={bands}
+                />
+            ) : null}
         </AppLayout>
     );
 }

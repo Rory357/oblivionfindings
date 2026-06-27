@@ -167,7 +167,7 @@ export function CompensationHero({
         ...(can?.compensation?.manage
             ? [
                   { label: 'New band', icon: Plus, href: '/hr/compensation/bands' },
-                  { label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews/create' },
+                  { label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews' },
                   { label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' },
               ]
             : []),

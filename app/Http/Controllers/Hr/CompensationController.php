@@ -384,6 +384,22 @@ class CompensationController extends Controller
             ],
             'stats' => $this->compensationService->heroStats($tenantId, $user),
             'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            // Surfaced so the builder wizard can open in-place from the list
+            // (no navigation to a separate create page).
+            'employees' => $user->canDo('hr.compensation.manage')
+                ? HrEmployeeProfile::where('tenant_id', $tenantId)
+                    ->with('user:id,name')
+                    ->active()
+                    ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate'])
+                : [],
+            'reviewCycles' => [
+                ['value' => 'annual', 'label' => 'Annual'],
+                ['value' => 'mid_year', 'label' => 'Mid-Year'],
+                ['value' => 'ad_hoc', 'label' => 'Ad Hoc'],
+            ],
+            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()
+                ->orderByDesc('effective_from')
+                ->get(['id', 'position_role', 'min_salary', 'mid_salary', 'max_salary']),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
             ],
@@ -496,6 +512,8 @@ class CompensationController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
 
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+
         try {
             $this->compensationService->approveCompensationReview($review, $user->id);
         } catch (\LogicException $e) {
@@ -512,6 +530,8 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
 
         try {
             $this->compensationService->applyCompensationReview($review);

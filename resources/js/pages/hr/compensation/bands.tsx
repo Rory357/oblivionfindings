@@ -1055,7 +1055,7 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
     const heroActions: CompensationQuickAction[] = [
         ...(can.manage ? [{ label: 'New band', icon: Plus, onClick: openCreate }] : []),
         ...(can.manage
-            ? [{ label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews/create' }]
+            ? [{ label: 'Start pay review', icon: ClipboardCheck, href: '/hr/compensation/reviews' }]
             : []),
         ...(can.manage ? [{ label: 'Record bonus', icon: Banknote, href: '/hr/compensation/bonuses' }] : []),
         ...(can.expenses
