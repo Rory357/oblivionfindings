@@ -132,8 +132,10 @@ class TimeTrackingController extends Controller
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
         $payType = $request->query('pay_type');
+        $siteFilter = $request->query('site_id');
         $scope = $request->query('scope', $access['canApproveAny'] ? 'team' : 'mine');
-        $tab = $request->query('tab', 'dashboard');
+        $tab = $request->query('tab', 'overview');
+        $tz = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
 
         // --- Team members list (for filters and dialogs) ---
         $teamMembers = [];
@@ -210,48 +212,19 @@ class TimeTrackingController extends Controller
         $entries = (clone $entriesBaseQuery)
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($payType, fn ($q) => $q->where('pay_type', $payType))
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+                ->orWhere('notes', 'like', "%{$search}%")
             ))
-            ->with('user:id,name,email', 'approver:id,name', 'shift:id,starts_at,ends_at', 'shift.client:id,first_name,last_name', 'client:id,first_name,last_name')
+            ->withCount('amendments')
+            ->with('user:id,name,email', 'approver:id,name', 'site:id,name', 'shift:id,starts_at,ends_at', 'shift.client:id,first_name,last_name', 'client:id,first_name,last_name')
             ->orderByDesc('entry_date')
             ->orderByDesc('clock_in')
             ->paginate(20)
             ->withQueryString();
 
-        $entries->through(fn ($entry) => [
-            'id' => $entry->id,
-            'user_name' => $entry->user?->name ?? 'Unknown',
-            'user_id' => $entry->user_id,
-            'entry_date' => $entry->entry_date->toDateString(),
-            'clock_in' => $entry->clock_in->format('Y-m-d\TH:i'),
-            'clock_in_short' => $entry->clock_in->format('H:i'),
-            'clock_out' => $entry->clock_out?->format('Y-m-d\TH:i'),
-            'clock_out_short' => $entry->clock_out?->format('H:i'),
-            'break_minutes' => $entry->break_minutes,
-            'total_hours' => $entry->total_hours,
-            'entry_type' => $entry->entry_type,
-            'status' => $entry->status,
-            'pay_type' => $entry->pay_type ?? 'standard',
-            'is_sleepover' => (bool) $entry->is_sleepover,
-            'is_on_call' => (bool) $entry->is_on_call,
-            'is_public_holiday' => (bool) $entry->is_public_holiday,
-            'break_compliance_met' => $entry->break_compliance_met,
-            'notes' => $entry->notes,
-            'project_code' => $entry->project_code,
-            'approved_by' => $entry->approver?->name,
-            'amended_by' => $entry->amended_by,
-            'amendment_reason' => $entry->amendment_reason,
-            'client_name' => $entry->client
-                ? trim(($entry->client->first_name ?? '').' '.($entry->client->last_name ?? ''))
-                : ($entry->shift?->client
-                    ? trim(($entry->shift->client->first_name ?? '').' '.($entry->shift->client->last_name ?? ''))
-                    : null),
-            'shift' => $entry->shift ? [
-                'id' => $entry->shift->id,
-                'starts_at' => $entry->shift->starts_at?->format('H:i'),
-                'ends_at' => $entry->shift->ends_at?->format('H:i'),
-            ] : null,
-        ]);
+        $entries->through(fn ($entry) => $this->serializeEntry($entry, $tz));
 
         // --- Timesheets ---
         $timesheets = (clone $this->operationsTimesheetQuery($tenantId, $user, $access))
@@ -285,7 +258,58 @@ class TimeTrackingController extends Controller
 
         $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
 
-        // Recent activity
+        // --- On now (everyone currently clocked in, in scope) ---
+        $onNowQuery = HrTimeEntry::forTenant($tenantId)->active();
+        $this->applyAccessScope($onNowQuery, $user, $access);
+        $onNow = $onNowQuery
+            ->with('user:id,name', 'site:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at')
+            ->orderBy('clock_in')
+            ->get()
+            ->map(function (HrTimeEntry $e) use ($tz) {
+                $name = $e->user?->name ?? 'Unknown';
+                $client = $e->client
+                    ? trim(($e->client->first_name ?? '').' '.($e->client->last_name ?? ''))
+                    : null;
+                $meta = array_filter([$e->site?->name, $client]);
+
+                return [
+                    'id' => $e->id,
+                    'user_id' => $e->user_id,
+                    'name' => $name,
+                    'initials' => $this->initialsFor($name),
+                    'meta' => $meta ? implode(' · ', $meta) : 'No site linked',
+                    'since' => $e->clock_in->copy()->setTimezone($tz)->format('H:i'),
+                    'clock_in' => $e->clock_in->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
+                    'entry_date' => $e->entry_date->toDateString(),
+                    'elapsed_minutes' => (int) $e->clock_in->diffInMinutes(now()),
+                    'pay_type' => $e->pay_type ?? 'standard',
+                    'is_sleepover' => (bool) $e->is_sleepover,
+                ];
+            })
+            ->values()
+            ->all();
+
+        // --- Team weekly hours (Mon–Sun rollup) ---
+        $weekRows = (clone $kpiEntriesQuery)
+            ->forDateRange($weekStart, $weekEnd)
+            ->whereNotNull('clock_out')
+            ->get(['entry_date', 'total_hours']);
+        $weeklyTeam = [];
+        for ($d = now()->startOfWeek(); $d->lte(now()->endOfWeek()); $d->addDay()) {
+            $key = $d->toDateString();
+            $weeklyTeam[] = [
+                'date' => $key,
+                'day' => $d->format('D'),
+                'hours' => round((float) $weekRows->where('entry_date', $key)->sum('total_hours'), 1),
+            ];
+        }
+
+        // --- Exceptions board ---
+        $exceptions = $access['canApproveAny']
+            ? $this->buildExceptions($tenantId, $user, $access, $tz, $weekStart, $weekEnd)
+            : [];
+
+        // --- Recent activity ---
         $recentActivity = [];
         if ($access['canApproveAny']) {
             $activityQuery = HrTimeEntry::forTenant($tenantId);
@@ -293,41 +317,67 @@ class TimeTrackingController extends Controller
             $recentActivity = $activityQuery
                 ->with('user:id,name')
                 ->orderByDesc('created_at')
-                ->limit(10)
+                ->limit(8)
                 ->get()
                 ->map(fn ($entry) => [
                     'id' => $entry->id,
                     'user_name' => $entry->user?->name ?? 'Unknown',
-                    'action' => $entry->clock_out ? 'clocked_out' : 'clocked_in',
-                    'time' => ($entry->clock_out ?? $entry->clock_in)->diffForHumans(),
-                    'pay_type' => $entry->pay_type ?? 'standard',
-                    'entry_type' => $entry->entry_type,
-                ]);
+                    'action' => $entry->clock_out ? 'clocked out' : 'clocked in',
+                    'time' => ($entry->clock_out ?? $entry->clock_in)->diffForHumans(null, true),
+                    'on_behalf' => $entry->entry_type === 'admin_clock',
+                ])
+                ->all();
         }
+
+        // --- Pickers (staff / sites / clients) ---
+        $staff = collect($teamMembers)->map(fn ($m) => [
+            'id' => $m['id'],
+            'name' => $m['name'],
+        ])->values()->all();
+
+        $sites = \App\Models\Site::query()->orderBy('name')->get(['id', 'name'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all();
+
+        $clients = \App\Models\Client::query()
+            ->orderBy('first_name')
+            ->limit(500)
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
+            ])->all();
 
         return Inertia::render('hr/time/index', [
             'entries' => $entries,
             'timesheets' => $timesheets,
             'approvalTimesheets' => $approvalTimesheets,
             'pendingApprovalCount' => $pendingApprovalCount,
+            'onNow' => $onNow,
+            'exceptions' => $exceptions,
+            'weeklyTeam' => $weeklyTeam,
+            'recentActivity' => $recentActivity,
             'teamMembers' => $teamMembers,
+            'staff' => $staff,
+            'sites' => $sites,
+            'clients' => $clients,
             'activeClock' => $activeClock ? [
                 'id' => $activeClock->id,
-                'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
+                'clock_in' => $activeClock->clock_in->copy()->setTimezone($tz)->format('Y-m-d H:i'),
                 'notes' => $activeClock->notes,
             ] : null,
             'weeklySummary' => $weeklySummary,
             'kpiStats' => [
-                'total_hours_this_week' => round($totalHoursThisWeek, 1),
-                'active_clocked_in' => $activeClockedIn,
-                'pending_timesheets' => $pendingTimesheets,
+                'clocked_in_now' => $activeClockedIn,
+                'team_hours_week' => round($totalHoursThisWeek, 1),
+                'awaiting_approval' => $pendingTimesheets,
+                'exceptions_count' => count($exceptions),
                 'overtime_hours' => $overtimeHours,
                 'avg_hours_per_day' => $avgHoursPerDay,
             ],
-            'recentActivity' => $recentActivity,
             'filters' => [
                 'status' => $status,
                 'pay_type' => $payType,
+                'site_id' => $siteFilter,
                 'q' => $search,
                 'tab' => $tab,
                 'scope' => $scope,
@@ -340,6 +390,162 @@ class TimeTrackingController extends Controller
                 'clockOnBehalf' => $access['canApproveAny'],
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Serialization + exception helpers */
+    /* ------------------------------------------------------------------ */
+
+    private function initialsFor(string $name): string
+    {
+        $parts = array_values(array_filter(preg_split('/\s+/', trim($name)) ?: []));
+        $letters = array_map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)), array_slice($parts, 0, 2));
+
+        return implode('', $letters) ?: '—';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeEntry(HrTimeEntry $entry, string $tz): array
+    {
+        $name = $entry->user?->name ?? 'Unknown';
+        $clientName = $entry->client
+            ? trim(($entry->client->first_name ?? '').' '.($entry->client->last_name ?? ''))
+            : ($entry->shift?->client
+                ? trim(($entry->shift->client->first_name ?? '').' '.($entry->shift->client->last_name ?? ''))
+                : null);
+
+        return [
+            'id' => $entry->id,
+            'user_name' => $name,
+            'user_id' => $entry->user_id,
+            'initials' => $this->initialsFor($name),
+            'site_name' => $entry->site?->name,
+            'entry_date' => $entry->entry_date->toDateString(),
+            'clock_in' => $entry->clock_in->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
+            'clock_in_short' => $entry->clock_in->copy()->setTimezone($tz)->format('H:i'),
+            'clock_out' => $entry->clock_out?->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
+            'clock_out_short' => $entry->clock_out?->copy()->setTimezone($tz)->format('H:i'),
+            'break_minutes' => $entry->break_minutes,
+            'total_hours' => $entry->total_hours !== null ? (float) $entry->total_hours : null,
+            'entry_type' => $entry->entry_type,
+            'status' => $entry->status,
+            'pay_type' => $entry->pay_type ?? 'standard',
+            'is_sleepover' => (bool) $entry->is_sleepover,
+            'is_on_call' => (bool) $entry->is_on_call,
+            'is_public_holiday' => (bool) $entry->is_public_holiday,
+            'break_compliance_met' => $entry->break_compliance_met,
+            'mileage_km' => $entry->mileage_km !== null ? (float) $entry->mileage_km : null,
+            'notes' => $entry->notes,
+            'project_code' => $entry->project_code,
+            'cost_centre' => $entry->cost_centre,
+            'approved_by' => $entry->approver?->name,
+            'amended_by' => $entry->amended_by,
+            'amendment_reason' => $entry->amendment_reason,
+            'amendment_count' => (int) ($entry->amendments_count ?? 0),
+            'client_name' => $clientName,
+            'shift' => $entry->shift ? [
+                'id' => $entry->shift->id,
+                'starts_at' => $entry->shift->starts_at?->copy()->setTimezone($tz)->format('H:i'),
+                'ends_at' => $entry->shift->ends_at?->copy()->setTimezone($tz)->format('H:i'),
+            ] : null,
+        ];
+    }
+
+    /**
+     * Build the Overview exception board — missed clock-outs, break-compliance
+     * fails, weekly overtime, roster-unlinked entries and today's loadings.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildExceptions(int $tenantId, User $user, array $access, string $tz, string $weekStart, string $weekEnd): array
+    {
+        $exceptions = [];
+
+        // 1. Missed clock-out — still active beyond 12h.
+        $missedQuery = HrTimeEntry::forTenant($tenantId)
+            ->active()
+            ->where('clock_in', '<', now()->subHours(12));
+        $this->applyAccessScope($missedQuery, $user, $access);
+        foreach ($missedQuery->with('user:id,name')->orderBy('clock_in')->limit(20)->get() as $e) {
+            $hours = round($e->clock_in->diffInMinutes(now()) / 60, 1);
+            $exceptions[] = [
+                'id' => 'missed-'.$e->id,
+                'kind' => 'missed_clock_out',
+                'severity' => 'critical',
+                'title' => $e->user?->name ?? 'Unknown',
+                'detail' => 'Clocked in '.$e->clock_in->copy()->setTimezone($tz)->format('D H:i').' — still open after '.$hours.'h',
+                'badge' => 'Missed clock-out',
+                'entry_id' => $e->id,
+                'user_id' => $e->user_id,
+                'user_name' => $e->user?->name ?? 'Unknown',
+                'clock_in' => $e->clock_in->copy()->setTimezone($tz)->format('Y-m-d\TH:i'),
+                'entry_date' => $e->entry_date->toDateString(),
+                'action' => 'correct',
+            ];
+        }
+
+        // 2. Break-compliance fails this week.
+        $breakQuery = HrTimeEntry::forTenant($tenantId)
+            ->forDateRange($weekStart, $weekEnd)
+            ->where('break_compliance_met', false);
+        $this->applyAccessScope($breakQuery, $user, $access);
+        foreach ($breakQuery->with('user:id,name')->orderByDesc('entry_date')->limit(20)->get() as $e) {
+            $exceptions[] = [
+                'id' => 'break-'.$e->id,
+                'kind' => 'break_fail',
+                'severity' => 'warning',
+                'title' => $e->user?->name ?? 'Unknown',
+                'detail' => $e->entry_date->format('D d M').' — '.($e->break_minutes ?: 0).'m break logged on a '.($e->total_hours ?? 0).'h shift',
+                'badge' => 'Break shortfall',
+                'entry_id' => $e->id,
+                'action' => 'edit',
+            ];
+        }
+
+        // 3. Weekly overtime (>40h) per staff.
+        $otQuery = HrTimeEntry::forTenant($tenantId)
+            ->forDateRange($weekStart, $weekEnd)
+            ->whereNotNull('clock_out');
+        $this->applyAccessScope($otQuery, $user, $access);
+        $otRows = $otQuery->selectRaw('user_id, SUM(total_hours) as week_hours')
+            ->groupBy('user_id')
+            ->havingRaw('SUM(total_hours) > 40')
+            ->get();
+        $userNames = User::whereIn('id', $otRows->pluck('user_id'))->pluck('name', 'id');
+        foreach ($otRows as $row) {
+            $exceptions[] = [
+                'id' => 'ot-'.$row->user_id,
+                'kind' => 'overtime',
+                'severity' => 'warning',
+                'title' => $userNames[$row->user_id] ?? 'Unknown',
+                'detail' => round((float) $row->week_hours, 1).'h logged this week — '.round((float) $row->week_hours - 40, 1).'h over 40h',
+                'badge' => 'Overtime',
+                'user_id' => $row->user_id,
+                'action' => 'view_entries',
+            ];
+        }
+
+        // 4. Today's loadings (sleepover / on-call / public holiday).
+        $loadingQuery = HrTimeEntry::forTenant($tenantId)
+            ->where('entry_date', now()->toDateString())
+            ->where(fn ($q) => $q->where('is_sleepover', true)->orWhere('is_on_call', true)->orWhere('is_public_holiday', true));
+        $this->applyAccessScope($loadingQuery, $user, $access);
+        $loadingCount = (clone $loadingQuery)->count();
+        if ($loadingCount > 0) {
+            $exceptions[] = [
+                'id' => 'loadings-today',
+                'kind' => 'loadings',
+                'severity' => 'info',
+                'title' => $loadingCount.' loading '.($loadingCount === 1 ? 'entry' : 'entries').' today',
+                'detail' => 'Sleepover, on-call or public-holiday loadings to verify before payroll.',
+                'badge' => 'Loadings',
+                'action' => 'view_entries',
+            ];
+        }
+
+        return $exceptions;
     }
 
     /* ------------------------------------------------------------------ */
@@ -473,6 +679,58 @@ class TimeTrackingController extends Controller
             ]);
 
         return response()->json($amendments);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Correct a missed clock-out */
+    /* ------------------------------------------------------------------ */
+
+    public function correct(Request $request, HrTimeEntry $entry)
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('timesheets.manageAny') || $user->canDo('timesheets.approve')), 403);
+
+        $validated = $request->validate([
+            'clock_out' => ['required', 'date', 'after:'.$entry->clock_in->toDateTimeString()],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->timeTrackingService->correctMissedClockOut(
+                $entry,
+                $user,
+                $validated['clock_out'],
+                (int) ($validated['break_minutes'] ?? 0),
+                $validated['reason'],
+            );
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Clock-out corrected.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Void (soft-delete) an entry */
+    /* ------------------------------------------------------------------ */
+
+    public function void(Request $request, HrTimeEntry $entry)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('timesheets.manageAny'), 403);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->timeTrackingService->voidEntry($entry, $user, $validated['reason']);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Time entry voided.');
     }
 
     /* ------------------------------------------------------------------ */

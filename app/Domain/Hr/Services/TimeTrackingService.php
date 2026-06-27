@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Models\HrTimeEntryAmendment;
@@ -208,7 +209,7 @@ class TimeTrackingService
         }
 
         return DB::transaction(function () use ($entry, $editor, $data, $reason) {
-            $editableFields = ['clock_in', 'clock_out', 'break_minutes', 'pay_type', 'notes', 'is_sleepover', 'is_on_call', 'mileage_km'];
+            $editableFields = ['clock_in', 'clock_out', 'break_minutes', 'pay_type', 'notes', 'is_sleepover', 'is_on_call', 'is_public_holiday', 'mileage_km', 'cost_centre', 'project_code'];
             $originalValues = [];
             $tenantId = $entry->tenant_id;
 
@@ -312,7 +313,9 @@ class TimeTrackingService
             $breakCompliant = $breakMinutes >= $requiredBreak;
         }
 
-        return DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager) {
+        $reason = isset($data['reason']) ? trim((string) $data['reason']) : '';
+
+        return DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager, $reason) {
             $entry = HrTimeEntry::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $targetUserId,
@@ -333,14 +336,127 @@ class TimeTrackingService
                 'mileage_km' => $data['mileage_km'] ?? null,
                 'break_compliance_met' => $breakCompliant,
                 'notes' => $data['notes'] ?? null,
+                'amendment_reason' => $reason !== '' ? $reason : null,
                 'created_by' => $manager->id,
             ]);
+
+            // Persist the (required) on-behalf reason as an audit row so the
+            // amendment history drawer explains why a manager created the entry.
+            if ($reason !== '') {
+                HrTimeEntryAmendment::create([
+                    'tenant_id' => $tenantId,
+                    'hr_time_entry_id' => $entry->id,
+                    'amended_by' => $manager->id,
+                    'field_name' => 'created_on_behalf',
+                    'old_value' => null,
+                    'new_value' => $manager->name,
+                    'reason' => $reason,
+                ]);
+            }
 
             if ($clockOut) {
                 $this->draftTimesheets->fromManualEntry($entry->fresh(), $manager->id);
             }
 
             return $entry->fresh();
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Void (soft-delete) an entry */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Soft-delete a time entry with a mandatory reason recorded to the
+     * amendment trail. Approved entries are locked (payroll integrity).
+     */
+    public function voidEntry(HrTimeEntry $entry, User $actor, string $reason): void
+    {
+        if ($entry->status === 'approved') {
+            throw new \LogicException('Cannot void an approved time entry. Adjust it through a timesheet amendment instead.');
+        }
+
+        DB::transaction(function () use ($entry, $actor, $reason) {
+            HrTimeEntryAmendment::create([
+                'tenant_id' => $entry->tenant_id,
+                'hr_time_entry_id' => $entry->id,
+                'amended_by' => $actor->id,
+                'field_name' => 'voided',
+                'old_value' => $entry->status,
+                'new_value' => 'voided',
+                'reason' => $reason,
+            ]);
+
+            $entry->update([
+                'status' => 'voided',
+                'amended_by' => $actor->id,
+                'amended_at' => now(),
+                'amendment_reason' => $reason,
+            ]);
+
+            $entry->delete(); // soft-delete (deleted_at)
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Correct / close a missed clock-out */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Force-close a still-open entry: set the clock-out, recompute hours +
+     * NZ break compliance, and (when the entry is attendance-backed) route the
+     * close through AttendanceService::correctSession so the linked Operations
+     * timesheet is returned to draft with an audit trail.
+     */
+    public function correctMissedClockOut(HrTimeEntry $entry, User $actor, string $clockOut, int $breakMinutes, string $reason): HrTimeEntry
+    {
+        if ($entry->clock_out) {
+            throw new \LogicException('This entry is already clocked out.');
+        }
+
+        $clockOutLocal = $this->parseWorkerLocalDateTime($clockOut);
+        $clockOutUtc = $clockOutLocal->copy()->utc();
+
+        if ($entry->attendance_session_id) {
+            $session = HrAttendanceSession::find($entry->attendance_session_id);
+            if ($session) {
+                $this->attendanceService->correctSession($actor, $session, $clockOutUtc, $breakMinutes, $reason);
+            }
+        }
+
+        $totalMinutes = $entry->clock_in->diffInMinutes($clockOutUtc) - $breakMinutes;
+        $totalHours = max(0, round($totalMinutes / 60, 2));
+        $workedHours = $totalMinutes / 60;
+        $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+
+        return DB::transaction(function () use ($entry, $actor, $clockOutUtc, $breakMinutes, $totalHours, $requiredBreak, $reason) {
+            HrTimeEntryAmendment::create([
+                'tenant_id' => $entry->tenant_id,
+                'hr_time_entry_id' => $entry->id,
+                'amended_by' => $actor->id,
+                'field_name' => 'clock_out',
+                'old_value' => null,
+                'new_value' => $clockOutUtc->toDateTimeString(),
+                'reason' => $reason,
+            ]);
+
+            $entry->update([
+                'clock_out' => $clockOutUtc,
+                'break_minutes' => $breakMinutes,
+                'total_hours' => $totalHours,
+                'break_compliance_met' => $breakMinutes >= $requiredBreak,
+                'status' => $entry->status === 'active' ? 'submitted' : $entry->status,
+                'amended_by' => $actor->id,
+                'amended_at' => now(),
+                'amendment_reason' => $reason,
+            ]);
+
+            $fresh = $entry->fresh();
+            if ($fresh->clock_out && ! $fresh->attendance_session_id) {
+                $this->draftTimesheets->fromManualEntry($fresh, $actor->id);
+            }
+
+            return $fresh;
         });
     }
 

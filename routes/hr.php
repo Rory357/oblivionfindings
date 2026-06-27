@@ -1016,8 +1016,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:timesheets.manageAny|timesheets.approve')->group(function () {
             Route::put('/entries/{entry}', [TimeTrackingController::class, 'updateEntry'])->name('entries.update');
             Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
+            Route::post('/entries/{entry}/correct', [TimeTrackingController::class, 'correct'])->name('entries.correct');
             Route::post('/clock-on-behalf', [TimeTrackingController::class, 'clockOnBehalf'])->name('clock-on-behalf');
         });
+
+        // Voiding a paid-relevant entry is admin-only (manageAny).
+        Route::post('/entries/{entry}/void', [TimeTrackingController::class, 'void'])
+            ->name('entries.void')->middleware('permission:timesheets.manageAny');
     });
 
     /*

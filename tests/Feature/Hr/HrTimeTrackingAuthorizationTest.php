@@ -142,7 +142,7 @@ test('hr time approval queue lists submitted operations timesheets', function ()
         ->assertInertia(fn (Assert $page) => $page
             ->component('hr/time/index')
             ->where('pendingApprovalCount', 1)
-            ->where('kpiStats.pending_timesheets', 1)
+            ->where('kpiStats.awaiting_approval', 1)
             ->where('approvalTimesheets.0.id', $timesheet->id)
             ->where('approvalTimesheets.0.source', 'operations')
             ->where('approvalTimesheets.0.module_url', '/operations/timesheets?tab=submitted&view='.$timesheet->id)
@@ -169,6 +169,123 @@ test('hr time frontend links to operations timesheets instead of posting to lega
     expect($source)->not->toContain('/hr/time/timesheets/');
     expect($source)->not->toContain('/hr/time/timesheets/bulk-');
     expect($source)->toContain('/operations/timesheets');
+});
+
+test('clock on behalf requires and persists a reason', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    hrTimeProfile($staff, $manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    // Missing reason → validation error.
+    $this->actingAs($manager)
+        ->post('/hr/time/clock-on-behalf', [
+            'target_user_id' => $staff->id,
+            'clock_in' => '2026-04-20 09:00',
+        ])
+        ->assertSessionHasErrors(['reason']);
+
+    // With reason → persisted to the entry + an audit amendment row.
+    $this->actingAs($manager)
+        ->post('/hr/time/clock-on-behalf', [
+            'target_user_id' => $staff->id,
+            'clock_in' => '2026-04-20 09:00',
+            'clock_out' => '2026-04-20 17:00',
+            'break_minutes' => 30,
+            'reason' => 'Staff forgot to clock in during an emergency handover.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+        ->where('user_id', $staff->id)
+        ->where('entry_type', 'admin_clock')
+        ->firstOrFail();
+
+    expect($entry->amendment_reason)->toContain('emergency handover');
+    expect($entry->amendments()->where('field_name', 'created_on_behalf')->exists())->toBeTrue();
+});
+
+test('voiding an entry soft-deletes it with a required reason', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $staff->id,
+        'status' => 'submitted',
+    ]);
+
+    // Reason required.
+    $this->actingAs($manager)
+        ->post("/hr/time/entries/{$entry->id}/void", [])
+        ->assertSessionHasErrors(['reason']);
+
+    $this->actingAs($manager)
+        ->post("/hr/time/entries/{$entry->id}/void", [
+            'reason' => 'Duplicate entry created in error.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(\App\Domain\Hr\Models\HrTimeEntry::withTrashed()->find($entry->id)->trashed())->toBeTrue();
+    expect($entry->amendments()->where('field_name', 'voided')->exists())->toBeTrue();
+});
+
+test('approved entries cannot be voided', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $staff->id,
+        'status' => 'approved',
+    ]);
+
+    $this->actingAs($manager)
+        ->post("/hr/time/entries/{$entry->id}/void", [
+            'reason' => 'Trying to void an approved entry.',
+        ])
+        ->assertSessionHas('error');
+
+    expect(\App\Domain\Hr\Models\HrTimeEntry::find($entry->id))->not->toBeNull();
+});
+
+test('correcting a missed clock-out closes the entry and records the reason', function () {
+    $manager = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($manager);
+    grantHrTimePermission($manager, 'timesheets.viewAny');
+    grantHrTimePermission($manager, 'timesheets.manageAny');
+
+    $clockIn = CarbonImmutable::parse('2026-04-20 09:00:00', config('app.worker_timezone'))->utc();
+    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+        'user_id' => $staff->id,
+        'entry_date' => '2026-04-20',
+        'clock_in' => $clockIn,
+        'clock_out' => null,
+        'total_hours' => null,
+        'status' => 'active',
+        'entry_type' => 'clock',
+    ]);
+
+    $this->actingAs($manager)
+        ->post("/hr/time/entries/{$entry->id}/correct", [
+            'clock_out' => '2026-04-20 17:00',
+            'break_minutes' => 30,
+            'reason' => 'Confirmed finish time with the on-call supervisor.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    $entry->refresh();
+    expect($entry->clock_out)->not->toBeNull();
+    expect($entry->status)->toBe('submitted');
+    expect((float) $entry->total_hours)->toBeGreaterThan(0);
+    expect($entry->amendments()->where('field_name', 'clock_out')->exists())->toBeTrue();
 });
 
 test('hr clock out rejects break_minutes above the shared 240 cap', function () {

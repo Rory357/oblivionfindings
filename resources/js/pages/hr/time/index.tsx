@@ -1,1613 +1,546 @@
-import PageShell from '@/components/page-shell';
-import { KpiCard } from '@/components/recruitment/kpi-card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
+    AmendmentDrawer,
+    EntriesPane,
+    OverviewPane,
+    type ApprovalTimesheet,
+    type ExceptionItem,
+    type KpiStats,
+    type NamedOption,
+    type OnNowItem,
+    type PaginatedData,
+    type RecentActivityItem,
+    type TimeCan,
+    type TimeDialogMode,
+    TimeEntryDialog,
+    type TimeEntry,
+    type TimeFilters,
+    TimeHero,
+    type TimesheetRow,
+    TimesheetsPane,
+    type WeeklyDay,
+} from '@/components/hr/time';
+import { HrTabs, type HrTabItem, useHrTab } from '@/components/hr';
+import { PageLayout } from '@/components/page';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
+    ShiftContextMenu,
+    type ShiftCtxState,
+} from '@/components/rostering/shift-context-menu';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
-    Activity,
     AlertTriangle,
-    ArrowRight,
-    CheckCircle,
-    ClipboardCheck,
-    Clock,
+    CalendarClock,
     FileText,
+    History,
     LayoutDashboard,
     List,
-    Loader2,
     Pencil,
-    Play,
-    Search,
-    Square,
-    Timer,
-    TrendingUp,
-    UserPlus,
-    Users,
+    Pin,
+    Star,
+    Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface TimeEntry {
-    id: number;
-    user_name: string;
-    user_id: number;
-    entry_date: string;
-    clock_in: string;
-    clock_in_short: string;
-    clock_out: string | null;
-    clock_out_short: string | null;
-    break_minutes: number;
-    total_hours: number | null;
-    entry_type: string;
-    status: string;
-    pay_type: string;
-    is_sleepover: boolean;
-    is_on_call: boolean;
-    is_public_holiday: boolean;
-    break_compliance_met: boolean | null;
-    notes: string | null;
-    project_code: string | null;
-    approved_by: string | null;
-    amended_by: number | null;
-    amendment_reason: string | null;
-    client_name: string | null;
-    shift: { id: number; starts_at: string; ends_at: string } | null;
-}
-
-interface TimesheetRow {
-    id: number;
-    source: 'operations';
-    user_name: string;
-    user_id: number;
-    period_start: string;
-    period_end: string;
-    work_date: string | null;
-    client_name: string | null;
-    status: string;
-    total_hours: number | null;
-    submitted_at: string | null;
-    approved_by: string | null;
-    approved_at: string | null;
-    rejection_reason: string | null;
-    returned_notes: string | null;
-    returned_at: string | null;
-    module_url: string;
-    edit_url: string;
-}
-
-interface ApprovalTimesheet {
-    id: number;
-    source: 'operations';
-    user_name: string;
-    user_id: number;
-    period_start: string;
-    period_end: string;
-    total_hours: number | null;
-    submitted_at: string | null;
-    hours_waiting: number;
-    module_url: string;
-}
-
-interface WeeklySummary {
-    week_start: string;
-    week_end: string;
-    daily_hours: Record<string, number>;
-    total_hours: number;
-    total_entries: number;
-}
-
-interface KpiStats {
-    total_hours_this_week: number;
-    active_clocked_in: number;
-    pending_timesheets: number;
-    overtime_hours: number;
-    avg_hours_per_day: number;
-}
-
-interface RecentActivityItem {
-    id: number;
-    user_name: string;
-    action: 'clocked_in' | 'clocked_out';
-    time: string;
-    pay_type: string;
-    entry_type: string;
-}
-
-interface TeamMember {
-    id: number;
-    name: string;
-}
-
-interface PaginatedData<T> {
-    data: T[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    links: Array<{ url: string | null; label: string; active: boolean }>;
-}
+import {
+    useEffect,
+    useMemo,
+    useState,
+    type MouseEvent,
+    type ReactNode,
+} from 'react';
 
 interface Props {
     entries: PaginatedData<TimeEntry>;
     timesheets: PaginatedData<TimesheetRow>;
     approvalTimesheets: ApprovalTimesheet[];
     pendingApprovalCount: number;
-    teamMembers: TeamMember[];
-    activeClock: { id: number; clock_in: string; notes: string | null } | null;
-    weeklySummary: WeeklySummary;
-    kpiStats: KpiStats;
+    onNow: OnNowItem[];
+    exceptions: ExceptionItem[];
+    weeklyTeam: WeeklyDay[];
     recentActivity: RecentActivityItem[];
-    filters: {
-        status?: string;
-        pay_type?: string;
-        q?: string;
-        tab?: string;
-        scope?: string;
-    };
-    can: {
-        manage?: boolean;
-        approveTeam?: boolean;
-        approveAny?: boolean;
-        editEntry?: boolean;
-        clockOnBehalf?: boolean;
-    };
+    teamMembers: NamedOption[];
+    staff: NamedOption[];
+    sites: NamedOption[];
+    clients: NamedOption[];
+    activeClock: { id: number; clock_in: string; notes: string | null } | null;
+    weeklySummary: { total_hours: number };
+    kpiStats: KpiStats;
+    filters: TimeFilters;
+    can: TimeCan;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Config                                                             */
-/* ------------------------------------------------------------------ */
-
-const breadcrumbs = [
+const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
     { title: 'Timekeeping', href: '/hr/time' },
 ];
 
-const statusConfig: Record<string, { className: string; label: string }> = {
-    active: {
-        className: 'border-status-info/30 text-status-info bg-status-info-bg',
-        label: 'Active',
-    },
-    submitted: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Submitted',
-    },
-    approved: {
-        className:
-            'border-status-success/30 text-status-success bg-status-success-bg',
-        label: 'Approved',
-    },
-    rejected: {
-        className:
-            'border-status-critical/30 text-status-critical bg-status-critical-bg',
-        label: 'Rejected',
-    },
-    returned: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Returned',
-    },
-    draft: {
-        className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-        label: 'Draft',
-    },
-};
-
-const payTypeConfig: Record<string, { className: string; label: string }> = {
-    standard: {
-        className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-        label: 'Standard',
-    },
-    sleepover: {
-        className: 'border-primary/30 text-primary bg-primary/10',
-        label: 'Sleepover',
-    },
-    on_call: {
-        className: 'border-primary/30 text-primary bg-primary/10',
-        label: 'On-Call',
-    },
-    public_holiday: {
-        className:
-            'border-status-warning/30 text-status-warning bg-status-warning-bg',
-        label: 'Public Holiday',
-    },
-    night: {
-        className: 'border-status-info/30 text-status-info bg-status-info-bg',
-        label: 'Night',
-    },
-    weekend: {
-        className: 'border-status-info/30 text-status-info bg-status-info-bg',
-        label: 'Weekend',
-    },
-    evening: {
-        className: 'border-primary/30 text-primary bg-primary/10',
-        label: 'Evening',
-    },
-};
-
-const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const NONE = '__none__';
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+const KNOWN_TABS = ['overview', 'entries', 'timesheets'];
 
 export default function TimeIndex({
     entries,
     timesheets,
     approvalTimesheets,
     pendingApprovalCount,
-    teamMembers,
+    onNow,
+    exceptions,
+    weeklyTeam,
+    recentActivity,
+    staff,
+    sites,
+    clients,
     activeClock,
     weeklySummary,
     kpiStats,
-    recentActivity,
     filters,
     can,
 }: Props) {
-    const [searchValue, setSearchValue] = useState(filters.q ?? '');
-    const [processing, setProcessing] = useState<number | string | null>(null);
+    const isManager = !!can.approveAny;
+    const [tab, setTab] = useHrTab(filters.tab && KNOWN_TABS.includes(filters.tab) ? filters.tab : 'overview');
+    const activeTab = KNOWN_TABS.includes(tab) ? tab : 'overview';
 
-    // Edit dialog state
-    const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
-    const [editForm, setEditForm] = useState({
-        clock_in: '',
-        clock_out: '',
-        break_minutes: 0,
-        pay_type: 'standard',
-        notes: '',
-        amendment_reason: '',
+    const [dialogMode, setDialogMode] = useState<TimeDialogMode | null>(null);
+    const [dialogEntry, setDialogEntry] = useState<TimeEntry | null>(null);
+    const [drawerEntry, setDrawerEntry] = useState<TimeEntry | null>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+
+    // tab pin / default-view persistence
+    const [pins, setPins] = useState<string[]>([]);
+    const [defaultTab, setDefaultTab] = useState<string>('');
+
+    useEffect(() => {
+        try {
+            const sp = new URLSearchParams(window.location.search);
+            const sd = window.localStorage.getItem('hrTime.defaultTab');
+            if (sd && KNOWN_TABS.includes(sd)) {
+                setDefaultTab(sd);
+                if (!sp.get('tab') && sd !== tab) setTab(sd);
+            }
+            const rawPins = window.localStorage.getItem('hrTime.pinnedTabs');
+            if (rawPins) {
+                const parsed: unknown = JSON.parse(rawPins);
+                if (Array.isArray(parsed))
+                    setPins(parsed.filter((p): p is string => typeof p === 'string' && KNOWN_TABS.includes(p)));
+            }
+        } catch {
+            /* ignore malformed storage */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // keyboard shortcuts
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const el = e.target as HTMLElement;
+            if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+            if (dialogMode || drawerEntry) return;
+            if (e.key === 'n' && isManager) {
+                e.preventDefault();
+                openDialog('add');
+            } else if (e.key === 'b' && can.clockOnBehalf) {
+                e.preventDefault();
+                openDialog('behalf');
+            } else if (e.key === '/') {
+                const input = document.querySelector<HTMLInputElement>(
+                    'input[placeholder^="Search staff"]',
+                );
+                if (input) {
+                    e.preventDefault();
+                    input.focus();
+                }
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dialogMode, drawerEntry, isManager, can.clockOnBehalf]);
+
+    function openDialog(mode: TimeDialogMode, entry: TimeEntry | null = null) {
+        setDialogEntry(entry);
+        setDialogMode(mode);
+    }
+
+    function closeDialog() {
+        setDialogMode(null);
+        setDialogEntry(null);
+    }
+
+    function applyFilter(key: string, value: string | null) {
+        router.get(
+            '/hr/time',
+            { ...filters, tab, [key]: value || undefined },
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+    }
+
+    function clearFilters() {
+        router.get(
+            '/hr/time',
+            { tab: 'entries', scope: filters.scope },
+            { preserveState: true, replace: true, preserveScroll: true },
+        );
+    }
+
+    function viewPersonEntries(name: string) {
+        router.get(
+            '/hr/time',
+            { ...filters, tab: 'entries', q: name },
+            { preserveState: true, replace: true },
+        );
+        setTab('entries');
+    }
+
+    /** Minimal entry for a Correct dialog launched from on-now / exceptions. */
+    function correctSeed(seed: {
+        id: number;
+        user_id: number;
+        user_name: string;
+        clock_in: string;
+        entry_date: string;
+    }): TimeEntry {
+        const inList = entries.data.find((e) => e.id === seed.id);
+        if (inList) return inList;
+        return {
+            id: seed.id,
+            user_id: seed.user_id,
+            user_name: seed.user_name,
+            initials: '',
+            site_name: null,
+            entry_date: seed.entry_date,
+            clock_in: seed.clock_in,
+            clock_in_short: '',
+            clock_out: null,
+            clock_out_short: null,
+            break_minutes: 0,
+            total_hours: null,
+            entry_type: 'clock',
+            status: 'active',
+            pay_type: 'standard',
+            is_sleepover: false,
+            is_on_call: false,
+            is_public_holiday: false,
+            break_compliance_met: null,
+            mileage_km: null,
+            notes: null,
+            project_code: null,
+            cost_centre: null,
+            approved_by: null,
+            amended_by: null,
+            amendment_reason: null,
+            amendment_count: 0,
+            client_name: null,
+            shift: null,
+        };
+    }
+
+    /* ---- context menus ---- */
+    function rowMenu(e: TimeEntry, ev: MouseEvent) {
+        ev.preventDefault();
+        const items: ShiftCtxState['items'] = [];
+        if (e.status !== 'approved' && e.status !== 'voided') {
+            items.push({
+                icon: <Pencil className="h-4 w-4" />,
+                label: 'Amend entry',
+                kbd: 'E',
+                onClick: () => openDialog('edit', e),
+            });
+        }
+        if (!e.clock_out) {
+            items.push({
+                icon: <CalendarClock className="h-4 w-4" />,
+                label: 'Correct clock-out',
+                onClick: () => openDialog('correct', e),
+            });
+        }
+        if (e.amendment_count > 0) {
+            items.push({
+                icon: <History className="h-4 w-4" />,
+                label: 'Amendment history',
+                onClick: () => setDrawerEntry(e),
+            });
+        }
+        items.push({
+            icon: <List className="h-4 w-4" />,
+            label: 'View this person’s entries',
+            onClick: () => viewPersonEntries(e.user_name),
+        });
+        if (can.manage && e.status !== 'approved' && e.status !== 'voided') {
+            items.push({ sep: true });
+            items.push({
+                icon: <Trash2 className="h-4 w-4" />,
+                label: 'Void entry',
+                tone: 'critical',
+                onClick: () => openDialog('void', e),
+            });
+        }
+        setCtx({ x: ev.clientX, y: ev.clientY, tag: 'Entry', meta: e.user_name, items });
+    }
+
+    function personMenu(p: OnNowItem, ev: MouseEvent) {
+        ev.preventDefault();
+        setCtx({
+            x: ev.clientX,
+            y: ev.clientY,
+            tag: 'On now',
+            meta: p.name,
+            items: [
+                {
+                    icon: <CalendarClock className="h-4 w-4" />,
+                    label: 'Correct / close clock-out',
+                    onClick: () => openDialog('correct', correctSeed({ ...p, user_name: p.name })),
+                },
+                {
+                    icon: <List className="h-4 w-4" />,
+                    label: 'View this person’s entries',
+                    onClick: () => viewPersonEntries(p.name),
+                },
+            ],
+        });
+    }
+
+    function exceptionMenu(e: ExceptionItem, ev: MouseEvent) {
+        ev.preventDefault();
+        setCtx({
+            x: ev.clientX,
+            y: ev.clientY,
+            tag: 'Exception',
+            meta: e.title,
+            items: [
+                {
+                    icon: <AlertTriangle className="h-4 w-4" />,
+                    label:
+                        e.action === 'correct'
+                            ? 'Correct clock-out'
+                            : e.action === 'edit'
+                              ? 'Amend entry'
+                              : 'View entries',
+                    onClick: () => runException(e),
+                },
+            ],
+        });
+    }
+
+    function runException(e: ExceptionItem) {
+        if (e.action === 'correct' && e.entry_id && e.clock_in && e.entry_date) {
+            openDialog(
+                'correct',
+                correctSeed({
+                    id: e.entry_id,
+                    user_id: e.user_id ?? 0,
+                    user_name: e.user_name ?? e.title,
+                    clock_in: e.clock_in,
+                    entry_date: e.entry_date,
+                }),
+            );
+        } else if (e.action === 'edit' && e.entry_id) {
+            const inList = entries.data.find((x) => x.id === e.entry_id);
+            if (inList) openDialog('edit', inList);
+            else viewPersonEntries(e.title);
+        } else {
+            viewPersonEntries(e.user_name ?? e.title);
+        }
+    }
+
+    /* ---- tabs ---- */
+    const tabItems: HrTabItem[] = [
+        {
+            id: 'overview',
+            label: 'Overview',
+            icon: LayoutDashboard,
+            tone: 'primary',
+            badge: kpiStats.exceptions_count > 0 ? kpiStats.exceptions_count : undefined,
+        },
+        {
+            id: 'entries',
+            label: 'Time entries',
+            icon: List,
+            tone: 'violet',
+            badge: entries.total,
+        },
+        {
+            id: 'timesheets',
+            label: 'Shift timesheets',
+            icon: FileText,
+            tone: 'success',
+            badge: pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
+        },
+    ];
+
+    const orderedTabs = [
+        ...tabItems.filter((t) => pins.includes(t.id)),
+        ...tabItems.filter((t) => !pins.includes(t.id)),
+    ];
+
+    const setDefaultView = (id: string) => {
+        setDefaultTab(id);
+        try {
+            window.localStorage.setItem('hrTime.defaultTab', id);
+        } catch {
+            /* ignore */
+        }
+    };
+    const togglePin = (id: string) => {
+        setPins((prev) => {
+            const next = prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id];
+            try {
+                window.localStorage.setItem('hrTime.pinnedTabs', JSON.stringify(next));
+            } catch {
+                /* ignore */
+            }
+            return next;
+        });
+    };
+
+    const tabDecorations: Record<string, ReactNode> = {};
+    tabItems.forEach((t) => {
+        const isDefault = defaultTab === t.id;
+        const isPinned = pins.includes(t.id);
+        if (isDefault || isPinned) {
+            tabDecorations[t.id] = (
+                <span className="ml-0.5 inline-flex items-center gap-0.5">
+                    {isDefault ? <Star className="h-3 w-3 fill-current text-status-warning" /> : null}
+                    {isPinned ? <Pin className="h-3 w-3" /> : null}
+                </span>
+            );
+        }
     });
 
-    // Clock on behalf dialog state
-    const [showClockOnBehalf, setShowClockOnBehalf] = useState(false);
-    const [cobForm, setCobForm] = useState({
-        target_user_id: '',
-        clock_in: '',
-        clock_out: '',
-        break_minutes: 0,
-        pay_type: 'standard',
-        notes: '',
-        reason: '',
-    });
-
-    function updateFilter(key: string, value: string | null) {
-        const newFilters = { ...filters, [key]: value };
-        if (value === null || value === NONE)
-            delete newFilters[key as keyof typeof newFilters];
-        router.get('/hr/time', newFilters, {
-            preserveState: true,
-            replace: true,
+    const openTabMenu = (id: string, ev: MouseEvent) => {
+        ev.preventDefault();
+        const item = tabItems.find((t) => t.id === id);
+        setCtx({
+            x: ev.clientX,
+            y: ev.clientY,
+            tag: 'Tab',
+            meta: item?.label ?? '',
+            items: [
+                {
+                    icon: <Star className="h-4 w-4" />,
+                    label: defaultTab === id ? 'Default view' : 'Set as default view',
+                    tone: defaultTab === id ? 'primary' : undefined,
+                    onClick: () => setDefaultView(id),
+                },
+                {
+                    icon: <Pin className="h-4 w-4" />,
+                    label: pins.includes(id) ? 'Unpin tab' : 'Pin tab',
+                    onClick: () => togglePin(id),
+                },
+            ],
         });
-    }
+    };
 
-    function handleClockIn() {
-        router.post('/hr/time/clock-in', {}, { preserveScroll: true });
-    }
-    function handleClockOut() {
-        router.post('/hr/time/clock-out', {}, { preserveScroll: true });
-    }
-
-    // --- Edit entry ---
-    function openEditDialog(entry: TimeEntry) {
-        setEditEntry(entry);
-        setEditForm({
-            clock_in: entry.clock_in,
-            clock_out: entry.clock_out ?? '',
-            break_minutes: entry.break_minutes,
-            pay_type: entry.pay_type,
-            notes: entry.notes ?? '',
-            amendment_reason: '',
-        });
-    }
-
-    function submitEditEntry() {
-        if (!editEntry || !editForm.amendment_reason.trim()) return;
-        setProcessing('edit');
-        router.put(`/hr/time/entries/${editEntry.id}`, editForm, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditEntry(null);
-                setProcessing(null);
-            },
-            onError: () => setProcessing(null),
-        });
-    }
-
-    // --- Clock on behalf ---
-    function submitClockOnBehalf() {
-        if (!cobForm.target_user_id || !cobForm.clock_in) return;
-        setProcessing('cob');
-        router.post('/hr/time/clock-on-behalf', cobForm, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowClockOnBehalf(false);
-                setProcessing(null);
-                setCobForm({
-                    target_user_id: '',
-                    clock_in: '',
-                    clock_out: '',
-                    break_minutes: 0,
-                    pay_type: 'standard',
-                    notes: '',
-                    reason: '',
-                });
-            },
-            onError: () => setProcessing(null),
-        });
-    }
+    /* ---- hero alert chips ---- */
+    const alerts = useMemo(() => {
+        const byKind = (kind: string) => exceptions.filter((e) => e.kind === kind).length;
+        const chips: { key: string; label: string; onClick: () => void }[] = [];
+        const missed = byKind('missed_clock_out');
+        const breaks = byKind('break_fail');
+        const ot = byKind('overtime');
+        if (missed > 0)
+            chips.push({ key: 'missed', label: `${missed} missed clock-out${missed === 1 ? '' : 's'}`, onClick: () => setTab('overview') });
+        if (breaks > 0)
+            chips.push({ key: 'breaks', label: `${breaks} break ${breaks === 1 ? 'fail' : 'fails'}`, onClick: () => setTab('overview') });
+        if (ot > 0)
+            chips.push({ key: 'ot', label: `${ot} over 40h`, onClick: () => setTab('overview') });
+        return chips;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [exceptions]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Timekeeping" />
-            <PageHero category="hr"
-                icon={Clock}
-                title="Timekeeping"
-                description="Clocking, time entries, period timesheets, and shift timesheets."
-                stats={[
-                    { label: 'Hours this week', value: `${kpiStats.total_hours_this_week}h` },
-                    { label: 'Active', value: kpiStats.active_clocked_in },
-                    { label: 'Pending', value: kpiStats.pending_timesheets },
-                    { label: 'Overtime', value: `${kpiStats.overtime_hours}h` },
-                ]}
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                            <a href="/operations/timesheets">
-                                <FileText className="mr-1.5 h-4 w-4" />
-                                Shift Timesheets
-                            </a>
-                        </Button>
-                        {can.approveAny && (
-                            <Button variant="outline" size="sm" asChild>
-                                <a href="/operations/timesheets/approvals">
-                                    <ArrowRight className="mr-1.5 h-4 w-4" />
-                                    Shift Approvals
-                                </a>
-                            </Button>
-                        )}
-                        {can.clockOnBehalf && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowClockOnBehalf(true)}
-                            >
-                                <UserPlus className="mr-1.5 h-4 w-4" />{' '}
-                                Clock On Behalf
-                            </Button>
-                        )}
-                    </div>
+
+            <PageLayout
+                hero={
+                    <TimeHero
+                        tenantName="the team"
+                        isManager={isManager}
+                        kpi={kpiStats}
+                        onNow={onNow}
+                        weekly={weeklyTeam}
+                        alerts={alerts}
+                        selfHoursWeek={weeklySummary.total_hours}
+                        isOnClock={!!activeClock}
+                        handlers={{
+                            onAddEntry: isManager ? () => openDialog('add') : undefined,
+                            onClockOnBehalf: can.clockOnBehalf ? () => openDialog('behalf') : undefined,
+                            onReviewTimesheets: () => router.visit('/operations/timesheets'),
+                            onStatOnNow: () => setTab('overview'),
+                            onStatHours: () => setTab('entries'),
+                            onStatApproval: () => setTab('timesheets'),
+                            onStatExceptions: () => setTab('overview'),
+                            onViewAllOnNow: () => setTab('overview'),
+                        }}
+                    />
                 }
+            >
+                {isManager ? (
+                    <HrTabs
+                        value={activeTab}
+                        onChange={setTab}
+                        items={orderedTabs}
+                        ariaLabel="Timekeeping views"
+                        className="mb-6"
+                        decorations={tabDecorations}
+                        onItemContextMenu={openTabMenu}
+                    />
+                ) : null}
+
+                {activeTab === 'overview' && isManager ? (
+                    <OverviewPane
+                        exceptions={exceptions}
+                        weekly={weeklyTeam}
+                        teamHoursWeek={kpiStats.team_hours_week}
+                        onNow={onNow}
+                        onNowCount={kpiStats.clocked_in_now}
+                        recent={recentActivity}
+                        onException={runException}
+                        onExceptionContext={exceptionMenu}
+                        onPersonContext={personMenu}
+                        onActivityClick={(r) => viewPersonEntries(r.user_name)}
+                    />
+                ) : null}
+
+                {(activeTab === 'entries' || !isManager) ? (
+                    <EntriesPane
+                        entries={entries}
+                        filters={filters}
+                        sites={sites}
+                        can={can}
+                        onAdd={isManager ? () => openDialog('add') : undefined}
+                        onFilter={applyFilter}
+                        onRowContext={rowMenu}
+                        onAmendments={(e) => setDrawerEntry(e)}
+                        onClearFilters={clearFilters}
+                    />
+                ) : null}
+
+                {activeTab === 'timesheets' && isManager ? (
+                    <TimesheetsPane timesheets={timesheets} canApproveAny={!!can.approveAny} />
+                ) : null}
+            </PageLayout>
+
+            {isManager ? (
+                <TimeEntryDialog
+                    mode={dialogMode}
+                    entry={dialogEntry}
+                    staff={staff}
+                    sites={sites}
+                    clients={clients}
+                    onClose={closeDialog}
+                />
+            ) : null}
+
+            <AmendmentDrawer
+                entryId={drawerEntry?.id ?? null}
+                staffName={drawerEntry?.user_name ?? ''}
+                subtitle={
+                    drawerEntry
+                        ? `${drawerEntry.entry_date} · ${drawerEntry.clock_in_short}–${drawerEntry.clock_out_short ?? '·'}`
+                        : ''
+                }
+                onClose={() => setDrawerEntry(null)}
             />
-            <PageShell>
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                    <KpiCard
-                        label="Hours This Week"
-                        value={kpiStats.total_hours_this_week}
-                        icon={Clock}
-                        suffix="h"
-                        decimals={1}
-                        color="bg-primary/10 text-primary"
-                    />
-                    <KpiCard
-                        label="Active Staff"
-                        value={kpiStats.active_clocked_in}
-                        icon={Users}
-                        description="Currently clocked in"
-                        color="bg-status-success-bg text-status-success"
-                    />
-                    <KpiCard
-                        label="Pending Timesheets"
-                        value={kpiStats.pending_timesheets}
-                        icon={FileText}
-                        description="Awaiting approval"
-                        color="bg-status-warning-bg text-status-warning"
-                    />
-                    <KpiCard
-                        label="Overtime Hours"
-                        value={kpiStats.overtime_hours}
-                        icon={AlertTriangle}
-                        suffix="h"
-                        decimals={1}
-                        description="Over 40h/week"
-                        color="bg-status-critical-bg text-status-critical"
-                    />
-                    <KpiCard
-                        label="Avg Hours/Day"
-                        value={kpiStats.avg_hours_per_day}
-                        icon={TrendingUp}
-                        suffix="h"
-                        decimals={1}
-                        color="bg-status-info-bg text-status-info"
-                    />
-                </div>
 
-                {/* Tabs */}
-                <Tabs
-                    defaultValue={filters.tab ?? 'dashboard'}
-                    className="space-y-4"
-                >
-                    <TabsList className="flex h-auto flex-wrap gap-1">
-                        <TabsTrigger value="dashboard">
-                            <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Dashboard
-                        </TabsTrigger>
-                        <TabsTrigger value="entries">
-                            <List className="mr-1.5 h-3.5 w-3.5" /> Time Entries
-                        </TabsTrigger>
-                        <TabsTrigger value="timesheets">
-                            <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />{' '}
-                            Period Timesheets
-                        </TabsTrigger>
-                        {can.approveAny && (
-                            <TabsTrigger value="approvals" className="relative">
-                                <CheckCircle className="mr-1.5 h-3.5 w-3.5" />{' '}
-                                Period Approvals
-                                {pendingApprovalCount > 0 && (
-                                    <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-status-warning px-1.5 text-[10px] text-white">
-                                        {pendingApprovalCount}
-                                    </Badge>
-                                )}
-                            </TabsTrigger>
-                        )}
-                    </TabsList>
-
-                    {/* ===== Dashboard Tab ===== */}
-                    <TabsContent value="dashboard" className="space-y-4">
-                        <div className="grid gap-6 lg:grid-cols-3">
-                            <div className="space-y-4 lg:col-span-2">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Clock className="h-4 w-4" />{' '}
-                                                Clock Status
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {activeClock ? (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 animate-pulse rounded-full bg-status-success" />
-                                                        <span className="text-sm font-medium">
-                                                            Clocked in since{' '}
-                                                            {
-                                                                activeClock.clock_in
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                    <Button
-                                                        onClick={handleClockOut}
-                                                        variant="destructive"
-                                                        className="w-full"
-                                                        size="sm"
-                                                    >
-                                                        <Square className="mr-2 h-4 w-4" />{' '}
-                                                        Clock Out
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 rounded-full bg-muted" />
-                                                        <span className="text-sm text-muted-foreground">
-                                                            Not clocked in
-                                                        </span>
-                                                    </div>
-                                                    <Button
-                                                        onClick={handleClockIn}
-                                                        className="w-full"
-                                                        size="sm"
-                                                    >
-                                                        <Play className="mr-2 h-4 w-4" />{' '}
-                                                        Clock In
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <Timer className="h-4 w-4" />{' '}
-                                                This Week
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="mb-3 text-center">
-                                                <p className="text-3xl font-bold">
-                                                    {weeklySummary.total_hours}h
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {weeklySummary.week_start}{' '}
-                                                    to {weeklySummary.week_end}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-end justify-between gap-1">
-                                                {Object.entries(
-                                                    weeklySummary.daily_hours,
-                                                ).map(([date, hours], i) => {
-                                                    const h =
-                                                        Number(hours) || 0;
-                                                    const max = Math.max(
-                                                        10,
-                                                        ...Object.values(
-                                                            weeklySummary.daily_hours,
-                                                        ).map(
-                                                            (v) =>
-                                                                Number(v) || 0,
-                                                        ),
-                                                    );
-                                                    const bar =
-                                                        max > 0
-                                                            ? (h / max) * 50
-                                                            : 0;
-                                                    return (
-                                                        <div
-                                                            key={date}
-                                                            className="flex flex-1 flex-col items-center gap-1"
-                                                        >
-                                                            <div
-                                                                className="w-full rounded bg-primary/20"
-                                                                style={{
-                                                                    height: `${Math.max(4, bar)}px`,
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    className="w-full rounded bg-primary"
-                                                                    style={{
-                                                                        height: `${bar}px`,
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-[10px] text-muted-foreground">
-                                                                {dayLabels[i] ??
-                                                                    date.slice(
-                                                                        5,
-                                                                    )}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            </div>
-                            {can.approveAny && recentActivity.length > 0 && (
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Activity className="h-4 w-4" />{' '}
-                                            Recent Activity
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {recentActivity.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className="flex items-start gap-2"
-                                            >
-                                                <div
-                                                    className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.action === 'clocked_in' ? 'bg-status-success' : 'bg-muted'}`}
-                                                />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-sm font-medium">
-                                                        {item.user_name}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {item.action ===
-                                                        'clocked_in'
-                                                            ? 'Clocked in'
-                                                            : 'Clocked out'}{' '}
-                                                        {item.time}
-                                                        {item.entry_type ===
-                                                            'admin_clock' && (
-                                                            <span className="ml-1 text-status-warning">
-                                                                (on behalf)
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                {item.pay_type !==
-                                                    'standard' && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`shrink-0 text-[10px] ${payTypeConfig[item.pay_type]?.className ?? ''}`}
-                                                    >
-                                                        {payTypeConfig[
-                                                            item.pay_type
-                                                        ]?.label ??
-                                                            item.pay_type}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    </TabsContent>
-
-                    {/* ===== Time Entries Tab ===== */}
-                    <TabsContent value="entries" className="space-y-4">
-                        <div className="flex flex-col gap-3 sm:flex-row">
-                            <div className="relative flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by staff name..."
-                                    className="pl-9"
-                                    value={searchValue}
-                                    onChange={(e) =>
-                                        setSearchValue(e.target.value)
-                                    }
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' &&
-                                        updateFilter(
-                                            'q',
-                                            searchValue.trim() || null,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {can.approveAny && (
-                                    <Select
-                                        value={filters.scope ?? 'team'}
-                                        onValueChange={(v) =>
-                                            updateFilter('scope', v)
-                                        }
-                                    >
-                                        <SelectTrigger className="h-9 w-28 text-xs">
-                                            <SelectValue placeholder="Scope" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="mine">
-                                                My Entries
-                                            </SelectItem>
-                                            <SelectItem value="team">
-                                                My Team
-                                            </SelectItem>
-                                            {can.manage && (
-                                                <SelectItem value="all">
-                                                    All Staff
-                                                </SelectItem>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                <Select
-                                    value={filters.status ?? NONE}
-                                    onValueChange={(v) =>
-                                        updateFilter(
-                                            'status',
-                                            v === NONE ? null : v,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="h-9 w-32 text-xs">
-                                        <SelectValue placeholder="All Statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>
-                                            All Statuses
-                                        </SelectItem>
-                                        <SelectItem value="active">
-                                            Active
-                                        </SelectItem>
-                                        <SelectItem value="submitted">
-                                            Submitted
-                                        </SelectItem>
-                                        <SelectItem value="approved">
-                                            Approved
-                                        </SelectItem>
-                                        <SelectItem value="rejected">
-                                            Rejected
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={filters.pay_type ?? NONE}
-                                    onValueChange={(v) =>
-                                        updateFilter(
-                                            'pay_type',
-                                            v === NONE ? null : v,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="h-9 w-32 text-xs">
-                                        <SelectValue placeholder="All Pay Types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>
-                                            All Pay Types
-                                        </SelectItem>
-                                        {Object.entries(payTypeConfig).map(
-                                            ([k, v]) => (
-                                                <SelectItem key={k} value={k}>
-                                                    {v.label}
-                                                </SelectItem>
-                                            ),
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {entries.data.length === 0 ? (
-                            <div className="py-16 text-center">
-                                <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="font-medium text-muted-foreground">
-                                    No time entries found
-                                </p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="overflow-hidden rounded-xl border">
-                                    <table className="w-full text-sm">
-                                        <thead className="border-b bg-muted/50">
-                                            <tr>
-                                                {can.approveAny && (
-                                                    <th className="px-4 py-3 text-left font-medium">
-                                                        Staff
-                                                    </th>
-                                                )}
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Date
-                                                </th>
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Shift / Client
-                                                </th>
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    In
-                                                </th>
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Out
-                                                </th>
-                                                <th className="px-4 py-3 text-right font-medium">
-                                                    Break
-                                                </th>
-                                                <th className="px-4 py-3 text-right font-medium">
-                                                    Hours
-                                                </th>
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Pay Type
-                                                </th>
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Status
-                                                </th>
-                                                {can.editEntry && (
-                                                    <th className="px-4 py-3 text-right font-medium">
-                                                        Actions
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {entries.data.map((entry) => {
-                                                const sc =
-                                                    statusConfig[
-                                                        entry.status
-                                                    ] || statusConfig.active;
-                                                const pc =
-                                                    payTypeConfig[
-                                                        entry.pay_type
-                                                    ] || payTypeConfig.standard;
-                                                return (
-                                                    <tr
-                                                        key={entry.id}
-                                                        className="border-b last:border-b-0 hover:bg-muted/50"
-                                                    >
-                                                        {can.approveAny && (
-                                                            <td className="px-4 py-3 font-medium">
-                                                                {
-                                                                    entry.user_name
-                                                                }
-                                                                {entry.entry_type ===
-                                                                    'admin_clock' && (
-                                                                    <span className="ml-1 text-[10px] text-status-warning">
-                                                                        (on
-                                                                        behalf)
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {entry.entry_date}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {entry.client_name ||
-                                                                '-'}
-                                                            {entry.shift && (
-                                                                <span className="ml-1 text-xs text-muted-foreground">
-                                                                    (
-                                                                    {
-                                                                        entry
-                                                                            .shift
-                                                                            .starts_at
-                                                                    }
-                                                                    -
-                                                                    {
-                                                                        entry
-                                                                            .shift
-                                                                            .ends_at
-                                                                    }
-                                                                    )
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {
-                                                                entry.clock_in_short
-                                                            }
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {entry.clock_out_short ??
-                                                                '-'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right text-muted-foreground">
-                                                            {entry.break_minutes >
-                                                            0
-                                                                ? `${entry.break_minutes}m`
-                                                                : '-'}
-                                                            {entry.break_compliance_met ===
-                                                                false && (
-                                                                <AlertTriangle className="ml-1 inline h-3 w-3 text-status-warning" />
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-medium">
-                                                            {entry.total_hours !=
-                                                            null
-                                                                ? `${entry.total_hours}h`
-                                                                : '-'}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={`text-[10px] ${pc.className}`}
-                                                            >
-                                                                {pc.label}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={
-                                                                    sc.className
-                                                                }
-                                                            >
-                                                                {sc.label}
-                                                            </Badge>
-                                                            {entry.amended_by && (
-                                                                <span className="ml-1 text-[10px] text-muted-foreground">
-                                                                    (amended)
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        {can.editEntry && (
-                                                            <td className="px-4 py-3 text-right">
-                                                                {entry.status !==
-                                                                    'approved' && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-7 w-7 p-0"
-                                                                        onClick={() =>
-                                                                            openEditDialog(
-                                                                                entry,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Pencil className="h-3.5 w-3.5" />
-                                                                    </Button>
-                                                                )}
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {entries.last_page > 1 && (
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm text-muted-foreground">
-                                            Showing{' '}
-                                            {(entries.current_page - 1) *
-                                                entries.per_page +
-                                                1}{' '}
-                                            to{' '}
-                                            {Math.min(
-                                                entries.current_page *
-                                                    entries.per_page,
-                                                entries.total,
-                                            )}{' '}
-                                            of {entries.total}
-                                        </p>
-                                        <LaravelPagination
-                                            links={entries.links}
-                                        />
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </TabsContent>
-
-                    {/* ===== Timesheets Tab ===== */}
-                    <TabsContent value="timesheets" className="space-y-4">
-                        {timesheets.data.length === 0 ? (
-                            <div className="py-16 text-center">
-                                <ClipboardCheck className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="font-medium text-muted-foreground">
-                                    No timesheets found
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="overflow-hidden rounded-xl border">
-                                <table className="w-full text-sm">
-                                    <thead className="border-b bg-muted/50">
-                                        <tr>
-                                            {can.approveAny && (
-                                                <th className="px-4 py-3 text-left font-medium">
-                                                    Staff
-                                                </th>
-                                            )}
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Period
-                                            </th>
-                                            <th className="px-4 py-3 text-right font-medium">
-                                                Hours
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Status
-                                            </th>
-                                            <th className="px-4 py-3 text-left font-medium">
-                                                Submitted
-                                            </th>
-                                            <th className="px-4 py-3 text-right font-medium">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {timesheets.data.map((ts) => {
-                                            const sc =
-                                                statusConfig[ts.status] ||
-                                                statusConfig.draft;
-                                            return (
-                                                <tr
-                                                    key={ts.id}
-                                                    className="border-b last:border-b-0 hover:bg-muted/50"
-                                                >
-                                                    {can.approveAny && (
-                                                        <td className="px-4 py-3 font-medium">
-                                                            {ts.user_name}
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3">
-                                                        {ts.period_start}{' '}
-                                                        <ArrowRight className="mx-1 inline h-3 w-3" />{' '}
-                                                        {ts.period_end}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-medium">
-                                                        {ts.total_hours != null
-                                                            ? `${ts.total_hours}h`
-                                                            : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                sc.className
-                                                            }
-                                                        >
-                                                            {sc.label}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-muted-foreground">
-                                                        {ts.submitted_at?.slice(
-                                                            0,
-                                                            10,
-                                                        ) ?? '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-7"
-                                                            asChild
-                                                        >
-                                                            <a
-                                                                href={
-                                                                    ts.module_url
-                                                                }
-                                                            >
-                                                                <FileText className="mr-1 h-3 w-3" />{' '}
-                                                                {ts.status ===
-                                                                    'submitted' &&
-                                                                can.approveAny
-                                                                    ? 'Review'
-                                                                    : 'Open'}
-                                                            </a>
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </TabsContent>
-
-                    {/* ===== Approvals Tab ===== */}
-                    {can.approveAny && (
-                        <TabsContent value="approvals" className="space-y-4">
-                            {approvalTimesheets.length === 0 ? (
-                                <div className="py-16 text-center">
-                                    <CheckCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
-                                    <p className="font-medium text-muted-foreground">
-                                        No timesheets awaiting approval
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        All caught up!
-                                    </p>
-                                </div>
-                            ) : (
-                                <Card className="border-status-warning/20 bg-status-warning-bg">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            Pending Approval (
-                                            {approvalTimesheets.length})
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
-                                        <div className="overflow-hidden rounded-b-xl">
-                                            <table className="w-full text-sm">
-                                                <thead className="border-b bg-muted/50">
-                                                    <tr>
-                                                        <th className="px-4 py-3 text-left font-medium">
-                                                            Staff
-                                                        </th>
-                                                        <th className="px-4 py-3 text-left font-medium">
-                                                            Period
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right font-medium">
-                                                            Hours
-                                                        </th>
-                                                        <th className="px-4 py-3 text-left font-medium">
-                                                            Waiting
-                                                        </th>
-                                                        <th className="px-4 py-3 text-right font-medium">
-                                                            Actions
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {approvalTimesheets.map(
-                                                        (ts) => (
-                                                            <tr
-                                                                key={ts.id}
-                                                                className="border-b last:border-b-0 hover:bg-muted/50"
-                                                            >
-                                                                <td className="px-4 py-3 font-medium">
-                                                                    {
-                                                                        ts.user_name
-                                                                    }
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    {
-                                                                        ts.period_start
-                                                                    }{' '}
-                                                                    <ArrowRight className="mx-1 inline h-3 w-3" />{' '}
-                                                                    {
-                                                                        ts.period_end
-                                                                    }
-                                                                </td>
-                                                                <td className="px-4 py-3 text-right font-medium">
-                                                                    {ts.total_hours !=
-                                                                    null
-                                                                        ? `${ts.total_hours}h`
-                                                                        : '-'}
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className={
-                                                                            ts.hours_waiting >
-                                                                            48
-                                                                                ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
-                                                                                : ts.hours_waiting >
-                                                                                    24
-                                                                                  ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                                                                  : 'border-status-info/30 bg-status-info-bg text-status-info'
-                                                                        }
-                                                                    >
-                                                                        {ts.hours_waiting >
-                                                                        48
-                                                                            ? `${Math.round(ts.hours_waiting)}h overdue`
-                                                                            : ts.hours_waiting >
-                                                                                24
-                                                                              ? 'Due soon'
-                                                                              : `${Math.round(ts.hours_waiting)}h`}
-                                                                    </Badge>
-                                                                </td>
-                                                                <td className="px-4 py-3 text-right">
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="h-7"
-                                                                        asChild
-                                                                    >
-                                                                        <a
-                                                                            href={
-                                                                                ts.module_url
-                                                                            }
-                                                                        >
-                                                                            <FileText className="mr-1 h-3 w-3" />{' '}
-                                                                            Review
-                                                                        </a>
-                                                                    </Button>
-                                                                </td>
-                                                            </tr>
-                                                        ),
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </TabsContent>
-                    )}
-                </Tabs>
-            </PageShell>
-
-            {/* ===== DIALOGS ===== */}
-
-            {/* Edit Entry Dialog */}
-            <Dialog
-                open={!!editEntry}
-                onOpenChange={(open) => !open && setEditEntry(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Time Entry</DialogTitle>
-                        <DialogDescription>
-                            Amend {editEntry?.user_name}'s time entry for{' '}
-                            {editEntry?.entry_date}. A reason is required for
-                            audit.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Clock In</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={editForm.clock_in}
-                                    onChange={(e) =>
-                                        setEditForm({
-                                            ...editForm,
-                                            clock_in: e.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label>Clock Out</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={editForm.clock_out}
-                                    onChange={(e) =>
-                                        setEditForm({
-                                            ...editForm,
-                                            clock_out: e.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Break (minutes)</Label>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    max={480}
-                                    value={editForm.break_minutes}
-                                    onChange={(e) =>
-                                        setEditForm({
-                                            ...editForm,
-                                            break_minutes: Number(
-                                                e.target.value,
-                                            ),
-                                        })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label>Pay Type</Label>
-                                <Select
-                                    value={editForm.pay_type}
-                                    onValueChange={(v) =>
-                                        setEditForm({
-                                            ...editForm,
-                                            pay_type: v,
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.entries(payTypeConfig).map(
-                                            ([k, v]) => (
-                                                <SelectItem key={k} value={k}>
-                                                    {v.label}
-                                                </SelectItem>
-                                            ),
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Input
-                                value={editForm.notes}
-                                onChange={(e) =>
-                                    setEditForm({
-                                        ...editForm,
-                                        notes: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
-                        <div>
-                            <Label>Amendment Reason *</Label>
-                            <Textarea
-                                placeholder="Why is this entry being amended?"
-                                value={editForm.amendment_reason}
-                                onChange={(e) =>
-                                    setEditForm({
-                                        ...editForm,
-                                        amendment_reason: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setEditEntry(null)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitEditEntry}
-                            disabled={
-                                !editForm.amendment_reason.trim() ||
-                                processing === 'edit'
-                            }
-                        >
-                            {processing === 'edit' ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : null}{' '}
-                            Save Changes
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Clock On Behalf Dialog */}
-            <Dialog
-                open={showClockOnBehalf}
-                onOpenChange={setShowClockOnBehalf}
-            >
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                <UserPlus className="h-4 w-4" />
-                            </div>
-                            Clock On Behalf
-                        </DialogTitle>
-                        <DialogDescription>
-                            Create a time entry for a team member who forgot to
-                            clock in or out. This will be recorded as an admin
-                            entry with your name as the creator.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-5">
-                        {/* Staff member selection */}
-                        <div className="rounded-lg border bg-muted/30 p-4">
-                            <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                Staff Member
-                            </Label>
-                            <Select
-                                value={cobForm.target_user_id}
-                                onValueChange={(v) =>
-                                    setCobForm({
-                                        ...cobForm,
-                                        target_user_id: v,
-                                    })
-                                }
-                            >
-                                <SelectTrigger className="mt-2 bg-background">
-                                    <SelectValue placeholder="Select a team member..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {teamMembers.map((m) => (
-                                        <SelectItem
-                                            key={m.id}
-                                            value={String(m.id)}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">
-                                                    {m.name
-                                                        .split(' ')
-                                                        .map((n) => n[0])
-                                                        .join('')
-                                                        .slice(0, 2)}
-                                                </span>
-                                                {m.name}
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* Time details */}
-                        <div>
-                            <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                Shift Times
-                            </Label>
-                            <div className="mt-2 grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label className="text-sm">
-                                        Clock In{' '}
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        type="datetime-local"
-                                        className="mt-1"
-                                        value={cobForm.clock_in}
-                                        onChange={(e) =>
-                                            setCobForm({
-                                                ...cobForm,
-                                                clock_in: e.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-sm">Clock Out</Label>
-                                    <Input
-                                        type="datetime-local"
-                                        className="mt-1"
-                                        value={cobForm.clock_out}
-                                        onChange={(e) =>
-                                            setCobForm({
-                                                ...cobForm,
-                                                clock_out: e.target.value,
-                                            })
-                                        }
-                                    />
-                                    <p className="mt-1 text-[10px] text-muted-foreground">
-                                        Leave blank if still on shift
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pay & Break details */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <Label className="text-sm">
-                                    Break (minutes)
-                                </Label>
-                                <Input
-                                    type="number"
-                                    className="mt-1"
-                                    min={0}
-                                    max={480}
-                                    value={cobForm.break_minutes}
-                                    onChange={(e) =>
-                                        setCobForm({
-                                            ...cobForm,
-                                            break_minutes: Number(
-                                                e.target.value,
-                                            ),
-                                        })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-sm">Pay Type</Label>
-                                <Select
-                                    value={cobForm.pay_type}
-                                    onValueChange={(v) =>
-                                        setCobForm({ ...cobForm, pay_type: v })
-                                    }
-                                >
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.entries(payTypeConfig).map(
-                                            ([k, v]) => (
-                                                <SelectItem key={k} value={k}>
-                                                    <span className="flex items-center gap-2">
-                                                        <span
-                                                            className={`h-2 w-2 rounded-full ${v.className.includes('indigo') ? 'bg-primary' : v.className.includes('purple') ? 'bg-primary' : v.className.includes('orange') ? 'bg-status-warning' : v.className.includes('cyan') ? 'bg-status-info' : v.className.includes('blue') ? 'bg-status-info' : v.className.includes('violet') ? 'bg-primary' : 'bg-muted-foreground/80'}`}
-                                                        />
-                                                        {v.label}
-                                                    </span>
-                                                </SelectItem>
-                                            ),
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Reason & Notes */}
-                        <div>
-                            <Label className="text-sm">
-                                Reason for Entry{' '}
-                                <span className="text-status-critical">*</span>
-                            </Label>
-                            <Textarea
-                                className="mt-1"
-                                placeholder="e.g., Staff member forgot to clock in due to emergency handover"
-                                value={cobForm.reason}
-                                onChange={(e) =>
-                                    setCobForm({
-                                        ...cobForm,
-                                        reason: e.target.value,
-                                    })
-                                }
-                                rows={2}
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-sm">Additional Notes</Label>
-                            <Input
-                                className="mt-1"
-                                placeholder="Optional notes for the time entry"
-                                value={cobForm.notes}
-                                onChange={(e) =>
-                                    setCobForm({
-                                        ...cobForm,
-                                        notes: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
-
-                        {/* Summary preview */}
-                        {cobForm.target_user_id && cobForm.clock_in && (
-                            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                                <p className="text-xs font-medium text-primary">
-                                    Entry Preview
-                                </p>
-                                <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                    <span className="text-muted-foreground">
-                                        Staff:
-                                    </span>
-                                    <span className="font-medium">
-                                        {
-                                            teamMembers.find(
-                                                (m) =>
-                                                    String(m.id) ===
-                                                    cobForm.target_user_id,
-                                            )?.name
-                                        }
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        Clock In:
-                                    </span>
-                                    <span>
-                                        {cobForm.clock_in.replace('T', ' ')}
-                                    </span>
-                                    {cobForm.clock_out && (
-                                        <>
-                                            <span className="text-muted-foreground">
-                                                Clock Out:
-                                            </span>
-                                            <span>
-                                                {cobForm.clock_out.replace(
-                                                    'T',
-                                                    ' ',
-                                                )}
-                                            </span>
-                                        </>
-                                    )}
-                                    <span className="text-muted-foreground">
-                                        Pay Type:
-                                    </span>
-                                    <span>
-                                        <Badge
-                                            variant="outline"
-                                            className={`text-[10px] ${payTypeConfig[cobForm.pay_type]?.className}`}
-                                        >
-                                            {
-                                                payTypeConfig[cobForm.pay_type]
-                                                    ?.label
-                                            }
-                                        </Badge>
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowClockOnBehalf(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submitClockOnBehalf}
-                            disabled={
-                                !cobForm.target_user_id ||
-                                !cobForm.clock_in ||
-                                !cobForm.reason.trim() ||
-                                processing === 'cob'
-                            }
-                        >
-                            {processing === 'cob' ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <UserPlus className="mr-2 h-4 w-4" />
-                            )}
-                            Create Time Entry
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
+            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
 }

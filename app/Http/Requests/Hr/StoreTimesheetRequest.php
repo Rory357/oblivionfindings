@@ -3,12 +3,16 @@
 namespace App\Http\Requests\Hr;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTimesheetRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->canDo('timesheets.manageAny') ?? false;
+        // Managers creating team entries (approve) are allowed alongside admins
+        // (manageAny) — the rebuilt Add-entry wizard is a manager oversight tool.
+        return $this->user()?->canDo('timesheets.manageAny')
+            || $this->user()?->canDo('timesheets.approve');
     }
 
     public function rules(): array
@@ -18,6 +22,14 @@ class StoreTimesheetRequest extends FormRequest
             'clock_in' => ['required', 'date'],
             'clock_out' => ['required', 'date', 'after:clock_in'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'pay_type' => ['nullable', 'string', Rule::in(['standard', 'sleepover', 'on_call', 'public_holiday', 'night', 'weekend', 'evening'])],
+            'is_sleepover' => ['nullable', 'boolean'],
+            'is_on_call' => ['nullable', 'boolean'],
+            'is_public_holiday' => ['nullable', 'boolean'],
+            'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'notes' => ['nullable', 'string', 'max:500'],
             'project_code' => ['nullable', 'string', 'max:50'],
             'cost_centre' => ['nullable', 'string', 'max:50'],
