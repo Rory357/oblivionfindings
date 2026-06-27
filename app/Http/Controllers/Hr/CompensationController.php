@@ -29,9 +29,11 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $bands = HrSalaryBand::query()
-            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$role.'%'))
+            ->forTenant($tenantId)
+            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
             ->when($request->query('active_only'), fn ($q) => $q->active())
             ->orderBy('position_role')
             ->orderBy('band_name')
@@ -42,6 +44,7 @@ class CompensationController extends Controller
         // range and to compute true (non-page-limited) hero aggregates. Salary
         // fields are encrypted → placement is computed in PHP, not SQL.
         $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
             ->active()
             ->with('user:id,name')
             ->get(['id', 'user_id', 'position_role', 'annual_salary', 'hourly_rate']);
@@ -82,8 +85,13 @@ class CompensationController extends Controller
         });
 
         // True hero aggregates across ALL active bands (one active band per role),
-        // independent of pagination.
-        $activeBands = HrSalaryBand::query()->active()->get();
+        // independent of pagination. Ordered so that when a role has more than one
+        // active band, the per-role aggregate deterministically uses the newest.
+        $activeBands = HrSalaryBand::query()
+            ->forTenant($tenantId)
+            ->active()
+            ->orderByDesc('effective_from')
+            ->get();
         $activeByRole = $activeBands->groupBy('position_role');
 
         $peoplePlaced = 0;
@@ -130,9 +138,11 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $bands = HrSalaryBand::query()
-            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$role.'%'))
+            ->forTenant($tenantId)
+            ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
             ->when($request->query('active_only'), fn ($q) => $q->active())
             ->orderBy('position_role')
             ->orderBy('band_name')
@@ -146,6 +156,7 @@ class CompensationController extends Controller
 
         return response()->streamDownload(function () use ($bands) {
             $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads currency/macrons correctly
             fputcsv($out, [
                 'Position role', 'Band', 'Currency',
                 'Min salary', 'Mid salary', 'Max salary',
@@ -209,6 +220,7 @@ class CompensationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
 
         $data = $request->validate([
             'position_role' => ['sometimes', 'string', 'max:255'],
@@ -220,7 +232,7 @@ class CompensationController extends Controller
             'max_hourly' => ['sometimes', 'numeric', 'min:0'],
             'currency' => ['sometimes', 'string', 'max:3'],
             'effective_from' => ['sometimes', 'date'],
-            'effective_to' => ['nullable', 'date', 'after:effective_from'],
+            'effective_to' => ['nullable', 'date'],
         ]);
 
         // Validate min ≤ mid ≤ max against the merged (existing + incoming) values,
@@ -233,9 +245,27 @@ class CompensationController extends Controller
             'max_hourly' => $data['max_hourly'] ?? $band->max_hourly,
         ]);
 
+        // Guard the effective window against the merged dates. The `after` rule
+        // can't see the stored effective_from on a partial PATCH, so check here.
+        $from = $data['effective_from'] ?? optional($band->effective_from)->toDateString();
+        $to = $data['effective_to'] ?? optional($band->effective_to)->toDateString();
+        if ($from && $to && strtotime((string) $to) <= strtotime((string) $from)) {
+            throw ValidationException::withMessages([
+                'effective_to' => 'Effective-to must be after effective-from.',
+            ]);
+        }
+
         $band->update($data);
 
         return redirect()->back()->with('success', 'Salary band updated.');
+    }
+
+    /**
+     * Escape LIKE wildcards so a user-typed % or _ is matched literally.
+     */
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     /**

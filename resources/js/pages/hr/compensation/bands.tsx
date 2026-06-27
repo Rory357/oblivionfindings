@@ -179,14 +179,15 @@ function RangeBar({
     const mid = num(band.mid_salary);
     const max = num(band.max_salary);
     const valid = !Number.isNaN(min) && !Number.isNaN(max) && max > min;
+    const midValid = valid && !Number.isNaN(mid);
 
     const pct = (salary: number) =>
         valid ? Math.min(100, Math.max(0, ((salary - min) / (max - min)) * 100)) : 0;
 
-    const midPct = valid && !Number.isNaN(mid) ? pct(mid) : 50;
+    const midPct = midValid ? pct(mid) : 50;
     // Target zone = 90%–110% of the midpoint (Mercer compa-ratio convention).
-    const zoneStart = valid && !Number.isNaN(mid) ? pct(mid * 0.9) : 35;
-    const zoneEnd = valid && !Number.isNaN(mid) ? pct(mid * 1.1) : 65;
+    const zoneStart = midValid ? pct(mid * 0.9) : 35;
+    const zoneEnd = midValid ? pct(mid * 1.1) : 65;
 
     return (
         <div className="w-full">
@@ -194,32 +195,37 @@ function RangeBar({
                 {/* base track */}
                 <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted" />
                 {/* target zone */}
-                {valid ? (
+                {midValid ? (
                     <div
                         className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-primary/25"
                         style={{ left: `${zoneStart}%`, width: `${Math.max(0, zoneEnd - zoneStart)}%` }}
                     />
                 ) : null}
                 {/* mid marker */}
-                {valid ? (
+                {midValid ? (
                     <div
                         className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-primary"
                         style={{ left: `${midPct}%` }}
                     />
                 ) : null}
                 {/* employee dots */}
-                {showDots && valid
+                {showDots && midValid
                     ? (placements ?? []).map((p, i) => {
-                          if (p.compa_ratio == null || Number.isNaN(mid)) return null;
+                          if (p.compa_ratio == null) return null;
                           const salary = p.compa_ratio * mid;
                           const left = pct(salary);
+                          const dotLabel = `${p.name}: ${compaLabel(p.compa_ratio)} compa-ratio, ${p.position} band`;
                           return (
                               <TooltipProvider key={`${p.name}-${i}`} delayDuration={100}>
                                   <Tooltip>
                                       <TooltipTrigger asChild>
-                                          <span
+                                          {/* eslint-disable-next-line no-restricted-syntax -- focusable plotted-employee marker; must be a native button for the tooltip trigger + keyboard access. */}
+                                          <button
+                                              type="button"
+                                              aria-label={dotLabel}
+                                              title={dotLabel}
                                               className={cn(
-                                                  'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card',
+                                                  'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                                                   POSITION_DOT[p.position],
                                               )}
                                               style={{ left: `${left}%` }}
@@ -590,12 +596,16 @@ function BandWizard({
         return true;
     };
 
+    // The whole form is valid only when every data step passes. Used for both the
+    // submit gate and rail jumps so a user can't skip a step to an invalid submit.
+    const formValid = stepValid(0) && stepValid(1) && stepValid(2);
+
     const completeness = useMemo(() => {
         const checks = [
             form.position_role.trim() !== '',
             form.band_name.trim() !== '',
             !Number.isNaN(minS) && !Number.isNaN(midS) && !Number.isNaN(maxS) && !rangeError,
-            !Number.isNaN(minH) && !Number.isNaN(maxH),
+            !Number.isNaN(minH) && !Number.isNaN(maxH) && !rangeError,
             form.effective_from !== '' && !datesError,
         ];
         return Math.round((checks.filter(Boolean).length / checks.length) * 100);
@@ -603,7 +613,7 @@ function BandWizard({
 
     const submit = (e?: FormEvent) => {
         e?.preventDefault();
-        if (rangeError || datesError) return;
+        if (!formValid) return;
         setSaving(true);
         const payload = { ...form, effective_to: form.effective_to || null };
         const opts = {
@@ -653,7 +663,10 @@ function BandWizard({
             steps={WIZARD_STEPS}
             stepIndex={wiz.index}
             onStepClick={(i) => {
-                if (i <= wiz.index || stepValid(wiz.index)) wiz.goTo(i);
+                // Going back is always allowed; jumping forward requires every
+                // intervening step to be valid (no skipping to an invalid Review).
+                const forwardOk = Array.from({ length: i }, (_, s) => stepValid(s)).every(Boolean);
+                if (i <= wiz.index || forwardOk) wiz.goTo(i);
             }}
             pct={completeness}
             railExtra={railExtra}
@@ -678,7 +691,7 @@ function BandWizard({
                             Continue
                         </Button>
                     ) : (
-                        <Button type="button" onClick={() => submit()} disabled={saving || !!rangeError || !!datesError}>
+                        <Button type="button" onClick={() => submit()} disabled={saving || !formValid}>
                             {saving ? 'Saving…' : editId ? 'Update band' : 'Create band'}
                         </Button>
                     )}
@@ -759,6 +772,22 @@ function BandWizard({
                             />
                         </Field>
                         <SubHead icon={DollarSign}>Hourly equivalent</SubHead>
+                        <div className="col-span-full -mt-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={Number.isNaN(minS) || Number.isNaN(maxS)}
+                                onClick={() => {
+                                    // Standard NZ full-time year: 40h/week × 52 = 2080h.
+                                    const round2 = (n: number) => (Math.round((n / 2080) * 100) / 100).toString();
+                                    if (!Number.isNaN(minS)) set('min_hourly', round2(minS));
+                                    if (!Number.isNaN(maxS)) set('max_hourly', round2(maxS));
+                                }}
+                            >
+                                Derive from salary (÷2080h)
+                            </Button>
+                        </div>
                         <Field label="Min hourly" required>
                             <Input
                                 type="number"
@@ -932,11 +961,14 @@ export default function SalaryBands({ bands, filters, stats, can }: Props) {
 
     const exportUrl = useMemo(() => {
         const params = new URLSearchParams();
-        if (filters.role) params.set('role', filters.role);
+        // Use the live typed value (not just the committed filter) so Export
+        // always reflects what the user currently sees / is typing.
+        const role = (roleQuery || filters.role || '').trim();
+        if (role) params.set('role', role);
         if (filters.active_only) params.set('active_only', '1');
         const qs = params.toString();
         return `/hr/compensation/bands/export${qs ? `?${qs}` : ''}`;
-    }, [filters.role, filters.active_only]);
+    }, [roleQuery, filters.role, filters.active_only]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
