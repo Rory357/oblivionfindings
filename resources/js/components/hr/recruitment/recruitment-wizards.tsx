@@ -606,8 +606,8 @@ function RequisitionWizard({ onClose, support }: WizProps) {
 
             {wizard.index === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={Megaphone} title="Posting" blurb="Where it's advertised and when applications close." />
-                    <Field label="Posting channels">
+                    <StepHead icon={Megaphone} title="Posting" blurb="Track where you'll advertise this role and when applications close." />
+                    <Field label="Posting channels" hint="manual record — we don't post to these sites for you">
                         <div className="flex flex-wrap gap-2">
                             {Object.keys(channelLabels).map((c) => {
                                 const on = channels.includes(c);

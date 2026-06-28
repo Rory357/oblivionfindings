@@ -315,7 +315,7 @@ class RecruitmentJobController extends Controller
 
         if ($job->status !== 'published') {
             return redirect()->back()->withErrors([
-                'job' => 'Only published jobs can be synced to external channels.',
+                'job' => 'Only published jobs can be marked as posted to external channels.',
             ]);
         }
 
@@ -325,25 +325,27 @@ class RecruitmentJobController extends Controller
 
         if ($channels->isEmpty()) {
             return redirect()->back()->withErrors([
-                'job' => 'Select at least one posting channel before syncing.',
+                'job' => 'Select at least one advertising channel before marking it as posted.',
             ]);
         }
 
+        // Manual tracking only — there is no live integration with SEEK/Indeed/etc.
+        // This records that the recruiter has advertised the role on the selected
+        // channels and when, so the hub can reflect its external-posting state.
         $job->update([
             'external_posting_status' => 'posted',
             'external_posted_at' => $job->external_posted_at ?? now(),
             'external_sync_at' => now(),
             'external_sync_error' => null,
-            'external_reference' => $channels->mapWithKeys(
-                fn (string $channel) => [$channel => [
-                    'external_job_id' => 'JOB-' . strtoupper($channel) . '-' . $job->id,
-                    'last_synced_at' => now()->toIso8601String(),
-                ]]
-            )->toArray(),
+            'external_reference' => [
+                'channels' => $channels->all(),
+                'marked_posted_by' => $user->id,
+                'marked_posted_at' => now()->toIso8601String(),
+            ],
             'updated_by' => $user->id,
         ]);
 
-        return redirect()->back()->with('success', 'External posting channels synced.');
+        return redirect()->back()->with('success', 'Marked as posted to the selected channels.');
     }
 
     public function unpublishPosting(Request $request, HrJobRequisition $job)
