@@ -7,6 +7,7 @@ import {
     Award,
     Check,
     Download,
+    FileText,
     GitBranch,
     Gauge,
     MessageSquare,
@@ -282,6 +283,14 @@ export default function PerformanceHub(props: Props) {
     };
 
     const SERVER_EXPORT = new Set(['reviews', 'supervision', 'goals', 'development', 'feedback', 'pips', 'competencies']);
+    const exportPdf = () => {
+        if (!SERVER_EXPORT.has(tab)) {
+            toast.error('PDF export is not available for this tab.');
+            return;
+        }
+        window.location.href = `/hr/performance/export?tab=${encodeURIComponent(tab)}&format=pdf`;
+        toast.success('Preparing PDF…');
+    };
     const exportCsv = () => {
         if (SERVER_EXPORT.has(tab)) {
             // Full-dataset server-side export (not just the loaded rows).
@@ -440,6 +449,7 @@ export default function PerformanceHub(props: Props) {
                             openRowCtx={openRowCtx}
                             rowMenu={rowMenu}
                             exportCsv={exportCsv}
+                            exportPdf={exportPdf}
                             post={post}
                             del={del}
                         />
@@ -478,6 +488,7 @@ type BodyProps = {
     openRowCtx: (e: MouseEvent, tag: string, meta: string, items: ShiftCtxItem[]) => void;
     rowMenu: (kind: string, row: Record<string, unknown>) => ShiftCtxItem[];
     exportCsv: () => void;
+    exportPdf: () => void;
     post: (url: string, data: Record<string, unknown>, msg: string) => void;
     del: (url: string, msg: string) => void;
 };
@@ -651,7 +662,15 @@ function CommandBar({
                     className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold"
                 >
                     <Download className="h-[14px] w-[14px]" />
-                    Export
+                    CSV
+                </button>
+                <button
+                    type="button"
+                    onClick={b.exportPdf}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold"
+                >
+                    <FileText className="h-[14px] w-[14px]" />
+                    PDF
                 </button>
                 {b.canManage ? (
                     <button

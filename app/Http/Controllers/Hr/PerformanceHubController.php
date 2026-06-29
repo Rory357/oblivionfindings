@@ -110,7 +110,21 @@ class PerformanceHubController extends Controller
         abort_if($rows === [] && ! in_array($tab, ['reviews', 'supervision', 'goals', 'development', 'feedback', 'pips', 'competencies'], true), 404);
 
         $headers = $rows === [] ? [] : array_keys((array) $rows[0]);
-        $filename = 'performance-'.preg_replace('/[^a-z0-9_-]/i', '', $tab).'-'.now()->format('Ymd').'.csv';
+        $slug = preg_replace('/[^a-z0-9_-]/i', '', $tab);
+        $title = ucfirst($tab).' export';
+
+        if ($request->query('format') === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('hr.performance.export-pdf', [
+                'title' => $title,
+                'headers' => $headers,
+                'rows' => array_map(fn ($r) => (array) $r, $rows),
+                'generatedAt' => now()->format('d M Y H:i'),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download('performance-'.$slug.'-'.now()->format('Ymd').'.pdf');
+        }
+
+        $filename = 'performance-'.$slug.'-'.now()->format('Ymd').'.csv';
 
         return response()->streamDownload(function () use ($rows, $headers) {
             $out = fopen('php://output', 'w');
