@@ -216,6 +216,7 @@ class RecruitmentController extends Controller
                 'full_name' => $c->full_name,
                 'email' => $c->personal_email,
                 'source' => $c->source,
+                'tags' => array_values((array) ($c->tags ?? [])),
                 'stage' => $c->status,
                 'days' => $days,
                 'stale' => $days > $staleDays,

@@ -186,6 +186,7 @@ class CandidateController extends Controller
             'personal_phone' => $candidate->personal_phone,
             'source' => $candidate->source,
             'source_detail' => $candidate->source_detail,
+            'tags' => array_values((array) ($candidate->tags ?? [])),
             'notes' => $candidate->notes,
             'created_at' => optional($candidate->created_at)->toDateString(),
             'applications' => $candidate->applications->map(function (HrApplication $application) use ($candidate) {
@@ -307,16 +308,48 @@ class CandidateController extends Controller
                 ];
             }
             if ($app->offer) {
+                $offer = $app->offer;
                 $activityLog[] = [
                     'type' => 'offer',
-                    'description' => "Offer created - {$app->offer->position_title}",
-                    'timestamp' => optional($app->offer->created_at)->diffForHumans() ?? '',
+                    'description' => "Offer created - {$offer->position_title}",
+                    'timestamp' => optional($offer->created_at)->diffForHumans() ?? '',
                 ];
-                if ($app->offer->response) {
+                // Approval chain: submitted → approved / sent back for changes.
+                if ($offer->approval_requested_at) {
                     $activityLog[] = [
                         'type' => 'offer',
-                        'description' => "Offer {$app->offer->response}",
-                        'timestamp' => optional($app->offer->response_at)->diffForHumans() ?? '',
+                        'description' => 'Offer submitted for approval',
+                        'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->approval_status === 'approved' && $offer->approved_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer approved',
+                        'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
+                        'actor' => $offer->approvedBy?->name,
+                    ];
+                }
+                if ($offer->approval_status === 'declined') {
+                    $reason = $offer->approval_declined_reason;
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
+                        'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->sent_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent to candidate',
+                        'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->response) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => "Offer {$offer->response}",
+                        'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
                     ];
                 }
             }
@@ -392,6 +425,31 @@ class CandidateController extends Controller
         $candidate->update($validated);
 
         return redirect()->back()->with('success', 'Candidate updated successfully.');
+    }
+
+    /** Replace a candidate's tags (deduped, trimmed). Lightweight surface for the tag editor. */
+    public function updateTags(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $validated = $request->validate([
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:100'],
+        ]);
+
+        $tags = collect($validated['tags'] ?? [])
+            ->map(fn ($tag) => trim((string) $tag))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $candidate->update(['tags' => $tags, 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Tags updated.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -1260,6 +1318,7 @@ class CandidateController extends Controller
             'approval_status' => 'pending_approval',
             'approval_requested_at' => now(),
             'approval_declined_reason' => null,
+            'approval_reminder_sent_at' => null,
             'updated_by' => $user->id,
         ]);
 

@@ -40,6 +40,11 @@ class OfferApprovalNotification extends Notification implements ShouldQueue
                 ->line("An offer for **{$this->candidateName}** ({$role}) is awaiting your approval before it can be sent.")
                 ->action('Review the offer', $url)
                 ->salutation('Ngā mihi, The Recruitment Team'),
+            'reminder' => $mail
+                ->subject("Reminder: offer still awaiting approval — {$this->candidateName}")
+                ->line("A gentle reminder that the offer for **{$this->candidateName}** ({$role}) is still awaiting your approval. It can't be sent to the candidate until it's approved.")
+                ->action('Review the offer', $url)
+                ->salutation('Ngā mihi, The Recruitment Team'),
             'approved' => $mail
                 ->subject("Offer approved — {$this->candidateName}")
                 ->line("Your offer for **{$this->candidateName}** ({$role}) has been approved and is ready to send.")

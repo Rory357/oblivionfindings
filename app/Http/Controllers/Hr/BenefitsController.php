@@ -40,7 +40,10 @@ class BenefitsController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $plans = HrBenefitPlan::forTenant($tenantId)->active()->get(['id', 'name', 'type']);
+        // employer_contribution_rate drives the enroll wizard's employer-default
+        // prefill + cost preview.
+        $plans = HrBenefitPlan::forTenant($tenantId)->active()
+            ->get(['id', 'name', 'type', 'employer_contribution_rate']);
 
         $employees = HrEmployeeProfile::query()
             ->where('tenant_id', $tenantId)
@@ -49,12 +52,24 @@ class BenefitsController extends Controller
             ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title']);
 
+        // profileId → annual salary (decrypted in PHP) so the wizard can show a
+        // live $/yr contribution cost preview. Manager-only (it exposes pay).
+        $annualSalaryByProfileId = $user->canDo('hr.benefits.manage')
+            ? HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->get(['id', 'annual_salary'])
+                ->mapWithKeys(fn ($p) => [$p->id => $p->annual_salary !== null ? (float) $p->annual_salary : null])
+                ->all()
+            : [];
+
         $summary = $this->benefitsService->getEnrollmentSummary($tenantId);
 
         return Inertia::render('hr/compensation/benefits/index', [
             'enrollments' => $enrollments,
             'plans' => $plans,
             'employees' => $employees,
+            'annualSalaryByProfileId' => $annualSalaryByProfileId,
             'summary' => $summary,
             'filters' => [
                 'status' => $request->query('status'),
