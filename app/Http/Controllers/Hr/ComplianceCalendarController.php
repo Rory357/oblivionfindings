@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
+use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -12,6 +15,10 @@ use Inertia\Inertia;
 
 class ComplianceCalendarController extends Controller
 {
+    use BuildsComplianceHero;
+    use ProvidesComplianceWizardData;
+    use ResolvesHrTenant;
+
     /**
      * Renders compliance calendar showing all compliance deadlines,
      * expiry dates, and training due dates in a calendar format.
@@ -20,129 +27,111 @@ class ComplianceCalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $now = now();
-        $rangeStart = $now->copy()->subMonths(1)->startOfMonth();
-        $rangeEnd = $now->copy()->addMonths(3)->endOfMonth();
+        // Capture overdue (back 9 months) through the next 4 months of renewals.
+        $rangeStart = $now->copy()->subMonths(9)->startOfDay();
+        $rangeEnd = $now->copy()->addMonths(4)->endOfMonth();
 
         $events = collect();
 
-        // 1. Compliance status expiry dates
-        $complianceStatuses = HrStaffComplianceStatus::query()
+        // 1. Compliance status expiries.
+        HrStaffComplianceStatus::query()
+            ->where('tenant_id', $tenantId)
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$rangeStart, $rangeEnd])
             ->with(['user:id,name', 'requirement:id,name,code'])
-            ->get();
+            ->get()
+            ->each(function ($status) use ($events, $now) {
+                $events->push($this->event(
+                    'compliance', $status->id, $status->expires_at, $now,
+                    $status->requirement?->name ?? 'Compliance requirement',
+                    $status->user?->name ?? 'Unknown',
+                    $status->user_id,
+                ));
+            });
 
-        foreach ($complianceStatuses as $status) {
-            $events->push([
-                'id' => 'compliance-' . $status->id,
-                'title' => ($status->requirement?->name ?? 'Compliance') . ' - ' . ($status->user?->name ?? 'Unknown'),
-                'start' => $status->expires_at->format('Y-m-d'),
-                'type' => 'compliance',
-                'color' => $this->getEventColor($status->expires_at, $now),
-                'meta' => [
-                    'employee' => $status->user?->name,
-                    'requirement' => $status->requirement?->name,
-                    'requirement_code' => $status->requirement?->code,
-                    'status' => $status->status,
-                ],
-            ]);
-        }
-
-        // 2. Vetting expiry dates from staff_background_checks
-        $vettingChecks = StaffBackgroundCheck::query()
+        // 2. Vetting expiries.
+        StaffBackgroundCheck::query()
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$rangeStart, $rangeEnd])
             ->with('user:id,name')
-            ->get();
+            ->get()
+            ->each(function ($check) use ($events, $now) {
+                $events->push($this->event(
+                    'vetting', $check->id, $check->expires_at, $now,
+                    ucfirst(str_replace('_', ' ', (string) $check->check_type)),
+                    $check->user?->name ?? 'Unknown',
+                    $check->user_id,
+                ));
+            });
 
-        foreach ($vettingChecks as $check) {
-            $events->push([
-                'id' => 'vetting-' . $check->id,
-                'title' => ucfirst(str_replace('_', ' ', $check->check_type)) . ' - ' . ($check->user?->name ?? 'Unknown'),
-                'start' => $check->expires_at->format('Y-m-d'),
-                'type' => 'vetting',
-                'color' => $this->getEventColor($check->expires_at, $now),
-                'meta' => [
-                    'employee' => $check->user?->name,
-                    'check_type' => $check->check_type,
-                    'reference_number' => $check->reference_number,
-                    'status' => $check->status,
-                ],
-            ]);
-        }
-
-        // 3. Driver license expiry dates
-        $driverRecords = HrDriverEligibility::query()
+        // 3. Driver licence expiries.
+        HrDriverEligibility::query()
+            ->where('tenant_id', $tenantId)
             ->whereNotNull('licence_expires_at')
             ->whereBetween('licence_expires_at', [$rangeStart, $rangeEnd])
             ->with('user:id,name')
-            ->get();
-
-        foreach ($driverRecords as $record) {
-            $events->push([
-                'id' => 'driver-' . $record->id,
-                'title' => 'Driver Licence - ' . ($record->user?->name ?? 'Unknown'),
-                'start' => $record->licence_expires_at->format('Y-m-d'),
-                'type' => 'driver',
-                'color' => $this->getEventColor($record->licence_expires_at, $now),
-                'meta' => [
-                    'employee' => $record->user?->name,
-                    'licence_class' => $record->licence_class,
-                    'status' => $record->status,
-                ],
-            ]);
-        }
-
-        // 4. Training enrollment due dates (enrolled/in-progress with session dates)
-        $enrollments = HrCourseEnrollment::query()
-            ->whereIn('status', ['enrolled', 'in_progress', 'completed'])
-            ->with(['user:id,name', 'course:id,title,code', 'session:id,session_date'])
-            ->get();
-
-        foreach ($enrollments as $enrollment) {
-            $eventDate = $enrollment->completed_at
-                ?? ($enrollment->session?->session_date ? $enrollment->session->session_date : null);
-
-            if (! $eventDate) {
-                continue;
-            }
-
-            $eventDateCarbon = $eventDate instanceof \Carbon\Carbon ? $eventDate : \Carbon\Carbon::parse($eventDate);
-
-            if ($eventDateCarbon->lt($rangeStart) || $eventDateCarbon->gt($rangeEnd)) {
-                continue;
-            }
-
-            $color = $enrollment->status === 'completed' ? '#22c55e' : '#3b82f6';
-
-            $events->push([
-                'id' => 'training-' . $enrollment->id,
-                'title' => ($enrollment->course?->title ?? 'Training') . ' - ' . ($enrollment->user?->name ?? 'Unknown'),
-                'start' => $eventDateCarbon->format('Y-m-d'),
-                'type' => 'training',
-                'color' => $color,
-                'meta' => [
-                    'employee' => $enrollment->user?->name,
-                    'course' => $enrollment->course?->title,
-                    'course_code' => $enrollment->course?->code,
-                    'status' => $enrollment->status,
-                ],
-            ]);
-        }
+            ->get()
+            ->each(function ($record) use ($events, $now) {
+                $events->push($this->event(
+                    'driver', $record->id, $record->licence_expires_at, $now,
+                    'Driver Licence (Class ' . ($record->licence_class ?: '—') . ')',
+                    $record->user?->name ?? 'Unknown',
+                    $record->user_id,
+                ));
+            });
 
         $filterType = $request->query('type');
-        if ($filterType) {
-            $events = $events->where('type', $filterType)->values();
+        if ($filterType && $filterType !== 'all') {
+            $events = $events->where('type', $filterType);
         }
 
         return Inertia::render('hr/compliance/calendar', [
-            'events' => $events->values(),
+            'hero' => $this->complianceHero($user, $tenantId),
+            'events' => $events->sortBy('start')->values(),
+            'wizard' => $this->complianceWizardData($tenantId),
             'filters' => [
-                'type' => $filterType,
+                'type' => $filterType ?: 'all',
+            ],
+            'can' => [
+                'manage' => $user->canDo('hr.compliance.manage'),
             ],
         ]);
+    }
+
+    /** Build a renewal event row with urgency + human "days" label. */
+    private function event(string $type, int $id, $date, $now, string $requirement, string $person, ?int $userId = null): array
+    {
+        $date = $date instanceof \Carbon\Carbon ? $date : \Carbon\Carbon::parse($date);
+        $diff = (int) round($now->diffInDays($date, false));
+        if ($diff < 0) {
+            $urgency = 'over';
+            $days = abs($diff) . ' days overdue';
+        } elseif ($diff <= 30) {
+            $urgency = 'soon';
+            $days = 'in ' . $diff . ' days';
+        } else {
+            $urgency = 'far';
+            $days = 'in ' . $diff . ' days';
+        }
+
+        return [
+            'id' => $type . '-' . $id,
+            'entity_type' => $type,
+            'entity_id' => $id,
+            'user_id' => $userId,
+            'type' => $type,
+            'requirement' => $requirement,
+            'person' => $person,
+            'start' => $date->format('Y-m-d'),
+            'date' => $date->format('d M Y'),
+            'month' => $urgency === 'over' ? 'Overdue' : $date->format('F Y'),
+            'days' => $days,
+            'urgency' => $urgency,
+            'color' => $this->getEventColor($date, $now),
+        ];
     }
 
     /**

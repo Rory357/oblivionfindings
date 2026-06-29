@@ -13,6 +13,7 @@ use App\Http\Controllers\Hr\CompensationController;
 use App\Http\Controllers\Hr\CompetencyController;
 use App\Http\Controllers\Hr\ComplianceCalendarController;
 use App\Http\Controllers\Hr\ComplianceController;
+use App\Http\Controllers\Hr\ComplianceExportController;
 use App\Http\Controllers\Hr\ComplianceMatrixController;
 use App\Http\Controllers\Hr\CustomFieldController;
 use App\Http\Controllers\Hr\DepartmentController;
@@ -258,7 +259,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.compliance.view')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
+        Route::get('/compliance/export', [ComplianceExportController::class, 'export'])->name('compliance.export');
         Route::get('/compliance/staff/{staff}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
+        Route::get('/compliance/status/{status}/evidence', [ComplianceController::class, 'evidence'])->name('compliance.status.evidence');
+        Route::post('/compliance/renewals/remind', [ComplianceController::class, 'renewalRemind'])->name('compliance.renewals.remind');
 
         Route::middleware('permission:hr.compliance.manage')->group(function () {
             Route::get('/compliance/matrix', [ComplianceMatrixController::class, 'index'])->name('compliance.matrix');
@@ -266,6 +270,20 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::put('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'updateRequirement'])->name('compliance.requirements.update');
             Route::delete('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'destroyRequirement'])->name('compliance.requirements.destroy');
             Route::post('/compliance/matrix', [ComplianceMatrixController::class, 'updateMatrix'])->name('compliance.matrix.update');
+
+            // Record / update / waive a per-staff compliance status (the write loop).
+            Route::post('/compliance/staff/{staff}/status', [ComplianceController::class, 'storeStatus'])->name('compliance.status.store');
+            Route::put('/compliance/status/{status}', [ComplianceController::class, 'updateStatus'])->name('compliance.status.update');
+            Route::post('/compliance/status/{status}/exempt', [ComplianceController::class, 'exempt'])->name('compliance.status.exempt');
+
+            // Bulk + assignment.
+            Route::post('/compliance/assign', [ComplianceController::class, 'assign'])->name('compliance.assign');
+            Route::post('/compliance/bulk-record', [ComplianceController::class, 'bulkRecord'])->name('compliance.bulk.record');
+            Route::post('/compliance/bulk-remind', [ComplianceController::class, 'bulkRemind'])->name('compliance.bulk.remind');
+            Route::post('/compliance/bulk-exempt', [ComplianceController::class, 'bulkExempt'])->name('compliance.bulk.exempt');
+
+            // Renewals snooze (remind is view-gated above; record renewal uses status.store).
+            Route::post('/compliance/renewals/snooze', [ComplianceController::class, 'renewalSnooze'])->name('compliance.renewals.snooze');
         });
     });
 
@@ -307,6 +325,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.driver.view')->group(function () {
         Route::get('/compliance/drivers', [DriverEligibilityController::class, 'index'])->name('drivers.index');
+        Route::get('/compliance/drivers/{eligibility}', [DriverEligibilityController::class, 'show'])->name('drivers.show');
 
         Route::middleware('permission:hr.driver.manage')->group(function () {
             Route::post('/compliance/drivers', [DriverEligibilityController::class, 'store'])->name('drivers.store');
