@@ -71,6 +71,7 @@ type HubCandidate = {
     full_name: string;
     email: string;
     source: string;
+    tags: string[];
     stage: string;
     days: number;
     stale: boolean;
@@ -219,7 +220,7 @@ export default function RecruitmentHub(props: Props) {
         return candidates.filter((c) => {
             if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
             if (q) {
-                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''}`.toLowerCase();
+                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''} ${c.tags.join(' ')}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
@@ -803,6 +804,14 @@ function PipelineTab({
                                 <span className="min-w-0">
                                     <span className="block truncate text-[13.5px] font-semibold">{c.full_name}</span>
                                     <span className="block truncate text-[11.5px] text-muted-foreground">{c.email}</span>
+                                    {c.tags.length > 0 ? (
+                                        <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                            {c.tags.slice(0, 3).map((t) => (
+                                                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t}</span>
+                                            ))}
+                                            {c.tags.length > 3 ? <span className="text-[10px] text-muted-foreground">+{c.tags.length - 3}</span> : null}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </button>
                             <span>

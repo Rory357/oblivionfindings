@@ -136,6 +136,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/recruitment/candidates/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
         Route::put('/recruitment/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/{candidate}/tags', [CandidateController::class, 'updateTags'])->name('candidates.tags.update')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/applications/{application}/advance', [CandidateController::class, 'advanceApplication'])->name('applications.advance')
             ->middleware('permission:hr.recruitment.manage');
 

@@ -1147,3 +1147,25 @@ test('the candidate timeline records the offer approval history', function () {
             && collect($log)->contains(fn ($e) => $e['description'] === 'Offer approved' && ($e['actor'] ?? null) === 'Mana Approver'))
     );
 });
+
+test('a candidate can be tagged and the tags surface in the hub and profile', function () {
+    $ctx = makeApplicant($this->hr->id, 'screening');
+    $candidate = $ctx['candidate'];
+
+    // Tag endpoint trims, dedupes, and drops blanks.
+    $this->actingAs($this->hr)
+        ->post(route('hr.candidates.tags.update', $candidate->id), ['tags' => ['Rehire', ' rural ', 'Rehire', '']])
+        ->assertRedirect();
+    expect($candidate->fresh()->tags)->toBe(['Rehire', 'rural']);
+
+    // Surfaces on the pipeline row and the candidate profile payload.
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
+        ->where('candidates', fn ($list) => collect($list)
+            ->contains(fn ($c) => (int) $c['id'] === (int) $candidate->id && in_array('Rehire', $c['tags'], true))));
+    $this->actingAs($this->hr)->get(route('hr.candidates.show', $candidate->id))->assertInertia(fn ($page) => $page
+        ->where('candidate.tags', ['Rehire', 'rural']));
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.candidates.tags.update', $candidate->id), ['tags' => ['x']])->assertForbidden();
+});
