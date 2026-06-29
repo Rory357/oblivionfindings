@@ -1059,3 +1059,23 @@ test('an offer must be submitted, approved (or declined) before it can be sent',
     $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $this->actingAs($viewer)->post(route('hr.offers.submit-approval', $offer->id))->assertForbidden();
 });
+
+test('the hub surfaces offer approval states and the approve/send nudges', function () {
+    // An offer awaiting sign-off (the approver's queue).
+    $ctxA = makeApplicant($this->hr->id, 'offer_pending');
+    $pending = makeOffer($ctxA, 'draft', $this->hr->id, $this->site->id);
+    $pending->update(['approval_status' => 'pending_approval', 'approval_requested_at' => now()]);
+
+    // An approved-but-unsent offer (ready to send).
+    $ctxB = makeApplicant($this->hr->id, 'offer_pending');
+    makeOffer($ctxB, 'draft', $this->hr->id, $this->site->id); // makeOffer defaults approval_status='approved'
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('offers.list', fn ($list) => collect($list)
+            ->contains(fn ($o) => (int) $o['id'] === (int) $pending->id && $o['status'] === 'pending_approval'))
+        ->where('needs', fn ($needs) => collect($needs)->contains(fn ($n) => $n['key'] === 'offers_approval')
+            && collect($needs)->contains(fn ($n) => $n['key'] === 'offers_send'))
+    );
+});
