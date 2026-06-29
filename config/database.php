@@ -60,6 +60,10 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // Opt-in (DB_EMULATE_PREPARES=true) dodge for the MySQL 1615
+                // "prepared statement needs to be re-prepared" flake that hits
+                // repeated migrate:fresh + seed runs under the test suite.
+                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOL) ?: null,
             ]) : [],
         ],
 

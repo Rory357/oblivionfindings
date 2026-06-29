@@ -8,7 +8,6 @@ use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrDriverEligibility;
-use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Models\StaffBackgroundCheck;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
