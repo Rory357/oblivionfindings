@@ -48,7 +48,6 @@ import {
     Power,
     Search,
     Send,
-    Sparkles,
     Trash2,
     UserCog,
 } from 'lucide-react';
@@ -222,10 +221,7 @@ export default function OnboardingIndex(props: Props) {
         ]);
 
     const tabMenu = (id: string) =>
-        ctx.open([
-            { kind: 'item', label: 'Set as default view', icon: Sparkles, onSelect: () => { try { localStorage.setItem('hr.onboarding.defaultTab', id); } catch { /* ignore */ } } },
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => setTab(id) },
-        ]);
+        ctx.open([{ kind: 'item', label: 'Open', icon: Eye, onSelect: () => setTab(id) }]);
 
     const templateMenu = (t: TemplateRow) =>
         ctx.open([

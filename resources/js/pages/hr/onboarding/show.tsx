@@ -6,6 +6,11 @@ import {
     CompleteTaskDialog,
     type CompleteTaskTarget,
 } from '@/components/hr/onboarding/complete-task-dialog';
+import {
+    ProvisionAssetDialog,
+    type ProvisionableAsset,
+    type ProvisionTarget,
+} from '@/components/hr/onboarding/provision-asset-dialog';
 import { ReassignDialog, type ReassignTarget } from '@/components/hr/onboarding/reassign-dialog';
 import {
     avatarStyle,
@@ -26,6 +31,7 @@ import {
     Check,
     CheckCircle2,
     GripVertical,
+    Laptop,
     MoreHorizontal,
     Pencil,
     Plus,
@@ -81,10 +87,11 @@ interface Props {
     checklist: Checklist;
     progress: { total: number; completed: number; pending: number; percent: number };
     owners: Array<{ id: number; name: string | null }>;
+    provisionableAssets: ProvisionableAsset[];
     can: { manage: boolean };
 }
 
-export default function OnboardingShow({ checklist, owners, can }: Props) {
+export default function OnboardingShow({ checklist, owners, provisionableAssets, can }: Props) {
     const authUserId = Number(
         (usePage().props as { auth?: { user?: { id?: number } } }).auth?.user?.id ?? 0,
     );
@@ -99,7 +106,14 @@ export default function OnboardingShow({ checklist, owners, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Onboarding — ${checklist.employee.name}`} />
-            <DetailBody checklist={checklist} owners={owners} can={can} authUserId={authUserId} ctx={ctx} />
+            <DetailBody
+                checklist={checklist}
+                owners={owners}
+                assets={provisionableAssets}
+                can={can}
+                authUserId={authUserId}
+                ctx={ctx}
+            />
             {ctx.element}
         </AppLayout>
     );
@@ -108,12 +122,14 @@ export default function OnboardingShow({ checklist, owners, can }: Props) {
 function DetailBody({
     checklist,
     owners,
+    assets,
     can,
     authUserId,
     ctx,
 }: {
     checklist: Checklist;
     owners: Array<{ id: number; name: string | null }>;
+    assets: ProvisionableAsset[];
     can: { manage: boolean };
     authUserId: number;
     ctx: ReturnType<typeof useLeaveContextMenu>;
@@ -121,6 +137,7 @@ function DetailBody({
     const [completeTarget, setCompleteTarget] = useState<CompleteTaskTarget | null>(null);
     const [taskForm, setTaskForm] = useState<{ open: boolean; task: TaskFormTarget | null }>({ open: false, task: null });
     const [reassign, setReassign] = useState<ReassignTarget | null>(null);
+    const [provision, setProvision] = useState<ProvisionTarget | null>(null);
     const [dragId, setDragId] = useState<number | null>(null);
 
     // Drag-to-reorder: drop the dragged task at the target's position and
@@ -187,6 +204,17 @@ function DetailBody({
                           icon: Upload,
                           onSelect: () =>
                               setCompleteTarget({ id: t.id, title: t.title, sign_off_required: t.sign_off_required, employee: checklist.employee.name }),
+                      },
+                  ]
+                : []),
+            ...(!t.is_completed && (t.category || '') === 'it'
+                ? [
+                      {
+                          kind: 'item' as const,
+                          label: 'Provision asset',
+                          icon: Laptop,
+                          onSelect: () =>
+                              setProvision({ id: t.id, title: t.title, sign_off_required: t.sign_off_required }),
                       },
                   ]
                 : []),
@@ -409,6 +437,13 @@ function DetailBody({
                         onClose={() => setReassign(null)}
                         target={reassign}
                         owners={owners}
+                    />
+                    <ProvisionAssetDialog
+                        open={provision !== null}
+                        onClose={() => setProvision(null)}
+                        task={provision}
+                        assets={assets}
+                        currentUserId={authUserId}
                     />
                 </>
             )}

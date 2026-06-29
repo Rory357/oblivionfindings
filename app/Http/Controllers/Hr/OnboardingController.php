@@ -18,6 +18,7 @@ use App\Http\Requests\Hr\StoreOnboardingChecklistRequest;
 use App\Http\Requests\Hr\StoreOnboardingTaskRequest;
 use App\Http\Requests\Hr\StoreOnboardingTemplateRequest;
 use App\Http\Requests\Hr\UpdateOnboardingTaskRequest;
+use App\Models\AssetAssignment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -213,10 +214,26 @@ class OnboardingController extends Controller
             ],
             'progress' => $this->onboardingService->getProgress($checklist),
             'owners' => $this->tenantUserOptions($tenantId),
+            'provisionableAssets' => $this->provisionableAssets(),
             'can' => [
                 'manage' => $user->canDo('hr.onboarding.manage'),
             ],
         ]);
+    }
+
+    /** Active company assets not currently issued — the IT-provisioning picks. */
+    private function provisionableAssets(): \Illuminate\Support\Collection
+    {
+        $assignedIds = AssetAssignment::query()->whereNull('released_at')->pluck('asset_id');
+
+        return \App\Models\Asset::query()
+            ->where('status', 'active')
+            ->whereNotIn('id', $assignedIds)
+            ->orderBy('name')
+            ->limit(200)
+            ->get(['id', 'name', 'asset_tag'])
+            ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name, 'asset_tag' => $a->asset_tag])
+            ->values();
     }
 
     public function create(Request $request)
@@ -316,9 +333,10 @@ class OnboardingController extends Controller
             'signed_off_by' => $validated['signed_off_by'] ?? null,
         ];
 
+        // The service turns the uploaded file into a gated HrDocument (+ sign-off
+        // signature) inside the completion transaction.
         if ($request->hasFile('evidence')) {
-            $payload['evidence_path'] = $request->file('evidence')
-                ->store("onboarding/evidence/{$checklist->id}", 'local');
+            $payload['evidence_file'] = $request->file('evidence');
         }
 
         try {
@@ -363,6 +381,34 @@ class OnboardingController extends Controller
         $this->onboardingService->addTask($checklist, $request->validated());
 
         return redirect()->back()->with('success', 'Task added.');
+    }
+
+    public function provisionAsset(\App\Http\Requests\Hr\ProvisionOnboardingAssetRequest $request, HrOnboardingTask $task)
+    {
+        $user = $request->user();
+        $this->taskChecklist($task, $this->resolveHrTenantIdForUser($user));
+
+        $validated = $request->validated();
+
+        if ($task->sign_off_required && empty($validated['signed_off_by'])) {
+            return redirect()->back()->with('error', 'This task requires sign-off. Please specify the sign-off user.');
+        }
+
+        $asset = \App\Models\Asset::findOrFail((int) $validated['asset_id']);
+
+        try {
+            $this->onboardingService->provisionAssetForTask(
+                $task,
+                $asset,
+                $user->id,
+                $validated['purpose'] ?? null,
+                $validated['signed_off_by'] ?? null,
+            );
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', "Issued {$asset->name} and completed the task.");
     }
 
     public function destroyTask(Request $request, HrOnboardingTask $task)

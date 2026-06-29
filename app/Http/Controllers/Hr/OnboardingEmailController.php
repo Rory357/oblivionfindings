@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrOnboardingEmail;
+use App\Domain\Hr\Services\OnboardingEmailService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Domain\Hr\Models\HrOnboardingEmail;
-use App\Domain\Hr\Models\HrOnboardingEmailLog;
-use App\Domain\Hr\Services\OnboardingEmailService;
+use App\Http\Requests\Hr\StoreOnboardingEmailRequest;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Support\Facades\Mail;
 
+/**
+ * Onboarding email templates. Reads now live in the hub's Emails tab (served by
+ * OnboardingController@index); this controller only handles mutations.
+ */
 class OnboardingEmailController extends Controller
 {
     use ResolvesHrTenant;
@@ -19,42 +23,12 @@ class OnboardingEmailController extends Controller
     ) {}
 
     /**
-     * List email templates.
-     */
-    public function index(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-
-        $templates = HrOnboardingEmail::query()
-            ->with('creator:id,name')
-            ->orderBy('send_days_before_start')
-            ->paginate(20)
-            ->withQueryString();
-
-        return Inertia::render('hr/onboarding/emails', [
-            'templates' => $templates,
-            'can' => [
-                'manage' => $user->canDo('hr.onboarding.manage'),
-            ],
-        ]);
-    }
-
-    /**
      * Create a new email template.
      */
-    public function store(Request $request)
+    public function store(StoreOnboardingEmailRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-
-        $data = $request->validate([
-            'template_name' => ['required', 'string', 'max:255'],
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:50000'],
-            'send_days_before_start' => ['required', 'integer', 'min:-90', 'max:90'],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
+        $data = $request->validated();
 
         HrOnboardingEmail::create([
             'tenant_id' => $this->resolveHrTenantIdForUser($user),
@@ -72,20 +46,11 @@ class OnboardingEmailController extends Controller
     /**
      * Update an email template.
      */
-    public function update(Request $request, HrOnboardingEmail $email)
+    public function update(StoreOnboardingEmailRequest $request, HrOnboardingEmail $email)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($request->user()), $email->tenant_id);
 
-        $data = $request->validate([
-            'template_name' => ['sometimes', 'string', 'max:255'],
-            'subject' => ['sometimes', 'string', 'max:255'],
-            'body' => ['sometimes', 'string', 'max:50000'],
-            'send_days_before_start' => ['sometimes', 'integer', 'min:-90', 'max:90'],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
-
-        $email->update($data);
+        $email->update($request->validated());
 
         return redirect()->back()->with('success', 'Onboarding email template updated.');
     }
@@ -97,6 +62,7 @@ class OnboardingEmailController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $email->tenant_id);
 
         $email->delete();
 
@@ -111,6 +77,7 @@ class OnboardingEmailController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $email->tenant_id);
 
         $recipient = $user->email;
         if (! $recipient) {
@@ -122,70 +89,11 @@ class OnboardingEmailController extends Controller
         $body = $this->emailService->render($email->body, $sample);
 
         try {
-            \Illuminate\Support\Facades\Mail::to($recipient)
-                ->send(new \App\Mail\Hr\OnboardingTemplateMail($subject, $body));
+            Mail::to($recipient)->send(new \App\Mail\Hr\OnboardingTemplateMail($subject, $body));
         } catch (\Throwable $exception) {
             return redirect()->back()->with('error', 'Could not send the test email: '.$exception->getMessage());
         }
 
         return redirect()->back()->with('success', "Test email sent to {$recipient}.");
-    }
-
-    /**
-     * Preview a rendered email.
-     */
-    public function preview(Request $request, HrOnboardingEmail $email)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-
-        $sampleData = $this->emailService->sampleData();
-
-        return Inertia::render('hr/onboarding/emails', [
-            'templates' => HrOnboardingEmail::query()
-                ->with('creator:id,name')
-                ->orderBy('send_days_before_start')
-                ->paginate(20),
-            'preview' => [
-                'id' => $email->id,
-                'template_name' => $email->template_name,
-                'subject' => $this->emailService->render($email->subject, $sampleData),
-                'body' => $this->emailService->render($email->body, $sampleData),
-            ],
-            'can' => [
-                'manage' => $user->canDo('hr.onboarding.manage'),
-            ],
-        ]);
-    }
-
-    /**
-     * View sent email log.
-     */
-    public function log(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-
-        $logs = HrOnboardingEmailLog::query()
-            ->with([
-                'onboardingEmail:id,template_name,subject',
-                'employeeProfile:id,user_id,employee_number',
-                'employeeProfile.user:id,name',
-            ])
-            ->orderByDesc('created_at')
-            ->paginate(30)
-            ->withQueryString();
-
-        return Inertia::render('hr/onboarding/emails', [
-            'templates' => HrOnboardingEmail::query()
-                ->with('creator:id,name')
-                ->orderBy('send_days_before_start')
-                ->paginate(20),
-            'emailLog' => $logs,
-            'showLog' => true,
-            'can' => [
-                'manage' => $user->canDo('hr.onboarding.manage'),
-            ],
-        ]);
     }
 }

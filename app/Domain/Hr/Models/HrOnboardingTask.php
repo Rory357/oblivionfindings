@@ -27,6 +27,7 @@ class HrOnboardingTask extends Model
         'completed_at',
         'completed_by',
         'evidence_path',
+        'hr_document_id',
         'sign_off_required',
         'signed_off_by',
         'signed_off_at',
@@ -65,5 +66,10 @@ class HrOnboardingTask extends Model
     public function signedOffBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'signed_off_by');
+    }
+
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(HrDocument::class, 'hr_document_id');
     }
 }

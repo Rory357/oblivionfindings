@@ -371,6 +371,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/onboarding/tasks/{task}/uncomplete', [OnboardingController::class, 'uncompleteTask'])->name('onboarding.tasks.uncomplete');
             Route::patch('/onboarding/tasks/{task}', [OnboardingController::class, 'updateTask'])->name('onboarding.tasks.update');
             Route::delete('/onboarding/tasks/{task}', [OnboardingController::class, 'destroyTask'])->name('onboarding.tasks.destroy');
+            Route::post('/onboarding/tasks/{task}/provision-asset', [OnboardingController::class, 'provisionAsset'])->name('onboarding.tasks.provision-asset');
             Route::post('/onboarding/{checklist}/tasks', [OnboardingController::class, 'storeTask'])->name('onboarding.tasks.store');
             Route::post('/onboarding/{checklist}/tasks/reorder', [OnboardingController::class, 'reorderTasks'])->name('onboarding.tasks.reorder');
 
