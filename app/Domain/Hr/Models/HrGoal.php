@@ -34,6 +34,7 @@ class HrGoal extends Model
         'unit',
         'progress_percentage',
         'status',
+        'evidence_path',
         'priority',
         'start_date',
         'due_date',

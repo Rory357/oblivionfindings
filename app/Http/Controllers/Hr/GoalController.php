@@ -5,14 +5,18 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Services\GoalService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class GoalController extends Controller
 {
+    use ServesPrivateAttachments;
+
     public function __construct(
         protected GoalService $goalService,
     ) {}
@@ -216,6 +220,7 @@ class GoalController extends Controller
                 'category' => $goal->category,
                 'status' => $goal->status,
                 'priority' => $goal->priority,
+                'evidence_path' => $goal->evidence_path,
                 'progress_percentage' => $goal->progress_percentage,
                 'target_value' => $goal->target_value,
                 'current_value' => $goal->current_value,
@@ -460,6 +465,43 @@ class GoalController extends Controller
         $this->goalService->recalculateGoalProgress($goal);
 
         return redirect()->back()->with('success', 'Key result removed.');
+    }
+
+    /**
+     * Upload evidence for a goal (private disk).
+     */
+    public function uploadEvidence(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user) || $goal->user_id === $user?->id, 403);
+
+        $request->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240']]);
+
+        if ($goal->evidence_path) {
+            Storage::disk('private')->delete($goal->evidence_path);
+        }
+        $path = $request->file('file')->store('hr/goals/'.$goal->id, 'private');
+        $goal->update(['evidence_path' => $path]);
+
+        return redirect()->back()->with('success', 'Evidence uploaded.');
+    }
+
+    /**
+     * Stream a goal's evidence (private disk, hardened headers).
+     */
+    public function downloadEvidence(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($this->canView($user), 403);
+        abort_unless($goal->evidence_path, 404);
+
+        return $this->streamPrivateAttachment(
+            'private',
+            $goal->evidence_path,
+            basename($goal->evidence_path),
+            Storage::disk('private')->mimeType($goal->evidence_path) ?: null,
+            'inline',
+        );
     }
 
     private function canView($user): bool

@@ -410,6 +410,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             // Review lifecycle transitions (guarded, audited, locked after sign-off)
             Route::post('/reviews/{review}/submit', [PerformanceReviewController::class, 'submit'])->name('reviews.submit');
             Route::post('/reviews/{review}/sign-off', [PerformanceReviewController::class, 'signOff'])->name('reviews.sign-off');
+            Route::post('/reviews/{review}/evidence', [PerformanceReviewController::class, 'uploadEvidence'])->name('reviews.evidence.store');
 
             // Probation reviews
             Route::post('/probation', [PerformanceReviewController::class, 'storeProbation'])->name('probation.store');
@@ -419,6 +420,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         // Employee-side acknowledgements (any viewer can ack their own record)
         Route::post('/reviews/{review}/acknowledge', [PerformanceReviewController::class, 'acknowledge'])->name('reviews.acknowledge');
         Route::post('/supervision/{note}/acknowledge', [SupervisionController::class, 'acknowledge'])->name('supervision.acknowledge');
+        Route::get('/reviews/{review}/evidence', [PerformanceReviewController::class, 'downloadEvidence'])->name('reviews.evidence.show');
     });
 
     /*
@@ -857,6 +859,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
             // Status transitions (activate / complete / cancel)
             Route::post('/{goal}/transition', [GoalController::class, 'transition'])->name('transition');
+            Route::post('/{goal}/evidence', [GoalController::class, 'uploadEvidence'])->name('evidence.store');
 
             // Key Results
             Route::post('/{goal}/key-results', [GoalController::class, 'storeKeyResult'])->name('key-results.store');
@@ -866,6 +869,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         // Check-in history timeline (surfaces hr_goal_updates)
         Route::get('/{goal}/check-ins', [GoalController::class, 'checkIns'])->name('check-ins');
+        Route::get('/{goal}/evidence', [GoalController::class, 'downloadEvidence'])->name('evidence.show');
 
         Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
     });

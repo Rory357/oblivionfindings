@@ -7,6 +7,7 @@ import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/component
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EvidenceAttachment } from '@/components/hr/performance/evidence-attachment';
 import {
     Dialog,
     DialogContent,
@@ -112,6 +113,7 @@ interface Goal {
     status: string;
     priority: string;
     progress_percentage: number;
+    evidence_path: string | null;
     target_value: number | null;
     current_value: number | null;
     unit: string | null;
@@ -451,6 +453,20 @@ export default function GoalShow({
                 {/* ============================================================ */}
                 {/*  TABS                                                         */}
                 {/* ============================================================ */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Evidence</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <EvidenceAttachment
+                            uploadUrl={`/hr/goals/${goal.id}/evidence`}
+                            viewUrl={`/hr/goals/${goal.id}/evidence`}
+                            hasEvidence={!!goal.evidence_path}
+                            canManage={can.manage || can.updateProgress}
+                        />
+                    </CardContent>
+                </Card>
+
                 <Tabs defaultValue="key-results">
                     <TabsList>
                         <TabsTrigger value="key-results" className="gap-1.5">

@@ -3,17 +3,20 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StorePerformanceReviewRequest;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class PerformanceReviewController extends Controller
 {
     use ResolvesHrTenant;
+    use ServesPrivateAttachments;
 
     /**
      * List all performance reviews.
@@ -308,6 +311,46 @@ class PerformanceReviewController extends Controller
         }
 
         return redirect()->back()->with('success', 'Review acknowledged.');
+    }
+
+    /**
+     * Upload evidence for a review (private disk).
+     */
+    public function uploadEvidence(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        abort_if($review->status === 'signed_off', 422, 'This review is signed off and locked.');
+
+        $request->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240']]);
+
+        if ($review->evidence_path) {
+            Storage::disk('private')->delete($review->evidence_path);
+        }
+        $path = $request->file('file')->store('hr/performance-reviews/'.$review->id, 'private');
+        $review->update(['evidence_path' => $path]);
+
+        return redirect()->back()->with('success', 'Evidence uploaded.');
+    }
+
+    /**
+     * Stream a review's evidence (private disk, hardened headers).
+     */
+    public function downloadEvidence(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        abort_unless($review->evidence_path, 404);
+
+        return $this->streamPrivateAttachment(
+            'private',
+            $review->evidence_path,
+            basename($review->evidence_path),
+            Storage::disk('private')->mimeType($review->evidence_path) ?: null,
+            'inline',
+        );
     }
 
     /**

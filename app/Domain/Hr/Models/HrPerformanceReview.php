@@ -30,6 +30,7 @@ class HrPerformanceReview extends Model
         'strengths',
         'development_areas',
         'goals',
+        'evidence_path',
         'training_recommendations',
         'employee_comments',
         'employee_signed_off',

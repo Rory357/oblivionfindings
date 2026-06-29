@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EvidenceAttachment } from '@/components/hr/performance/evidence-attachment';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
@@ -41,6 +42,7 @@ type PerformanceReview = {
     employee_signed_off_at: string | null;
     manager_signed_off: boolean;
     manager_signed_off_at: string | null;
+    evidence_path: string | null;
     created_at: string;
 };
 
@@ -156,6 +158,24 @@ export default function ShowReview({ review, can }: Props) {
                         </Badge>
                     )}
                 </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FileText className="h-4 w-4" />
+                            Evidence
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <EvidenceAttachment
+                            uploadUrl={`/hr/performance/reviews/${review.id}/evidence`}
+                            viewUrl={`/hr/performance/reviews/${review.id}/evidence`}
+                            hasEvidence={!!review.evidence_path}
+                            canManage={can.manage}
+                            disabled={review.status === 'signed_off'}
+                        />
+                    </CardContent>
+                </Card>
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <Card>
