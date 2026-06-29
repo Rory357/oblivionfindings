@@ -6,16 +6,19 @@ use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CompetencyController extends Controller
 {
     use ResolvesHrTenant;
+    use ServesPrivateAttachments;
 
     /**
      * List competencies grouped by category.
@@ -128,6 +131,48 @@ class CompetencyController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Assessment signed off.');
+    }
+
+    /**
+     * Upload evidence for a recorded assessment (private disk).
+     */
+    public function uploadAssessmentEvidence(Request $request, HrCompetencyAssessment $assessment)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $assessment->tenant_id);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
+        ]);
+
+        if ($assessment->evidence_path) {
+            Storage::disk('private')->delete($assessment->evidence_path);
+        }
+
+        $path = $request->file('file')->store('hr/competency-assessments/'.$assessment->id, 'private');
+        $assessment->update(['evidence_path' => $path]);
+
+        return redirect()->back()->with('success', 'Evidence uploaded.');
+    }
+
+    /**
+     * Stream an assessment's evidence (private disk, hardened headers).
+     */
+    public function downloadAssessmentEvidence(Request $request, HrCompetencyAssessment $assessment)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $assessment->tenant_id);
+        abort_unless($assessment->evidence_path, 404);
+
+        return $this->streamPrivateAttachment(
+            'private',
+            $assessment->evidence_path,
+            basename($assessment->evidence_path),
+            Storage::disk('private')->mimeType($assessment->evidence_path) ?: null,
+            'inline',
+        );
     }
 
     public function createAssessment(Request $request)
@@ -275,6 +320,8 @@ class CompetencyController extends Controller
             'target_level' => $assessment->target_level,
             'assessment_date' => $assessment->assessment_date?->toDateString(),
             'notes' => $assessment->notes,
+            'has_evidence' => (bool) $assessment->evidence_path,
+            'assessor_declared_at' => $assessment->assessor_declared_at?->toDateString(),
         ];
     }
 }

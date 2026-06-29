@@ -14,8 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { CheckCircle2, Clock, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, Clock, FileText, Paperclip, XCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface Milestone {
     id: number;
@@ -27,6 +27,7 @@ interface Milestone {
     reviewer_notes: string | null;
     reviewed_at: string | null;
     reviewer: { id: number; name: string } | null;
+    evidence_path: string | null;
 }
 
 interface Pip {
@@ -390,6 +391,14 @@ export default function PipShow({ pip, can }: Props) {
                                                             )}
                                                         </p>
                                                     )}
+                                                    <MilestoneEvidence
+                                                        milestone={milestone}
+                                                        canManage={
+                                                            can.manage &&
+                                                            pip.status !==
+                                                                'completed'
+                                                        }
+                                                    />
                                                 </div>
                                                 {can.manage &&
                                                     pip.status !==
@@ -439,5 +448,77 @@ export default function PipShow({ pip, can }: Props) {
                 </Card>
             </PageLayout>
         </AppLayout>
+    );
+}
+
+function MilestoneEvidence({
+    milestone,
+    canManage,
+}: {
+    milestone: Milestone;
+    canManage: boolean;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const upload = (file: File) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        setUploading(true);
+        router.post(
+            `/hr/performance/pips/milestones/${milestone.id}/evidence`,
+            fd,
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onFinish: () => setUploading(false),
+            },
+        );
+    };
+
+    return (
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            {milestone.evidence_path ? (
+                <a
+                    href={`/hr/performance/pips/milestones/${milestone.id}/evidence`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+                >
+                    <FileText className="h-3.5 w-3.5" />
+                    View evidence
+                </a>
+            ) : (
+                <span className="text-muted-foreground">No evidence attached</span>
+            )}
+            {canManage && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={uploading}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+                    >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        {uploading
+                            ? 'Uploading…'
+                            : milestone.evidence_path
+                              ? 'Replace'
+                              : 'Attach evidence'}
+                    </button>
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) upload(f);
+                            e.target.value = '';
+                        }}
+                    />
+                </>
+            )}
+        </div>
     );
 }

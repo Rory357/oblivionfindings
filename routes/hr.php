@@ -784,8 +784,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/performance/competencies/{competency}/deactivate', [CompetencyController::class, 'deactivate'])->name('competencies.deactivate');
             Route::post('/performance/competencies/assess', [CompetencyController::class, 'assess'])->name('competencies.assess');
             Route::post('/performance/competencies/assessments/{assessment}/sign-off', [CompetencyController::class, 'signOffAssessment'])->name('competencies.assessments.sign-off');
+            Route::post('/performance/competencies/assessments/{assessment}/evidence', [CompetencyController::class, 'uploadAssessmentEvidence'])->name('competencies.assessments.evidence.store');
         });
 
+        Route::get('/performance/competencies/assessments/{assessment}/evidence', [CompetencyController::class, 'downloadAssessmentEvidence'])->name('competencies.assessments.evidence.show');
         Route::get('/performance/competencies/{profile}', [CompetencyController::class, 'employeeProfile'])->name('competencies.profile');
     });
 
@@ -805,11 +807,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/{pip}/milestones', [PipController::class, 'storeMilestone'])->name('milestones.store');
             Route::put('/milestones/{milestone}', [PipController::class, 'updateMilestone'])->name('milestones.update');
             Route::delete('/milestones/{milestone}', [PipController::class, 'destroyMilestone'])->name('milestones.destroy');
+            Route::post('/milestones/{milestone}/evidence', [PipController::class, 'uploadMilestoneEvidence'])->name('milestones.evidence.store');
             Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
         });
 
         // Employee acknowledges their PIP
         Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
+        Route::get('/milestones/{milestone}/evidence', [PipController::class, 'downloadMilestoneEvidence'])->name('milestones.evidence.show');
 
         Route::get('/{pip}', [PipController::class, 'show'])->name('show');
     });

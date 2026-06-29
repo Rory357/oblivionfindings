@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPipMilestone;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class PipController extends Controller
 {
+    use ServesPrivateAttachments;
+
     /**
      * List PIPs with optional status filter.
      */
@@ -271,6 +275,46 @@ class PipController extends Controller
         }
 
         return redirect()->back()->with('success', 'Plan acknowledged.');
+    }
+
+    /**
+     * Upload evidence for a milestone to the private disk.
+     */
+    public function uploadMilestoneEvidence(Request $request, HrPipMilestone $milestone)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
+        ]);
+
+        if ($milestone->evidence_path) {
+            Storage::disk('private')->delete($milestone->evidence_path);
+        }
+
+        $path = $request->file('file')->store('hr/pip-milestones/'.$milestone->id, 'private');
+        $milestone->update(['evidence_path' => $path]);
+
+        return redirect()->back()->with('success', 'Evidence uploaded.');
+    }
+
+    /**
+     * Stream a milestone's evidence (private disk, hardened headers).
+     */
+    public function downloadMilestoneEvidence(Request $request, HrPipMilestone $milestone)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        abort_unless($milestone->evidence_path, 404);
+
+        return $this->streamPrivateAttachment(
+            'private',
+            $milestone->evidence_path,
+            basename($milestone->evidence_path),
+            Storage::disk('private')->mimeType($milestone->evidence_path) ?: null,
+            'inline',
+        );
     }
 
     /**

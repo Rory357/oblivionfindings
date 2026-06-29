@@ -11,7 +11,9 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { FileText, Paperclip } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface RadarPoint {
     competency: string;
@@ -27,6 +29,8 @@ interface Assessment {
     target_level: number | null;
     assessment_date: string;
     notes: string | null;
+    has_evidence?: boolean;
+    assessor_declared_at?: string | null;
 }
 
 interface Props {
@@ -322,13 +326,14 @@ export default function CompetencyProfile({
                                     </TableHead>
                                     <TableHead>Assessor</TableHead>
                                     <TableHead>Notes</TableHead>
+                                    <TableHead>Evidence</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {history.length === 0 && (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={5}
+                                            colSpan={6}
                                             className="text-center text-muted-foreground"
                                         >
                                             No history
@@ -361,6 +366,12 @@ export default function CompetencyProfile({
                                         <TableCell className="text-sm text-muted-foreground">
                                             {a.notes || '-'}
                                         </TableCell>
+                                        <TableCell className="text-sm">
+                                            <AssessmentEvidence
+                                                assessment={a}
+                                                canManage={can.manage}
+                                            />
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -369,5 +380,70 @@ export default function CompetencyProfile({
                 </Card>
             </PageLayout>
         </AppLayout>
+    );
+}
+
+function AssessmentEvidence({
+    assessment,
+    canManage,
+}: {
+    assessment: Assessment;
+    canManage: boolean;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const upload = (file: File) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        setUploading(true);
+        router.post(
+            `/hr/performance/competencies/assessments/${assessment.id}/evidence`,
+            fd,
+            { forceFormData: true, preserveScroll: true, onFinish: () => setUploading(false) },
+        );
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            {assessment.has_evidence ? (
+                <a
+                    href={`/hr/performance/competencies/assessments/${assessment.id}/evidence`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                    <FileText className="h-3.5 w-3.5" />
+                    View
+                </a>
+            ) : (
+                <span className="text-muted-foreground">-</span>
+            )}
+            {canManage && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={uploading}
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-xs font-semibold disabled:opacity-50"
+                        title={assessment.has_evidence ? 'Replace evidence' : 'Attach evidence'}
+                    >
+                        <Paperclip className="h-3 w-3" />
+                        {uploading ? '…' : assessment.has_evidence ? 'Replace' : 'Attach'}
+                    </button>
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) upload(f);
+                            e.target.value = '';
+                        }}
+                    />
+                </>
+            )}
+        </div>
     );
 }
