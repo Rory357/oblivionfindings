@@ -190,6 +190,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/submit-approval', [CandidateController::class, 'submitOfferApproval'])->name('offers.submit-approval')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/decline-approval', [CandidateController::class, 'declineOfferApproval'])->name('offers.decline-approval')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
             ->middleware('permission:hr.recruitment.manage');
         // Segregation of duties: minting a login account additionally requires hr.employees.manage.

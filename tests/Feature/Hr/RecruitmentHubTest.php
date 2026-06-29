@@ -19,6 +19,7 @@ use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
+use App\Domain\Hr\Notifications\OfferApprovalNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -1005,4 +1006,82 @@ test('the pipeline surfaces a candidate average interview score for ranking', fu
 
             return true;
         }));
+});
+
+/* ---- Offer approval chain ---- */
+
+test('an offer must be submitted, approved (or declined) before it can be sent', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    $req = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-appr-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
+    ]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_pending', 'personal_email' => 'c.appr@example.test', 'created_by' => $this->hr->id]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
+        'position_title' => 'Support Worker', 'status' => 'active',
+    ]);
+    $offer = HrOffer::create([
+        'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'draft', 'created_by' => $this->hr->id,
+    ]);
+
+    // A draft offer cannot be sent.
+    $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();
+    expect($offer->fresh()->sent_at)->toBeNull();
+
+    // Submit → pending_approval, notifies the hiring-manager approver.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('pending_approval');
+    expect($offer->fresh()->approval_requested_at)->not->toBeNull();
+    Notification::assertSentTo($manager, OfferApprovalNotification::class);
+
+    // Decline → declined with reason, notifies the creator.
+    $this->actingAs($manager)->post(route('hr.offers.decline-approval', $offer->id), ['reason' => 'Rate too high'])->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('declined');
+    expect($offer->fresh()->approval_declined_reason)->toBe('Rate too high');
+    Notification::assertSentTo($this->hr, OfferApprovalNotification::class);
+
+    // Resubmit then approve → approved (creator notified), now sendable.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.approve', $offer->id))->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('approved');
+
+    $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();
+    expect($offer->fresh()->sent_at)->not->toBeNull();
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.offers.submit-approval', $offer->id))->assertForbidden();
+});
+
+test('the hub surfaces offer approval states and the approve/send nudges', function () {
+    // An offer awaiting sign-off (the approver's queue).
+    $ctxA = makeApplicant($this->hr->id, 'offer_pending');
+    $pending = makeOffer($ctxA, 'draft', $this->hr->id, $this->site->id);
+    $pending->update(['approval_status' => 'pending_approval', 'approval_requested_at' => now()]);
+
+    // An approved-but-unsent offer (ready to send).
+    $ctxB = makeApplicant($this->hr->id, 'offer_pending');
+    makeOffer($ctxB, 'draft', $this->hr->id, $this->site->id); // makeOffer defaults approval_status='approved'
+
+    // An approver-declined offer surfaces distinctly (not as a fresh "draft").
+    $ctxC = makeApplicant($this->hr->id, 'offer_pending');
+    $declined = makeOffer($ctxC, 'draft', $this->hr->id, $this->site->id);
+    $declined->update(['approval_status' => 'declined', 'approval_declined_reason' => 'Rate too high']);
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('offers.list', fn ($list) => collect($list)
+            ->contains(fn ($o) => (int) $o['id'] === (int) $pending->id && $o['status'] === 'pending_approval')
+            && collect($list)->contains(fn ($o) => (int) $o['id'] === (int) $declined->id && $o['status'] === 'changes_requested'))
+        ->where('needs', fn ($needs) => collect($needs)->contains(fn ($n) => $n['key'] === 'offers_approval')
+            && collect($needs)->contains(fn ($n) => $n['key'] === 'offers_send'))
+    );
 });
