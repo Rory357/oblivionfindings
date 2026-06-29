@@ -525,15 +525,43 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/surveys/{survey}', [WellbeingController::class, 'showSurvey'])->name('surveys.show');
         Route::post('/surveys/{survey}/responses', [WellbeingController::class, 'submitResponse'])->name('surveys.responses.store');
 
+        // Staff (My HR) actions on their own records.
+        Route::post('/checkins/{checkin}/acknowledge', [WellbeingController::class, 'acknowledgeCheckin'])->name('checkins.acknowledge');
+
         Route::middleware('permission:hr.performance.manage')->group(function () {
+            // Surveys
             Route::post('/surveys', [WellbeingController::class, 'storeSurvey'])->name('surveys.store');
             Route::put('/surveys/{survey}', [WellbeingController::class, 'updateSurvey'])->name('surveys.update');
             Route::post('/surveys/{survey}/publish', [WellbeingController::class, 'publishSurvey'])->name('surveys.publish');
             Route::post('/surveys/{survey}/close', [WellbeingController::class, 'closeSurvey'])->name('surveys.close');
+            Route::post('/surveys/{survey}/duplicate', [WellbeingController::class, 'duplicateSurvey'])->name('surveys.duplicate');
+            Route::post('/surveys/{survey}/nudge', [WellbeingController::class, 'nudgeSurvey'])->name('surveys.nudge');
+            Route::post('/surveys/{survey}/archive', [WellbeingController::class, 'archiveSurvey'])->name('surveys.archive');
+            Route::delete('/surveys/{survey}', [WellbeingController::class, 'destroySurvey'])->name('surveys.destroy');
+            Route::get('/surveys/{survey}/export', [WellbeingController::class, 'exportSurvey'])->name('surveys.export');
             Route::post('/surveys/{survey}/action-plans', [WellbeingController::class, 'storeActionPlan'])->name('action-plans.store');
+
+            // Standalone / flag-linked action plans + lifecycle + notes
+            Route::post('/action-plans', [WellbeingController::class, 'storeStandaloneActionPlan'])->name('action-plans.store-standalone');
+            Route::post('/action-plans/{plan}/reopen', [WellbeingController::class, 'reopenActionPlan'])->name('action-plans.reopen');
+            Route::post('/action-plans/{plan}/cancel', [WellbeingController::class, 'cancelActionPlan'])->name('action-plans.cancel');
+
+            // Flag triage
+            Route::post('/signals/{user}/acknowledge', [WellbeingController::class, 'acknowledgeFlag'])->name('signals.acknowledge');
+            Route::post('/signals/{user}/snooze', [WellbeingController::class, 'snoozeFlag'])->name('signals.snooze');
+            Route::post('/signals/{user}/dismiss', [WellbeingController::class, 'dismissFlag'])->name('signals.dismiss');
+            Route::post('/signals/{user}/undo', [WellbeingController::class, 'undoFlag'])->name('signals.undo');
+
+            // Check-ins
+            Route::post('/checkins', [WellbeingController::class, 'storeCheckin'])->name('checkins.store');
+            Route::patch('/checkins/{checkin}', [WellbeingController::class, 'updateCheckin'])->name('checkins.update');
+
+            // EAP referrals
+            Route::post('/eap-referrals', [WellbeingController::class, 'storeEapReferral'])->name('eap.store');
         });
 
         Route::put('/action-plans/{plan}', [WellbeingController::class, 'updateActionPlan'])->name('action-plans.update');
+        Route::post('/action-plans/{plan}/notes', [WellbeingController::class, 'storeActionPlanNote'])->name('action-plans.notes.store');
     });
 
     /*
