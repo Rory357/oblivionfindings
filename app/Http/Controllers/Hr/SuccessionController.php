@@ -112,7 +112,10 @@ class SuccessionController extends Controller
             'candidates.*.strengths' => ['nullable', 'string', 'max:2000'],
             'candidates.*.development_needs' => ['nullable', 'string', 'max:2000'],
             'candidates.*.overall_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'stay' => ['nullable', 'boolean'],
         ]);
+
+        $stay = (bool) ($data['stay'] ?? false);
 
         DB::transaction(function () use ($user, $data) {
             $plan = HrSuccessionPlan::create([
@@ -139,6 +142,10 @@ class SuccessionController extends Controller
                 ]);
             }
         });
+
+        if ($stay) {
+            return redirect()->back()->with('success', 'Succession plan created.');
+        }
 
         return redirect()->route('hr.succession.index')->with('success', 'Succession plan created.');
     }

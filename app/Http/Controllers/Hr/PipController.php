@@ -103,7 +103,10 @@ class PipController extends Controller
             'milestones.*.title' => ['required', 'string', 'max:255'],
             'milestones.*.description' => ['nullable', 'string', 'max:2000'],
             'milestones.*.due_date' => ['required', 'date'],
+            'stay' => ['nullable', 'boolean'],
         ]);
+
+        $stay = (bool) ($data['stay'] ?? false);
 
         DB::transaction(function () use ($user, $data) {
             $pip = HrPerformanceImprovementPlan::create([
@@ -134,6 +137,10 @@ class PipController extends Controller
                 }
             }
         });
+
+        if ($stay) {
+            return redirect()->back()->with('success', 'Performance Improvement Plan created.');
+        }
 
         return redirect()->route('hr.performance.pips.index')->with('success', 'Performance Improvement Plan created.');
     }

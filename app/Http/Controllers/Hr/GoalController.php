@@ -151,13 +151,37 @@ class GoalController extends Controller
             'start_date' => ['required', 'date'],
             'due_date' => ['required', 'date', 'after_or_equal:start_date'],
             'status' => ['sometimes', 'string', 'in:draft,active'],
+            'key_results' => ['nullable', 'array'],
+            'key_results.*' => ['string', 'max:500'],
+            'stay' => ['nullable', 'boolean'],
         ]);
+
+        $keyResults = $data['key_results'] ?? [];
+        $stay = (bool) ($data['stay'] ?? false);
+        unset($data['key_results'], $data['stay']);
 
         $goal = $this->goalService->createGoal([
             'tenant_id' => $user->tenant_id ?? 1,
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        // Inline key results from the hub wizard (one title per line).
+        foreach (array_filter(array_map('trim', $keyResults)) as $title) {
+            HrKeyResult::create([
+                'tenant_id' => $goal->tenant_id,
+                'goal_id' => $goal->id,
+                'title' => $title,
+                'target_value' => 100,
+                'due_date' => $goal->due_date,
+                'owner_id' => $goal->user_id,
+                'status' => 'not_started',
+            ]);
+        }
+
+        if ($stay) {
+            return redirect()->back()->with('success', 'Objective created.');
+        }
 
         return redirect("/hr/goals/{$goal->id}")->with('success', 'Objective created. Add key results below.');
     }

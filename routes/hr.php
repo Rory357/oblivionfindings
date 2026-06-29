@@ -45,6 +45,7 @@ use App\Http\Controllers\Hr\OnboardingEmailController;
 use App\Http\Controllers\Hr\OrgChartController;
 use App\Http\Controllers\Hr\PayrollExportController;
 use App\Http\Controllers\Hr\PayslipController;
+use App\Http\Controllers\Hr\PerformanceHubController;
 use App\Http\Controllers\Hr\PerformanceReviewController;
 use App\Http\Controllers\Hr\PipController;
 use App\Http\Controllers\Hr\PolicyAttestationController;
@@ -387,7 +388,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.performance.view')->prefix('performance')->name('performance.')->group(function () {
-        Route::get('/', [SupervisionController::class, 'index'])->name('index');
+        Route::get('/', [PerformanceHubController::class, 'index'])->name('index');
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
             // Supervision notes
