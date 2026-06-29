@@ -295,6 +295,62 @@ class GoalController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Status transitions — activate / complete / cancel */
+    /* ------------------------------------------------------------------ */
+
+    public function transition(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+
+        $data = $request->validate([
+            'action' => ['required', 'string', 'in:activate,complete,cancel'],
+        ]);
+
+        $map = [
+            'activate' => ['status' => 'active', 'completed_at' => null],
+            'complete' => ['status' => 'completed', 'completed_at' => now(), 'progress_percentage' => 100],
+            'cancel' => ['status' => 'cancelled'],
+        ];
+
+        $goal->update($map[$data['action']]);
+
+        return redirect()->back()->with('success', 'Goal '.[
+            'activate' => 'activated',
+            'complete' => 'completed',
+            'cancel' => 'cancelled',
+        ][$data['action']].'.');
+    }
+
+    /**
+     * Check-in history for a goal — surfaces hr_goal_updates as a timeline.
+     * Returns JSON (consumed by the hub's detail sheet via axios).
+     */
+    public function checkIns(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($this->canView($user), 403);
+
+        $updates = $goal->updates()
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'user_name' => $u->user?->name,
+                'previous_value' => $u->previous_value,
+                'new_value' => $u->new_value,
+                'progress_percentage' => $u->progress_percentage,
+                'comment' => $u->comment,
+                'created_at' => $u->created_at?->toIso8601String(),
+                'created_for_humans' => $u->created_at?->diffForHumans(),
+            ]);
+
+        return response()->json(['goal_id' => $goal->id, 'check_ins' => $updates]);
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Update Progress */
     /* ------------------------------------------------------------------ */
 

@@ -405,10 +405,18 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/reviews/{review}/edit', [PerformanceReviewController::class, 'edit'])->name('reviews.edit');
             Route::put('/reviews/{review}', [PerformanceReviewController::class, 'update'])->name('reviews.update');
 
+            // Review lifecycle transitions (guarded, audited, locked after sign-off)
+            Route::post('/reviews/{review}/submit', [PerformanceReviewController::class, 'submit'])->name('reviews.submit');
+            Route::post('/reviews/{review}/sign-off', [PerformanceReviewController::class, 'signOff'])->name('reviews.sign-off');
+
             // Probation reviews
             Route::post('/probation', [PerformanceReviewController::class, 'storeProbation'])->name('probation.store');
             Route::put('/probation/{review}', [PerformanceReviewController::class, 'updateProbation'])->name('probation.update');
         });
+
+        // Employee-side acknowledgements (any viewer can ack their own record)
+        Route::post('/reviews/{review}/acknowledge', [PerformanceReviewController::class, 'acknowledge'])->name('reviews.acknowledge');
+        Route::post('/supervision/{note}/acknowledge', [SupervisionController::class, 'acknowledge'])->name('supervision.acknowledge');
     });
 
     /*
@@ -737,14 +745,26 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.performance.view')->prefix('feedback')->name('feedback.')->group(function () {
         Route::get('/', [FeedbackController::class, 'index'])->name('index');
-        Route::get('/request', [FeedbackController::class, 'request'])->name('request');
-        Route::post('/request', [FeedbackController::class, 'storeRequest'])->name('request.store');
+        Route::get('/summary/{user}', [FeedbackController::class, 'summary'])->name('summary');
+
+        // Reviewers (anyone who can view) respond to a request assigned to them.
         Route::get('/{feedbackRequest}/respond', [FeedbackController::class, 'respond'])->name('respond');
         Route::post('/{feedbackRequest}/respond', [FeedbackController::class, 'submitResponse'])->name('respond.store');
-        Route::get('/summary/{user}', [FeedbackController::class, 'summary'])->name('summary');
-        Route::post('/templates', [FeedbackController::class, 'storeTemplate'])->name('templates.store');
-        Route::put('/templates/{template}', [FeedbackController::class, 'updateTemplate'])->name('templates.update');
-        Route::delete('/templates/{template}', [FeedbackController::class, 'deleteTemplate'])->name('templates.destroy');
+
+        // P0 security fix: creating requests + managing templates is a manager
+        // action. These writes were previously gated only on `.view`, so any
+        // viewer could create/decline/remind 360 cycles and CRUD templates.
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/request', [FeedbackController::class, 'request'])->name('request');
+            Route::post('/request', [FeedbackController::class, 'storeRequest'])->name('request.store');
+            Route::post('/bulk-request', [FeedbackController::class, 'bulkRequest'])->name('bulk-request');
+            Route::post('/{feedbackRequest}/decline', [FeedbackController::class, 'decline'])->name('decline');
+            Route::post('/{feedbackRequest}/remind', [FeedbackController::class, 'remind'])->name('remind');
+            Route::post('/{feedbackRequest}/cancel', [FeedbackController::class, 'cancel'])->name('cancel');
+            Route::post('/templates', [FeedbackController::class, 'storeTemplate'])->name('templates.store');
+            Route::put('/templates/{template}', [FeedbackController::class, 'updateTemplate'])->name('templates.update');
+            Route::delete('/templates/{template}', [FeedbackController::class, 'deleteTemplate'])->name('templates.destroy');
+        });
     });
 
     /*
@@ -759,7 +779,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/performance/competencies/assess', [CompetencyController::class, 'createAssessment'])->name('competencies.assess.create');
             Route::post('/performance/competencies', [CompetencyController::class, 'store'])->name('competencies.store');
             Route::put('/performance/competencies/{competency}', [CompetencyController::class, 'update'])->name('competencies.update');
+            Route::post('/performance/competencies/{competency}/deactivate', [CompetencyController::class, 'deactivate'])->name('competencies.deactivate');
             Route::post('/performance/competencies/assess', [CompetencyController::class, 'assess'])->name('competencies.assess');
+            Route::post('/performance/competencies/assessments/{assessment}/sign-off', [CompetencyController::class, 'signOffAssessment'])->name('competencies.assessments.sign-off');
         });
 
         Route::get('/performance/competencies/{profile}', [CompetencyController::class, 'employeeProfile'])->name('competencies.profile');
@@ -776,9 +798,16 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.performance.manage')->group(function () {
             Route::get('/create', [PipController::class, 'create'])->name('create');
             Route::post('/', [PipController::class, 'store'])->name('store');
+            Route::put('/{pip}', [PipController::class, 'update'])->name('update');
+            Route::post('/{pip}/cancel', [PipController::class, 'cancel'])->name('cancel');
+            Route::post('/{pip}/milestones', [PipController::class, 'storeMilestone'])->name('milestones.store');
             Route::put('/milestones/{milestone}', [PipController::class, 'updateMilestone'])->name('milestones.update');
+            Route::delete('/milestones/{milestone}', [PipController::class, 'destroyMilestone'])->name('milestones.destroy');
             Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
         });
+
+        // Employee acknowledges their PIP
+        Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
 
         Route::get('/{pip}', [PipController::class, 'show'])->name('show');
     });
@@ -795,8 +824,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/create', [SuccessionController::class, 'create'])->name('create');
             Route::post('/', [SuccessionController::class, 'store'])->name('store');
             Route::put('/{plan}', [SuccessionController::class, 'update'])->name('update');
+            Route::delete('/{plan}', [SuccessionController::class, 'destroy'])->name('destroy');
             Route::post('/{plan}/candidates', [SuccessionController::class, 'addCandidate'])->name('candidates.store');
             Route::put('/candidates/{candidate}', [SuccessionController::class, 'updateCandidate'])->name('candidates.update');
+            Route::delete('/candidates/{candidate}', [SuccessionController::class, 'removeCandidate'])->name('candidates.destroy');
+            Route::post('/candidates/{candidate}/nominate', [SuccessionController::class, 'nominateToTalentPool'])->name('candidates.nominate');
         });
 
         Route::get('/{plan}', [SuccessionController::class, 'show'])->name('show');
@@ -817,11 +849,17 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
             Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
 
+            // Status transitions (activate / complete / cancel)
+            Route::post('/{goal}/transition', [GoalController::class, 'transition'])->name('transition');
+
             // Key Results
             Route::post('/{goal}/key-results', [GoalController::class, 'storeKeyResult'])->name('key-results.store');
             Route::put('/key-results/{keyResult}', [GoalController::class, 'updateKeyResult'])->name('key-results.update');
             Route::delete('/key-results/{keyResult}', [GoalController::class, 'destroyKeyResult'])->name('key-results.destroy');
         });
+
+        // Check-in history timeline (surfaces hr_goal_updates)
+        Route::get('/{goal}/check-ins', [GoalController::class, 'checkIns'])->name('check-ins');
 
         Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
     });

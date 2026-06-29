@@ -20,7 +20,10 @@ class HrPipMilestone extends Model
         'description',
         'due_date',
         'status',
+        'sort_order',
         'outcome',
+        'evidence',
+        'evidence_path',
         'reviewer_notes',
         'reviewed_by',
         'reviewed_at',
@@ -29,6 +32,7 @@ class HrPipMilestone extends Model
     protected $casts = [
         'due_date' => 'date',
         'reviewed_at' => 'datetime',
+        'sort_order' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */

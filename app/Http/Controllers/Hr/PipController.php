@@ -157,6 +157,116 @@ class PipController extends Controller
     }
 
     /**
+     * Edit the core PIP fields.
+     */
+    public function update(Request $request, HrPerformanceImprovementPlan $pip)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_if(in_array($pip->status, ['completed', 'cancelled'], true), 422, 'This plan is closed and can no longer be edited.');
+
+        $data = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'reason' => ['sometimes', 'string', 'max:5000'],
+            'expectations' => ['sometimes', 'string', 'max:5000'],
+            'support_offered' => ['nullable', 'string', 'max:5000'],
+            'consequences' => ['nullable', 'string', 'max:5000'],
+            'start_date' => ['sometimes', 'date'],
+            'end_date' => ['sometimes', 'date'],
+            'review_date' => ['nullable', 'date'],
+        ]);
+
+        $pip->update([...$data, 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Plan updated.');
+    }
+
+    /**
+     * Cancel an in-flight PIP.
+     */
+    public function cancel(Request $request, HrPerformanceImprovementPlan $pip)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_if(in_array($pip->status, ['completed', 'cancelled'], true), 422, 'This plan is already closed.');
+
+        $data = $request->validate([
+            'outcome_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $pip->update([
+            'status' => 'cancelled',
+            'outcome_notes' => $data['outcome_notes'] ?? $pip->outcome_notes,
+            'completed_at' => now(),
+            'updated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Plan cancelled.');
+    }
+
+    /**
+     * Add a milestone to an existing PIP.
+     */
+    public function storeMilestone(Request $request, HrPerformanceImprovementPlan $pip)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'due_date' => ['required', 'date'],
+        ]);
+
+        $nextOrder = (int) $pip->milestones()->max('sort_order') + 1;
+
+        $pip->milestones()->create([
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'due_date' => $data['due_date'],
+            'status' => 'pending',
+            'sort_order' => $nextOrder,
+        ]);
+
+        return redirect()->back()->with('success', 'Milestone added.');
+    }
+
+    /**
+     * Remove a milestone (only while still pending).
+     */
+    public function destroyMilestone(Request $request, HrPipMilestone $milestone)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $milestone->delete();
+
+        return redirect()->back()->with('success', 'Milestone removed.');
+    }
+
+    /**
+     * Employee acknowledges their PIP.
+     */
+    public function acknowledge(Request $request, HrPerformanceImprovementPlan $pip)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless(
+            $pip->employee_user_id === $user->id || $user->canDo('hr.performance.manage'),
+            403,
+        );
+
+        if (! $pip->employee_acknowledged) {
+            $pip->update([
+                'employee_acknowledged' => true,
+                'employee_acknowledged_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Plan acknowledged.');
+    }
+
+    /**
      * Update a milestone status (met / not_met).
      */
     public function updateMilestone(Request $request, HrPipMilestone $milestone)

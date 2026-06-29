@@ -26,12 +26,17 @@ class HrCompetencyAssessment extends Model
         'target_level',
         'assessment_date',
         'notes',
+        'assessor_declared_at',
+        'staff_acknowledged_at',
+        'evidence_path',
     ];
 
     protected $casts = [
         'assessment_date' => 'date',
         'assessed_level' => 'integer',
         'target_level' => 'integer',
+        'assessor_declared_at' => 'datetime',
+        'staff_acknowledged_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */

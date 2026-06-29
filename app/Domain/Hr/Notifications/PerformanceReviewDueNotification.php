@@ -34,8 +34,8 @@ class PerformanceReviewDueNotification extends Notification implements ShouldQue
             'due_date'      => $this->dueDate,
             'review_id'     => $this->reviewId,
             'action_url'    => $this->reviewId
-                ? "/hr/performance-reviews/{$this->reviewId}"
-                : '/hr/performance-reviews',
+                ? "/hr/performance/reviews/{$this->reviewId}"
+                : '/hr/performance/reviews',
         ];
     }
 }

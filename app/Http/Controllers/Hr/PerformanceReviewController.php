@@ -198,6 +198,9 @@ class PerformanceReviewController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
+        // A signed-off review is locked — no further edits via the generic update.
+        abort_if($review->status === 'signed_off', 422, 'This review is signed off and locked.');
+
         $data = $request->validate([
             'review_type' => ['sometimes', 'string', 'in:annual,mid_year,quarterly,ad_hoc'],
             'review_period_start' => ['sometimes', 'date'],
@@ -229,6 +232,82 @@ class PerformanceReviewController extends Controller
         $review->update($data);
 
         return redirect()->back()->with('success', 'Performance review updated.');
+    }
+
+    /**
+     * Submit a draft review for sign-off (draft → in_progress).
+     */
+    public function submit(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+
+        abort_unless(in_array($review->status, ['draft', 'in_progress'], true), 422, 'Only draft reviews can be submitted.');
+
+        $review->update(['status' => 'in_progress', 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Review submitted for sign-off.');
+    }
+
+    /**
+     * Manager sign-off (Approve & lock) or return for edits.
+     */
+    public function signOff(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+
+        abort_if($review->status === 'signed_off', 422, 'This review is already signed off.');
+
+        $data = $request->validate([
+            'decision' => ['required', 'string', 'in:approve,return'],
+            'comment' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        if ($data['decision'] === 'return') {
+            $review->update([
+                'status' => 'in_progress',
+                'updated_by' => $user->id,
+            ]);
+
+            return redirect()->back()->with('success', 'Review returned for edits.');
+        }
+
+        $review->update([
+            'status' => 'signed_off',
+            'manager_signed_off' => true,
+            'manager_signed_off_at' => $review->manager_signed_off_at ?? now(),
+            'updated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Review signed off and locked.');
+    }
+
+    /**
+     * Employee acknowledges their own completed review.
+     */
+    public function acknowledge(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        // Either the review subject, or a manager acting on their behalf.
+        abort_unless(
+            $review->employee_user_id === $user->id || $user->canDo('hr.performance.manage'),
+            403,
+        );
+
+        if (! $review->employee_signed_off) {
+            $review->update([
+                'employee_signed_off' => true,
+                'employee_signed_off_at' => now(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Review acknowledged.');
     }
 
     /**

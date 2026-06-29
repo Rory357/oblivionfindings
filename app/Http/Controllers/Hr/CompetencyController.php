@@ -62,7 +62,6 @@ class CompetencyController extends Controller
             'sort_order' => ['nullable', 'integer'],
         ]);
 
-        // NB: hr_competencies has no created_by column — don't write it.
         HrCompetency::create([
             'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $data['name'],
@@ -71,6 +70,7 @@ class CompetencyController extends Controller
             'proficiency_levels' => $data['proficiency_levels'] ?? ['Beginner', 'Developing', 'Competent', 'Advanced', 'Expert'],
             'is_active' => true,
             'sort_order' => $data['sort_order'] ?? 0,
+            'created_by' => $user->id,
         ]);
 
         return redirect()->back()->with('success', 'Competency created.');
@@ -97,6 +97,37 @@ class CompetencyController extends Controller
         $competency->update($data);
 
         return redirect()->back()->with('success', 'Competency updated.');
+    }
+
+    /**
+     * Deactivate (soft-retire) a competency — keeps history, hides from pickers.
+     */
+    public function deactivate(Request $request, HrCompetency $competency)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $competency->update(['is_active' => false]);
+
+        return redirect()->back()->with('success', 'Competency deactivated.');
+    }
+
+    /**
+     * Assessor signs off (declares competent) on a recorded assessment.
+     */
+    public function signOffAssessment(Request $request, HrCompetencyAssessment $assessment)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $assessment->tenant_id);
+
+        $assessment->update([
+            'assessor_declared_at' => now(),
+            'assessed_by' => $assessment->assessed_by ?? $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Assessment signed off.');
     }
 
     public function createAssessment(Request $request)

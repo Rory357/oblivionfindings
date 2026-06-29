@@ -239,6 +239,81 @@ class FeedbackController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  Lifecycle — decline / remind / cancel / bulk request               */
+    /* ------------------------------------------------------------------ */
+
+    /** Reviewer (or manager on their behalf) declines a pending request. */
+    public function decline(Request $request, HrFeedbackRequest $feedbackRequest)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
+        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be declined.');
+
+        $feedbackRequest->update(['status' => 'declined']);
+
+        return redirect()->back()->with('success', 'Feedback request declined.');
+    }
+
+    /** Nudge the reviewer of a still-pending request. */
+    public function remind(Request $request, HrFeedbackRequest $feedbackRequest)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
+        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be reminded.');
+
+        $this->feedbackService->remind($feedbackRequest);
+
+        return redirect()->back()->with('success', 'Reminder sent to the reviewer.');
+    }
+
+    /** Cancel (soft-expire) a pending request that is no longer needed. */
+    public function cancel(Request $request, HrFeedbackRequest $feedbackRequest)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
+        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be cancelled.');
+
+        $feedbackRequest->update(['status' => 'expired']);
+
+        return redirect()->back()->with('success', 'Feedback request cancelled.');
+    }
+
+    /** Fan a single subject out to many reviewers in one shot (bulk 360). */
+    public function bulkRequest(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $validated = $request->validate([
+            'subject_user_id' => ['required', 'integer', 'exists:users,id'],
+            'reviewer_user_ids' => ['required', 'array', 'min:1'],
+            'reviewer_user_ids.*' => ['integer', 'exists:users,id'],
+            'review_type' => ['required', 'string', Rule::in(FeedbackService::REVIEW_TYPES)],
+            'template_id' => ['nullable', 'integer', 'exists:hr_feedback_templates,id'],
+            'due_date' => ['nullable', 'date'],
+        ]);
+
+        try {
+            $this->feedbackService->request360Feedback(
+                $validated['subject_user_id'],
+                $validated['reviewer_user_ids'],
+                $validated['review_type'],
+                null,
+                $user,
+                $validated['template_id'] ?? null,
+                $validated['due_date'] ?? null,
+            );
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', '360 feedback requests sent to '.count($validated['reviewer_user_ids']).' reviewers.');
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  Template CRUD                                                       */
     /* ------------------------------------------------------------------ */
 

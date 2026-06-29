@@ -41,8 +41,9 @@ class FeedbackService
         ?int $performanceReviewId,
         User $requester,
         ?int $templateId = null,
+        ?string $dueDate = null,
     ): array {
-        return DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId) {
+        return DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId, $dueDate) {
             $tenantId = $requester->getAttribute('tenant_id')
                 ?? $requester->getAttribute('organization_id')
                 ?? HrEmployeeProfile::where('user_id', $requester->id)->value('tenant_id')
@@ -79,12 +80,31 @@ class FeedbackService
                     'template_id' => $templateId,
                     'questions_snapshot' => $questionsSnapshot,
                     'status' => 'pending',
-                    'due_date' => now()->addDays(14),
+                    'due_date' => $dueDate ? \Illuminate\Support\Carbon::parse($dueDate) : now()->addDays(14),
                 ]);
             }
 
             return $requests;
         });
+    }
+
+    /**
+     * Send a reminder to the reviewer of a still-pending request.
+     *
+     * Pushes the due date back to "soon" if it had already lapsed so the
+     * request resurfaces in the reviewer's queue, and notifies them.
+     */
+    public function remind(HrFeedbackRequest $request): void
+    {
+        if ($request->status !== 'pending') {
+            return;
+        }
+
+        $reviewer = $request->reviewer;
+        if ($reviewer) {
+            $subjectName = $request->subject?->name ?? 'a colleague';
+            $reviewer->notify(new \App\Domain\Hr\Notifications\FeedbackReminderNotification($request, $subjectName));
+        }
     }
 
     /**

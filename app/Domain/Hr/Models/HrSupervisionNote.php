@@ -19,6 +19,8 @@ class HrSupervisionNote extends Model
         'supervisor_user_id',
         'session_date',
         'session_type',
+        'status',
+        'cadence',
         'duration_minutes',
         'topics_discussed',
         'actions_agreed',

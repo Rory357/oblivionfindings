@@ -275,6 +275,50 @@ class SuccessionController extends Controller
         return redirect()->back()->with('success', 'Candidate updated.');
     }
 
+    /**
+     * Delete a succession plan (and its candidates via cascade).
+     */
+    public function destroy(Request $request, HrSuccessionPlan $plan)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+
+        $plan->delete();
+
+        return redirect()->route('hr.succession.index')->with('success', 'Succession plan deleted.');
+    }
+
+    /**
+     * Remove a candidate from a plan.
+     */
+    public function removeCandidate(Request $request, HrSuccessionCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+
+        $candidate->delete();
+
+        return redirect()->back()->with('success', 'Candidate removed from plan.');
+    }
+
+    /**
+     * Nominate a candidate to the ready-now talent bench. Promotes their
+     * readiness so they surface in the "Ready now" pipeline across plans.
+     */
+    public function nominateToTalentPool(Request $request, HrSuccessionCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($this->canManage($user), 403);
+
+        $candidate->update([
+            'readiness' => 'ready_now',
+            'assessed_by' => $user->id,
+            'assessed_at' => now()->toDateString(),
+        ]);
+
+        return redirect()->back()->with('success', 'Candidate nominated to the ready-now talent pool.');
+    }
+
     private function canView($user): bool
     {
         return (bool) $user && (

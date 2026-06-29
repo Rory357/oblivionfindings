@@ -430,4 +430,27 @@ class SupervisionController extends Controller
 
         return redirect()->back()->with('success', 'Supervision note updated.');
     }
+
+    /**
+     * Employee acknowledges a supervision note made visible to them.
+     */
+    public function acknowledge(Request $request, HrSupervisionNote $note)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless(
+            $note->employee_user_id === $user->id || $user->canDo('hr.performance.manage'),
+            403,
+        );
+
+        if (! $note->employee_acknowledged) {
+            $note->update([
+                'employee_acknowledged' => true,
+                'employee_acknowledged_at' => now(),
+                'status' => 'acknowledged',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Supervision note acknowledged.');
+    }
 }

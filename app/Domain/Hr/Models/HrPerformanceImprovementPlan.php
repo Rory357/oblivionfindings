@@ -32,6 +32,8 @@ class HrPerformanceImprovementPlan extends Model
         'outcome',
         'outcome_notes',
         'completed_at',
+        'employee_acknowledged',
+        'employee_acknowledged_at',
         'created_by',
         'updated_by',
     ];
@@ -41,6 +43,8 @@ class HrPerformanceImprovementPlan extends Model
         'end_date' => 'date',
         'review_date' => 'date',
         'completed_at' => 'datetime',
+        'employee_acknowledged' => 'boolean',
+        'employee_acknowledged_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
