@@ -183,7 +183,8 @@ class ApprovalWorkflowService
         }
 
         return User::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            // Users are tenanted by organization_id (there is no users.tenant_id).
+            ->when($tenantId, fn ($q) => $q->where('organization_id', $tenantId))
             ->whereHas('roles', fn ($q) => $q->where('roles.id', $step->approver_role_id))
             ->first();
     }

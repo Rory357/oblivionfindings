@@ -36,6 +36,19 @@ class HrCourseEnrollmentObserver
                 return;
             }
 
+            // GL double-count rule (handover item 10): the provider-invoice
+            // posting (DR 6510 / CR 2000 AP) only belongs to the org-pays-
+            // provider model. When the fee is reimbursed to staff via an
+            // expense claim, the claim approval books the cost instead, so
+            // suppress this posting to avoid booking the same cost twice.
+            if ($course->staff_can_claim && ! $course->org_pays_provider) {
+                return;
+            }
+
+            if ($this->hasLinkedTrainingClaim($enrollment)) {
+                return;
+            }
+
             $accountConfig = config('finance.event_accounts.training_cost');
 
             ProcessFinancialEventJob::dispatch([
@@ -56,5 +69,23 @@ class HrCourseEnrollmentObserver
         } catch (\Throwable $e) {
             Log::error("HrCourseEnrollmentObserver: Failed to dispatch GL job for enrollment #{$enrollment->id}: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Whether a (non-rejected) training expense claim already references this
+     * enrollment — i.e. the cost is being reimbursed to staff, so the provider
+     * posting must be suppressed.
+     */
+    private function hasLinkedTrainingClaim(HrCourseEnrollment $enrollment): bool
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('hr_expense_items', 'source_type')) {
+            return false;
+        }
+
+        return \App\Domain\Hr\Models\HrExpenseItem::query()
+            ->where('source_type', HrCourseEnrollment::class)
+            ->where('source_id', $enrollment->id)
+            ->whereHas('expenseClaim', fn ($q) => $q->where('status', '!=', 'rejected'))
+            ->exists();
     }
 }

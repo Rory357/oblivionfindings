@@ -275,7 +275,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
-        Route::get('/training', [TrainingDashboardController::class, 'index'])->name('training.index');
+        // Legacy standalone dashboard is consolidated into the Training hub.
+        // Both URLs render the hub (it defaults to the Dashboard tab).
+        Route::get('/training', [TrainingController::class, 'catalog'])->name('training.index');
     });
 
     /*
@@ -1118,15 +1120,30 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
         Route::get('/training/catalog', [TrainingController::class, 'catalog'])->name('training.catalog');
         Route::get('/training/courses/{course}', [TrainingController::class, 'showCourse'])->name('training.courses.show');
+        Route::get('/training/courses/{course}/detail', [TrainingController::class, 'courseDetail'])->name('training.courses.detail');
+        Route::get('/training/export', [TrainingController::class, 'export'])->name('training.export');
         Route::get('/training/enrollments/{enrollment}/certificate', [TrainingController::class, 'downloadCertificate'])->name('training.certificate');
+        // Claims reuse the expense backend; gated on the expense-create path inside the controller.
+        Route::post('/training/claims', [TrainingController::class, 'claimFee'])->name('training.claims.store');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses')->group(function () {
         Route::post('/training/courses', [TrainingController::class, 'storeCourse'])->name('training.courses.store');
+        Route::put('/training/courses/{course}', [TrainingController::class, 'updateCourse'])->name('training.courses.update');
+        Route::patch('/training/courses/{course}/toggle', [TrainingController::class, 'toggleCourse'])->name('training.courses.toggle');
+        Route::post('/training/courses/bulk-archive', [TrainingController::class, 'bulkArchiveCourses'])->name('training.courses.bulk-archive');
+        Route::post('/training/courses/{course}/sessions', [TrainingController::class, 'storeSession'])->name('training.sessions.store');
+        Route::put('/training/sessions/{session}', [TrainingController::class, 'updateSession'])->name('training.sessions.update');
+        Route::delete('/training/sessions/{session}', [TrainingController::class, 'cancelSession'])->name('training.sessions.cancel');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses|training.enrol')->group(function () {
         Route::post('/training/enroll', [TrainingController::class, 'enroll'])->name('training.enroll');
+        Route::post('/training/assignments', [TrainingController::class, 'storeAssignments'])->name('training.assignments.store');
+        Route::get('/training/assignments/preview', [TrainingController::class, 'previewAssignments'])->name('training.assignments.preview');
+        Route::post('/training/assignments/{assignment}/remind', [TrainingController::class, 'remindAssignment'])->name('training.assignments.remind');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses|training.record')->group(function () {
         Route::put('/training/enrollments/{enrollment}/complete', [TrainingController::class, 'completeEnrollment'])->name('training.enrollments.complete');
+        Route::post('/training/record', [TrainingController::class, 'recordCompletion'])->name('training.record');
+        Route::patch('/training/assignments/{assignment}/waive', [TrainingController::class, 'waiveAssignment'])->name('training.assignments.waive');
     });
 });
