@@ -25,6 +25,7 @@ import {
     Bell,
     Check,
     CheckCircle2,
+    GripVertical,
     MoreHorizontal,
     Pencil,
     Plus,
@@ -120,6 +121,23 @@ function DetailBody({
     const [completeTarget, setCompleteTarget] = useState<CompleteTaskTarget | null>(null);
     const [taskForm, setTaskForm] = useState<{ open: boolean; task: TaskFormTarget | null }>({ open: false, task: null });
     const [reassign, setReassign] = useState<ReassignTarget | null>(null);
+    const [dragId, setDragId] = useState<number | null>(null);
+
+    // Drag-to-reorder: drop the dragged task at the target's position and
+    // persist the full task order (the endpoint rewrites sort_order 1..n).
+    const reorderTo = (targetId: number) => {
+        if (dragId === null || dragId === targetId) {
+            setDragId(null);
+            return;
+        }
+        const ids = checklist.tasks.map((t) => t.id);
+        const from = ids.indexOf(dragId);
+        const to = ids.indexOf(targetId);
+        setDragId(null);
+        if (from < 0 || to < 0) return;
+        ids.splice(to, 0, ids.splice(from, 1)[0]);
+        router.post(`/hr/onboarding/${checklist.id}/tasks/reorder`, { task_ids: ids }, { preserveScroll: true });
+    };
 
     const done = checklist.tasks.filter((t) => t.is_completed).length;
     const total = checklist.tasks.length;
@@ -269,9 +287,24 @@ function DetailBody({
                                 <div
                                     key={t.id}
                                     onContextMenu={can.manage ? taskMenu(t) : undefined}
-                                    className="flex items-start gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                    onDragOver={can.manage ? (e) => e.preventDefault() : undefined}
+                                    onDrop={can.manage ? () => reorderTo(t.id) : undefined}
+                                    className={`group flex items-start gap-2 border-b border-border/55 px-4.5 py-3 last:border-0 ${
+                                        dragId === t.id ? 'opacity-50' : ''
+                                    }`}
                                     style={t.is_overdue ? { background: 'color-mix(in oklch, var(--status-critical-bg) 40%, transparent)' } : undefined}
                                 >
+                                    {can.manage && (
+                                        <span
+                                            draggable
+                                            onDragStart={() => setDragId(t.id)}
+                                            onDragEnd={() => setDragId(null)}
+                                            aria-label="Drag to reorder"
+                                            className="mt-1 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 hover:text-muted-foreground active:cursor-grabbing"
+                                        >
+                                            <GripVertical className="h-4 w-4" />
+                                        </span>
+                                    )}
                                     <button
                                         type="button"
                                         disabled={!can.manage}
