@@ -1736,10 +1736,10 @@ export default function CandidateShow({
                                                         }
                                                         className="capitalize"
                                                     >
-                                                        {
-                                                            app.offer
-                                                                .approval_status
-                                                        }
+                                                        {app.offer.approval_status.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
                                                     {app.offer.sent_at && (
                                                         <Badge variant="outline">
