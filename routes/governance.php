@@ -184,6 +184,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/performance/{review}/goals', [PerformanceReviewController::class, 'addGoal'])->name('performance.goals.add');
             Route::post('/performance/{review}/assess', [PerformanceReviewController::class, 'submitAssessment'])->name('performance.assess');
             Route::post('/performance/{review}/feedback', [PerformanceReviewController::class, 'submitFeedback'])->name('performance.feedback');
+            Route::post('/performance/{review}/self-assessment', [PerformanceReviewController::class, 'submitSelfAssessment'])->name('performance.self-assessment');
+            Route::post('/performance/{review}/approve', [PerformanceReviewController::class, 'approve'])->name('performance.approve');
         });
     });
     

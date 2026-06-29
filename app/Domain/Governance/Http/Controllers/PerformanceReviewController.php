@@ -167,6 +167,39 @@ class PerformanceReviewController extends Controller
         return redirect()->back()->with('success', 'Feedback submitted.');
     }
 
+    /**
+     * Submit the self-assessment, advancing the review to board review.
+     */
+    public function submitSelfAssessment(Request $request, PerformanceReview $review)
+    {
+        abort_unless(auth()->user()?->canDo('governance.performance.manage'), 403);
+
+        $validated = $request->validate([
+            'self_assessment' => 'required|string|max:10000',
+        ]);
+
+        $review->submitSelfAssessment($validated['self_assessment']);
+
+        return redirect()->back()->with('success', 'Self-assessment submitted for board review.');
+    }
+
+    /**
+     * Board approval — finalises the review to completed, optionally linking the
+     * approving resolution.
+     */
+    public function approve(Request $request, PerformanceReview $review)
+    {
+        abort_unless(auth()->user()?->canDo('governance.performance.manage'), 403);
+
+        $validated = $request->validate([
+            'resolution_id' => 'nullable|integer',
+        ]);
+
+        $review->approve($validated['resolution_id'] ?? null);
+
+        return redirect()->back()->with('success', 'Performance review approved and completed.');
+    }
+
     protected function getReviewCycles(): array
     {
         $year = now()->year;

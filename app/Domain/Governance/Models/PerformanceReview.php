@@ -141,7 +141,7 @@ class PerformanceReview extends Model
         ]);
     }
 
-    public function approve(int $resolutionId): void
+    public function approve(?int $resolutionId = null): void
     {
         $this->update([
             'status' => 'completed',
