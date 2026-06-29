@@ -103,12 +103,18 @@ test('performance dashboard returns manager one to one and competency signals', 
         'updated_by' => $this->hr->id,
     ]);
 
-    $response = $this->actingAs($this->hr)->get("/hr/performance?staff_id={$this->staff->id}");
+    $response = $this->actingAs($this->hr)->get('/hr/performance');
     $response->assertOk();
 
-    expect($response->inertiaProps('oneToOneSla.overdue_count'))->toBeGreaterThan(0);
-    expect($response->inertiaProps('engagementActionPlanSla.overdue'))->toBeGreaterThan(0);
+    // Unified hub aggregator renders without error and surfaces the signals.
+    expect($response->inertiaProps('supervision.overdue_count'))->toBeGreaterThan(0);
 
-    $gapIds = collect($response->inertiaProps('competencyGaps'))->pluck('id')->all();
-    expect($gapIds)->toContain($goal->id);
+    $reviewStatuses = collect($response->inertiaProps('reviews'))->pluck('status')->all();
+    expect($reviewStatuses)->toContain('overdue');
+
+    $devIds = collect($response->inertiaProps('development'))->pluck('id')->all();
+    expect($devIds)->toContain($goal->id);
+
+    // Hero exposes the clickable stat scaffold.
+    expect($response->inertiaProps('hero.stats'))->not->toBeEmpty();
 });
