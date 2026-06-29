@@ -32,6 +32,11 @@ const TONE_ACTIVE: Record<RosterTabTone, string> = {
         'bg-status-success-bg text-status-success [&_.chip]:bg-status-success [&_.chip]:text-white [&_.underline-bar]:bg-status-success',
     info:
         'bg-status-info-bg text-status-info [&_.chip]:bg-status-info [&_.chip]:text-white [&_.underline-bar]:bg-status-info',
+    // 'violet' intentionally resolves to the brand purple. The app runs a
+    // restrained monochrome-purple palette (note --status-info also === --primary
+    // in app.css), so a "violet" accent is brand purple by design — not a clashing
+    // hue. Kept as a named tone so callers read semantically; it uses the same
+    // tokens as `primary` (no raw colour literals).
     violet:
         'bg-primary/10 text-primary [&_.chip]:bg-primary [&_.chip]:text-primary-foreground [&_.underline-bar]:bg-primary',
     critical:
