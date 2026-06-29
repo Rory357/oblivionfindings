@@ -398,6 +398,21 @@ export default function CandidateShow({
             { preserveScroll: true },
         );
     }
+    function submitOfferApproval(offerId: number) {
+        router.post(
+            `/hr/recruitment/offers/${offerId}/submit-approval`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+    function declineOfferApproval(offerId: number) {
+        const reason = window.prompt('Decline this offer for changes. Reason (optional):') ?? '';
+        router.post(
+            `/hr/recruitment/offers/${offerId}/decline-approval`,
+            { reason },
+            { preserveScroll: true },
+        );
+    }
 
     function handleDocumentUpload(e: React.FormEvent) {
         e.preventDefault();
@@ -1782,21 +1797,59 @@ export default function CandidateShow({
                                                     <div className="mt-3 flex flex-wrap gap-2">
                                                         {app.offer
                                                             .approval_status !==
-                                                            'approved' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    approveOffer(
-                                                                        app
-                                                                            .offer!
-                                                                            .id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                        )}
+                                                            'approved' &&
+                                                            !app.offer
+                                                                .sent_at && (
+                                                                <>
+                                                                    {app.offer
+                                                                        .approval_status !==
+                                                                        'pending_approval' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                submitOfferApproval(
+                                                                                    app
+                                                                                        .offer!
+                                                                                        .id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Submit for approval
+                                                                        </Button>
+                                                                    )}
+                                                                    {app.offer
+                                                                        .approval_status ===
+                                                                        'pending_approval' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                declineOfferApproval(
+                                                                                    app
+                                                                                        .offer!
+                                                                                        .id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Decline
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() =>
+                                                                            approveOffer(
+                                                                                app
+                                                                                    .offer!
+                                                                                    .id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                </>
+                                                            )}
                                                         {app.offer
                                                             .approval_status ===
                                                             'approved' &&
