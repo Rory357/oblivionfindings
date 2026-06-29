@@ -21,14 +21,22 @@ class HrDocumentSignature extends Model
         'ip_address',
         'user_agent',
         'status',
+        'signing_order',
+        'order_index',
         'requested_by',
         'requested_at',
+        'due_at',
+        'reminder_sent_at',
         'declined_reason',
+        'message',
     ];
 
     protected $casts = [
         'signed_at' => 'datetime',
         'requested_at' => 'datetime',
+        'due_at' => 'date',
+        'reminder_sent_at' => 'datetime',
+        'order_index' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -67,6 +75,11 @@ class HrDocumentSignature extends Model
     public function scopeSigned(Builder $query): Builder
     {
         return $query->where('status', 'signed');
+    }
+
+    public function scopeDeclined(Builder $query): Builder
+    {
+        return $query->where('status', 'declined');
     }
 
     public function scopeForSigner(Builder $query, int $userId): Builder
