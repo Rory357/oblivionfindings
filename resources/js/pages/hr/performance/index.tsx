@@ -690,13 +690,77 @@ function CommandBar({
             {b.selected.length ? (
                 <div className="flex items-center gap-3 rounded-[10px] border border-primary/30 bg-primary/[0.08] px-3 py-2 motion-safe:animate-in motion-safe:fade-in-0">
                     <span className="text-[13px] font-bold text-primary">{b.selected.length} selected</span>
-                    <button type="button" onClick={() => toast.success('Bulk reminder sent')} className="text-[13px] font-semibold text-primary">Remind</button>
+                    <BulkActions b={b} />
                     <button type="button" onClick={b.exportCsv} className="text-[13px] font-semibold text-primary">Export</button>
                     <button type="button" onClick={() => b.setSelected([])} className="ml-auto text-[13px] font-semibold text-muted-foreground">Clear</button>
                 </div>
             ) : null}
         </div>
     );
+}
+
+/** Tab-aware bulk actions over the current selection — only real, wired actions. */
+function BulkActions({ b }: { b: BodyProps }) {
+    if (!b.canManage) return null;
+    const sel = new Set(b.selected);
+    const link = 'text-[13px] font-semibold text-primary';
+
+    if (b.tab === 'reviews') {
+        const targets = b.props.reviews.filter((r) => sel.has(r.id) && ['draft', 'in_progress'].includes(r.status));
+        if (!targets.length) return null;
+        return (
+            <button
+                type="button"
+                className={link}
+                onClick={() => {
+                    targets.forEach((r) => b.post(`/hr/performance/reviews/${r.id}/submit`, {}, 'Submitted'));
+                    toast.success(`Submitting ${targets.length} ${targets.length === 1 ? 'review' : 'reviews'}…`);
+                    b.setSelected([]);
+                }}
+            >
+                Submit
+            </button>
+        );
+    }
+
+    if (b.tab === 'feedback') {
+        const targets = b.props.feedback.filter((r) => sel.has(r.id) && r.status === 'in_progress');
+        if (!targets.length) return null;
+        return (
+            <button
+                type="button"
+                className={link}
+                onClick={() => {
+                    targets.forEach((row) => row.ids.forEach((rid) => b.post(`/hr/feedback/${rid}/remind`, {}, 'Reminder sent')));
+                    toast.success(`Reminding reviewers on ${targets.length} ${targets.length === 1 ? 'cycle' : 'cycles'}…`);
+                    b.setSelected([]);
+                }}
+            >
+                Remind reviewers
+            </button>
+        );
+    }
+
+    if (b.tab === 'goals') {
+        const targets = b.props.goals.filter((r) => sel.has(r.id) && !['completed', 'cancelled'].includes(r.status));
+        if (!targets.length) return null;
+        return (
+            <button
+                type="button"
+                className={link}
+                onClick={() => {
+                    targets.forEach((r) => b.post(`/hr/goals/${r.id}/transition`, { action: 'complete' }, 'Completed'));
+                    toast.success(`Completing ${targets.length} ${targets.length === 1 ? 'goal' : 'goals'}…`);
+                    b.setSelected([]);
+                }}
+            >
+                Mark complete
+            </button>
+        );
+    }
+
+    // Tabs with no safe bulk mutation: Export/Clear only.
+    return null;
 }
 
 type Col = { key: string; label: string; kind: 'person' | 'badge' | 'rating' | 'progress' | 'level' | 'reviewers' | 'muted' | 'strong' | 'title'; sub?: string; align?: 'left' | 'right' };

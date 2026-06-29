@@ -3,9 +3,15 @@
 namespace App\Console\Commands;
 
 use App\Domain\Hr\Models\HrFeedbackRequest;
+use App\Domain\Hr\Models\HrGoal;
+use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Notifications\FeedbackReminderNotification;
+use App\Domain\Hr\Notifications\GoalDueNotification;
 use App\Domain\Hr\Notifications\PerformanceReviewDueNotification;
+use App\Domain\Hr\Notifications\PipReviewDueNotification;
+use App\Domain\Hr\Notifications\SupervisionDueNotification;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -29,10 +35,95 @@ class PerformanceRemindersCommand extends Command
         $expired = $this->expireOverdueFeedback();
         $reminded = $this->remindDueFeedback();
         $reviewsNudged = $this->remindDueReviews();
+        $supNudged = $this->remindOverdueSupervision();
+        $pipNudged = $this->remindPipReviews();
+        $goalNudged = $this->remindDueGoals();
 
-        $this->info("Performance reminders: {$expired} 360 expired, {$reminded} 360 reminders, {$reviewsNudged} review nudges.");
+        $this->info("Performance reminders: {$expired} 360 expired, {$reminded} 360 reminders, {$reviewsNudged} review nudges, {$supNudged} supervision, {$pipNudged} PIP reviews, {$goalNudged} goal due.");
 
         return self::SUCCESS;
+    }
+
+    /** Notify supervisors of acknowledged-pending 1:1s now past their next date. */
+    private function remindOverdueSupervision(): int
+    {
+        $notes = HrSupervisionNote::query()
+            ->where('is_visible_to_employee', true)
+            ->where('employee_acknowledged', false)
+            ->whereNotNull('next_session_date')
+            ->whereDate('next_session_date', '<', now())
+            ->with('employee:id,name')
+            ->get(['id', 'supervisor_user_id', 'employee_user_id', 'next_session_date']);
+
+        $count = 0;
+        foreach ($notes as $note) {
+            $supervisor = $note->supervisor_user_id ? User::find($note->supervisor_user_id) : null;
+            if (! $supervisor) {
+                continue;
+            }
+            $supervisor->notify(new SupervisionDueNotification(
+                $note->employee?->name ?? 'an employee',
+                $note->next_session_date?->toDateString() ?? now()->toDateString(),
+                $note->id,
+            ));
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /** Notify PIP owners of plans whose review date falls within 3 days. */
+    private function remindPipReviews(): int
+    {
+        $pips = HrPerformanceImprovementPlan::query()
+            ->whereIn('status', ['active', 'in_progress'])
+            ->whereNotNull('review_date')
+            ->whereBetween('review_date', [now()->startOfDay(), now()->addDays(3)->endOfDay()])
+            ->with('employee:id,name')
+            ->get(['id', 'manager_user_id', 'employee_user_id', 'review_date', 'status']);
+
+        $count = 0;
+        foreach ($pips as $pip) {
+            $manager = $pip->manager_user_id ? User::find($pip->manager_user_id) : null;
+            if (! $manager) {
+                continue;
+            }
+            $manager->notify(new PipReviewDueNotification(
+                $pip->employee?->name ?? 'an employee',
+                $pip->review_date?->toDateString() ?? now()->toDateString(),
+                $pip->id,
+            ));
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /** Nudge goal owners of active goals due within 7 days and not yet complete. */
+    private function remindDueGoals(): int
+    {
+        $goals = HrGoal::query()
+            ->where('status', 'active')
+            ->where('progress_percentage', '<', 100)
+            ->whereNotNull('due_date')
+            ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
+            ->get(['id', 'user_id', 'title', 'due_date']);
+
+        $count = 0;
+        foreach ($goals as $goal) {
+            $owner = $goal->user_id ? User::find($goal->user_id) : null;
+            if (! $owner) {
+                continue;
+            }
+            $owner->notify(new GoalDueNotification(
+                $goal->title,
+                $goal->due_date?->toDateString() ?? now()->toDateString(),
+                $goal->id,
+            ));
+            $count++;
+        }
+
+        return $count;
     }
 
     /** Pending 360 requests past their due date become `expired`. */
