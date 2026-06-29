@@ -307,16 +307,48 @@ class CandidateController extends Controller
                 ];
             }
             if ($app->offer) {
+                $offer = $app->offer;
                 $activityLog[] = [
                     'type' => 'offer',
-                    'description' => "Offer created - {$app->offer->position_title}",
-                    'timestamp' => optional($app->offer->created_at)->diffForHumans() ?? '',
+                    'description' => "Offer created - {$offer->position_title}",
+                    'timestamp' => optional($offer->created_at)->diffForHumans() ?? '',
                 ];
-                if ($app->offer->response) {
+                // Approval chain: submitted → approved / sent back for changes.
+                if ($offer->approval_requested_at) {
                     $activityLog[] = [
                         'type' => 'offer',
-                        'description' => "Offer {$app->offer->response}",
-                        'timestamp' => optional($app->offer->response_at)->diffForHumans() ?? '',
+                        'description' => 'Offer submitted for approval',
+                        'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->approval_status === 'approved' && $offer->approved_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer approved',
+                        'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
+                        'actor' => $offer->approvedBy?->name,
+                    ];
+                }
+                if ($offer->approval_status === 'declined') {
+                    $reason = $offer->approval_declined_reason;
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
+                        'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->sent_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent to candidate',
+                        'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->response) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => "Offer {$offer->response}",
+                        'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
                     ];
                 }
             }
@@ -1260,6 +1292,7 @@ class CandidateController extends Controller
             'approval_status' => 'pending_approval',
             'approval_requested_at' => now(),
             'approval_declined_reason' => null,
+            'approval_reminder_sent_at' => null,
             'updated_by' => $user->id,
         ]);
 
