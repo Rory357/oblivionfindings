@@ -1,9 +1,9 @@
-/* eslint-disable no-restricted-syntax -- This hub uses a few bespoke on-surface
- * controls (the segmented view switch, layer-toggle rows in the popover, the
- * renewals list rows) that are intentional raw <button>/<div> layout cases, not
- * shadcn <Button>/<Card>. Colours stay token-based throughout. */
+/* eslint-disable no-restricted-syntax -- The calendar surface is a bespoke,
+ * design-prototype-faithful hub: the underline tab strip, segmented view switch,
+ * layer panel, toolbar selects and grid views are intentional native
+ * <button>/<div>/<select> layout cases, not shadcn primitives. Colours stay
+ * token-based throughout (no raw hex). */
 import PageShell from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -14,7 +14,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -22,16 +21,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState } from '@/components/ui/error-state';
 import { CalendarHero, type UpNextEntry } from '@/components/hr/calendar/calendar-hero';
 import {
     EventWizardDialog,
@@ -40,52 +29,60 @@ import {
 } from '@/components/hr/calendar/event-wizard-dialog';
 import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
 import { CalendarMonthGrid } from '@/components/hr/calendar/calendar-month-grid';
+import { CalendarTimeGrid } from '@/components/hr/calendar/calendar-time-grid';
+import { CalendarAgenda } from '@/components/hr/calendar/calendar-agenda';
+import { CalendarRenewals } from '@/components/hr/calendar/calendar-renewals';
 import {
     CalendarDetailPopover,
     type EventDetail,
 } from '@/components/hr/calendar/calendar-detail-popover';
 import { CalendarYearPicker } from '@/components/hr/calendar/calendar-year-picker';
+import {
+    addDays,
+    colorVar,
+    dayStart,
+    fmtLong,
+    layerLabel,
+    secondaryFor,
+    startOfWeek,
+} from '@/components/hr/calendar/calendar-render';
 import { type PersonOption } from '@/components/hr/people-picker';
 import {
     ShiftContextMenu,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
-import { HrTabs } from '@/components/hr';
-import { CalendarView } from '@/components/calendar/calendar-view';
 import {
-    CALENDAR_LAYERS,
     LAYER_DISPLAY_ORDER,
     DEFAULT_ACTIVE_LAYERS,
     LAYER_META,
+    CALENDAR_LAYERS,
     type CalendarLayer,
     type CalendarLayerFeed,
 } from '@/lib/calendar/layer-feed';
-import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
-import interactionPlugin from '@fullcalendar/interaction';
-import listPlugin from '@fullcalendar/list';
-import type {
-    EventClickArg,
-    EventInput,
-    EventSourceFuncArg,
-} from '@fullcalendar/core';
-import type FullCalendar from '@fullcalendar/react';
+import type { EventClickArg } from '@fullcalendar/core';
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    CalendarClock,
     CalendarDays,
-    CalendarPlus,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     Copy,
     ExternalLink,
-    Layers,
-    ListChecks,
+    Eye,
+    Layers as LayersIcon,
     Pencil,
+    Pin,
+    Plus,
     Search,
+    Star,
     Trash2,
+    User as UserIcon,
+    Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+    type CSSProperties,
     useCallback,
     useEffect,
     useLayoutEffect,
@@ -96,8 +93,9 @@ import {
 import { createPortal } from 'react-dom';
 
 type BreadcrumbItem = { title: string; href: string };
-
 type IdName = { id: number; name: string };
+type CalView = 'month' | 'week' | 'day';
+type CalTab = 'calendar' | 'agenda' | 'renewals';
 
 interface HeroStats {
     eventsThisWeek: number;
@@ -123,14 +121,19 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Calendar', href: '/hr/calendar' },
 ];
 
-const LAYERS_STORAGE_KEY = 'hrCalendar.layers';
+const LAYERS_KEY = 'hrCalendar.layers';
+const PANEL_KEY = 'hrCalendar.panelOpen';
+const PINNED_KEY = 'hrCalendar.pinned';
+const DEFAULT_TAB_KEY = 'hrCalendar.defaultTab';
 
-/** One-time page-scoped styling for layer-specific event treatments. */
 const PAGE_STYLE_ID = 'hr-calendar-layer-styles';
 const PAGE_STYLES = `
-.hrcal-pending { opacity: 0.85; border-style: dashed !important; border-width: 1.5px !important; }
-.hrcal-pending .fc-event-title { font-style: italic; }
-.hrcal-redacted .fc-event-title::after { content: ' · private'; opacity: 0.6; font-size: 0.85em; }
+.hrcal-add { opacity: .32; transition: opacity .15s ease, background .15s ease; }
+.hrcal-add:hover { opacity: 1; background: var(--muted); }
+.hrcal-agenda-row { transition: transform .12s ease, box-shadow .12s ease; }
+.hrcal-agenda-row:hover { transform: translateY(-1px); box-shadow: 0 6px 18px -8px rgba(0,0,0,.18); }
+.hrcal-renewal-row:hover { background: var(--muted); }
+.hrcal-tab-hint { color: var(--muted-foreground); }
 `;
 
 function useLayerStyles() {
@@ -143,59 +146,43 @@ function useLayerStyles() {
     }, []);
 }
 
+function load<T>(key: string, fallback: T): T {
+    if (typeof window === 'undefined') return fallback;
+    try {
+        const v = window.localStorage.getItem(key);
+        return v == null ? fallback : (JSON.parse(v) as T);
+    } catch {
+        return fallback;
+    }
+}
+
 function readInitialLayers(): CalendarLayer[] {
     if (typeof window === 'undefined') return [...DEFAULT_ACTIVE_LAYERS];
     const fromUrl = new URLSearchParams(window.location.search).get('layers');
-    const source = fromUrl ?? window.localStorage.getItem(LAYERS_STORAGE_KEY);
+    const source = fromUrl ?? window.localStorage.getItem(LAYERS_KEY);
     if (!source) return [...DEFAULT_ACTIVE_LAYERS];
-    const parsed = source.split(',').filter((l): l is CalendarLayer =>
-        (CALENDAR_LAYERS as readonly string[]).includes(l),
-    );
+    const parsed = source
+        .split(',')
+        .filter((l): l is CalendarLayer => (CALENDAR_LAYERS as readonly string[]).includes(l));
     return parsed.length ? parsed : [...DEFAULT_ACTIVE_LAYERS];
 }
 
-
-/** Map one feed row to a FullCalendar event, applying per-layer styling. */
-function toFcEvent(e: CalendarLayerFeed): EventInput {
-    const ext = { ...e.extendedProps, layer: e.layer, deepLink: e.deepLink };
-    const base: EventInput = {
-        id: e.id,
-        title: e.title,
-        start: e.start,
-        end: e.end,
-        allDay: e.allDay,
-        // Only standalone HR events are drag/resize editable; recurring
-        // occurrences are edited through the scope prompt, not by dragging.
-        editable: e.editable && !e.extendedProps.recurring,
-        extendedProps: ext,
-    };
-
-    if (e.layer === 'holiday') {
-        return {
-            ...base,
-            display: 'background',
-            backgroundColor: 'color-mix(in oklch, var(--status-warning) 16%, transparent)',
-        };
+function rangeFor(view: CalView, cursor: Date): { from: Date; to: Date } {
+    if (view === 'month') {
+        const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+        const gs = startOfWeek(first);
+        return { from: gs, to: addDays(gs, 41) };
     }
-    if (e.extendedProps.gap) {
-        return {
-            ...base,
-            display: 'background',
-            backgroundColor: 'color-mix(in oklch, var(--status-critical) 14%, transparent)',
-        };
+    if (view === 'week') {
+        const gs = startOfWeek(cursor);
+        return { from: gs, to: addDays(gs, 6) };
     }
+    const ds = dayStart(cursor);
+    return { from: ds, to: ds };
+}
 
-    const color = `var(--${e.color})`;
-    const classNames: string[] = [];
-    if (e.extendedProps.pending) classNames.push('hrcal-pending');
-    if (e.extendedProps.redacted) classNames.push('hrcal-redacted');
-    return {
-        ...base,
-        backgroundColor: color,
-        borderColor: color,
-        textColor: 'var(--primary-foreground)',
-        classNames,
-    };
+function iso(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default function CalendarIndex({
@@ -210,51 +197,58 @@ export default function CalendarIndex({
     can,
 }: Props) {
     useLayerStyles();
-    const calendarRef = useRef<FullCalendar>(null);
+    const today = useMemo(() => new Date(), []);
 
-    const [tab, setTab] = useState<'calendar' | 'agenda' | 'renewals'>('calendar');
+    const [tab, setTab] = useState<CalTab>(() => load<CalTab>(DEFAULT_TAB_KEY, 'calendar'));
+    const [view, setView] = useState<CalView>('month');
+    const [cursor, setCursor] = useState<Date>(() => new Date());
     const [activeLayers, setActiveLayers] = useState<CalendarLayer[]>(readInitialLayers);
-    const [siteFilter, setSiteFilter] = useState<string>('all');
-    const [deptFilter, setDeptFilter] = useState<string>('all');
-    const [teamFilter, setTeamFilter] = useState<string>('all');
+    const [siteFilter, setSiteFilter] = useState('all');
+    const [deptFilter, setDeptFilter] = useState('all');
+    const [teamFilter, setTeamFilter] = useState('all');
     const [search, setSearch] = useState('');
+    const [panelOpen, setPanelOpen] = useState<boolean>(() => load(PANEL_KEY, true));
+    const [pinned, setPinned] = useState<Record<string, boolean>>(() =>
+        load(PINNED_KEY, { calendar: false, agenda: false, renewals: false }),
+    );
+
+    const [events, setEvents] = useState<CalendarLayerFeed[]>([]);
+    const [agendaEvents, setAgendaEvents] = useState<CalendarLayerFeed[] | null>(null);
+    const [renewals, setRenewals] = useState<CalendarLayerFeed[] | null>(null);
     const [counts, setCounts] = useState<Record<string, number>>({});
     const [feedError, setFeedError] = useState(false);
-    const [renewals, setRenewals] = useState<CalendarLayerFeed[] | null>(null);
+    const [loading, setLoading] = useState(false);
+
     const [wizardOpen, setWizardOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<CalendarEventInitial | null>(null);
     const [createDate, setCreateDate] = useState<string | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
     const [scopePrompt, setScopePrompt] = useState<EventClickArg | null>(null);
-    const [loading, setLoading] = useState(false);
     const [detail, setDetail] = useState<EventDetail | null>(null);
     const [ctxMenu, setCtxMenu] = useState<ShiftCtxState | null>(null);
     const [quickAdd, setQuickAdd] = useState<{ date: string; x: number; y: number } | null>(null);
+    const [hover, setHover] = useState<{ e: CalendarLayerFeed; x: number; y: number } | null>(null);
     const [yearPickerOpen, setYearPickerOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
-    const clickedInfoRef = useRef<EventClickArg | null>(null);
-    const searchRef = useRef<HTMLInputElement>(null);
-    // Month-grid (Calendar tab) state — the grid is a rostering-style month view.
-    const [cursor, setCursor] = useState<Date>(() => new Date());
-    const [monthEvents, setMonthEvents] = useState<CalendarLayerFeed[]>([]);
     const [dayDetail, setDayDetail] = useState<{ label: string; events: CalendarLayerFeed[] } | null>(null);
 
-    // Keep the live filter/layer state in a ref so the FullCalendar event source
-    // (registered once) always reads the current values without re-registering.
-    // Synced in an effect (never written during render).
-    const filtersRef = useRef({ activeLayers, siteFilter, deptFilter, teamFilter, search });
+    const clickedInfoRef = useRef<EventClickArg | null>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
+    const filtersRef = useRef({ activeLayers, siteFilter, deptFilter, teamFilter });
     useEffect(() => {
-        filtersRef.current = { activeLayers, siteFilter, deptFilter, teamFilter, search };
+        filtersRef.current = { activeLayers, siteFilter, deptFilter, teamFilter };
     });
 
     // Persist layer choice to localStorage + ?layers=
     useEffect(() => {
-        window.localStorage.setItem(LAYERS_STORAGE_KEY, activeLayers.join(','));
+        window.localStorage.setItem(LAYERS_KEY, activeLayers.join(','));
         const url = new URL(window.location.href);
         url.searchParams.set('layers', activeLayers.join(','));
         window.history.replaceState(window.history.state, '', url.toString());
-        calendarRef.current?.getApi().refetchEvents();
     }, [activeLayers]);
+    useEffect(() => {
+        window.localStorage.setItem(PANEL_KEY, JSON.stringify(panelOpen));
+    }, [panelOpen]);
 
     const buildFeedUrl = useCallback((from: string, to: string, layers: string) => {
         const { siteFilter: s, deptFilter: d, teamFilter: t } = filtersRef.current;
@@ -265,86 +259,119 @@ export default function CalendarIndex({
         return `/hr/calendar/feed?${params.toString()}`;
     }, []);
 
-    const fetchEvents = useCallback(
-        (
-            info: EventSourceFuncArg,
-            success: (e: EventInput[]) => void,
-            failure: (error: Error) => void,
-        ) => {
-            const { activeLayers: layers, search: q } = filtersRef.current;
-            if (layers.length === 0) {
-                setCounts({});
-                success([]);
-                return;
-            }
-            setLoading(true);
-            fetch(buildFeedUrl(info.startStr.slice(0, 10), info.endStr.slice(0, 10), layers.join(',')), {
+    const fetchJson = useCallback(
+        async (url: string): Promise<CalendarLayerFeed[]> => {
+            const res = await fetch(url, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
-            })
-                .then((r) => {
-                    if (!r.ok) throw new Error(String(r.status));
-                    return r.json();
-                })
-                .then((data: { events: CalendarLayerFeed[] }) => {
-                    setFeedError(false);
-                    setLoading(false);
-                    const tally: Record<string, number> = {};
-                    for (const e of data.events) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
-                    setCounts(tally);
-                    const filtered = q.trim()
-                        ? data.events.filter((e) =>
-                              e.title.toLowerCase().includes(q.trim().toLowerCase()),
-                          )
-                        : data.events;
-                    success(filtered.map(toFcEvent));
-                })
-                .catch((err: Error) => {
-                    setFeedError(true);
-                    setLoading(false);
-                    failure(err);
-                });
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            const data: { events: CalendarLayerFeed[] } = await res.json();
+            return data.events;
         },
-        [buildFeedUrl],
+        [],
     );
 
-    // Refetch when filters/search change.
-    useEffect(() => {
-        calendarRef.current?.getApi().refetchEvents();
-    }, [siteFilter, deptFilter, teamFilter, search]);
+    const fetchRange = useCallback(async () => {
+        const { activeLayers: layers } = filtersRef.current;
+        if (layers.length === 0) {
+            setEvents([]);
+            setCounts({});
+            return;
+        }
+        const { from, to } = rangeFor(view, cursor);
+        setLoading(true);
+        try {
+            const evs = await fetchJson(buildFeedUrl(iso(from), iso(to), layers.join(',')));
+            setFeedError(false);
+            const tally: Record<string, number> = {};
+            for (const e of evs) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
+            setCounts(tally);
+            setEvents(evs);
+        } catch {
+            setFeedError(true);
+        } finally {
+            setLoading(false);
+        }
+    }, [view, cursor, buildFeedUrl, fetchJson]);
 
-    // Load the renewals list when that tab opens.
+    const fetchAgenda = useCallback(async () => {
+        const { activeLayers: layers } = filtersRef.current;
+        if (layers.length === 0) {
+            setAgendaEvents([]);
+            return;
+        }
+        const from = iso(today);
+        const to = iso(addDays(today, 30));
+        try {
+            setAgendaEvents(await fetchJson(buildFeedUrl(from, to, layers.join(','))));
+        } catch {
+            setAgendaEvents([]);
+        }
+    }, [today, buildFeedUrl, fetchJson]);
+
+    const fetchRenewals = useCallback(async () => {
+        const from = iso(today);
+        const to = iso(addDays(today, 90));
+        try {
+            const evs = await fetchJson(`/hr/calendar/feed?from=${from}&to=${to}&layers=compliance`);
+            setRenewals(evs.sort((a, b) => a.start.localeCompare(b.start)));
+        } catch {
+            setRenewals([]);
+        }
+    }, [today, fetchJson]);
+
+    // Calendar tab: (re)fetch the visible range on view / period / filter change.
+    useEffect(() => {
+        if (tab !== 'calendar') return;
+        void fetchRange();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, view, cursor, activeLayers, siteFilter, deptFilter, teamFilter]);
+
+    // Agenda tab: fetch the next 30 days.
+    useEffect(() => {
+        if (tab !== 'agenda') return;
+        void fetchAgenda();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, activeLayers, siteFilter, deptFilter, teamFilter]);
+
+    // Renewals tab: fetch compliance once on first open.
     useEffect(() => {
         if (tab !== 'renewals' || renewals !== null) return;
-        const from = new Date().toISOString().slice(0, 10);
-        const to = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
-        fetch(`/hr/calendar/feed?from=${from}&to=${to}&layers=compliance`, {
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin',
-        })
-            .then((r) => r.json())
-            .then((d: { events: CalendarLayerFeed[] }) =>
-                setRenewals(
-                    [...d.events].sort((a, b) => a.start.localeCompare(b.start)),
-                ),
-            )
-            .catch(() => setRenewals([]));
-    }, [tab, renewals]);
+        void fetchRenewals();
+    }, [tab, renewals, fetchRenewals]);
 
-    // Keyboard shortcuts: / search · n new · t today · 1-4 views · ←/→ period · Esc.
+    const refetch = useCallback(() => {
+        void fetchRange();
+        void fetchAgenda();
+    }, [fetchRange, fetchAgenda]);
+
+    const go = useCallback(
+        (dir: number) => {
+            setCursor((c) => {
+                if (view === 'month') return new Date(c.getFullYear(), c.getMonth() + dir, 1);
+                if (view === 'week') return addDays(c, 7 * dir);
+                return addDays(c, dir);
+            });
+        },
+        [view],
+    );
+
+    // Keyboard: / search · n new · t today · 1-4 views · ←/→ period · Esc.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement | null;
             const typing =
                 el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
             if (e.key === 'Escape') {
+                setHover(null);
                 setDetail(null);
                 setCtxMenu(null);
                 setQuickAdd(null);
+                setYearPickerOpen(false);
                 return;
             }
-            if (typing || tab === 'renewals') return;
-            const api = calendarRef.current?.getApi();
+            if (typing) return;
             switch (e.key) {
                 case '/':
                     e.preventDefault();
@@ -355,15 +382,27 @@ export default function CalendarIndex({
                     break;
                 case 't':
                     setCursor(new Date());
-                    api?.today();
+                    break;
+                case '1':
+                    setTab('calendar');
+                    setView('month');
+                    break;
+                case '2':
+                    setTab('calendar');
+                    setView('week');
+                    break;
+                case '3':
+                    setTab('calendar');
+                    setView('day');
+                    break;
+                case '4':
+                    setTab('agenda');
                     break;
                 case 'ArrowLeft':
-                    setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
-                    api?.prev();
+                    if (tab === 'calendar') go(-1);
                     break;
                 case 'ArrowRight':
-                    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
-                    api?.next();
+                    if (tab === 'calendar') go(1);
                     break;
                 default:
                     break;
@@ -372,17 +411,15 @@ export default function CalendarIndex({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tab, can.manage]);
+    }, [tab, can.manage, go]);
 
     const toggleLayer = (layer: CalendarLayer) => {
         setActiveLayers((prev) =>
             prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer],
         );
     };
-
-    const goToday = () => {
-        setCursor(new Date());
-        calendarRef.current?.getApi().today();
+    const ensureLayer = (layer: CalendarLayer) => {
+        setActiveLayers((prev) => (prev.includes(layer) ? prev : [...prev, layer]));
     };
 
     const openCreate = (date?: string | null) => {
@@ -391,61 +428,7 @@ export default function CalendarIndex({
         setWizardOpen(true);
     };
 
-    const refetch = () => {
-        calendarRef.current?.getApi().refetchEvents();
-        void fetchMonth();
-    };
-
-    // Fetch the 6-week matrix around `cursor` for the month grid (Calendar tab).
-    const fetchMonth = useCallback(async () => {
-        const { activeLayers: layers } = filtersRef.current;
-        const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-        const offset = (monthStart.getDay() + 6) % 7;
-        const from = new Date(monthStart);
-        from.setDate(1 - offset);
-        const to = new Date(from);
-        to.setDate(from.getDate() + 41);
-        const iso = (d: Date) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        if (layers.length === 0) {
-            setMonthEvents([]);
-            setCounts({});
-            return;
-        }
-        setLoading(true);
-        try {
-            const res = await fetch(buildFeedUrl(iso(from), iso(to), layers.join(',')), {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            if (!res.ok) throw new Error(String(res.status));
-            const data: { events: CalendarLayerFeed[] } = await res.json();
-            setFeedError(false);
-            const tally: Record<string, number> = {};
-            for (const e of data.events) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
-            setCounts(tally);
-            setMonthEvents(data.events);
-        } catch {
-            setFeedError(true);
-        } finally {
-            setLoading(false);
-        }
-    }, [cursor, buildFeedUrl]);
-
-    // (Re)fetch the month grid on month / filter / layer change while on a grid tab.
-    useEffect(() => {
-        if (tab === 'renewals') return;
-        void fetchMonth();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cursor, tab, activeLayers, siteFilter, deptFilter, teamFilter]);
-
-    // The visible month's events, after the client-side title search.
-    const visibleMonthEvents = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return q ? monthEvents.filter((e) => e.title.toLowerCase().includes(q)) : monthEvents;
-    }, [monthEvents, search]);
-
-    /** Adapt a feed chip into the EventClickArg shape the shared handlers expect. */
+    /* ── feed → EventClickArg adapter (shared with the wizard/popover wiring) ── */
     const feedToInfo = (e: CalendarLayerFeed, x = 200, y = 200): EventClickArg =>
         ({
             event: {
@@ -458,30 +441,6 @@ export default function CalendarIndex({
             },
             jsEvent: { clientX: x, clientY: y } as MouseEvent,
         }) as unknown as EventClickArg;
-
-    const moveEvent = (eventId: number, dateKey: string) => {
-        const ev = monthEvents.find((e) => Number(e.extendedProps.eventId) === eventId);
-        if (!ev || !ev.start) return;
-        const oldStart = new Date(ev.start);
-        const oldEnd = ev.end ? new Date(ev.end) : oldStart;
-        const durationMs = Math.max(0, oldEnd.getTime() - oldStart.getTime());
-        const [y, m, d] = dateKey.split('-').map(Number);
-        const newStart = new Date(oldStart);
-        newStart.setFullYear(y, m - 1, d);
-        const newEnd = new Date(newStart.getTime() + durationMs);
-        const fmt = (dt: Date) =>
-            `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}T${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-        router.put(
-            `/hr/calendar/events/${eventId}`,
-            { starts_at: fmt(newStart), ends_at: fmt(newEnd), scope: 'all' },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => refetch(),
-                onError: () => toast.error('Could not move the event'),
-            },
-        );
-    };
 
     const buildInitial = (
         info: EventClickArg,
@@ -532,10 +491,10 @@ export default function CalendarIndex({
         };
     };
 
-    // Left-click any entry → detail popover (read any layer; deep-link or edit).
     const handleEventClick = (info: EventClickArg) => {
         clickedInfoRef.current = info;
         const e = info.jsEvent as MouseEvent;
+        setHover(null);
         setCtxMenu(null);
         setDetail(detailFromInfo(info, e?.clientX ?? 200, e?.clientY ?? 200));
     };
@@ -546,11 +505,8 @@ export default function CalendarIndex({
             if (props.deepLink) router.visit(props.deepLink as string);
             return;
         }
-        if (props.rrule && can.manageRecurring) {
-            setScopePrompt(info);
-        } else {
-            openEdit(buildInitial(info, 'all'));
-        }
+        if (props.rrule && can.manageRecurring) setScopePrompt(info);
+        else openEdit(buildInitial(info, 'all'));
     };
 
     const duplicateFromInfo = (info: EventClickArg) => {
@@ -587,24 +543,57 @@ export default function CalendarIndex({
         setDeleteTarget(null);
     };
 
-    const buildEntryMenu = (info: EventClickArg, x: number, y: number) => {
-        const props = info.event.extendedProps as Record<string, unknown>;
-        const layer = (props.layer as CalendarLayer) ?? 'event';
-        const meta = LAYER_META[layer];
+    const buildEntryMenu = (e: CalendarLayerFeed, x: number, y: number) => {
+        const info = feedToInfo(e, x, y);
+        const meta = LAYER_META[e.layer];
         const items =
-            layer === 'event' && can.manage
+            e.layer === 'event' && can.manage
                 ? [
-                      { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit', kbd: '↵', onClick: () => editFromInfo(info) },
+                      { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open', onClick: () => handleEventClick(info) },
+                      { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit…', kbd: '↵', onClick: () => editFromInfo(info) },
                       { icon: <Copy className="h-3.5 w-3.5" />, label: 'Duplicate', onClick: () => duplicateFromInfo(info) },
                       { sep: true as const },
                       { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Delete', tone: 'critical' as const, onClick: () => deleteFromInfo(info) },
                   ]
-                : props.deepLink
-                  ? [{ icon: <ExternalLink className="h-3.5 w-3.5" />, label: 'Open in ' + meta.label.split(' ')[0], onClick: () => router.visit(props.deepLink as string) }]
-                  : [];
-        if (items.length === 0) return;
+                : [
+                      { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open detail', onClick: () => handleEventClick(info) },
+                      ...(e.deepLink
+                          ? [{ icon: <ExternalLink className="h-3.5 w-3.5" />, label: 'Open in ' + meta.label.split(' ')[0], onClick: () => router.visit(e.deepLink as string) }]
+                          : []),
+                  ];
         setDetail(null);
-        setCtxMenu({ x, y, tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4), meta: info.event.title, items });
+        setCtxMenu({ x, y, tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4), meta: e.title, items });
+    };
+
+    const openDayMenu = (date: Date, x: number, y: number) => {
+        const items = [
+            ...(can.manage
+                ? [{ icon: <Plus className="h-3.5 w-3.5" />, label: 'New event here', kbd: 'N', onClick: () => openCreate(iso(date)) }]
+                : []),
+            { icon: <CalendarDays className="h-3.5 w-3.5" />, label: 'View this day', onClick: () => { setView('day'); setCursor(date); } },
+            { icon: <UserIcon className="h-3.5 w-3.5" />, label: "Show who's off", onClick: () => { ensureLayer('leave'); toast.success('Leave layer focused'); } },
+            { icon: <Users className="h-3.5 w-3.5" />, label: 'Show coverage', onClick: () => { ensureLayer('shift'); toast.success('Shifts layer focused'); } },
+        ];
+        setDetail(null);
+        setCtxMenu({ x, y, tag: 'DAY', meta: fmtLong(date), items });
+    };
+
+    const openTabMenu = (key: CalTab, x: number, y: number) => {
+        const items = [
+            { icon: <Star className="h-3.5 w-3.5" />, label: 'Set as default view', onClick: () => { window.localStorage.setItem(DEFAULT_TAB_KEY, JSON.stringify(key)); toast.success('Default tab set'); } },
+            { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open', onClick: () => setTab(key) },
+            {
+                icon: <Pin className="h-3.5 w-3.5" />,
+                label: pinned[key] ? 'Unpin' : 'Pin',
+                onClick: () =>
+                    setPinned((p) => {
+                        const next = { ...p, [key]: !p[key] };
+                        window.localStorage.setItem(PINNED_KEY, JSON.stringify(next));
+                        return next;
+                    }),
+            },
+        ];
+        setCtxMenu({ x, y, tag: 'TAB', meta: 'Tab options', items });
     };
 
     const onUpNext = (entry: UpNextEntry) => {
@@ -615,44 +604,54 @@ export default function CalendarIndex({
         const d = new Date(entry.start);
         if (!Number.isNaN(d.getTime())) {
             setTab('calendar');
+            setView('month');
             setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
         }
     };
 
-    const totalCount = useMemo(
-        () => Object.values(counts).reduce((a, b) => a + b, 0),
-        [counts],
-    );
-    const calendarTabs = useMemo(
-        () => [
-            {
-                id: 'calendar',
-                label: 'Calendar',
-                icon: CalendarDays,
-                tone: 'primary' as const,
-                badge: counts.event || undefined,
-            },
-            {
-                id: 'agenda',
-                label: 'Agenda',
-                icon: ListChecks,
-                tone: 'info' as const,
-                badge: totalCount || undefined,
-            },
-            {
-                id: 'renewals',
-                label: 'Renewals',
-                icon: CalendarClock,
-                tone: 'warning' as const,
-                badge: stats.renewalsSoon || undefined,
-            },
-        ],
-        [counts.event, totalCount, stats.renewalsSoon],
-    );
+    /* ── derived ── */
+    const visibleEvents = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return q ? events.filter((e) => e.title.toLowerCase().includes(q)) : events;
+    }, [events, search]);
+    const visibleAgenda = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const base = agendaEvents ?? [];
+        return q ? base.filter((e) => e.title.toLowerCase().includes(q)) : base;
+    }, [agendaEvents, search]);
 
-    const handleTabChange = (next: string) => {
-        setTab(next as 'calendar' | 'agenda' | 'renewals');
+    const totalCount = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts]);
+    const tabDefs: { key: CalTab; label: string; count: number }[] = [
+        { key: 'calendar', label: 'Calendar', count: counts.event ?? 0 },
+        { key: 'agenda', label: 'Agenda', count: totalCount },
+        { key: 'renewals', label: 'Renewals', count: stats.renewalsSoon },
+    ];
+
+    const periodTitle = useMemo(() => {
+        if (view === 'month')
+            return cursor.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+        if (view === 'week') {
+            const ws = startOfWeek(cursor);
+            const we = addDays(ws, 6);
+            return `${ws.getDate()} ${ws.toLocaleDateString('en-NZ', { month: 'short' })} – ${we.getDate()} ${we.toLocaleDateString('en-NZ', { month: 'short' })}`;
+        }
+        return fmtLong(cursor);
+    }, [view, cursor]);
+
+    const gridDays = useMemo(() => {
+        if (view === 'day') return [dayStart(cursor)];
+        const ws = startOfWeek(cursor);
+        return Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+    }, [view, cursor]);
+
+    const entryHandlers = {
+        onEntryClick: (e: CalendarLayerFeed, x: number, y: number) => handleEventClick(feedToInfo(e, x, y)),
+        onEntryCtx: (e: CalendarLayerFeed, x: number, y: number) => buildEntryMenu(e, x, y),
+        onEntryHover: (e: CalendarLayerFeed, x: number, y: number) => setHover({ e, x, y }),
+        onEntryHoverEnd: () => setHover(null),
     };
+
+    const showShiftCoverage = activeLayers.includes('shift');
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -666,193 +665,216 @@ export default function CalendarIndex({
                     siteCount={sites.length}
                     needs={[
                         ...(stats.coverageGapsToday > 0
-                            ? [
-                                  {
-                                      key: 'gaps',
-                                      label: `${stats.coverageGapsToday} coverage gap${stats.coverageGapsToday === 1 ? '' : 's'} today`,
-                                      onClick: () => {
-                                          if (!activeLayers.includes('shift')) toggleLayer('shift');
-                                          setTab('calendar');
-                                          goToday();
-                                      },
-                                  },
-                              ]
+                            ? [{ key: 'gaps', label: `${stats.coverageGapsToday} coverage gap${stats.coverageGapsToday === 1 ? '' : 's'} today`, onClick: () => { ensureLayer('shift'); setTab('calendar'); setView('month'); setCursor(new Date()); } }]
                             : []),
                         ...(stats.renewalsSoon > 0
-                            ? [
-                                  {
-                                      key: 'renewals',
-                                      label: `${stats.renewalsSoon} renewal${stats.renewalsSoon === 1 ? '' : 's'} due soon`,
-                                      onClick: () => setTab('renewals'),
-                                  },
-                              ]
+                            ? [{ key: 'renewals', label: `${stats.renewalsSoon} renewal${stats.renewalsSoon === 1 ? '' : 's'} due soon`, onClick: () => setTab('renewals') }]
                             : []),
                     ]}
                     handlers={{
-                        // Subscribe (iCal) lands in Pass 6; "Manage layers" is the toolbar
-                        // Layers popover, so it isn't duplicated as a hero action.
                         onNewEvent: can.manage ? () => openCreate() : undefined,
-                        onToday: () => {
-                            setTab('calendar');
-                            goToday();
-                        },
+                        onToday: () => { setTab('calendar'); setCursor(new Date()); },
                         onSubscribe: () => setSubscribeOpen(true),
-                        onStatEvents: () => {
-                            setTab('calendar');
-                            goToday();
-                        },
-                        onStatLeave: () => {
-                            if (!activeLayers.includes('leave')) toggleLayer('leave');
-                            setTab('agenda');
-                        },
-                        onStatGaps: () => {
-                            setTab('calendar');
-                            if (!activeLayers.includes('shift')) toggleLayer('shift');
-                            goToday();
-                        },
+                        onStatEvents: () => { setTab('calendar'); setView('week'); setCursor(new Date()); },
+                        onStatLeave: () => { ensureLayer('leave'); setTab('agenda'); },
+                        onStatGaps: () => { setTab('calendar'); ensureLayer('shift'); setCursor(new Date()); },
                         onStatRenewals: () => setTab('renewals'),
                         onUpNext,
                     }}
                 />
 
-                <div className="mt-6">
-                    <HrTabs
-                        value={tab}
-                        onChange={handleTabChange}
-                        items={calendarTabs}
-                        ariaLabel="Calendar views"
-                        className="mb-5"
-                        trailing={
-                            <span className="hidden text-[11px] text-muted-foreground lg:inline">
-                                Right-click a tab to pin / set default
-                            </span>
-                        }
-                    />
+                {/* ── tab strip ── */}
+                <div className="mt-[22px] flex items-end gap-1 border-b border-border">
+                    {tabDefs.map((t) => {
+                        const active = tab === t.key;
+                        return (
+                            <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => setTab(t.key)}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    openTabMenu(t.key, e.clientX, e.clientY);
+                                }}
+                                className="relative -mb-px inline-flex items-center gap-2 border-b-[2.5px] bg-transparent px-[15px] pb-3 pt-[11px] text-[13.5px] font-semibold"
+                                style={{
+                                    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                                    borderBottomColor: active ? 'var(--primary)' : 'transparent',
+                                }}
+                            >
+                                {t.label}
+                                {pinned[t.key] ? <Star className="h-3 w-3 fill-current opacity-70" /> : null}
+                                <span
+                                    className="inline-grid h-[19px] min-w-[19px] place-items-center rounded-full px-[5px] text-[11px] font-bold"
+                                    style={{
+                                        background: active ? 'var(--accent)' : 'var(--muted)',
+                                        color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                                    }}
+                                >
+                                    {t.count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                    <span className="hrcal-tab-hint ml-auto hidden pb-2 text-[11px] lg:inline">
+                        Right-click a tab to set default / pin
+                    </span>
                 </div>
 
-                {tab === 'calendar' || tab === 'agenda' ? (
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-                        {/* Left: persistent layer rail — one grid replacing four calendars */}
-                        <LayerRail
-                            activeLayers={activeLayers}
-                            counts={counts}
-                            onToggle={toggleLayer}
-                        />
+                {/* ── toolbar (calendar tab only) ── */}
+                {tab === 'calendar' ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1">
+                            <ToolbarIconButton ariaLabel="Previous" onClick={() => go(-1)}>
+                                <ChevronLeft className="h-[17px] w-[17px]" />
+                            </ToolbarIconButton>
+                            <ToolbarIconButton ariaLabel="Next" onClick={() => go(1)}>
+                                <ChevronRight className="h-[17px] w-[17px]" />
+                            </ToolbarIconButton>
+                            <button
+                                type="button"
+                                onClick={() => setCursor(new Date())}
+                                className="ml-1 h-[34px] rounded-[9px] border border-border bg-card px-[13px] text-[12.5px] font-semibold text-foreground hover:bg-muted"
+                            >
+                                Today
+                            </button>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setYearPickerOpen(true)}
+                            className="inline-flex min-w-[180px] items-center gap-[7px] rounded-[9px] bg-transparent px-2 py-1 text-[19px] font-bold tracking-tight text-foreground hover:bg-muted"
+                        >
+                            {periodTitle}
+                            <ChevronDown className="h-[15px] w-[15px] opacity-50" />
+                        </button>
 
-                        {/* Right: filters + legend + calendar */}
-                        <div className="min-w-0 flex-1 space-y-3">
-                        {/* Filter bar */}
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="ml-auto flex flex-wrap items-center gap-[10px]">
                             <div className="relative">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
+                                <Search className="pointer-events-none absolute left-[10px] top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
+                                <input
                                     ref={searchRef}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search events…  ( / )"
-                                    className="h-9 w-[200px] pl-8"
+                                    placeholder="Search events…"
+                                    className="h-[34px] w-[170px] rounded-[9px] border border-border bg-card pl-8 pr-[10px] text-[13px] text-foreground outline-none"
                                 />
                             </div>
-
-                            <FilterSelect
-                                value={siteFilter}
-                                onChange={setSiteFilter}
-                                allLabel="All sites"
-                                options={sites.map((s) => ({ value: String(s.id), label: s.name }))}
-                            />
-                            <FilterSelect
-                                value={deptFilter}
-                                onChange={setDeptFilter}
-                                allLabel="All departments"
-                                options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
-                            />
-                            {teams.length > 0 ? (
-                                <FilterSelect
-                                    value={teamFilter}
-                                    onChange={setTeamFilter}
-                                    allLabel="All teams"
-                                    options={teams.map((t) => ({ value: t, label: t }))}
-                                />
+                            <NativeSelect value={siteFilter} onChange={setSiteFilter}>
+                                <option value="all">All sites</option>
+                                {sites.map((s) => (
+                                    <option key={s.id} value={String(s.id)}>{s.name}</option>
+                                ))}
+                            </NativeSelect>
+                            {departments.length > 0 ? (
+                                <NativeSelect value={deptFilter} onChange={setDeptFilter}>
+                                    <option value="all">All departments</option>
+                                    {departments.map((d) => (
+                                        <option key={d.id} value={String(d.id)}>{d.name}</option>
+                                    ))}
+                                </NativeSelect>
                             ) : null}
-
+                            {teams.length > 0 ? (
+                                <NativeSelect value={teamFilter} onChange={setTeamFilter}>
+                                    <option value="all">All teams</option>
+                                    {teams.map((t) => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </NativeSelect>
+                            ) : null}
+                            <div className="inline-flex gap-[2px] rounded-[10px] bg-muted p-[3px]">
+                                {(['month', 'week', 'day'] as CalView[]).map((v) => (
+                                    <button
+                                        key={v}
+                                        type="button"
+                                        onClick={() => setView(v)}
+                                        className="rounded-lg px-[13px] py-[6px] text-[12.5px] font-semibold capitalize"
+                                        style={
+                                            view === v
+                                                ? { background: 'var(--card)', color: 'var(--foreground)', boxShadow: '0 1px 2px rgba(0,0,0,.08)' }
+                                                : { background: 'transparent', color: 'var(--muted-foreground)' }
+                                        }
+                                    >
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+                    </div>
+                ) : null}
 
-                        {/* Legend */}
-                        <Legend activeLayers={activeLayers} counts={counts} />
+                {/* ── body ── */}
+                <div className="mt-4 flex items-start gap-4">
+                    {tab === 'calendar' && panelOpen ? (
+                        <LayerPanel
+                            activeLayers={activeLayers}
+                            counts={counts}
+                            onToggle={toggleLayer}
+                            onHide={() => setPanelOpen(false)}
+                        />
+                    ) : null}
 
-                        {feedError ? (
-                            <Card>
-                                <CardContent className="p-4">
-                                    <ErrorState
-                                        title="Couldn't load the calendar"
-                                        message="The calendar feed failed to load."
-                                        onRetry={() => {
-                                            setFeedError(false);
-                                            void fetchMonth();
-                                            calendarRef.current?.getApi().refetchEvents();
-                                        }}
-                                    />
-                                </CardContent>
-                            </Card>
-                        ) : tab === 'calendar' ? (
+                    <div className="min-w-0 flex-1">
+                        {tab === 'calendar' ? (
+                            <Legend
+                                activeLayers={activeLayers}
+                                panelOpen={panelOpen}
+                                onShowPanel={() => setPanelOpen(true)}
+                            />
+                        ) : null}
+
+                        {feedError && tab === 'calendar' ? (
+                            <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                                The calendar feed failed to load.{' '}
+                                <button type="button" onClick={() => { setFeedError(false); void fetchRange(); }} className="font-semibold text-primary underline">
+                                    Retry
+                                </button>
+                            </div>
+                        ) : tab === 'calendar' && view === 'month' ? (
                             <CalendarMonthGrid
-                                events={visibleMonthEvents}
+                                events={visibleEvents}
                                 cursor={cursor}
-                                canManage={can.manage}
+                                today={today}
+                                showCoverage={showShiftCoverage}
                                 loading={loading}
                                 handlers={{
-                                    onPrev: () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1)),
-                                    onNext: () => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1)),
-                                    onToday: () => setCursor(new Date()),
-                                    onTitleClick: () => setYearPickerOpen(true),
-                                    onChipClick: (e, x, y) => handleEventClick(feedToInfo(e, x, y)),
-                                    onChipCtx: (e, x, y) => buildEntryMenu(feedToInfo(e, x, y), x, y),
-                                    onQuickAdd: (dateKey, x, y) => setQuickAdd({ date: dateKey, x, y }),
-                                    onMoreClick: (dateKey) => {
-                                        const sameDay = visibleMonthEvents.filter((e) => {
-                                            if (!e.start || e.layer === 'holiday') return false;
-                                            const d = new Date(e.start);
-                                            const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                            return k === dateKey;
-                                        });
-                                        setDayDetail({
-                                            label: new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-NZ', {
-                                                weekday: 'long',
-                                                day: 'numeric',
-                                                month: 'long',
-                                            }),
-                                            events: sameDay,
-                                        });
-                                    },
-                                    onMoveEvent: can.manage ? moveEvent : undefined,
+                                    ...entryHandlers,
+                                    onDayNum: (d) => { setView('day'); setCursor(d); },
+                                    onDayMenu: openDayMenu,
+                                    onAdd: (d, x, y) => setQuickAdd({ date: iso(d), x, y }),
+                                    onMore: (d) => { setView('day'); setCursor(d); },
+                                }}
+                            />
+                        ) : tab === 'calendar' ? (
+                            <CalendarTimeGrid
+                                days={gridDays}
+                                events={visibleEvents}
+                                today={today}
+                                handlers={{
+                                    ...entryHandlers,
+                                    onCreate: (d, _hour, x, y) => setQuickAdd({ date: iso(d), x, y }),
+                                }}
+                            />
+                        ) : tab === 'agenda' ? (
+                            <CalendarAgenda
+                                events={visibleAgenda}
+                                today={today}
+                                handlers={{
+                                    onEntryClick: (e, x, y) => handleEventClick(feedToInfo(e, x, y)),
+                                    onEntryCtx: (e, x, y) => buildEntryMenu(e, x, y),
+                                    onDeepLink: (href) => router.visit(href),
                                 }}
                             />
                         ) : (
-                            <Card>
-                                <CardContent className="p-4">
-                                    <CalendarView
-                                        calendarRef={calendarRef}
-                                        plugins={[listPlugin, interactionPlugin]}
-                                        initialView="listWeek"
-                                        events={fetchEvents}
-                                        eventClick={handleEventClick}
-                                        headerToolbar={{
-                                            left: 'prev,next today',
-                                            center: 'title',
-                                            right: '',
-                                        }}
-                                        buttonText={{ today: 'Today' }}
-                                        noEventsContent="Nothing scheduled this week."
-                                    />
-                                </CardContent>
-                            </Card>
+                            <CalendarRenewals
+                                renewals={renewals}
+                                today={today}
+                                onOpen={(href) => router.visit(href)}
+                            />
                         )}
-                        </div>
                     </div>
-                ) : (
-                    <RenewalsTab renewals={renewals} />
-                )}
+                </div>
 
+                {/* ── overlays / dialogs ── */}
                 {can.manage ? (
                     <EventWizardDialog
                         open={wizardOpen}
@@ -867,11 +889,7 @@ export default function CalendarIndex({
                     />
                 ) : null}
 
-                <ICalSubscribeDialog
-                    open={subscribeOpen}
-                    onClose={() => setSubscribeOpen(false)}
-                    url={ical.url}
-                />
+                <ICalSubscribeDialog open={subscribeOpen} onClose={() => setSubscribeOpen(false)} url={ical.url} />
 
                 <Dialog open={!!scopePrompt} onOpenChange={(o) => !o && setScopePrompt(null)}>
                     <DialogContent className="max-w-md">
@@ -911,64 +929,32 @@ export default function CalendarIndex({
                         detail={detail}
                         canManage={can.manage}
                         onClose={() => setDetail(null)}
-                        onEdit={() => {
-                            setDetail(null);
-                            if (clickedInfoRef.current) editFromInfo(clickedInfoRef.current);
-                        }}
-                        onDuplicate={() => {
-                            setDetail(null);
-                            if (clickedInfoRef.current) duplicateFromInfo(clickedInfoRef.current);
-                        }}
-                        onDelete={() => {
-                            setDetail(null);
-                            if (clickedInfoRef.current) deleteFromInfo(clickedInfoRef.current);
-                        }}
-                        onDeepLink={(href) => {
-                            setDetail(null);
-                            router.visit(href);
-                        }}
+                        onEdit={() => { setDetail(null); if (clickedInfoRef.current) editFromInfo(clickedInfoRef.current); }}
+                        onDuplicate={() => { setDetail(null); if (clickedInfoRef.current) duplicateFromInfo(clickedInfoRef.current); }}
+                        onDelete={() => { setDetail(null); if (clickedInfoRef.current) deleteFromInfo(clickedInfoRef.current); }}
+                        onDeepLink={(href) => { setDetail(null); router.visit(href); }}
                     />
                 ) : null}
 
                 {ctxMenu ? <ShiftContextMenu ctx={ctxMenu} onClose={() => setCtxMenu(null)} /> : null}
+
+                {hover ? <HoverPreview e={hover.e} x={hover.x} y={hover.y} /> : null}
 
                 {quickAdd ? (
                     <QuickAddPopover
                         date={quickAdd.date}
                         x={quickAdd.x}
                         y={quickAdd.y}
-                        onClose={() => {
-                            setQuickAdd(null);
-                            calendarRef.current?.getApi().unselect();
-                        }}
+                        onClose={() => setQuickAdd(null)}
                         onCreate={(title) => {
                             router.post(
                                 '/hr/calendar/events',
-                                {
-                                    title,
-                                    event_type: 'company',
-                                    starts_at: `${quickAdd.date}T09:00`,
-                                    ends_at: `${quickAdd.date}T10:00`,
-                                    is_all_day: false,
-                                },
-                                {
-                                    preserveScroll: true,
-                                    preserveState: true,
-                                    onSuccess: () => {
-                                        refetch();
-                                        toast.success('Event added');
-                                    },
-                                },
+                                { title, event_type: 'company', starts_at: `${quickAdd.date}T09:00`, ends_at: `${quickAdd.date}T10:00`, is_all_day: false },
+                                { preserveScroll: true, preserveState: true, onSuccess: () => { refetch(); toast.success('Event added'); } },
                             );
                             setQuickAdd(null);
-                            calendarRef.current?.getApi().unselect();
                         }}
-                        onMore={() => {
-                            const d = quickAdd.date;
-                            setQuickAdd(null);
-                            calendarRef.current?.getApi().unselect();
-                            openCreate(d);
-                        }}
+                        onMore={() => { const d = quickAdd.date; setQuickAdd(null); openCreate(d); }}
                     />
                 ) : null}
 
@@ -980,14 +966,15 @@ export default function CalendarIndex({
                     onPickMonth={(date) => {
                         setYearPickerOpen(false);
                         setTab('calendar');
+                        setView('month');
                         const d = new Date(`${date}T00:00:00`);
                         setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
                     }}
                     onPickDay={(date) => {
                         setYearPickerOpen(false);
                         setTab('calendar');
-                        const d = new Date(`${date}T00:00:00`);
-                        setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
+                        setView('day');
+                        setCursor(new Date(`${date}T00:00:00`));
                     }}
                 />
 
@@ -1004,23 +991,14 @@ export default function CalendarIndex({
                                 <button
                                     key={e.id}
                                     type="button"
-                                    onClick={(ev) => {
-                                        const x = ev.clientX;
-                                        const y = ev.clientY;
-                                        setDayDetail(null);
-                                        handleEventClick(feedToInfo(e, x, y));
-                                    }}
+                                    onClick={(ev) => { const x = ev.clientX; const y = ev.clientY; setDayDetail(null); handleEventClick(feedToInfo(e, x, y)); }}
                                     className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
-                                    style={{ borderLeftWidth: 3, borderLeftColor: `var(--${e.color})` }}
+                                    style={{ borderLeftWidth: 3, borderLeftColor: colorVar(e) }}
                                 >
-                                    <span className="h-2 w-2 flex-none rounded-full" style={{ background: `var(--${e.color})` }} />
+                                    <span className="h-2 w-2 flex-none rounded-full" style={{ background: colorVar(e) }} />
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-[13px] font-semibold">{e.title}</span>
-                                        <span className="block text-[11px] text-muted-foreground">
-                                            {e.allDay
-                                                ? 'All day'
-                                                : new Date(e.start).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                        </span>
+                                        <span className="block text-[11px] text-muted-foreground">{layerLabel(e)}</span>
                                     </span>
                                 </button>
                             ))}
@@ -1038,10 +1016,7 @@ export default function CalendarIndex({
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Keep event</AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={confirmDelete}
-                                className="bg-status-critical text-white hover:bg-status-critical/90"
-                            >
+                            <AlertDialogAction onClick={confirmDelete} className="bg-status-critical text-white hover:bg-status-critical/90">
                                 Delete event
                             </AlertDialogAction>
                         </AlertDialogFooter>
@@ -1054,31 +1029,214 @@ export default function CalendarIndex({
 
 /* ─────────────────────────── sub-components ─────────────────────────── */
 
-function FilterSelect({
+function ToolbarIconButton({
+    ariaLabel,
+    onClick,
+    children,
+}: {
+    ariaLabel: string;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={ariaLabel}
+            onClick={onClick}
+            className="grid h-[34px] w-[34px] place-items-center rounded-[9px] border border-border bg-card text-foreground hover:bg-muted"
+        >
+            {children}
+        </button>
+    );
+}
+
+function NativeSelect({
     value,
     onChange,
-    allLabel,
-    options,
+    children,
 }: {
     value: string;
     onChange: (v: string) => void;
-    allLabel: string;
-    options: { value: string; label: string }[];
+    children: React.ReactNode;
 }) {
     return (
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="h-9 w-[160px]">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">{allLabel}</SelectItem>
-                {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
+        <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-[34px] cursor-pointer appearance-none rounded-[9px] border border-border bg-card pl-[11px] pr-[28px] text-[12.5px] font-semibold text-foreground outline-none"
+            style={{
+                backgroundImage:
+                    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 10px center',
+            }}
+        >
+            {children}
+        </select>
+    );
+}
+
+const LAYER_SUBLABEL: Record<CalendarLayer, string> = {
+    event: 'Editable here',
+    leave: 'From Leave hub',
+    shift: 'From Rostering',
+    holiday: 'NZ statutory',
+    compliance: 'Cert expiries',
+    milestone: 'Birthdays, anniv.',
+};
+
+function LayerPanel({
+    activeLayers,
+    counts,
+    onToggle,
+    onHide,
+}: {
+    activeLayers: CalendarLayer[];
+    counts: Record<string, number>;
+    onToggle: (l: CalendarLayer) => void;
+    onHide: () => void;
+}) {
+    return (
+        <aside
+            className="sticky top-4 w-[248px] flex-none rounded-2xl border border-border bg-card p-3.5"
+            style={{ boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}
+        >
+            <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Layers</span>
+                <button
+                    type="button"
+                    aria-label="Hide layers"
+                    onClick={onHide}
+                    className="grid h-6 w-6 place-items-center rounded-[7px] text-muted-foreground hover:bg-muted"
+                >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+            </div>
+            <p className="mb-2.5 text-[11.5px] leading-snug text-muted-foreground">
+                One grid replacing four calendars. Toggle a source on or off.
+            </p>
+            <div className="flex flex-col gap-[3px]">
+                {LAYER_DISPLAY_ORDER.map((layer) => {
+                    const meta = LAYER_META[layer];
+                    const on = activeLayers.includes(layer);
+                    const sw = `var(--${meta.color})`;
+                    return (
+                        <button
+                            key={layer}
+                            type="button"
+                            onClick={() => onToggle(layer)}
+                            aria-pressed={on}
+                            className="flex items-center gap-2.5 rounded-[10px] px-[9px] py-2 text-left"
+                            style={{ background: on ? `color-mix(in oklch, ${sw} 8%, transparent)` : 'transparent' }}
+                        >
+                            <span
+                                className="grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px]"
+                                style={{ border: `1.5px solid ${on ? sw : 'var(--border)'}`, background: on ? sw : 'transparent' }}
+                            >
+                                {on ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M20 6 9 17l-5-5" />
+                                    </svg>
+                                ) : null}
+                            </span>
+                            <span className="min-w-0 flex-1 text-left">
+                                <span className="block truncate text-[12.5px] font-semibold text-foreground">{meta.label}</span>
+                                <span className="block text-[11px] text-muted-foreground">{LAYER_SUBLABEL[layer]}</span>
+                            </span>
+                            <span className="flex-none text-[11px] font-bold tabular-nums text-muted-foreground">
+                                {counts[layer] ?? 0}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+            <div className="mt-3 border-t border-border pt-[11px]">
+                <div className="mb-[7px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    Read-only layers
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    Leave, shifts &amp; renewals are <strong className="text-foreground">view-only</strong> here — click one to open it in its home hub. Only HR events are editable on this page.
+                </p>
+            </div>
+        </aside>
+    );
+}
+
+function Legend({
+    activeLayers,
+    panelOpen,
+    onShowPanel,
+}: {
+    activeLayers: CalendarLayer[];
+    panelOpen: boolean;
+    onShowPanel: () => void;
+}) {
+    return (
+        <div className="mb-3 flex flex-wrap items-center gap-x-[14px] gap-y-1.5 px-0.5">
+            {LAYER_DISPLAY_ORDER.filter((l) => activeLayers.includes(l)).map((layer) => {
+                const meta = LAYER_META[layer];
+                return (
+                    <span key={layer} className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold text-muted-foreground">
+                        <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: `var(--${meta.color})` }} />
+                        {meta.label}
+                    </span>
+                );
+            })}
+            <span className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold" style={{ color: 'var(--status-critical)' }}>
+                <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: 'var(--status-critical)' }} />
+                Coverage gap
+            </span>
+            {!panelOpen ? (
+                <button type="button" onClick={onShowPanel} className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-primary">
+                    <LayersIcon className="h-[13px] w-[13px]" />
+                    Layers
+                </button>
+            ) : null}
+        </div>
+    );
+}
+
+function HoverPreview({ e, x, y }: { e: CalendarLayerFeed; x: number; y: number }) {
+    const c = colorVar(e);
+    const start = new Date(e.start);
+    const end = e.end ? new Date(e.end) : start;
+    const when = e.allDay
+        ? 'All day'
+        : `${start.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true })} – ${end.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    const sub = secondaryFor(e);
+    const meta =
+        e.layer === 'event'
+            ? e.extendedProps.attendeeCount
+                ? `${e.extendedProps.attendeeCount} invited`
+                : ''
+            : e.deepLink
+              ? 'Read-only · opens in its hub'
+              : '';
+    const style: CSSProperties = {
+        position: 'fixed',
+        left: Math.min(x + 14, window.innerWidth - 250),
+        top: Math.min(y + 14, window.innerHeight - 130),
+        zIndex: 88,
+        width: 236,
+        pointerEvents: 'none',
+        borderRadius: 12,
+        border: '1px solid var(--border)',
+        background: 'var(--popover)',
+        padding: '11px 13px',
+        boxShadow: '0 18px 44px -14px rgba(20,10,40,.4)',
+    };
+    return createPortal(
+        <div style={style}>
+            <div className="flex items-center gap-2">
+                <span className="h-[9px] w-[9px] flex-none rounded-[3px]" style={{ background: c }} />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-foreground">{e.title}</span>
+            </div>
+            <div className="mt-1.5 text-[11.5px] text-muted-foreground">{layerLabel(e)}</div>
+            <div className="text-[11.5px] font-semibold text-foreground">{when}</div>
+            {sub ? <div className="text-[11.5px] text-muted-foreground">{sub}</div> : null}
+            {meta ? <div className="mt-0.5 text-[11px] text-muted-foreground">{meta}</div> : null}
+        </div>,
+        document.body,
     );
 }
 
@@ -1120,213 +1278,49 @@ function QuickAddPopover({
         return () => window.removeEventListener('mousedown', onDown);
     }, [onClose]);
 
-    const niceDate = new Date(date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
+    const niceDate = new Date(`${date}T00:00:00`).toLocaleDateString('en-NZ', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+    });
 
     return createPortal(
         <div
             ref={ref}
-            style={{ position: 'fixed', left: pos.left, top: pos.top, zIndex: 60 }}
-            className="w-[280px] rounded-xl border border-border bg-popover p-3 shadow-[var(--shadow-float)]"
+            style={{ position: 'fixed', left: pos.left, top: pos.top, zIndex: 97 }}
+            className="w-[300px] overflow-hidden rounded-[15px] border border-border bg-card shadow-[var(--shadow-float)]"
         >
-            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                New event · {niceDate}
+            <div className="border-b border-border bg-muted/40 px-4 py-3">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">New event</div>
+                <div className="mt-0.5 text-[12.5px] font-semibold text-foreground">{niceDate}</div>
             </div>
-            <Input
-                autoFocus
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && title.trim()) onCreate(title.trim());
-                    if (e.key === 'Escape') onClose();
-                }}
-                placeholder="Add a title…"
-                className="h-9"
-            />
-            <div className="mt-2.5 flex items-center justify-between">
-                <button
-                    type="button"
-                    onClick={onMore}
-                    className="text-[12px] font-semibold text-primary hover:underline"
-                >
-                    More options →
-                </button>
-                <Button size="sm" disabled={!title.trim()} onClick={() => onCreate(title.trim())}>
-                    Add
-                </Button>
+            <div className="p-3.5">
+                <input
+                    autoFocus
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && title.trim()) onCreate(title.trim());
+                        if (e.key === 'Escape') onClose();
+                    }}
+                    placeholder="Add a title…"
+                    className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+                />
+                <div className="mt-2.5 flex items-center justify-between">
+                    <button type="button" onClick={onMore} className="text-[12px] font-semibold text-primary hover:underline">
+                        More options →
+                    </button>
+                    <button
+                        type="button"
+                        disabled={!title.trim()}
+                        onClick={() => onCreate(title.trim())}
+                        className="rounded-lg bg-primary px-3.5 py-1.5 text-[12.5px] font-bold text-primary-foreground disabled:opacity-50"
+                    >
+                        Add
+                    </button>
+                </div>
             </div>
         </div>,
         document.body,
-    );
-}
-
-function LayerSwatch({ token }: { token: string }) {
-    return (
-        <span
-            className="h-3 w-3 flex-none rounded-[4px]"
-            style={{ background: `var(--${token})` }}
-        />
-    );
-}
-
-/** Per-layer source descriptor, mirroring the prototype's rail cards. */
-const LAYER_SUBLABEL: Record<CalendarLayer, string> = {
-    event: 'Editable here',
-    leave: 'From Leave hub',
-    shift: 'From Rostering',
-    holiday: 'NZ statutory',
-    compliance: 'Cert expiries',
-    milestone: 'Birthdays, anniv.',
-};
-
-/**
- * The persistent left "LAYERS" rail — one grid replacing four calendars. Each
- * source is a toggle card (swatch-tinted when on) with its origin sublabel and a
- * live count; a read-only explainer notes which layers deep-link to their hub.
- */
-function LayerRail({
-    activeLayers,
-    counts,
-    onToggle,
-}: {
-    activeLayers: CalendarLayer[];
-    counts: Record<string, number>;
-    onToggle: (l: CalendarLayer) => void;
-}) {
-    return (
-        <aside className="w-full flex-none rounded-2xl border border-border bg-card p-3 lg:sticky lg:top-4 lg:w-[240px]">
-            <div className="mb-1 flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-                    Layers
-                </span>
-                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-            </div>
-            <p className="mb-2.5 px-1 text-[11.5px] leading-snug text-muted-foreground">
-                One grid replacing four calendars. Toggle a source on or off.
-            </p>
-
-            <div className="flex flex-col gap-1.5">
-                {LAYER_DISPLAY_ORDER.map((layer) => {
-                    const meta = LAYER_META[layer];
-                    const active = activeLayers.includes(layer);
-                    return (
-                        <button
-                            key={layer}
-                            type="button"
-                            onClick={() => onToggle(layer)}
-                            aria-pressed={active}
-                            style={
-                                active
-                                    ? {
-                                          background: `color-mix(in oklch, var(--${meta.color}) 12%, transparent)`,
-                                          borderColor: `color-mix(in oklch, var(--${meta.color}) 45%, transparent)`,
-                                      }
-                                    : undefined
-                            }
-                            className={cn(
-                                'flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-colors',
-                                active ? '' : 'border-transparent hover:bg-muted/50',
-                            )}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={active}
-                                readOnly
-                                className="pointer-events-none rounded border-border"
-                            />
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12.5px] font-semibold">{meta.label}</span>
-                                <span className="block text-[10.5px] text-muted-foreground">{LAYER_SUBLABEL[layer]}</span>
-                            </span>
-                            <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
-                                {counts[layer] ?? 0}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            <div className="mt-3 border-t border-border pt-2.5">
-                <p className="px-1 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                    Read-only layers
-                </p>
-                <p className="mt-1 px-1 text-[11px] leading-snug text-muted-foreground">
-                    Leave, shifts &amp; renewals are view-only here — click one to open it in its home hub. Only HR events are editable on this page.
-                </p>
-            </div>
-        </aside>
-    );
-}
-
-function Legend({
-    activeLayers,
-    counts,
-}: {
-    activeLayers: CalendarLayer[];
-    counts: Record<string, number>;
-}) {
-    return (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {LAYER_DISPLAY_ORDER.filter((l) => activeLayers.includes(l)).map((layer) => {
-                const meta = LAYER_META[layer];
-                return (
-                    <div key={layer} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <LayerSwatch token={meta.color} />
-                        <span>{meta.label}</span>
-                        <span className="font-semibold tabular-nums">{counts[layer] ?? 0}</span>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-function RenewalsTab({ renewals }: { renewals: CalendarLayerFeed[] | null }) {
-    if (renewals === null) {
-        return (
-            <Card>
-                <CardContent className="p-6 text-sm text-muted-foreground">Loading renewals…</CardContent>
-            </Card>
-        );
-    }
-    if (renewals.length === 0) {
-        return (
-            <EmptyState
-                icon={CalendarClock}
-                title="No renewals due"
-                description="Nothing expires in the next 90 days. Compliance items appear here as their renewal dates approach."
-            />
-        );
-    }
-    return (
-        <Card>
-            <CardContent className="divide-y divide-border p-0">
-                {renewals.map((r) => {
-                    const critical = r.extendedProps.urgency === 'critical';
-                    return (
-                        <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => router.visit(r.deepLink ?? '/hr/compliance')}
-                            className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-accent"
-                        >
-                            <AlertTriangle
-                                className={
-                                    'h-4 w-4 flex-none ' +
-                                    (critical ? 'text-status-critical' : 'text-status-warning')
-                                }
-                            />
-                            <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.title}</span>
-                            <span className="flex-none text-xs font-semibold tabular-nums text-muted-foreground">
-                                {new Date(r.start).toLocaleDateString('en-NZ', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                })}
-                            </span>
-                        </button>
-                    );
-                })}
-            </CardContent>
-        </Card>
     );
 }
