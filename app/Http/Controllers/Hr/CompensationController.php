@@ -102,7 +102,9 @@ class CompensationController extends Controller
                 'active_only' => $request->boolean('active_only'),
                 'as_of' => $asOf->toDateString(),
             ],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
+            // Reuse the already-loaded $employees so the hero doesn't decrypt the
+            // whole workforce a second time this request.
+            'stats' => $this->compensationService->heroStats($tenantId, $user, $employees),
             'tabCounts' => $this->compensationService->tabCounts($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
@@ -407,35 +409,16 @@ class CompensationController extends Controller
     }
 
     /**
-     * Show form to create a compensation review.
+     * Legacy create-review URL. The builder now opens as a modal in place on the
+     * reviews list, so this just redirects there (kept so any old link/bookmark
+     * still resolves instead of 404ing).
      */
     public function createReview(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->with('user:id,name')
-            ->active()
-            ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate']);
-
-        return Inertia::render('hr/compensation/review-detail', [
-            'review' => null,
-            'employees' => $employees,
-            'reviewCycles' => [
-                ['value' => 'annual', 'label' => 'Annual'],
-                ['value' => 'mid_year', 'label' => 'Mid-Year'],
-                ['value' => 'ad_hoc', 'label' => 'Ad Hoc'],
-            ],
-            // Active bands for the builder's per-line in/under/over placement.
-            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()
-                ->orderByDesc('effective_from')
-                ->get(['id', 'position_role', 'min_salary', 'mid_salary', 'max_salary']),
-            'can' => [
-                'manage' => true,
-            ],
-        ]);
+        return redirect()->route('hr.compensation.reviews');
     }
 
     /**
