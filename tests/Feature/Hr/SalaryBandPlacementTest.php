@@ -104,10 +104,15 @@ test('the pay-review builder receives active bands for placement', function () {
         'effective_from' => now()->subMonth()->toDateString(),
     ]);
 
-    $this->actingAs($this->hr)->get('/hr/compensation/reviews/create')->assertOk()
+    // The builder now opens in place on the reviews list, which ships the bands.
+    $this->actingAs($this->hr)->get('/hr/compensation/reviews')->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('hr/compensation/review-detail')
+            ->component('hr/compensation/reviews')
             ->has('bands', 1));
+
+    // The legacy create URL just redirects to the list now.
+    $this->actingAs($this->hr)->get('/hr/compensation/reviews/create')
+        ->assertRedirect('/hr/compensation/reviews');
 });
 
 test('the compensation history index and settings hub tabs render', function () {

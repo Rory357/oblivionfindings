@@ -4,8 +4,20 @@ import {
 } from '@/components/hr/review-builder-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { StatusBadge } from '@/components/hr/status-badge';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Table,
     TableBody,
@@ -128,26 +140,35 @@ export default function CompensationReviewDetail({
         },
     ];
 
+    // Styled confirm for the salary-mutating review actions (replaces native confirm).
+    const [confirmState, setConfirmState] = useState<{
+        title: string;
+        body: string;
+        confirmLabel: string;
+        run: () => void;
+    } | null>(null);
+    // Line-reject reason capture (replaces native prompt).
+    const [rejectId, setRejectId] = useState<number | null>(null);
+    const [rejectReason, setRejectReason] = useState('');
+
     const approveReview = () => {
-        if (
-            review &&
-            confirm(
-                'Approve this compensation review? This marks all pending line-items approved and unlocks applying it.',
-            )
-        ) {
-            router.post(`/hr/compensation/reviews/${review.id}/approve`);
-        }
+        if (!review) return;
+        setConfirmState({
+            title: 'Approve this review?',
+            body: 'This marks all pending line-items approved and unlocks applying it.',
+            confirmLabel: 'Approve',
+            run: () => router.post(`/hr/compensation/reviews/${review.id}/approve`),
+        });
     };
 
     const applyReview = () => {
-        if (
-            review &&
-            confirm(
-                'Apply this compensation review? This will update all approved employee salaries.',
-            )
-        ) {
-            router.post(`/hr/compensation/reviews/${review.id}/apply`);
-        }
+        if (!review) return;
+        setConfirmState({
+            title: 'Apply this review?',
+            body: 'This updates the approved employees’ salaries and writes their compensation history. This cannot be undone.',
+            confirmLabel: 'Apply',
+            run: () => router.post(`/hr/compensation/reviews/${review.id}/apply`),
+        });
     };
 
     const approveItem = (itemId: number) => {
@@ -160,13 +181,20 @@ export default function CompensationReviewDetail({
     };
 
     const rejectItem = (itemId: number) => {
-        if (!review) return;
-        const reason = window.prompt('Reason for rejecting this line (optional):');
-        if (reason === null) return; // cancelled
+        setRejectReason('');
+        setRejectId(itemId);
+    };
+
+    const confirmReject = () => {
+        if (!review || rejectId === null) return;
+        const id = rejectId;
         router.post(
-            `/hr/compensation/reviews/${review.id}/items/${itemId}/reject`,
-            reason.trim() ? { reason: reason.trim() } : {},
-            { preserveScroll: true },
+            `/hr/compensation/reviews/${review.id}/items/${id}/reject`,
+            rejectReason.trim() ? { reason: rejectReason.trim() } : {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setRejectId(null),
+            },
         );
     };
 
@@ -424,6 +452,69 @@ export default function CompensationReviewDetail({
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            {/* Styled confirm for approve / apply (replaces native confirm) */}
+            <AlertDialog
+                open={confirmState !== null}
+                onOpenChange={(o) => !o && setConfirmState(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {confirmState?.body}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                confirmState?.run();
+                                setConfirmState(null);
+                            }}
+                        >
+                            {confirmState?.confirmLabel ?? 'Confirm'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Line-reject with an optional reason (replaces native prompt) */}
+            <AlertDialog
+                open={rejectId !== null}
+                onOpenChange={(o) => !o && setRejectId(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Reject this line?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            It will be excluded when the review is applied. Add a
+                            reason for the record (optional).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div>
+                        <Label htmlFor="reject-reason" className="mb-1.5">
+                            Reason
+                        </Label>
+                        <Textarea
+                            id="reject-reason"
+                            rows={3}
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="e.g. Out of budget this cycle"
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-status-critical text-status-critical-foreground hover:bg-status-critical/90"
+                            onClick={confirmReject}
+                        >
+                            Reject line
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }
