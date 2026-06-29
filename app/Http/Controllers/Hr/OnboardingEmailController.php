@@ -104,6 +104,34 @@ class OnboardingEmailController extends Controller
     }
 
     /**
+     * Send a test render of this template to the current user, using sample
+     * merge data so what's sent matches the in-modal preview.
+     */
+    public function test(Request $request, HrOnboardingEmail $email)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+
+        $recipient = $user->email;
+        if (! $recipient) {
+            return redirect()->back()->with('error', 'Your account has no email address to send a test to.');
+        }
+
+        $sample = $this->emailService->sampleData();
+        $subject = '[TEST] '.$this->emailService->render($email->subject, $sample);
+        $body = $this->emailService->render($email->body, $sample);
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($recipient)
+                ->send(new \App\Mail\Hr\OnboardingTemplateMail($subject, $body));
+        } catch (\Throwable $exception) {
+            return redirect()->back()->with('error', 'Could not send the test email: '.$exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', "Test email sent to {$recipient}.");
+    }
+
+    /**
      * Preview a rendered email.
      */
     public function preview(Request $request, HrOnboardingEmail $email)

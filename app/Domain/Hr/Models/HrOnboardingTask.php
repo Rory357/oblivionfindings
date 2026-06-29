@@ -61,4 +61,9 @@ class HrOnboardingTask extends Model
     {
         return $this->belongsTo(User::class, 'completed_by');
     }
+
+    public function signedOffBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signed_off_by');
+    }
 }

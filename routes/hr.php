@@ -359,23 +359,48 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.onboarding.view')->group(function () {
         Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding.index');
+        Route::get('/onboarding/export', [OnboardingController::class, 'export'])->name('onboarding.export');
 
         Route::middleware('permission:hr.onboarding.manage')->group(function () {
+            // Legacy single-field create page → redirects to the hub wizard.
             Route::get('/onboarding/create', [OnboardingController::class, 'create'])->name('onboarding.create');
             Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
+
+            // Task lifecycle
             Route::post('/onboarding/tasks/{task}/complete', [OnboardingController::class, 'completeTask'])->name('onboarding.tasks.complete');
+            Route::post('/onboarding/tasks/{task}/uncomplete', [OnboardingController::class, 'uncompleteTask'])->name('onboarding.tasks.uncomplete');
+            Route::patch('/onboarding/tasks/{task}', [OnboardingController::class, 'updateTask'])->name('onboarding.tasks.update');
+            Route::delete('/onboarding/tasks/{task}', [OnboardingController::class, 'destroyTask'])->name('onboarding.tasks.destroy');
+            Route::post('/onboarding/{checklist}/tasks', [OnboardingController::class, 'storeTask'])->name('onboarding.tasks.store');
+            Route::post('/onboarding/{checklist}/tasks/reorder', [OnboardingController::class, 'reorderTasks'])->name('onboarding.tasks.reorder');
+
+            // Bulk + checklist lifecycle
+            Route::post('/onboarding/bulk', [OnboardingController::class, 'bulkAction'])->name('onboarding.bulk');
+            Route::post('/onboarding/{checklist}/complete', [OnboardingController::class, 'completeChecklist'])->name('onboarding.complete');
+            Route::post('/onboarding/{checklist}/remind', [OnboardingController::class, 'remindChecklist'])->name('onboarding.remind');
+            Route::post('/onboarding/{checklist}/reassign', [OnboardingController::class, 'reassignChecklist'])->name('onboarding.reassign');
+            Route::post('/onboarding/{checklist}/status', [OnboardingController::class, 'setChecklistStatus'])->name('onboarding.status');
+            Route::delete('/onboarding/{checklist}', [OnboardingController::class, 'destroy'])->name('onboarding.destroy');
+
+            // Templates
             Route::put('/onboarding/templates', [OnboardingController::class, 'updateTemplates'])->name('onboarding.templates.update');
+            Route::post('/onboarding/templates/{template}/duplicate', [OnboardingController::class, 'duplicateTemplate'])->name('onboarding.templates.duplicate');
+            Route::post('/onboarding/templates/{template}/active', [OnboardingController::class, 'setTemplateActive'])->name('onboarding.templates.active');
+            Route::delete('/onboarding/templates/{template}', [OnboardingController::class, 'destroyTemplate'])->name('onboarding.templates.destroy');
         });
 
-        // Onboarding Email Templates (must be above {checklist} wildcard)
-        Route::get('/onboarding/emails', [OnboardingEmailController::class, 'index'])->name('onboarding.emails.index');
-        Route::get('/onboarding/emails/log', [OnboardingEmailController::class, 'log'])->name('onboarding.emails.log');
-        Route::get('/onboarding/emails/{email}/preview', [OnboardingEmailController::class, 'preview'])->name('onboarding.emails.preview');
+        // Onboarding Email Templates. Reads now live in the hub's Emails tab;
+        // the legacy GET pages redirect there. Mutations stay (must be above
+        // the {checklist} wildcard).
+        Route::get('/onboarding/emails', fn () => redirect()->route('hr.onboarding.index', ['tab' => 'emails']))->name('onboarding.emails.index');
+        Route::get('/onboarding/emails/log', fn () => redirect()->route('hr.onboarding.index', ['tab' => 'emails']))->name('onboarding.emails.log');
+        Route::get('/onboarding/emails/{email}/preview', fn () => redirect()->route('hr.onboarding.index', ['tab' => 'emails']))->name('onboarding.emails.preview');
 
         Route::middleware('permission:hr.onboarding.manage')->group(function () {
             Route::post('/onboarding/emails', [OnboardingEmailController::class, 'store'])->name('onboarding.emails.store');
             Route::put('/onboarding/emails/{email}', [OnboardingEmailController::class, 'update'])->name('onboarding.emails.update');
             Route::delete('/onboarding/emails/{email}', [OnboardingEmailController::class, 'destroy'])->name('onboarding.emails.destroy');
+            Route::post('/onboarding/emails/{email}/test', [OnboardingEmailController::class, 'test'])->name('onboarding.emails.test');
         });
 
         Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');

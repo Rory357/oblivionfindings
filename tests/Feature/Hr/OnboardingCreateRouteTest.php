@@ -17,9 +17,10 @@ beforeEach(function () {
     }
 });
 
-test('onboarding create route resolves to create page instead of checklist show binding', function () {
+test('onboarding create route redirects to the hub wizard instead of binding as a checklist', function () {
+    // The legacy single-field create page is retired; /create now redirects to
+    // the hub (and must still resolve literally, not as a {checklist} binding).
     $response = $this->actingAs($this->hr)->get('/hr/onboarding/create');
 
-    $response->assertOk();
-    $response->assertSee('hr\/onboarding\/create');
+    $response->assertRedirect('/hr/onboarding');
 });

@@ -210,6 +210,214 @@ class OnboardingService
     }
 
     /**
+     * Reopen a completed onboarding task and roll the checklist back to
+     * in_progress (a completed checklist becomes in_progress again once any
+     * required task is reopened).
+     */
+    public function uncompleteTask(HrOnboardingTask $task): HrOnboardingTask
+    {
+        if ($task->status !== 'completed') {
+            return $task;
+        }
+
+        $task->update([
+            'status' => 'pending',
+            'completed_at' => null,
+            'completed_by' => null,
+            'signed_off_by' => null,
+            'signed_off_at' => null,
+        ]);
+
+        $this->recomputeChecklistStatus($task->checklist()->with('tasks')->firstOrFail());
+
+        return $task->fresh();
+    }
+
+    /**
+     * Edit an onboarding task (title/description/category/due date/flags) and/or
+     * reassign it. When the assignee changes, the new owner is notified.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function editTask(HrOnboardingTask $task, array $data): HrOnboardingTask
+    {
+        $reassigned = array_key_exists('assigned_to_user_id', $data)
+            && (int) $data['assigned_to_user_id'] !== (int) $task->assigned_to_user_id;
+
+        $task->update(array_filter([
+            'title' => $data['title'] ?? null,
+            'category' => $data['category'] ?? null,
+            'due_date' => array_key_exists('due_date', $data) ? $data['due_date'] : null,
+            'assigned_to_role' => array_key_exists('assigned_to_role', $data) ? $data['assigned_to_role'] : null,
+        ], fn ($value) => $value !== null) + [
+            // Booleans + nullable description are set explicitly so they can be cleared.
+            'description' => array_key_exists('description', $data) ? $data['description'] : $task->description,
+            'is_required' => array_key_exists('is_required', $data) ? (bool) $data['is_required'] : $task->is_required,
+            'sign_off_required' => array_key_exists('sign_off_required', $data) ? (bool) $data['sign_off_required'] : $task->sign_off_required,
+            'assigned_to_user_id' => array_key_exists('assigned_to_user_id', $data) ? $data['assigned_to_user_id'] : $task->assigned_to_user_id,
+        ]);
+
+        if ($reassigned && $task->assigned_to_user_id) {
+            $assignee = User::find($task->assigned_to_user_id);
+            if ($assignee) {
+                try {
+                    $assignee->notify(new OnboardingTaskAssignedNotification($task->fresh()));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify reassigned onboarding task owner', [
+                        'task_id' => $task->id,
+                        'assignee_id' => $assignee->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $task->fresh();
+    }
+
+    /**
+     * Add an ad-hoc task to an existing checklist, appended to the end of its
+     * category group. Reopens a completed checklist if the new task is required.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function addTask(HrOnboardingChecklist $checklist, array $data): HrOnboardingTask
+    {
+        $nextOrder = (int) $checklist->tasks()->max('sort_order') + 1;
+
+        $assigneeId = $this->resolveAssignee(
+            $data['assigned_to_user_id'] ?? null,
+            $data['assigned_to_role'] ?? null,
+            $checklist->employeeProfile,
+        );
+
+        $task = HrOnboardingTask::create([
+            'checklist_id' => $checklist->id,
+            'category' => $data['category'] ?? 'general',
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'is_required' => (bool) ($data['is_required'] ?? false),
+            'sort_order' => $nextOrder,
+            'assigned_to_user_id' => $assigneeId,
+            'assigned_to_role' => $data['assigned_to_role'] ?? null,
+            'sign_off_required' => (bool) ($data['sign_off_required'] ?? false),
+            'due_date' => $data['due_date'] ?? null,
+            'status' => 'pending',
+        ]);
+
+        if ($assigneeId) {
+            $assignee = User::find($assigneeId);
+            if ($assignee) {
+                try {
+                    $assignee->notify(new OnboardingTaskAssignedNotification($task));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify new onboarding task owner', [
+                        'task_id' => $task->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        $this->recomputeChecklistStatus($checklist->fresh('tasks'));
+
+        return $task;
+    }
+
+    /**
+     * Delete an ad-hoc task, then recompute the parent checklist (deleting the
+     * last outstanding required task may complete the checklist).
+     */
+    public function deleteTask(HrOnboardingTask $task): void
+    {
+        $checklist = $task->checklist;
+        $task->delete();
+
+        if ($checklist) {
+            $this->recomputeChecklistStatus($checklist->fresh('tasks'));
+        }
+    }
+
+    /**
+     * Persist a new task order. `$orderedIds` is the full set of task ids for
+     * the checklist in their desired sequence; sort_order is rewritten 1..n.
+     *
+     * @param  array<int, int>  $orderedIds
+     */
+    public function reorderTasks(HrOnboardingChecklist $checklist, array $orderedIds): void
+    {
+        $valid = $checklist->tasks()->pluck('id')->all();
+        $order = 1;
+
+        DB::transaction(function () use ($orderedIds, $valid, &$order) {
+            foreach ($orderedIds as $id) {
+                if (! in_array((int) $id, $valid, true)) {
+                    continue;
+                }
+                HrOnboardingTask::where('id', $id)->update(['sort_order' => $order++]);
+            }
+        });
+    }
+
+    /**
+     * Manually close a checklist (Mark complete) regardless of outstanding
+     * optional tasks.
+     */
+    public function markChecklistComplete(HrOnboardingChecklist $checklist): HrOnboardingChecklist
+    {
+        if (! in_array($checklist->status, ['completed', 'cancelled', 'archived'], true)) {
+            $checklist->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
+        }
+
+        return $checklist->fresh();
+    }
+
+    /**
+     * Cancel or archive a checklist without deleting it (append-only history).
+     */
+    public function setChecklistStatus(HrOnboardingChecklist $checklist, string $status): HrOnboardingChecklist
+    {
+        $checklist->update([
+            'status' => $status,
+            'completed_at' => $status === 'completed' ? now() : $checklist->completed_at,
+        ]);
+
+        return $checklist->fresh();
+    }
+
+    /**
+     * Recompute a checklist's derived status from its tasks: completed when no
+     * required task is outstanding, in_progress when any task is done, else
+     * pending. Never overrides a terminal cancelled/archived state.
+     */
+    public function recomputeChecklistStatus(HrOnboardingChecklist $checklist): void
+    {
+        if (in_array($checklist->status, ['cancelled', 'archived'], true)) {
+            return;
+        }
+
+        $tasks = $checklist->tasks;
+        $pendingRequired = $tasks->where('is_required', true)->where('status', '!=', 'completed')->count();
+        $anyComplete = $tasks->where('status', 'completed')->count() > 0;
+
+        if ($tasks->count() > 0 && $pendingRequired === 0) {
+            if ($checklist->status !== 'completed') {
+                $this->checkChecklistCompletion($checklist);
+            }
+
+            return;
+        }
+
+        $next = $anyComplete ? 'in_progress' : 'pending';
+        if ($checklist->status !== $next) {
+            $checklist->update(['status' => $next, 'completed_at' => null]);
+        }
+    }
+
+    /**
      * Complete an offboarding task with dependency + sign-off validation.
      *
      * @throws \LogicException
@@ -441,6 +649,21 @@ class OnboardingService
                     'checklist_id' => $checklist->id,
                     'error' => $exception->getMessage(),
                 ]);
+            }
+
+            // Notify the checklist owner (creator) that onboarding is complete.
+            $owner = $checklist->created_by ? User::find($checklist->created_by) : null;
+            if ($owner) {
+                try {
+                    $owner->notify(new \App\Domain\Hr\Notifications\OnboardingChecklistCompletedNotification(
+                        $checklist->loadMissing('employeeProfile.user')
+                    ));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify onboarding checklist owner of completion', [
+                        'checklist_id' => $checklist->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
         } elseif ($checklist->status !== 'in_progress') {
             $checklist->update(['status' => 'in_progress']);
