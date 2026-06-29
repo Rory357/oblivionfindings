@@ -310,6 +310,14 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:15');
 
+// Performance & Development hub: expire overdue 360 requests + nudge reviewers of
+// due 360s and performance reviews (in-app). Daily at 07:00.
+app(Schedule::class)
+    ->command('hr:performance-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
+
 // Leave balance accrual: monthly on the 1st at 00:30
 app(Schedule::class)
     ->job(new ProcessLeaveBalanceAccrualJob)

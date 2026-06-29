@@ -389,6 +389,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.performance.view')->prefix('performance')->name('performance.')->group(function () {
         Route::get('/', [PerformanceHubController::class, 'index'])->name('index');
+        Route::get('/export', [PerformanceHubController::class, 'export'])->name('export');
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
             // Supervision notes

@@ -84,6 +84,46 @@ class PerformanceHubController extends Controller
         ]);
     }
 
+    /**
+     * Stream a tab's full dataset as a CSV download (server-side export).
+     */
+    public function export(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $roleMap = $this->roleMap($tenantId);
+        $tab = (string) $request->query('tab', 'reviews');
+
+        $rows = match ($tab) {
+            'reviews' => $this->reviews($tenantId, $roleMap),
+            'supervision' => $this->supervision($tenantId, $roleMap)['rows'],
+            'goals' => $this->goals($tenantId),
+            'development' => $this->development($tenantId, $roleMap),
+            'feedback' => array_map(fn ($r) => collect($r)->except('ids')->all(), $this->feedback($tenantId, $roleMap)),
+            'pips' => $this->pips($tenantId, $roleMap),
+            'competencies' => $this->competencies($tenantId)['coverage'],
+            default => [],
+        };
+
+        abort_if($rows === [] && ! in_array($tab, ['reviews', 'supervision', 'goals', 'development', 'feedback', 'pips', 'competencies'], true), 404);
+
+        $headers = $rows === [] ? [] : array_keys((array) $rows[0]);
+        $filename = 'performance-'.preg_replace('/[^a-z0-9_-]/i', '', $tab).'-'.now()->format('Ymd').'.csv';
+
+        return response()->streamDownload(function () use ($rows, $headers) {
+            $out = fopen('php://output', 'w');
+            if ($headers !== []) {
+                fputcsv($out, $headers);
+                foreach ($rows as $row) {
+                    fputcsv($out, array_map(fn ($v) => is_array($v) ? json_encode($v) : $v, array_values((array) $row)));
+                }
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Hero — clickable stats, compliance, needs-you                      */
     /* ------------------------------------------------------------------ */

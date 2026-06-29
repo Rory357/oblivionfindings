@@ -281,10 +281,17 @@ export default function PerformanceHub(props: Props) {
         }
     };
 
+    const SERVER_EXPORT = new Set(['reviews', 'supervision', 'goals', 'development', 'feedback', 'pips', 'competencies']);
     const exportCsv = () => {
+        if (SERVER_EXPORT.has(tab)) {
+            // Full-dataset server-side export (not just the loaded rows).
+            window.location.href = `/hr/performance/export?tab=${encodeURIComponent(tab)}`;
+            toast.success('Preparing CSV…');
+            return;
+        }
         const rows = currentRows();
         if (!rows.length) {
-            toast.error('Nothing to export.');
+            toast.error('Nothing to export on this tab.');
             return;
         }
         const keys = Object.keys(rows[0]).filter((k) => k !== 'ids');
