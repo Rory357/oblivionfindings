@@ -25,6 +25,8 @@ class StoreExpenseClaimRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.category' => ['required', 'string', Rule::in(ExpenseService::CATEGORIES)],
+            'items.*.source_type' => ['nullable', 'string', 'max:50'],
+            'items.*.source_id' => ['nullable', 'integer'],
             'items.*.amount' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'items.*.expense_date' => ['required', 'date'],
             'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],

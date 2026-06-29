@@ -25,10 +25,21 @@ type ExpenseItem = {
     tax_amount: string;
     notes: string;
     receipt: File | null;
+    source_type?: string | null;
+    source_id?: number | null;
 };
+
+type Prefill = {
+    description?: string;
+    category?: string;
+    amount?: string | number | null;
+    source_type?: string | null;
+    source_id?: number | null;
+} | null;
 
 type Props = {
     categories: string[];
+    prefill?: Prefill;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -43,6 +54,7 @@ const categoryLabels: Record<string, string> = {
     accommodation: 'Accommodation',
     supplies: 'Supplies',
     mileage: 'Mileage',
+    development: 'Development',
     other: 'Other',
 };
 
@@ -54,13 +66,26 @@ const emptyItem: ExpenseItem = {
     tax_amount: '',
     notes: '',
     receipt: null,
+    source_type: null,
+    source_id: null,
 };
 
-export default function CreateExpense({ categories }: Props) {
+export default function CreateExpense({ categories, prefill }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
-    const [title, setTitle] = useState('');
+    const [title, setTitle] = useState(prefill?.description ? `Development — ${prefill.description}` : '');
     const [notes, setNotes] = useState('');
-    const [items, setItems] = useState<ExpenseItem[]>([{ ...emptyItem }]);
+    const [items, setItems] = useState<ExpenseItem[]>([
+        prefill
+            ? {
+                  ...emptyItem,
+                  description: prefill.description ?? '',
+                  category: prefill.category ?? 'development',
+                  amount: prefill.amount != null ? String(prefill.amount) : '',
+                  source_type: prefill.source_type ?? null,
+                  source_id: prefill.source_id ?? null,
+              }
+            : { ...emptyItem },
+    ]);
     const [processing, setProcessing] = useState(false);
 
     const addItem = () => setItems((prev) => [...prev, { ...emptyItem }]);

@@ -14,7 +14,7 @@ class ExpenseService
     /**
      * Expense categories supported by the system.
      */
-    public const CATEGORIES = ['travel', 'meals', 'accommodation', 'supplies', 'mileage', 'other'];
+    public const CATEGORIES = ['travel', 'meals', 'accommodation', 'supplies', 'mileage', 'development', 'other'];
 
     /**
      * Create a new expense claim with optional items.
@@ -68,6 +68,8 @@ class ExpenseService
         $item = $claim->items()->create([
             'description' => $data['description'],
             'category' => $data['category'],
+            'source_type' => $data['source_type'] ?? null,
+            'source_id' => $data['source_id'] ?? null,
             'amount' => $data['amount'],
             'expense_date' => $data['expense_date'],
             'receipt_path' => $data['receipt_path'] ?? null,

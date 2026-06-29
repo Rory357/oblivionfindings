@@ -148,6 +148,17 @@ const PRIMARY_NEW: Record<string, WizardKind> = {
 
 const initials = (n: string) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
+/** Build a prefilled development-expense claim URL from a dev-goal / PIP row. */
+const claimExpenseUrl = (sourceType: string, sourceId: number, description: string) => {
+    const params = new URLSearchParams({
+        category: 'development',
+        source_type: sourceType,
+        source_id: String(sourceId),
+        description,
+    });
+    return `/hr/compensation/expenses/create?${params.toString()}`;
+};
+
 /* ================================================================== */
 /*  Page                                                              */
 /* ================================================================== */
@@ -353,7 +364,7 @@ export default function PerformanceHub(props: Props) {
             case 'development':
                 return [
                     { icon: <ArrowRight className="h-4 w-4" />, label: 'Open development', onClick: () => router.visit('/hr/goals/development') },
-                    { icon: <Download className="h-4 w-4" />, label: 'Claim expense', onClick: () => router.visit('/hr/compensation/expenses/create') },
+                    { icon: <Download className="h-4 w-4" />, label: 'Claim expense', onClick: () => router.visit(claimExpenseUrl('development_goal', id, String(row.area ?? ''))) },
                 ];
             case 'feedback':
                 return [
@@ -368,6 +379,7 @@ export default function PerformanceHub(props: Props) {
                     open(`/hr/performance/pips/${id}`),
                     { icon: <Pencil className="h-4 w-4" />, label: 'Open & edit', onClick: () => router.visit(`/hr/performance/pips/${id}`) },
                     { icon: <Check className="h-4 w-4" />, label: 'Acknowledge', onClick: () => post(`/hr/performance/pips/${id}/acknowledge`, {}, 'Plan acknowledged') },
+                    { icon: <Download className="h-4 w-4" />, label: 'Claim expense', onClick: () => router.visit(claimExpenseUrl('pip', id, String(row.reason ?? ''))) },
                     { sep: true },
                     { icon: <XCircle className="h-4 w-4" />, label: 'Cancel', tone: 'critical', onClick: () => post(`/hr/performance/pips/${id}/cancel`, {}, 'Plan cancelled') },
                 ];

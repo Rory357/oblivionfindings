@@ -98,10 +98,25 @@ class ExpenseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
 
+        // Optional prefill when arriving from a Development goal / PIP "Claim expense"
+        // action — pre-populates the first line item and links it to its source.
+        $prefill = null;
+        if ($request->filled('description') || $request->filled('source_type')) {
+            $prefill = [
+                'description' => (string) $request->query('description', ''),
+                'category' => in_array($request->query('category'), ExpenseService::CATEGORIES, true)
+                    ? $request->query('category') : 'development',
+                'amount' => $request->query('amount'),
+                'source_type' => $request->query('source_type'),
+                'source_id' => $request->query('source_id') !== null ? (int) $request->query('source_id') : null,
+            ];
+        }
+
         return Inertia::render('hr/compensation/expenses/create', [
             'categories' => ExpenseService::CATEGORIES,
             'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
             'employees' => $this->onBehalfEmployees($this->resolveHrTenantIdForUser($user)),
+            'prefill' => $prefill,
         ]);
     }
 

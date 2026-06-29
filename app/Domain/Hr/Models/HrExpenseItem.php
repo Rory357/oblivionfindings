@@ -15,6 +15,8 @@ class HrExpenseItem extends Model
         'expense_claim_id',
         'description',
         'category',
+        'source_type',
+        'source_id',
         'amount',
         'expense_date',
         'receipt_path',
