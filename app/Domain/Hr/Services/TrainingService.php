@@ -333,7 +333,20 @@ class TrainingService
             $count = 0;
             foreach ($courseIds as $courseId) {
                 foreach ($userIds as $userId) {
-                    $assignment = HrCourseAssignment::updateOrCreate(
+                    // Don't resurrect a completed/waived record. Read the prior
+                    // status BEFORE the write — after updateOrCreate's save(),
+                    // getOriginal() reflects the just-written value (syncOriginal),
+                    // so it can't be used to detect the pre-update state.
+                    $existing = HrCourseAssignment::where('tenant_id', $tenantId)
+                        ->where('user_id', $userId)
+                        ->where('hr_course_id', $courseId)
+                        ->first();
+
+                    if ($existing && in_array($existing->status, ['completed', 'waived'], true)) {
+                        continue;
+                    }
+
+                    HrCourseAssignment::updateOrCreate(
                         ['tenant_id' => $tenantId, 'user_id' => $userId, 'hr_course_id' => $courseId],
                         [
                             'session_id' => $sessionId,
@@ -345,11 +358,6 @@ class TrainingService
                             'status' => 'assigned',
                         ]
                     );
-                    // Don't resurrect completed/waived rows.
-                    if (in_array($assignment->getOriginal('status'), ['completed', 'waived'], true)
-                        && $assignment->wasChanged('status')) {
-                        $assignment->update(['status' => $assignment->getOriginal('status')]);
-                    }
                     $count++;
                 }
             }
@@ -462,7 +470,7 @@ class TrainingService
     {
         // Renewal pressure by course + site, from assignments.
         $assignments = HrCourseAssignment::forTenant($tenantId)
-            ->with(['course:id,title', 'user:id,name'])
+            ->with(['course:id,title,is_mandatory', 'user:id,name'])
             ->whereNotIn('status', ['waived'])
             ->get();
 
@@ -472,6 +480,10 @@ class TrainingService
         $siteNames = \App\Models\Site::pluck('name', 'id');
 
         $now = now();
+        // Overdue == strictly past-due: compare against the start of today so a
+        // due-today assignment is "due", not "overdue" (matches scopeOverdue's
+        // whereDate('due_at','<',today)).
+        $today = now()->startOfDay();
         $in30 = now()->addDays(30);
 
         $byCourseSite = [];
@@ -485,7 +497,7 @@ class TrainingService
             $key = $courseTitle.'||'.$siteName;
             $byCourseSite[$key] ??= ['course' => $courseTitle, 'site' => $siteName, 'overdue' => 0, 'due_soon' => 0];
 
-            if ($a->due_at && $a->due_at->lt($now)) {
+            if ($a->due_at && $a->due_at->lt($today)) {
                 $byCourseSite[$key]['overdue']++;
             } elseif ($a->due_at && $a->due_at->lte($in30)) {
                 $byCourseSite[$key]['due_soon']++;
@@ -540,14 +552,14 @@ class TrainingService
             ->join('hr_courses', 'hr_courses.id', '=', 'hr_course_enrollments.course_id')
             ->sum('hr_courses.cost');
 
-        $mandatoryAssignments = $assignments->filter(fn ($a) => true);
+        $mandatoryAssignments = $assignments->filter(fn ($a) => (bool) $a->course?->is_mandatory);
         $totalMand = $mandatoryAssignments->count();
         $currentMand = $mandatoryAssignments->filter(fn ($a) => $a->status === 'completed'
-            || ! ($a->due_at && $a->due_at->lt($now)))->count();
+            || ! ($a->due_at && $a->due_at->lt($today)))->count();
 
         return [
             'mandatoryCurrentPct' => $totalMand > 0 ? (int) round(($currentMand / $totalMand) * 100) : 100,
-            'overdueCount' => $assignments->filter(fn ($a) => $a->status !== 'completed' && $a->due_at && $a->due_at->lt($now))->count(),
+            'overdueCount' => $assignments->filter(fn ($a) => $a->status !== 'completed' && $a->due_at && $a->due_at->lt($today))->count(),
             'expiringCount' => $this->expiringEnrollmentCount($tenantId, 90),
             'spendYtd' => (float) $spend,
             'renewals' => $renewals,

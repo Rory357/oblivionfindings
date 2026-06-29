@@ -29,7 +29,7 @@ return new class extends Migration {
             // assigned | in_progress | completed | overdue | waived
             $table->string('status')->default('assigned');
             $table->decimal('score', 5, 2)->nullable();
-            $table->string('waived_reason')->nullable();
+            $table->text('waived_reason')->nullable();
             $table->timestamp('reminded_at')->nullable();
             $table->timestamps();
 

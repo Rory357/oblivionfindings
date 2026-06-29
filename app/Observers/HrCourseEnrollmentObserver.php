@@ -82,10 +82,16 @@ class HrCourseEnrollmentObserver
             return false;
         }
 
+        // Match what TrainingController::claimFee actually writes: the source is
+        // the HrCourse (source_id = course_id). Scope to the enrolled user so a
+        // different staff member's claim for the same course doesn't suppress
+        // this person's provider posting.
         return \App\Domain\Hr\Models\HrExpenseItem::query()
-            ->where('source_type', HrCourseEnrollment::class)
-            ->where('source_id', $enrollment->id)
-            ->whereHas('expenseClaim', fn ($q) => $q->where('status', '!=', 'rejected'))
+            ->where('source_type', \App\Domain\Hr\Models\HrCourse::class)
+            ->where('source_id', $enrollment->course_id)
+            ->whereHas('expenseClaim', fn ($q) => $q
+                ->where('status', '!=', 'rejected')
+                ->where('user_id', $enrollment->user_id))
             ->exists();
     }
 }

@@ -14,12 +14,12 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('hr_course_sessions', function (Blueprint $table) {
-            $table->string('online_link')->nullable()->after('location');
+            $table->string('online_link', 500)->nullable()->after('location');
             $table->foreignId('trainer_id')->nullable()->after('facilitator')->constrained('users')->nullOnDelete();
             $table->boolean('waitlist_enabled')->default(false)->after('max_participants');
             $table->text('notes')->nullable()->after('status');
             $table->timestamp('cancelled_at')->nullable()->after('notes');
-            $table->string('cancellation_reason')->nullable()->after('cancelled_at');
+            $table->text('cancellation_reason')->nullable()->after('cancelled_at');
         });
     }
 

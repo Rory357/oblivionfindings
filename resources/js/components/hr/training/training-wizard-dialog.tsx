@@ -345,43 +345,49 @@ export function TrainingWizardDialog({
     const steps = useMemo(() => (type ? buildSteps(type, lookups, courses) : []), [type, lookups, courses]);
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // (Re)initialise when the wizard opens / type changes.
-    useEffect(() => {
-        if (!type) return;
+    // Per-type initial state. Used both on open and by "Save & add another" so
+    // every wizard restarts with the correct defaults (not just course forms).
+    const initForType = (t: WizardType, c: WizardCourse | null) => {
         setStep(0);
         setErrors({});
         setSuccess(false);
         setPreview(null);
-        if (type === 'editCourse' && course) {
+        setItems([]);
+        if (t === 'editCourse' && c) {
             setForm({
-                title: course.title ?? '',
-                code: course.code ?? '',
-                category: course.category ?? '',
-                delivery_method: course.delivery_method ?? 'online',
-                provider: course.provider ?? '',
-                is_active: course.is_active ?? true,
-                duration_hours: course.duration_hours != null ? String(course.duration_hours) : '',
-                is_mandatory: !!course.is_mandatory,
-                requires_renewal: !!course.requires_renewal,
-                validity_period_months: course.validity_period_months != null ? String(course.validity_period_months) : '',
-                cpd_points: course.cpd_points != null ? String(course.cpd_points) : '',
-                cost: course.cost != null ? String(course.cost) : '',
+                title: c.title ?? '',
+                code: c.code ?? '',
+                category: c.category ?? '',
+                delivery_method: c.delivery_method ?? 'online',
+                provider: c.provider ?? '',
+                is_active: c.is_active ?? true,
+                duration_hours: c.duration_hours != null ? String(c.duration_hours) : '',
+                is_mandatory: !!c.is_mandatory,
+                requires_renewal: !!c.requires_renewal,
+                validity_period_months: c.validity_period_months != null ? String(c.validity_period_months) : '',
+                cpd_points: c.cpd_points != null ? String(c.cpd_points) : '',
+                cost: c.cost != null ? String(c.cost) : '',
             });
-        } else if (type === 'createCourse') {
+        } else if (t === 'createCourse') {
             setForm({ is_active: true, delivery_method: 'online' });
-        } else if (type === 'assign') {
-            setForm({ audience_type: 'individuals', course_ids: course ? [course.id] : [], user_ids: [], source: 'manual' });
-        } else if (type === 'record') {
-            setForm({ course_id: course ? String(course.id) : '', user_ids: [], completed_at: '' });
-        } else if (type === 'claim') {
-            const td = new Date().toISOString().slice(0, 10);
-            setForm({ title: course ? `${course.title} course fee` : '', course_id: course ? String(course.id) : '' });
-            setItems([{ description: course ? `${course.title} — enrolment` : '', category: 'training', amount: course?.cost != null ? String(course.cost) : '', expense_date: td }]);
-        } else if (type === 'session') {
+        } else if (t === 'assign') {
+            setForm({ audience_type: 'individuals', course_ids: c ? [c.id] : [], user_ids: [], source: 'manual' });
+        } else if (t === 'record') {
+            setForm({ course_id: c ? String(c.id) : '', user_ids: [], completed_at: '' });
+        } else if (t === 'claim') {
+            setForm({ title: c ? `${c.title} course fee` : '', course_id: c ? String(c.id) : '' });
+            setItems([{ description: c ? `${c.title} — enrolment` : '', category: 'training', amount: c?.cost != null ? String(c.cost) : '', expense_date: todayStr }]);
+        } else if (t === 'session') {
             setForm({ max_participants: '20', waitlist_enabled: false });
         } else {
             setForm({});
         }
+    };
+
+    // (Re)initialise when the wizard opens / type changes.
+    useEffect(() => {
+        if (!type) return;
+        initForType(type, course);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [type, course]);
 
@@ -724,7 +730,7 @@ export function TrainingWizardDialog({
     };
 
     return (
-        <div className="ovl fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(20,10,40,.45)] p-5" onClick={onClose}>
+        <div className="ovl fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
             <div
                 className="pop flex h-[min(88vh,820px)] w-[min(960px,96vw)] overflow-hidden rounded-[18px] bg-card shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
@@ -740,10 +746,10 @@ export function TrainingWizardDialog({
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setSuccess(false);
-                                    setStep(0);
-                                    setForm(type === 'createCourse' || type === 'editCourse' ? { is_active: true, delivery_method: 'online' } : {});
-                                    if (type === 'claim') setItems([{ description: '', category: 'training', amount: '', expense_date: todayStr }]);
+                                    // After editing a course, "add another" starts a fresh create;
+                                    // otherwise keep the same wizard + its course context.
+                                    if (type === 'editCourse') initForType('createCourse', null);
+                                    else initForType(type, course);
                                 }}
                                 className="rounded-[9px] border border-border bg-card px-4 py-[9px] text-[13px] font-semibold"
                             >

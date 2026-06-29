@@ -328,6 +328,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
     })();
 
     const visibleAssignments = assignments.filter((r) => asgStatus === 'all' || r.status === asgStatus);
+    const hasAsgActions = can.record || can.enroll || can.manage;
 
     const courseCtx = (c: Course, e: React.MouseEvent) =>
         openCtx(e, [
@@ -717,6 +718,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                             <Th>Due</Th>
                                             <Th>Status</Th>
                                             <Th right>Score</Th>
+                                            {hasAsgActions && <Th right>{''}</Th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -730,13 +732,20 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                                                     <span className={`inline-flex rounded-full border px-[10px] py-[2px] text-[11px] font-semibold ${STATUS_BADGE[r.status] ?? STATUS_BADGE.assigned}`}>{STATUS_LABEL[r.status] ?? r.status}</span>
                                                 </td>
                                                 <td className="px-[14px] py-[11px] text-right tabular-nums">{r.score != null ? `${r.score}%` : '—'}</td>
+                                                {hasAsgActions && (
+                                                    <td className="px-[14px] py-[11px] text-right">
+                                                        <button type="button" aria-label={`Actions for ${r.person}`} onClick={(e) => { e.stopPropagation(); asgCtx(r, e); }} className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground hover:bg-background">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             )}
                         </div>
-                        <p className="text-[12px] text-muted-foreground">Right-click a row to record completion, send a reminder, or waive.</p>
+                        <p className="text-[12px] text-muted-foreground">{hasAsgActions ? 'Use the ⋮ menu (or right-click a row) to record completion, send a reminder, or waive.' : 'Read-only view.'}</p>
                     </div>
                 )}
             </div>
@@ -756,7 +765,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
             {/* ───────── SHEET ───────── */}
             {sheetId && (
                 <>
-                    <div className="ovl fixed inset-0 z-[70] bg-[rgba(20,10,40,.4)]" onClick={() => setSheetId(null)} />
+                    <div className="ovl fixed inset-0 z-[70] bg-black/40" onClick={() => setSheetId(null)} />
                     <div className="slide thin fixed inset-y-0 right-0 z-[71] w-[min(560px,94vw)] overflow-y-auto bg-background shadow-2xl">
                         <div className="relative px-[26px] py-6 text-white" style={{ background: 'linear-gradient(120deg,color-mix(in oklch,var(--primary) 72%,black 18%),var(--primary))' }}>
                             <button type="button" onClick={() => setSheetId(null)} className="absolute top-[18px] right-[18px] flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-white/[.18] text-[15px] text-white">

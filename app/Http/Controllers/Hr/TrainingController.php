@@ -131,7 +131,7 @@ class TrainingController extends Controller
                 'manage' => $this->canManage($user),
                 'enroll' => $this->canEnroll($user),
                 'record' => $this->canRecord($user),
-                'claim' => $user->canDo('hr.expenses.create') || $user->canDo('hr.expenses.manage') || $this->canManage($user),
+                'claim' => $this->canClaim($user),
             ],
         ]);
     }
@@ -323,9 +323,9 @@ class TrainingController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
-            'user_id' => ['required_without:user_ids', 'integer', 'exists:users,id'],
+            'user_id' => ['required_without:user_ids', 'integer', 'exists:users,id', $this->rejectForeignTenantRecipient($tenantId)],
             'user_ids' => ['required_without:user_id', 'array'],
-            'user_ids.*' => ['integer', 'exists:users,id'],
+            'user_ids.*' => ['integer', 'exists:users,id', $this->rejectForeignTenantRecipient($tenantId)],
             'course_id' => ['required', 'integer', 'exists:hr_courses,id'],
             'session_id' => ['nullable', 'integer', 'exists:hr_course_sessions,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -374,7 +374,7 @@ class TrainingController extends Controller
         $data = $request->validate([
             'course_id' => ['required', 'integer', 'exists:hr_courses,id'],
             'user_ids' => ['required', 'array', 'min:1'],
-            'user_ids.*' => ['integer', 'exists:users,id'],
+            'user_ids.*' => ['integer', 'exists:users,id', $this->rejectForeignTenantRecipient($tenantId)],
             'session_id' => ['nullable', 'integer', 'exists:hr_course_sessions,id'],
             'completed_at' => ['required', 'date'],
             'score' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -419,7 +419,7 @@ class TrainingController extends Controller
             'course_ids.*' => ['integer', 'exists:hr_courses,id'],
             'audience_type' => ['required', 'in:individuals,role,site,cohort'],
             'user_ids' => ['nullable', 'array'],
-            'user_ids.*' => ['integer', 'exists:users,id'],
+            'user_ids.*' => ['integer', 'exists:users,id', $this->rejectForeignTenantRecipient($tenantId)],
             'role' => ['nullable', 'string', 'max:120'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'due_at' => ['nullable', 'date'],
@@ -483,6 +483,7 @@ class TrainingController extends Controller
     public function claimFee(Request $request)
     {
         $user = $request->user();
+        abort_unless($this->canClaim($user), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
@@ -495,6 +496,12 @@ class TrainingController extends Controller
             'items.*.amount' => ['required', 'numeric', 'min:0'],
             'items.*.expense_date' => ['required', 'date'],
         ]);
+
+        // The course (when given) is the expense source — resolve it scoped to
+        // the actor's tenant so a foreign-tenant id can't be linked.
+        if (! empty($data['course_id'])) {
+            HrCourse::forTenant($tenantId)->findOrFail($data['course_id']);
+        }
 
         $items = collect($data['items'])->map(fn ($it) => [
             'description' => $it['description'],
@@ -677,5 +684,10 @@ class TrainingController extends Controller
     private function canRecord(?User $user): bool
     {
         return $this->canManage($user) || (bool) ($user && $user->canDo('training.record'));
+    }
+
+    private function canClaim(?User $user): bool
+    {
+        return (bool) $user && ($user->canDo('hr.expenses.create') || $user->canDo('hr.expenses.manage') || $this->canManage($user));
     }
 }

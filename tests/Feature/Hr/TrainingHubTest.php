@@ -6,11 +6,15 @@ use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
+use App\Domain\Hr\Services\ExpenseService;
+use App\Domain\Hr\Services\TrainingService;
+use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -174,4 +178,95 @@ test('a viewer without manage cannot create courses', function () {
     $this->actingAs($viewer)->post('/hr/training/courses', [
         'title' => 'X', 'code' => 'X1', 'delivery_method' => 'online', 'duration_hours' => 1,
     ])->assertForbidden();
+});
+
+test('re-assigning does not resurrect a completed or waived assignment', function () {
+    $course = HrCourse::factory()->create(['tenant_id' => 1]);
+    $staff2 = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+
+    $done = HrCourseAssignment::factory()->create([
+        'tenant_id' => 1, 'user_id' => $this->staff->id, 'hr_course_id' => $course->id, 'status' => 'completed', 'score' => 88,
+    ]);
+    $waived = HrCourseAssignment::factory()->create([
+        'tenant_id' => 1, 'user_id' => $staff2->id, 'hr_course_id' => $course->id, 'status' => 'waived', 'waived_reason' => 'Exempt',
+    ]);
+
+    $this->actingAs($this->manager)->post('/hr/training/assignments', [
+        'course_ids' => [$course->id],
+        'audience_type' => 'individuals',
+        'user_ids' => [$this->staff->id, $staff2->id],
+        'source' => 'manual',
+    ])->assertRedirect();
+
+    expect($done->fresh()->status)->toBe('completed');
+    expect($waived->fresh()->status)->toBe('waived');
+});
+
+test('assignment preview reports conflicts for already-assigned people', function () {
+    $course = HrCourse::factory()->create(['tenant_id' => 1]);
+    HrCourseAssignment::factory()->create([
+        'tenant_id' => 1, 'user_id' => $this->staff->id, 'hr_course_id' => $course->id, 'status' => 'assigned',
+    ]);
+
+    $this->actingAs($this->manager)
+        ->getJson("/hr/training/assignments/preview?course_ids[]={$course->id}&audience_type=individuals&user_ids[]={$this->staff->id}")
+        ->assertOk()
+        ->assertJson(['count' => 1, 'conflicts' => 1]);
+});
+
+test('a manager can send an assignment reminder', function () {
+    $course = HrCourse::factory()->create(['tenant_id' => 1]);
+    $a = HrCourseAssignment::factory()->create(['tenant_id' => 1, 'user_id' => $this->staff->id, 'hr_course_id' => $course->id]);
+
+    $this->actingAs($this->manager)->post("/hr/training/assignments/{$a->id}/remind")->assertRedirect();
+    expect($a->fresh()->reminded_at)->not->toBeNull();
+});
+
+test('a manager can update a session', function () {
+    $course = HrCourse::factory()->create(['tenant_id' => 1]);
+    $session = HrCourseSession::create([
+        'tenant_id' => 1, 'course_id' => $course->id, 'session_date' => now()->addWeek()->toDateString(),
+        'status' => 'scheduled', 'max_participants' => 10,
+    ]);
+
+    $this->actingAs($this->manager)->put("/hr/training/sessions/{$session->id}", [
+        'session_date' => now()->addWeeks(2)->toDateString(), 'location' => 'Room B', 'max_participants' => 15,
+    ])->assertRedirect();
+
+    expect($session->fresh()->location)->toBe('Room B');
+    expect((int) $session->fresh()->max_participants)->toBe(15);
+});
+
+test('completing a paid course posts the provider GL event', function () {
+    Bus::fake([ProcessFinancialEventJob::class]);
+    $course = HrCourse::factory()->create(['tenant_id' => 1, 'cost' => 150, 'org_pays_provider' => true]);
+    $enr = HrCourseEnrollment::factory()->create([
+        'tenant_id' => 1, 'user_id' => $this->staff->id, 'course_id' => $course->id, 'status' => 'enrolled',
+    ]);
+
+    app(TrainingService::class)->completeEnrollment($enr->fresh(), ['completed_at' => now()->toDateString()]);
+
+    Bus::assertDispatched(ProcessFinancialEventJob::class);
+});
+
+test('a linked staff fee claim suppresses the provider GL posting (no double count)', function () {
+    Bus::fake([ProcessFinancialEventJob::class]);
+    $course = HrCourse::factory()->create(['tenant_id' => 1, 'cost' => 150, 'org_pays_provider' => true]);
+
+    // Staff files a reimbursement claim linked to the course for the same person.
+    app(ExpenseService::class)->createClaim($this->staff, [
+        'title' => 'Course fee', 'currency' => 'NZD',
+        'items' => [[
+            'description' => 'Course fee', 'category' => 'training', 'amount' => 150,
+            'expense_date' => now()->toDateString(), 'source_type' => HrCourse::class, 'source_id' => $course->id,
+        ]],
+    ]);
+
+    $enr = HrCourseEnrollment::factory()->create([
+        'tenant_id' => 1, 'user_id' => $this->staff->id, 'course_id' => $course->id, 'status' => 'enrolled',
+    ]);
+
+    app(TrainingService::class)->completeEnrollment($enr->fresh(), ['completed_at' => now()->toDateString()]);
+
+    Bus::assertNotDispatched(ProcessFinancialEventJob::class);
 });
