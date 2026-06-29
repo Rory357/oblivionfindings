@@ -1219,6 +1219,7 @@ class CandidateController extends Controller
             'approval_status' => 'approved',
             'approved_by' => $user->id,
             'approved_at' => now(),
+            'approval_declined_reason' => null,
             'updated_by' => $user->id,
         ]);
 

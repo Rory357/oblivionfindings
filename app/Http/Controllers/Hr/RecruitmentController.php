@@ -393,7 +393,8 @@ class RecruitmentController extends Controller
                 'declined' => 'Declined'.($o->response_notes ? ' — '.str($o->response_notes)->limit(20) : ''),
                 'approved' => 'Ready to send',
                 'pending_approval' => 'Awaiting sign-off',
-                default => $o->approval_status === 'declined' ? 'Changes requested' : 'Not yet submitted',
+                'changes_requested' => 'Changes requested',
+                default => 'Not yet submitted',
             };
 
             return [
@@ -414,7 +415,7 @@ class RecruitmentController extends Controller
 
         return [
             'summary' => [
-                ['key' => 'draft', 'label' => 'Draft', 'count' => $count('draft'), 'color' => 'var(--muted-foreground)'],
+                ['key' => 'draft', 'label' => 'Draft', 'count' => $count('draft') + $count('changes_requested'), 'color' => 'var(--muted-foreground)'],
                 ['key' => 'pending_approval', 'label' => 'Awaiting approval', 'count' => $count('pending_approval'), 'color' => 'var(--status-warning)'],
                 ['key' => 'approved', 'label' => 'Ready to send', 'count' => $count('approved'), 'color' => 'var(--status-info)'],
                 ['key' => 'sent', 'label' => 'Sent', 'count' => $count('sent'), 'color' => 'var(--status-info)'],
@@ -444,6 +445,11 @@ class RecruitmentController extends Controller
         }
         if ($o->approval_status === 'approved') {
             return 'approved';
+        }
+        // Sent back by the approver — distinct from a fresh draft so the hub
+        // can flag it and offer a resubmit rather than mislabelling it "Draft".
+        if ($o->approval_status === 'declined') {
+            return 'changes_requested';
         }
 
         return 'draft';

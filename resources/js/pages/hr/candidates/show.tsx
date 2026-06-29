@@ -406,7 +406,8 @@ export default function CandidateShow({
         );
     }
     function declineOfferApproval(offerId: number) {
-        const reason = window.prompt('Decline this offer for changes. Reason (optional):') ?? '';
+        const reason = window.prompt('Decline this offer for changes. Reason (optional):');
+        if (reason === null) return; // cancelled — don't decline
         router.post(
             `/hr/recruitment/offers/${offerId}/decline-approval`,
             { reason },

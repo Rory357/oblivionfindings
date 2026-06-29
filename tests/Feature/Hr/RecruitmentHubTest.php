@@ -1070,11 +1070,17 @@ test('the hub surfaces offer approval states and the approve/send nudges', funct
     $ctxB = makeApplicant($this->hr->id, 'offer_pending');
     makeOffer($ctxB, 'draft', $this->hr->id, $this->site->id); // makeOffer defaults approval_status='approved'
 
+    // An approver-declined offer surfaces distinctly (not as a fresh "draft").
+    $ctxC = makeApplicant($this->hr->id, 'offer_pending');
+    $declined = makeOffer($ctxC, 'draft', $this->hr->id, $this->site->id);
+    $declined->update(['approval_status' => 'declined', 'approval_declined_reason' => 'Rate too high']);
+
     $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
         ->where('offers.list', fn ($list) => collect($list)
-            ->contains(fn ($o) => (int) $o['id'] === (int) $pending->id && $o['status'] === 'pending_approval'))
+            ->contains(fn ($o) => (int) $o['id'] === (int) $pending->id && $o['status'] === 'pending_approval')
+            && collect($list)->contains(fn ($o) => (int) $o['id'] === (int) $declined->id && $o['status'] === 'changes_requested'))
         ->where('needs', fn ($needs) => collect($needs)->contains(fn ($n) => $n['key'] === 'offers_approval')
             && collect($needs)->contains(fn ($n) => $n['key'] === 'offers_send'))
     );

@@ -1119,6 +1119,7 @@ const OFFER_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'info' 
     sent: 'info',
     approved: 'info',
     pending_approval: 'warning',
+    changes_requested: 'warning',
     declined: 'critical',
     withdrawn: 'critical',
     draft: 'neutral',
@@ -1175,7 +1176,7 @@ function OffersTab({
                                         <button type="button" onClick={() => onAction(o.id, 'approve')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Approve</button>
                                         <button type="button" onClick={() => onAction(o.id, 'decline')} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Decline</button>
                                     </div>
-                                ) : o.status === 'draft' ? (
+                                ) : o.status === 'draft' || o.status === 'changes_requested' ? (
                                     <button type="button" onClick={() => onAction(o.id, 'submit')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Submit</button>
                                 ) : o.status === 'sent' ? (
                                     <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
