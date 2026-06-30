@@ -27,6 +27,7 @@ use App\Http\Controllers\Hr\ExpenseController;
 use App\Http\Controllers\Hr\FeedbackController;
 use App\Http\Controllers\Hr\FeedController;
 use App\Http\Controllers\Hr\GoalController;
+use App\Http\Controllers\Hr\GoalCycleController;
 use App\Http\Controllers\Hr\HeadcountController;
 use App\Http\Controllers\Hr\HrAutomationController;
 use App\Http\Controllers\Hr\HrCaseController;
@@ -542,6 +543,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('goals/development')->name('development.')->group(function () {
+        // Folded into the Goals & OKR hub — index redirects to the tab.
         Route::get('/', [DevelopmentGoalController::class, 'index'])->name('goals.index');
         Route::put('/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
 
@@ -810,17 +812,33 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.performance.view')->prefix('goals')->name('goals.')->group(function () {
         Route::get('/', [GoalController::class, 'index'])->name('index');
 
+        // Static segments must precede the /{goal} wildcard.
+        Route::get('/export', [GoalController::class, 'export'])->name('export');
+        Route::get('/cycles', [GoalCycleController::class, 'index'])->name('cycles.index');
+
+        // Owners (not just managers) can check in on their own objectives.
+        Route::post('/{goal}/checkin', [GoalController::class, 'checkin'])->name('checkin');
+        Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
+
         Route::middleware('permission:hr.performance.manage')->group(function () {
             Route::get('/create', [GoalController::class, 'create'])->name('create');
             Route::post('/', [GoalController::class, 'store'])->name('store');
+            Route::post('/bulk', [GoalController::class, 'bulk'])->name('bulk');
             Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
             Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
-            Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
+            Route::post('/{goal}/duplicate', [GoalController::class, 'duplicate'])->name('duplicate');
+            Route::patch('/{goal}/parent', [GoalController::class, 'reparent'])->name('reparent');
 
             // Key Results
             Route::post('/{goal}/key-results', [GoalController::class, 'storeKeyResult'])->name('key-results.store');
             Route::put('/key-results/{keyResult}', [GoalController::class, 'updateKeyResult'])->name('key-results.update');
             Route::delete('/key-results/{keyResult}', [GoalController::class, 'destroyKeyResult'])->name('key-results.destroy');
+
+            // Cycles
+            Route::post('/cycles', [GoalCycleController::class, 'store'])->name('cycles.store');
+            Route::put('/cycles/{cycle}', [GoalCycleController::class, 'update'])->name('cycles.update');
+            Route::post('/cycles/{cycle}/close', [GoalCycleController::class, 'close'])->name('cycles.close');
+            Route::post('/cycles/{cycle}/rollover', [GoalCycleController::class, 'rollover'])->name('cycles.rollover');
         });
 
         Route::get('/{goal}', [GoalController::class, 'show'])->name('show');

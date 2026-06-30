@@ -92,6 +92,18 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:30');
 
+// OKR & development reminders: check-in due / overdue / KR-due / dev review: 08:00 NZ
+app(Schedule::class)
+    ->command('hr:goal-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00');
+
+// Weekly OKR digest to objective owners: Monday 08:00 NZ
+app(Schedule::class)
+    ->command('hr:goal-weekly-digest')
+    ->timezone('Pacific/Auckland')
+    ->weeklyOn(1, '08:00');
+
 // HR calendar event reminders: every minute, fire any reminder whose lead time
 // lands in the last minute (de-duped via last_sent_at).
 app(Schedule::class)
