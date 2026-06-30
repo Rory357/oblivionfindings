@@ -60,6 +60,13 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // Emulated prepares sidestep MySQL error 1615 ("Prepared statement
+                // needs to be re-prepared") which the test suite hits under
+                // repeated migrate:fresh against the large schema. Off by default
+                // (native prepares); the test env opts in via phpunit.xml. Cast
+                // explicitly — PHP 8.4's PDO requires a real bool and phpunit's
+                // <env> delivers the value as the string "true".
+                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOLEAN),
             ]) : [],
         ],
 
