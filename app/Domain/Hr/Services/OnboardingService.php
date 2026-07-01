@@ -623,6 +623,22 @@ class OnboardingService
     }
 
     /**
+     * Pick the first free company asset for auto-provisioning: an asset in a
+     * usable status (not retired/lost/in maintenance) with no active (unreleased)
+     * assignment, optionally filtered to a category. Returns null when the pool
+     * is empty so the caller can surface a clear "nothing to assign" message.
+     */
+    public function autoPickAvailableAsset(?string $category = null): ?Asset
+    {
+        return Asset::query()
+            ->when($category, fn ($q) => $q->where('category', $category))
+            ->whereNotIn('status', ['retired', 'decommissioned', 'lost', 'maintenance'])
+            ->whereDoesntHave('assignments', fn ($q) => $q->whereNull('released_at'))
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
      * Complete an offboarding task with dependency + sign-off validation.
      *
      * @throws \LogicException

@@ -394,7 +394,13 @@ class OnboardingController extends Controller
             return redirect()->back()->with('error', 'This task requires sign-off. Please specify the sign-off user.');
         }
 
-        $asset = \App\Models\Asset::findOrFail((int) $validated['asset_id']);
+        $asset = ! empty($validated['asset_id'])
+            ? \App\Models\Asset::findOrFail((int) $validated['asset_id'])
+            : $this->onboardingService->autoPickAvailableAsset($validated['category'] ?? null);
+
+        if (! $asset) {
+            return redirect()->back()->with('error', 'No available asset to auto-assign — add one or pick a specific asset.');
+        }
 
         try {
             $this->onboardingService->provisionAssetForTask(

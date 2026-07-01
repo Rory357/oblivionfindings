@@ -67,13 +67,12 @@ export function ProvisionAssetDialog({
 
     if (!task) return null;
 
-    const submit = () => {
-        if (!assetId) return;
+    const post = (payload: Record<string, unknown>) => {
         setProcessing(true);
         router.post(
             `/hr/onboarding/tasks/${task.id}/provision-asset`,
             {
-                asset_id: assetId,
+                ...payload,
                 purpose: purpose.trim() || undefined,
                 signed_off_by: task.sign_off_required && signOff ? currentUserId : undefined,
             },
@@ -81,7 +80,16 @@ export function ProvisionAssetDialog({
         );
     };
 
-    const disabled = processing || !assetId || (task.sign_off_required && !signOff);
+    const submit = () => {
+        if (!assetId) return;
+        post({ asset_id: assetId });
+    };
+
+    // Omitting asset_id lets the server pick the first available asset.
+    const autoPick = () => post({});
+
+    const signOffMissing = task.sign_off_required && !signOff;
+    const disabled = processing || !assetId || signOffMissing;
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -155,7 +163,16 @@ export function ProvisionAssetDialog({
                     )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 border-t border-border bg-muted/30 px-6 py-3.5">
+                <div className="flex items-center gap-2.5 border-t border-border bg-muted/30 px-6 py-3.5">
+                    <Button
+                        variant="outline"
+                        onClick={autoPick}
+                        disabled={processing || signOffMissing || assets.length === 0}
+                        title="Assign the first available asset"
+                    >
+                        Auto-pick available
+                    </Button>
+                    <div className="flex-1" />
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>

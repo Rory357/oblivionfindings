@@ -176,3 +176,40 @@ test('provisioning an asset assigns it and completes the IT task, idempotently',
     expect(AssetAssignment::query()->where('asset_id', $asset->id)->count())->toBe(1);
     expect($task2->fresh()->status)->toBe('completed');
 });
+
+test('auto-pick chooses a free asset and skips retired or already-assigned ones', function () {
+    // Retired → skipped; already-assigned → skipped; only the free one qualifies.
+    Asset::query()->create(['name' => 'Old Laptop', 'asset_tag' => 'IT-OLD', 'status' => 'retired']);
+    $taken = Asset::query()->create(['name' => 'Taken Laptop', 'asset_tag' => 'IT-TKN', 'status' => 'active']);
+    AssetAssignment::query()->create([
+        'asset_id' => $taken->id, 'assignee_type' => 'staff', 'assignee_id' => 999, 'assigned_at' => now(),
+    ]);
+    $free = Asset::query()->create(['name' => 'Free Laptop', 'asset_tag' => 'IT-FREE', 'status' => 'active']);
+
+    $picked = $this->svc->autoPickAvailableAsset();
+    expect($picked)->not->toBeNull();
+    expect($picked->id)->toBe($free->id);
+
+    // Releasing the taken asset makes it eligible again (lowest id wins).
+    AssetAssignment::query()->where('asset_id', $taken->id)->update(['released_at' => now()]);
+    expect($this->svc->autoPickAvailableAsset()->id)->toBe($taken->id);
+});
+
+test('the provision endpoint auto-picks when no asset_id is given', function () {
+    $profile = crossLoopProfile();
+    $checklist = crossLoopChecklist($profile);
+    HrOnboardingTask::query()->create([
+        'checklist_id' => $checklist->id, 'category' => 'general', 'title' => 'Guard', 'is_required' => true, 'sort_order' => 1, 'status' => 'pending',
+    ]);
+    $task = HrOnboardingTask::query()->create([
+        'checklist_id' => $checklist->id, 'category' => 'it', 'title' => 'Issue laptop', 'is_required' => false, 'sort_order' => 2, 'status' => 'pending',
+    ]);
+    $free = Asset::query()->create(['name' => 'Auto Laptop', 'asset_tag' => 'IT-AUTO', 'status' => 'active']);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/onboarding/tasks/{$task->id}/provision-asset", [])
+        ->assertRedirect();
+
+    expect($task->fresh()->status)->toBe('completed');
+    expect(AssetAssignment::query()->where('asset_id', $free->id)->whereNull('released_at')->count())->toBe(1);
+});

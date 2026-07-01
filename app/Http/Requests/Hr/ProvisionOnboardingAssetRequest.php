@@ -17,7 +17,10 @@ class ProvisionOnboardingAssetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            // Either pick a specific asset, or omit it to auto-pick the first
+            // available one (optionally constrained to a category).
+            'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'category' => ['nullable', 'string', 'max:100'],
             'purpose' => ['nullable', 'string', 'max:255'],
             'signed_off_by' => ['nullable', 'integer', 'exists:users,id'],
         ];
