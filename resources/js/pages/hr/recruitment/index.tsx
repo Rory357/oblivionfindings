@@ -20,6 +20,7 @@ import {
     Search,
     Send,
     Sparkles,
+    Tags,
     UserCheck,
     Users,
     XCircle,
@@ -32,6 +33,7 @@ import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
+import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
     RecruitmentWizards,
     type RecruitmentSupport,
@@ -190,6 +192,7 @@ export default function RecruitmentHub(props: Props) {
     const [tagFilter, setTagFilter] = useState<string | null>(null);
     const [selected, setSelected] = useState<number[]>([]);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+    const [manageTagsOpen, setManageTagsOpen] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [moreOpen, setMoreOpen] = useState(false);
     const [sheetId, setSheetId] = useState<number | null>(null);
@@ -471,6 +474,7 @@ export default function RecruitmentHub(props: Props) {
                                 toggleAll={toggleAll}
                                 clearSelection={() => setSelected([])}
                                 onExport={() => exportData('pipeline')}
+                                onManageTags={() => setManageTagsOpen(true)}
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
                                 onBulkAdvance={() => bulkAction('advance')}
@@ -598,6 +602,7 @@ export default function RecruitmentHub(props: Props) {
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
             {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
             <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} templates={email_templates} canManage={can.manage} />
+            <TagManagerDialog open={manageTagsOpen} onClose={() => setManageTagsOpen(false)} tags={support.tags} canManage={can.manage} />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -682,6 +687,7 @@ function PipelineTab({
     toggleAll,
     clearSelection,
     onExport,
+    onManageTags,
     onOpen,
     onCtx,
     onBulkAdvance,
@@ -705,6 +711,7 @@ function PipelineTab({
     toggleAll: () => void;
     clearSelection: () => void;
     onExport: () => void;
+    onManageTags: () => void;
     onOpen: (c: HubCandidate) => void;
     onCtx: (e: MouseEvent, c: HubCandidate) => void;
     onBulkAdvance: () => void;
@@ -771,6 +778,15 @@ function PipelineTab({
                 >
                     <BarChart3 className="h-3.5 w-3.5" /> {sortByScore ? 'Top scored' : 'Sort by score'}
                 </button>
+                {canManage ? (
+                    <button
+                        type="button"
+                        onClick={onManageTags}
+                        className="inline-flex h-[38px] items-center gap-2 rounded-[10px] border border-border bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
+                    >
+                        <Tags className="h-3.5 w-3.5" /> Tags
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={onExport}

@@ -459,6 +459,82 @@ class CandidateController extends Controller
         return redirect()->back()->with('success', 'Tags updated.');
     }
 
+    /** Rename (and thereby merge) a tag across every candidate that carries it. */
+    public function renameTag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'from' => ['required', 'string', 'max:100'],
+            'to' => ['required', 'string', 'max:100'],
+        ]);
+        $from = trim($validated['from']);
+        $to = trim($validated['to']);
+        if ($from === '' || $to === '') {
+            return redirect()->back()->with('error', 'Both the current and new tag are required.');
+        }
+
+        $affected = $this->rewriteTagAcrossCandidates($tenantId, $from, $to, $user->id);
+
+        return redirect()->back()->with('success', $affected === 0
+            ? 'No candidates carried that tag.'
+            : "Renamed \u{201C}{$from}\u{201D} to \u{201C}{$to}\u{201D} on {$affected} ".str('candidate')->plural($affected).'.');
+    }
+
+    /** Remove a tag from every candidate that carries it. */
+    public function deleteTag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate(['tag' => ['required', 'string', 'max:100']]);
+        $tag = trim($validated['tag']);
+        if ($tag === '') {
+            return redirect()->back()->with('error', 'Enter a tag to remove.');
+        }
+
+        $affected = $this->rewriteTagAcrossCandidates($tenantId, $tag, null, $user->id);
+
+        return redirect()->back()->with('success', $affected === 0
+            ? 'No candidates carried that tag.'
+            : "Removed \u{201C}{$tag}\u{201D} from {$affected} ".str('candidate')->plural($affected).'.');
+    }
+
+    /**
+     * Rename (to != null) or delete (to == null) a tag across every candidate
+     * carrying a case-insensitive variant of it. Returns the number changed.
+     */
+    private function rewriteTagAcrossCandidates(?int $tenantId, string $from, ?string $to, int $userId): int
+    {
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereNotNull('tags')
+            ->get(['id', 'tags']);
+
+        $affected = 0;
+        foreach ($candidates as $candidate) {
+            $tags = collect((array) ($candidate->tags ?? []))
+                ->map(fn ($t) => trim((string) $t))
+                ->filter();
+            if (! $tags->contains(fn ($t) => strcasecmp($t, $from) === 0)) {
+                continue;
+            }
+            // Drop every variant of the source tag...
+            $tags = $tags->reject(fn ($t) => strcasecmp($t, $from) === 0);
+            // ...and, for a rename, add the target unless a variant already exists (merge).
+            if ($to !== null && ! $tags->contains(fn ($t) => strcasecmp($t, $to) === 0)) {
+                $tags->push($to);
+            }
+            $candidate->update(['tags' => $tags->values()->all(), 'updated_by' => $userId]);
+            $affected++;
+        }
+
+        return $affected;
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Advance Stage                                                      */
     /* ------------------------------------------------------------------ */

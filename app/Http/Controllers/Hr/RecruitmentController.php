@@ -631,6 +631,44 @@ class RecruitmentController extends Controller
             'employment_types' => self::EMPLOYMENT_TYPES,
             'document_categories' => \App\Domain\Hr\Models\HrCandidateDocument::CATEGORIES ?? [],
             'stages' => self::FLOW,
+            'tags' => $this->buildTagVocabulary($tenantId),
         ];
+    }
+
+    /**
+     * Distinct candidate tags with usage counts, grouped case-insensitively
+     * (canonical casing = the most-used variant). Drives the Manage-tags surface.
+     *
+     * @return list<array{tag: string, count: int}>
+     */
+    private function buildTagVocabulary(?int $tenantId): array
+    {
+        $rows = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereNotNull('tags')
+            ->get(['id', 'tags']);
+
+        $counts = [];   // lowercase key => count
+        $casing = [];   // lowercase key => [exact casing => times seen]
+        foreach ($rows as $row) {
+            foreach ((array) ($row->tags ?? []) as $tag) {
+                $tag = trim((string) $tag);
+                if ($tag === '') {
+                    continue;
+                }
+                $key = mb_strtolower($tag);
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+                $casing[$key][$tag] = ($casing[$key][$tag] ?? 0) + 1;
+            }
+        }
+        arsort($counts);
+
+        $out = [];
+        foreach ($counts as $key => $count) {
+            arsort($casing[$key]);
+            $out[] = ['tag' => (string) array_key_first($casing[$key]), 'count' => $count];
+        }
+
+        return $out;
     }
 }

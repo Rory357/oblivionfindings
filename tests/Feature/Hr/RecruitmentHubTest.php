@@ -1237,3 +1237,40 @@ test('a candidate can be tagged and the tags surface in the hub and profile', fu
     $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $this->actingAs($viewer)->post(route('hr.candidates.tags.update', $candidate->id), ['tags' => ['x']])->assertForbidden();
 });
+
+test('a manager can rename (merging) and delete a tag across every candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'interview')['candidate'];
+    $c = makeApplicant($this->hr->id, 'references')['candidate'];
+    $a->update(['tags' => ['Rural', 'Rehire']]);
+    $b->update(['tags' => ['rural']]);      // case-variant of Rural
+    $c->update(['tags' => ['Regional']]);
+
+    // Rename across all — case-insensitive match, other tags untouched.
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'rural', 'to' => 'Coastal'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire', 'Coastal']);
+    expect($b->fresh()->tags)->toBe(['Coastal']);
+    expect($c->fresh()->tags)->toBe(['Regional']); // untouched
+
+    // Merge: renaming into an existing tag de-duplicates (Coastal → Regional).
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'Coastal', 'to' => 'Regional'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire', 'Regional']);
+    expect($b->fresh()->tags)->toBe(['Regional']);
+
+    // Vocabulary aggregator surfaces distinct tags with counts.
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
+        ->where('support.tags', fn ($tags) => collect($tags)
+            ->contains(fn ($t) => $t['tag'] === 'Regional' && $t['count'] === 3)));
+
+    // Delete removes the tag everywhere.
+    $this->actingAs($this->hr)->post(route('hr.tags.delete'), ['tag' => 'regional'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire']);
+    expect($b->fresh()->tags)->toBe([]);
+    expect($c->fresh()->tags)->toBe([]);
+
+    // Blank rename target is rejected (TrimStrings empties it → required fails); both endpoints are manage-gated.
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'Rehire', 'to' => '   '])->assertSessionHasErrors('to');
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.tags.rename'), ['from' => 'Rehire', 'to' => 'x'])->assertForbidden();
+    $this->actingAs($viewer)->post(route('hr.tags.delete'), ['tag' => 'Rehire'])->assertForbidden();
+});

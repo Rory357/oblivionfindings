@@ -140,6 +140,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/candidates/{candidate}/tags', [CandidateController::class, 'updateTags'])->name('candidates.tags.update')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/tags/rename', [CandidateController::class, 'renameTag'])->name('tags.rename')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/tags/delete', [CandidateController::class, 'deleteTag'])->name('tags.delete')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/applications/{application}/advance', [CandidateController::class, 'advanceApplication'])->name('applications.advance')
             ->middleware('permission:hr.recruitment.manage');
 
