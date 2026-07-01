@@ -204,32 +204,39 @@ class TrainingService
             });
     }
 
+    /**
+     * Mirror a completed catalog enrollment into the canonical compliance-facing
+     * StaffTrainingRecord. HrCourse is the source of truth: the record is keyed by
+     * (user, hr_course_id) so EVERY catalog completion is compliance-visible — not
+     * only requirement-linked ones. When the course bridges to a legacy
+     * TrainingCourse (via its compliance requirement) that id is also stamped so
+     * legacy readers keep working during the transition.
+     */
     private function syncComplianceTrainingRecord(HrCourseEnrollment $enrollment): void
     {
         $enrollment->loadMissing('course.complianceRequirement');
         $course = $enrollment->course;
-        $requirement = $course?->complianceRequirement;
-
-        if (! $course || ! $requirement || $requirement->check_type !== 'training_course' || ! $requirement->reference_id) {
+        if (! $course) {
             return;
         }
 
-        $legacyCourse = TrainingCourse::query()->find($requirement->reference_id);
-        if (! $legacyCourse) {
-            return;
-        }
+        $requirement = $course->complianceRequirement;
+        $legacyCourse = ($requirement && $requirement->check_type === 'training_course' && $requirement->reference_id)
+            ? TrainingCourse::query()->find($requirement->reference_id)
+            : null;
 
         $completedAt = $enrollment->completed_at ?? now();
         $validityMonths = $course->validity_period_months
-            ?: ($requirement->validity_months ?: $legacyCourse->validity_period_months);
+            ?: ($requirement?->validity_months ?: $legacyCourse?->validity_period_months);
         $expiresAt = $validityMonths ? $completedAt->copy()->addMonths((int) $validityMonths) : null;
 
         StaffTrainingRecord::query()->updateOrCreate(
             [
                 'user_id' => $enrollment->user_id,
-                'training_course_id' => $legacyCourse->id,
+                'hr_course_id' => $course->id,
             ],
             [
+                'training_course_id' => $legacyCourse?->id,
                 'status' => 'completed',
                 'enrolled_at' => $enrollment->enrolled_at,
                 'completed_at' => $completedAt,
@@ -240,7 +247,7 @@ class TrainingService
                     ? ((float) $enrollment->score >= (float) $course->pass_mark_percentage)
                     : true,
                 'certificate_path' => $enrollment->certificate_path,
-                'provider' => $course->provider ?? $legacyCourse->provider,
+                'provider' => $course->provider ?? $legacyCourse?->provider,
                 'notes' => $enrollment->notes,
                 'updated_by' => $enrollment->user_id,
             ]

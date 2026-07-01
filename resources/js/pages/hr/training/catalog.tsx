@@ -8,11 +8,14 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
+    Award,
     BookOpen,
     Calendar,
     CheckSquare,
     ChevronRight,
+    ClipboardList,
     Download,
+    ExternalLink,
     LayoutDashboard,
     MoreVertical,
     Plus,
@@ -70,6 +73,21 @@ interface Assignment {
     status: string;
     score: number | null;
 }
+interface CompetencySummary {
+    total_frameworks: number;
+    total_assessments: number;
+    assessments_this_month: number;
+    frameworks: { id: number; name: string; category: string | null; assessment_count: number }[];
+    manage_url: string;
+}
+interface InductionSummary {
+    total_templates: number;
+    in_progress: number;
+    completed: number;
+    not_started: number;
+    templates: { id: number; role: string; site_type: string | null; task_count: number }[];
+    manage_url: string;
+}
 interface Props {
     summary: Summary;
     dashboard: DashboardData;
@@ -79,10 +97,12 @@ interface Props {
     deliveryMethods: { value: string; label: string }[];
     lookups: WizardLookups;
     filters: { search: string; sort: string };
-    can: { manage: boolean; enroll: boolean; record: boolean; claim: boolean };
+    competency: CompetencySummary | null;
+    induction: InductionSummary | null;
+    can: { manage: boolean; enroll: boolean; record: boolean; claim: boolean; competency: boolean; induction: boolean };
 }
 
-type Tab = 'dashboard' | 'catalog' | 'assignments';
+type Tab = 'dashboard' | 'catalog' | 'assignments' | 'competency' | 'induction';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
@@ -160,7 +180,7 @@ interface SheetData {
     enrollments: { id: number; name: string; status: string; score: number | null }[];
 }
 
-export default function TrainingHub({ summary, dashboard, courses, assignments, lookups, filters, can }: Props) {
+export default function TrainingHub({ summary, dashboard, courses, assignments, lookups, filters, competency, induction, can }: Props) {
     const { props } = usePage<{ flash?: { success?: string; error?: string } }>();
 
     const [tab, setTab] = useState<Tab>('dashboard');
@@ -368,6 +388,8 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, tone: 'primary' },
         { id: 'catalog', label: 'Catalog', icon: BookOpen, badge: String(courses.length), tone: 'primary' },
         { id: 'assignments', label: 'Assignments', icon: CheckSquare, badge: String(summary.overdue_assignments), tone: 'warning' },
+        ...(can.competency && competency ? [{ id: 'competency' as Tab, label: 'Competency', icon: Award, badge: String(competency.total_frameworks), tone: 'primary' as const }] : []),
+        ...(can.induction && induction ? [{ id: 'induction' as Tab, label: 'Induction', icon: ClipboardList, badge: String(induction.in_progress), tone: 'primary' as const }] : []),
     ];
 
     return (
@@ -746,6 +768,91 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
                             )}
                         </div>
                         <p className="text-[12px] text-muted-foreground">{hasAsgActions ? 'Use the ⋮ menu (or right-click a row) to record completion, send a reminder, or waive.' : 'Read-only view.'}</p>
+                    </div>
+                )}
+
+                {/* ───────── COMPETENCY ───────── */}
+                {tab === 'competency' && competency && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-3">
+                            <KpiTile label="Frameworks" value={competency.total_frameworks} sub="active competency frameworks" />
+                            <KpiTile label="Assessments" value={competency.total_assessments} sub="staff assessments on record" />
+                            <KpiTile label="This month" value={competency.assessments_this_month} sub="assessed since month start" />
+                        </div>
+                        <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+                            <div className="flex items-center justify-between border-b border-border px-4 py-[14px]">
+                                <div className="text-sm font-semibold">Competency frameworks</div>
+                                <a href={competency.manage_url} className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary">
+                                    Open competencies <ExternalLink className="h-3 w-3" />
+                                </a>
+                            </div>
+                            {competency.frameworks.length === 0 ? (
+                                <p className="px-4 py-10 text-center text-sm text-muted-foreground">No competency frameworks defined yet.</p>
+                            ) : (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="bg-muted text-left text-muted-foreground">
+                                            <Th>Framework</Th>
+                                            <Th>Category</Th>
+                                            <Th right>Assessments</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {competency.frameworks.map((f) => (
+                                            <tr key={f.id} className="border-t border-border">
+                                                <td className="px-4 py-[10px] font-medium">{f.name}</td>
+                                                <td className="px-4 py-[10px] text-muted-foreground">{f.category ?? '—'}</td>
+                                                <td className="px-4 py-[10px] text-right tabular-nums">{f.assessment_count}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <p className="text-[12px] text-muted-foreground">Competency frameworks and assessments are managed in the Performance hub.</p>
+                    </div>
+                )}
+
+                {/* ───────── INDUCTION ───────── */}
+                {tab === 'induction' && induction && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
+                            <KpiTile label="Templates" value={induction.total_templates} sub="active induction templates" />
+                            <KpiTile label="In progress" value={induction.in_progress} tone="warning" sub="inductions underway" />
+                            <KpiTile label="Completed" value={induction.completed} sub="inductions finished" />
+                            <KpiTile label="Not started" value={induction.not_started} tone="critical" sub="awaiting kickoff" />
+                        </div>
+                        <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+                            <div className="flex items-center justify-between border-b border-border px-4 py-[14px]">
+                                <div className="text-sm font-semibold">Induction templates</div>
+                                <a href={induction.manage_url} className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary">
+                                    Open induction <ExternalLink className="h-3 w-3" />
+                                </a>
+                            </div>
+                            {induction.templates.length === 0 ? (
+                                <p className="px-4 py-10 text-center text-sm text-muted-foreground">No induction templates defined yet.</p>
+                            ) : (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="bg-muted text-left text-muted-foreground">
+                                            <Th>Role</Th>
+                                            <Th>Site type</Th>
+                                            <Th right>Tasks</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {induction.templates.map((t) => (
+                                            <tr key={t.id} className="border-t border-border">
+                                                <td className="px-4 py-[10px] font-medium">{t.role}</td>
+                                                <td className="px-4 py-[10px] text-muted-foreground capitalize">{t.site_type ?? 'all'}</td>
+                                                <td className="px-4 py-[10px] text-right tabular-nums">{t.task_count}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <p className="text-[12px] text-muted-foreground">New-hire inductions are tracked and completed in the Onboarding hub.</p>
                     </div>
                 )}
             </div>

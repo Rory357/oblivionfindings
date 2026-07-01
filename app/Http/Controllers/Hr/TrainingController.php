@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrCompetency;
+use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Services\CertificateService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\TrainingService;
@@ -127,13 +131,70 @@ class TrainingController extends Controller
                 'delivery_method' => $request->query('delivery_method'),
                 'mandatory_only' => $request->boolean('mandatory_only'),
             ],
+            'competency' => $user->canDo('hr.performance.view') ? $this->competencySummary($tenantId) : null,
+            'induction' => $user->canDo('hr.onboarding.view') ? $this->inductionSummary($tenantId) : null,
             'can' => [
                 'manage' => $this->canManage($user),
                 'enroll' => $this->canEnroll($user),
                 'record' => $this->canRecord($user),
                 'claim' => $this->canClaim($user),
+                'competency' => (bool) $user->canDo('hr.performance.view'),
+                'induction' => (bool) $user->canDo('hr.onboarding.view'),
             ],
         ]);
+    }
+
+    /**
+     * Read-only competency-framework summary for the hub's Competency tab.
+     * Deep-links to the canonical /hr/performance/competencies surface.
+     */
+    private function competencySummary(int $tenantId): array
+    {
+        $frameworks = HrCompetency::forTenant($tenantId)->active()
+            ->withCount('assessments')
+            ->orderBy('sort_order')->orderBy('name')
+            ->get(['id', 'name', 'category']);
+
+        $assessments = HrCompetencyAssessment::whereHas('competency', fn ($q) => $q->where('tenant_id', $tenantId));
+
+        return [
+            'total_frameworks' => $frameworks->count(),
+            'total_assessments' => (clone $assessments)->count(),
+            'assessments_this_month' => (clone $assessments)->whereDate('assessment_date', '>=', now()->startOfMonth()->toDateString())->count(),
+            'frameworks' => $frameworks->map(fn ($f) => [
+                'id' => $f->id,
+                'name' => $f->name,
+                'category' => $f->category,
+                'assessment_count' => $f->assessments_count,
+            ])->values(),
+            'manage_url' => '/hr/performance/competencies',
+        ];
+    }
+
+    /**
+     * Read-only staff-induction summary for the hub's Induction tab.
+     * Deep-links to the canonical /hr/onboarding surface.
+     */
+    private function inductionSummary(int $tenantId): array
+    {
+        $templates = HrOnboardingTemplate::where('tenant_id', $tenantId)->where('is_active', true)
+            ->orderBy('role')->get(['id', 'role', 'site_type', 'tasks']);
+
+        $base = HrOnboardingChecklist::where('tenant_id', $tenantId);
+
+        return [
+            'total_templates' => $templates->count(),
+            'in_progress' => (clone $base)->where('status', 'in_progress')->count(),
+            'completed' => (clone $base)->where('status', 'completed')->count(),
+            'not_started' => (clone $base)->where('status', 'not_started')->count(),
+            'templates' => $templates->map(fn ($t) => [
+                'id' => $t->id,
+                'role' => $t->role,
+                'site_type' => $t->site_type,
+                'task_count' => is_array($t->tasks) ? count($t->tasks) : 0,
+            ])->values(),
+            'manage_url' => '/hr/onboarding',
+        ];
     }
 
     /**
