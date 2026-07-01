@@ -1,10 +1,13 @@
 <?php
 
+use App\Domain\Finance\Jobs\PostExpenseJournalJob;
+use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -88,6 +91,27 @@ test('the claim detail surfaces GL posting state and the pay action', function (
     expect($response->inertiaProps('claim.gl_posted_at'))->not->toBeNull();
     expect($response->inertiaProps('claim.journal_id'))->toBe(9999);
     expect($response->inertiaProps('can.pay'))->toBeTrue();
+});
+
+test('approving a claim posts exactly one GL journal (no observer double-post)', function () {
+    Queue::fake();
+
+    // A submitted claim with no journal yet.
+    $claim = makeExpenseClaimForPayment($this->worker->id, [
+        'status' => 'submitted',
+        'journal_id' => null,
+        'gl_posted_at' => null,
+        'approved_at' => null,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/compensation/expenses/{$claim->id}/approve")
+        ->assertSessionHas('success');
+
+    // Path A (the purpose-built expense journal) fires exactly once…
+    Queue::assertPushed(PostExpenseJournalJob::class, 1);
+    // …and the retired observer's second, conflicting posting never fires.
+    Queue::assertNotPushed(ProcessFinancialEventJob::class);
 });
 
 test('the expenses index lists tenant claims (regression: was whereNull)', function () {
