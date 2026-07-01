@@ -281,6 +281,27 @@ export default function RecruitmentHub(props: Props) {
         );
     };
 
+    const bulkTag = () => {
+        if (selected.length === 0) return;
+        const tag = window.prompt(`Tag to apply to ${selected.length} candidate(s):`);
+        if (tag === null) return; // cancelled
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+        router.post(
+            '/hr/recruitment/applications/bulk',
+            { action: 'tag', candidate_ids: selected, tag: trimmed },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else toast.success(f?.success ?? `${selected.length} candidates tagged`);
+                    setSelected([]);
+                },
+            },
+        );
+    };
+
     const toggleSelect = (id: number) =>
         setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
     const toggleAll = () => {
@@ -451,6 +472,7 @@ export default function RecruitmentHub(props: Props) {
                                 onBulkReject={() => bulkAction('reject')}
                                 onBulkPool={() => bulkAction('pool')}
                                 onBulkEmail={() => setBulkEmailOpen(true)}
+                                onBulkTag={bulkTag}
                                 canManage={can.manage}
                             />
                         ) : null}
@@ -659,6 +681,7 @@ function PipelineTab({
     onBulkReject,
     onBulkPool,
     onBulkEmail,
+    onBulkTag,
     canManage,
 }: {
     rows: HubCandidate[];
@@ -679,6 +702,7 @@ function PipelineTab({
     onBulkReject: () => void;
     onBulkPool: () => void;
     onBulkEmail: () => void;
+    onBulkTag: () => void;
     canManage: boolean;
 }) {
     const chips = [
@@ -749,6 +773,9 @@ function PipelineTab({
                     </button>
                     <button type="button" onClick={onBulkPool} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
                         Add to pool
+                    </button>
+                    <button type="button" onClick={onBulkTag} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Tag
                     </button>
                     <button type="button" onClick={onBulkReject} className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-2.5 py-1 text-[12.5px] font-semibold text-status-critical">
                         Reject

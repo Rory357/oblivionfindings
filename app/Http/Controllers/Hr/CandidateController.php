@@ -536,12 +536,15 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool'])],
+            'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool', 'tag', 'untag'])],
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['integer'],
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
             'reason' => ['nullable', 'string', 'max:2000'],
+            'tag' => ['required_if:action,tag,untag', 'nullable', 'string', 'max:100'],
         ]);
+
+        $tag = trim((string) ($validated['tag'] ?? ''));
 
         $candidates = HrCandidate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
@@ -557,6 +560,21 @@ class CandidateController extends Controller
                     $this->recruitmentService->advanceStage($candidate, $validated['target_stage'] ?? null, $user->id);
                 } elseif ($validated['action'] === 'pool') {
                     $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', null, null);
+                } elseif ($validated['action'] === 'tag' || $validated['action'] === 'untag') {
+                    $tags = collect((array) ($candidate->tags ?? []))
+                        ->map(fn ($t) => trim((string) $t))
+                        ->filter()
+                        ->values();
+                    if ($validated['action'] === 'tag') {
+                        // Case-insensitive add: skip when a variant already exists
+                        // (preserves the original casing) rather than duplicating.
+                        if (! $tags->contains(fn ($t) => strcasecmp($t, $tag) === 0)) {
+                            $tags->push($tag);
+                        }
+                    } else {
+                        $tags = $tags->reject(fn ($t) => strcasecmp($t, $tag) === 0);
+                    }
+                    $candidate->update(['tags' => $tags->values()->all(), 'updated_by' => $user->id]);
                 } else {
                     $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
                     $candidate->applications()
@@ -572,6 +590,8 @@ class CandidateController extends Controller
         $verb = match ($validated['action']) {
             'advance' => 'advanced',
             'pool' => 'added to the talent pool',
+            'tag' => "tagged \u{201C}{$tag}\u{201D}",
+            'untag' => "untagged \u{201C}{$tag}\u{201D}",
             default => 'rejected',
         };
         $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';

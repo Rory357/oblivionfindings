@@ -792,6 +792,44 @@ test('bulk pool warm-banks every selected candidate', function () {
     expect(HrTalentPool::query()->where('candidate_id', $b->id)->exists())->toBeTrue();
 });
 
+test('bulk tag adds and removes a label across every selected candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'interview')['candidate'];
+    $a->update(['tags' => []]); // clear factory-seeded tags for a deterministic start
+    $b->update(['tags' => ['Rehire']]); // pre-existing tag must be preserved
+
+    // Add — idempotent, case-insensitive, preserves existing tags.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id, $b->id], 'tag' => ' Bilingual ',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Bilingual']);
+    expect($b->fresh()->tags)->toBe(['Rehire', 'Bilingual']);
+
+    // Re-applying the same tag (different case) does not duplicate it.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id], 'tag' => 'bilingual',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Bilingual']);
+
+    // Remove — case-insensitive, leaves other tags intact.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'untag', 'candidate_ids' => [$a->id, $b->id], 'tag' => 'BILINGUAL',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe([]);
+    expect($b->fresh()->tags)->toBe(['Rehire']);
+
+    // A tag action requires a non-empty tag.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id],
+    ])->assertSessionHasErrors('tag');
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id], 'tag' => 'x',
+    ])->assertForbidden();
+});
+
 test('the interview reminder command sends once for tomorrow', function () {
     $tz = config('app.worker_timezone', 'Pacific/Auckland');
     ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
