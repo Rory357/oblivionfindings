@@ -3,91 +3,27 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
-use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Notifications\DevelopmentGoalAssignedNotification;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class DevelopmentGoalController extends Controller
 {
     use ResolvesHrTenant;
 
+    /**
+     * Development plans are now a tab inside the Goals & OKR hub. This legacy
+     * index redirects there so old links and route() helpers still resolve.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $canManage = $user->canDo('hr.performance.manage');
-        $status = $request->query('status');
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-
-        $goals = HrDevelopmentGoal::query()
-            ->with(['employee:id,name,email', 'manager:id,name', 'goal:id,title'])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->when($status, fn ($query, $value) => $query->where('status', $value))
-            ->when(! $canManage, fn ($query) => $query->where('employee_user_id', $user->id))
-            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'not_started' THEN 1 WHEN status = 'blocked' THEN 2 ELSE 3 END")
-            ->orderBy('due_date')
-            ->paginate(20)
-            ->withQueryString()
-            ->through(fn (HrDevelopmentGoal $goal) => [
-                'id' => $goal->id,
-                'title' => $goal->title,
-                'description' => $goal->description,
-                'category' => $goal->category,
-                'competency_area' => $goal->competency_area,
-                'target_level' => $goal->target_level,
-                'current_level' => $goal->current_level,
-                'status' => $goal->status,
-                'progress_percent' => (int) $goal->progress_percent,
-                'start_date' => optional($goal->start_date)->toDateString(),
-                'due_date' => optional($goal->due_date)->toDateString(),
-                'completed_at' => optional($goal->completed_at)->toDateString(),
-                'review_frequency' => $goal->review_frequency,
-                'review_notes' => $goal->review_notes,
-                'employee' => $goal->employee ? [
-                    'id' => $goal->employee->id,
-                    'name' => $goal->employee->name,
-                    'email' => $goal->employee->email,
-                ] : null,
-                'manager' => $goal->manager ? [
-                    'id' => $goal->manager->id,
-                    'name' => $goal->manager->name,
-                ] : null,
-                'hr_goal_id' => $goal->hr_goal_id,
-                'goal' => $goal->goal ? [
-                    'id' => $goal->goal->id,
-                    'title' => $goal->goal->title,
-                ] : null,
-            ]);
-
-        $staff = User::query()
-            ->staff()
-            ->when($tenantStaffIds !== [], fn ($query) => $query->whereIn('id', $tenantStaffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        $objectives = HrGoal::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->orderBy('title')
-            ->get(['id', 'title']);
-
-        return Inertia::render('hr/goals/development', [
-            'goals' => $goals,
-            'staff' => $staff,
-            'objectives' => $objectives,
-            'filters' => [
-                'status' => $status,
-            ],
-            'can' => [
-                'manage' => $canManage,
-            ],
-        ]);
+        return redirect('/hr/goals?tab=development');
     }
 
     public function store(Request $request)
@@ -112,6 +48,7 @@ class DevelopmentGoalController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
             'competency_area' => ['nullable', 'string', 'max:255'],
+            'competency_id' => ['nullable', 'integer', Rule::exists('hr_competencies', 'id')],
             'target_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'status' => ['nullable', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'])],
@@ -122,11 +59,19 @@ class DevelopmentGoalController extends Controller
             'review_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        // Seed the next review date so the reminder job has a target.
+        $nextReview = $validated['due_date'] ?? null;
+        if (! $nextReview && ! empty($validated['review_frequency'])) {
+            $days = HrDevelopmentGoal::REVIEW_CADENCE_DAYS[$validated['review_frequency']] ?? null;
+            $nextReview = $days ? now()->addDays($days)->toDateString() : null;
+        }
+
         $goal = HrDevelopmentGoal::create([
             'tenant_id' => $tenantId,
             ...$validated,
             'status' => $validated['status'] ?? 'not_started',
             'progress_percent' => (int) ($validated['progress_percent'] ?? 0),
+            'next_review_at' => $nextReview,
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
@@ -161,6 +106,7 @@ class DevelopmentGoalController extends Controller
             'description' => [$canManage ? 'nullable' : 'prohibited', 'string', 'max:5000'],
             'category' => [$canManage ? 'sometimes' : 'prohibited', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
             'competency_area' => ['nullable', 'string', 'max:255'],
+            'competency_id' => [$canManage ? 'nullable' : 'prohibited', 'integer', Rule::exists('hr_competencies', 'id')],
             'target_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'status' => ['sometimes', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'])],
@@ -176,9 +122,22 @@ class DevelopmentGoalController extends Controller
             'updated_by' => $user->id,
         ];
 
+        // Re-seed the review target when cadence or the first-review date changes.
+        if (array_key_exists('review_frequency', $validated) || array_key_exists('due_date', $validated)) {
+            $freq = $validated['review_frequency'] ?? $goal->review_frequency;
+            $due = $validated['due_date'] ?? optional($goal->due_date)->toDateString();
+            $next = $due;
+            if (! $next && $freq) {
+                $days = HrDevelopmentGoal::REVIEW_CADENCE_DAYS[$freq] ?? null;
+                $next = $days ? now()->addDays($days)->toDateString() : null;
+            }
+            $payload['next_review_at'] = $next;
+        }
+
         if (($payload['status'] ?? null) === 'completed') {
             $payload['completed_at'] = now()->toDateString();
             $payload['progress_percent'] = 100;
+            $payload['next_review_at'] = null;
         }
 
         $goal->update($payload);

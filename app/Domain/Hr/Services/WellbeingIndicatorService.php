@@ -3,7 +3,10 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrWellbeingCheckin;
+use App\Domain\Hr\Models\HrWellbeingFlagAction;
 use App\Domain\Hr\Models\HrWellbeingIndicator;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -11,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class WellbeingIndicatorService
 {
@@ -164,27 +168,48 @@ class WellbeingIndicatorService
                     ->when($tenantId !== null, fn ($inner) => $inner->where('tenant_id', $tenantId))
                     ->groupBy('user_id');
             })
-            ->with(['user.hrEmployeeProfile']);
+            ->with(['user.hrEmployeeProfile.primarySite:id,name']);
 
         if ($flagLevel) {
             $query->where('flag_level', $flagLevel);
         }
 
-        return $query
+        $indicators = $query
             ->orderByRaw("CASE WHEN flag_level = 'red' THEN 0 ELSE 1 END")
-            ->get()
-            ->map(function (HrWellbeingIndicator $indicator) {
-                $triggeredRules = $this->getTriggeredRules($indicator);
+            ->get();
+
+        $userIds = $indicators->pluck('user_id')->filter()->unique()->values();
+        $latestActions = $this->latestFlagActionsFor($userIds);
+        $lastCheckins = $this->lastCheckinDatesFor($tenantId, $userIds);
+        $openPlanCounts = $this->openPlanCountsFor($tenantId, $userIds);
+        $today = now()->startOfDay();
+
+        return $indicators
+            ->map(function (HrWellbeingIndicator $indicator) use ($latestActions, $lastCheckins, $openPlanCounts, $today) {
+                $action = $latestActions->get($indicator->user_id);
+
+                // Hide dismissed flags and flags snoozed to a future date.
+                if ($action) {
+                    if ($action->action === 'dismiss') {
+                        return null;
+                    }
+                    if ($action->action === 'snooze' && $action->snooze_until && $action->snooze_until->startOfDay()->greaterThan($today)) {
+                        return null;
+                    }
+                }
+
+                $lastCheckinAt = $lastCheckins->get($indicator->user_id);
 
                 return [
                     'user_id' => $indicator->user_id,
                     'name' => $indicator->user?->name,
                     'position_title' => $indicator->user?->hrEmployeeProfile?->position_title,
+                    'site_name' => $indicator->user?->hrEmployeeProfile?->primarySite?->name,
                     'flag_level' => $indicator->flag_level,
                     'period_start' => $indicator->period_start?->toDateString(),
                     'period_end' => $indicator->period_end?->toDateString(),
                     'calculated_at' => $indicator->calculated_at?->toIso8601String(),
-                    'triggered_rules' => $triggeredRules,
+                    'triggered_rules' => $this->getTriggeredRules($indicator),
                     'metrics' => [
                         'overtime_hours' => (float) $indicator->overtime_hours,
                         'consecutive_days_worked' => (int) $indicator->consecutive_days_worked,
@@ -193,8 +218,134 @@ class WellbeingIndicatorService
                         'shifts_worked_7d' => (int) $indicator->shifts_worked_7d,
                         'average_shift_length_hours' => (float) $indicator->average_shift_length_hours,
                     ],
+                    'last_checkin_at' => $lastCheckinAt?->toIso8601String(),
+                    'open_plan_count' => (int) ($openPlanCounts->get($indicator->user_id) ?? 0),
+                    'latest_action' => $action ? [
+                        'action' => $action->action,
+                        'actor_name' => $action->actor?->name,
+                        'snooze_until' => $action->snooze_until?->toDateString(),
+                        'reason' => $action->reason,
+                        'created_at' => $action->created_at?->toIso8601String(),
+                    ] : null,
                 ];
-            });
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Latest triage action keyed by staff_user_id.
+     *
+     * @return Collection<int, HrWellbeingFlagAction>
+     */
+    protected function latestFlagActionsFor(Collection $userIds): Collection
+    {
+        if ($userIds->isEmpty() || ! Schema::hasTable('hr_wellbeing_flag_actions')) {
+            return collect();
+        }
+
+        return HrWellbeingFlagAction::query()
+            ->whereIn('staff_user_id', $userIds)
+            ->whereIn('id', function ($sub) use ($userIds) {
+                $sub->select(DB::raw('MAX(id)'))
+                    ->from('hr_wellbeing_flag_actions')
+                    ->whereIn('staff_user_id', $userIds->all())
+                    ->groupBy('staff_user_id');
+            })
+            ->with('actor:id,name')
+            ->get()
+            ->keyBy('staff_user_id');
+    }
+
+    /**
+     * @return Collection<int, Carbon>
+     */
+    protected function lastCheckinDatesFor(?int $tenantId, Collection $userIds): Collection
+    {
+        if ($userIds->isEmpty() || ! Schema::hasTable('hr_wellbeing_checkins')) {
+            return collect();
+        }
+
+        return HrWellbeingCheckin::query()
+            ->whereIn('staff_user_id', $userIds)
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->selectRaw('staff_user_id, MAX(created_at) as last_at')
+            ->groupBy('staff_user_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->staff_user_id => Carbon::parse($row->last_at)]);
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    protected function openPlanCountsFor(?int $tenantId, Collection $userIds): Collection
+    {
+        if ($userIds->isEmpty() || ! Schema::hasColumn('hr_engagement_action_plans', 'staff_user_id')) {
+            return collect();
+        }
+
+        return HrEngagementActionPlan::query()
+            ->whereIn('staff_user_id', $userIds)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->selectRaw('staff_user_id, COUNT(*) as plan_count')
+            ->groupBy('staff_user_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->staff_user_id => (int) $row->plan_count]);
+    }
+
+    /**
+     * Per-staff indicator history for the Signals sparkline (oldest → newest).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getStaffTrend(?int $tenantId, int $userId, int $limit = 12): array
+    {
+        return HrWellbeingIndicator::query()
+            ->where('user_id', $userId)
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->orderByDesc('period_end')
+            ->limit($limit)
+            ->get()
+            ->reverse()
+            ->values()
+            ->map(fn (HrWellbeingIndicator $indicator) => [
+                'period_end' => $indicator->period_end?->toDateString(),
+                'flag_level' => $indicator->flag_level,
+                'overtime_hours' => (float) $indicator->overtime_hours,
+                'consecutive_days_worked' => (int) $indicator->consecutive_days_worked,
+                'average_shift_length_hours' => (float) $indicator->average_shift_length_hours,
+            ])
+            ->all();
+    }
+
+    /**
+     * Tenant-wide red/amber counts over recent periods (oldest → newest) for the
+     * Overview trend.
+     *
+     * @return array<int, array{period_end: string|null, red: int, amber: int, total: int}>
+     */
+    public function getTenantTrend(?int $tenantId, int $points = 8): array
+    {
+        $rows = HrWellbeingIndicator::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->selectRaw("period_end, "
+                . "SUM(CASE WHEN flag_level = 'red' THEN 1 ELSE 0 END) as red, "
+                . "SUM(CASE WHEN flag_level = 'amber' THEN 1 ELSE 0 END) as amber, "
+                . "COUNT(*) as total")
+            ->groupBy('period_end')
+            ->orderByDesc('period_end')
+            ->limit($points)
+            ->get()
+            ->reverse()
+            ->values();
+
+        return $rows->map(fn ($row) => [
+            'period_end' => $row->period_end ? Carbon::parse($row->period_end)->toDateString() : null,
+            'red' => (int) $row->red,
+            'amber' => (int) $row->amber,
+            'total' => (int) $row->total,
+        ])->all();
     }
 
     /**

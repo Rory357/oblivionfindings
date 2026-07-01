@@ -2,10 +2,15 @@
 
 namespace App\Domain\Hr\Jobs;
 
+use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
+use App\Domain\Hr\Notifications\DocumentExpiryNotification;
+use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\VisaExpiryNotification;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -90,6 +95,118 @@ class SendExpiryRemindersJob implements ShouldQueue
         ]);
 
         $this->sendVisaExpiryReminders($reminderDays);
+        $this->sendDocumentExpiryReminders((int) max($reminderDays));
+        $this->sendSignatureDueReminders();
+    }
+
+    /**
+     * Signature-due sweep: nudge each pending signer once their request enters
+     * the reminder window (default 2 days before due), then stamp
+     * `reminder_sent_at` so we don't re-send. Requests with no due date, or
+     * already reminded, are skipped.
+     */
+    private function sendSignatureDueReminders(): void
+    {
+        $leadDays = (int) config('hr.signature_reminder_lead_days', 2);
+        $cutoff = now()->addDays($leadDays)->toDateString();
+        $sentCount = 0;
+
+        $query = HrDocumentSignature::query()
+            ->with('document:id,title')
+            ->where('status', 'pending')
+            ->whereNull('reminder_sent_at')
+            ->whereNotNull('due_at')
+            ->whereDate('due_at', '<=', $cutoff);
+
+        if ($this->tenantId !== null) {
+            $query->where('tenant_id', $this->tenantId);
+        }
+
+        $query->chunkById(200, function ($signatures) use (&$sentCount) {
+            foreach ($signatures as $signature) {
+                $signer = User::find($signature->signer_user_id);
+                if ($signer) {
+                    try {
+                        $signer->notify(new SignatureReminderNotification([
+                            'signature_id' => $signature->id,
+                            'document_title' => $signature->document?->title ?? 'a document',
+                            'due_at' => optional($signature->due_at)->toDateString(),
+                        ]));
+                        $sentCount++;
+                    } catch (\Throwable $exception) {
+                        Log::warning('Failed to send signature reminder', [
+                            'signature_id' => $signature->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+                $signature->update(['reminder_sent_at' => now()]);
+            }
+        });
+
+        Log::info('SendExpiryRemindersJob: Signature-due reminder check completed.', [
+            'tenant_id' => $this->tenantId,
+            'sent' => $sentCount,
+        ]);
+    }
+
+    /**
+     * HR document expiry sweep: notify the employee (and their manager) once a
+     * document on file enters the reminder window, then flag it so we don't
+     * re-notify. Uses the single `expiry_reminder_sent` flag on the document.
+     */
+    private function sendDocumentExpiryReminders(int $windowDays): void
+    {
+        $sentCount = 0;
+        $cutoff = now()->addDays($windowDays)->toDateString();
+        $today = now()->toDateString();
+
+        $query = HrDocument::query()
+            ->with(['employeeProfile.user:id,name,email', 'employeeProfile.manager:id,name,email'])
+            ->whereNotNull('expires_at')
+            ->where('expiry_reminder_sent', false)
+            ->whereDate('expires_at', '<=', $cutoff)
+            ->whereDate('expires_at', '>=', $today);
+
+        if ($this->tenantId !== null) {
+            $query->where('tenant_id', $this->tenantId);
+        }
+
+        $query->chunkById(200, function ($documents) use (&$sentCount) {
+            foreach ($documents as $document) {
+                $payload = [
+                    'document_id' => $document->id,
+                    'title' => $document->title,
+                    'expires_at' => optional($document->expires_at)->toDateString(),
+                    'reminder_days' => now()->diffInDays($document->expires_at, false),
+                ];
+
+                $recipients = collect([
+                    $document->employeeProfile?->user,
+                    $document->employeeProfile?->manager,
+                ])->filter()->unique('id');
+
+                foreach ($recipients as $recipient) {
+                    try {
+                        $recipient->notify(new DocumentExpiryNotification($payload));
+                        $sentCount++;
+                    } catch (\Throwable $exception) {
+                        Log::warning('Failed to send document expiry notification', [
+                            'document_id' => $document->id,
+                            'recipient_id' => $recipient->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+
+                $document->update(['expiry_reminder_sent' => true]);
+            }
+        });
+
+        Log::info('SendExpiryRemindersJob: Document expiry reminder check completed.', [
+            'tenant_id' => $this->tenantId,
+            'sent' => $sentCount,
+        ]);
     }
 
     /**

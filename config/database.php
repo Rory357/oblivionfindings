@@ -60,13 +60,12 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                // Client-side prepare emulation — defaults off in production; the
-                // test suite sets DB_EMULATE_PREPARES=true to dodge MySQL error
-                // 1615 ("prepared statement needs to be re-prepared") that occurs
-                // after repeated migrate:fresh DDL. Cast to a real bool — PHP 8.4's
-                // PDO::connect rejects the string form of this attribute.
-                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOLEAN),
-            ]) : [],
+                // Opt-in client-side prepares (off by default → prod unchanged).
+                // Tests set DB_EMULATE_PREPARES=true to dodge the MySQL 1615
+                // "prepared statement needs to be re-prepared" flake that hits
+                // RbacSeeder under repeated migrate:fresh / concurrent test DBs.
+                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOL) ?: null,
+            ], fn ($value) => $value !== null) : [],
         ],
 
         'mariadb' => [

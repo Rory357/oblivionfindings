@@ -32,7 +32,6 @@ export * from './my-hr-utils';
 export * from './needs-triage-dialog';
 export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
-export * from './onboarding-tabs';
 export * from './onboarding-wizard-dialog';
 export * from './payroll-tabs';
 export * from './people-hero';

@@ -19,6 +19,7 @@ use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\InterviewInviteNotification;
 use App\Domain\Hr\Notifications\JobApplicationReceivedNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
+use App\Domain\Hr\Notifications\OfferApprovalNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -791,6 +792,44 @@ test('bulk pool warm-banks every selected candidate', function () {
     expect(HrTalentPool::query()->where('candidate_id', $b->id)->exists())->toBeTrue();
 });
 
+test('bulk tag adds and removes a label across every selected candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'interview')['candidate'];
+    $a->update(['tags' => []]); // clear factory-seeded tags for a deterministic start
+    $b->update(['tags' => ['Rehire']]); // pre-existing tag must be preserved
+
+    // Add — idempotent, case-insensitive, preserves existing tags.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id, $b->id], 'tag' => ' Bilingual ',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Bilingual']);
+    expect($b->fresh()->tags)->toBe(['Rehire', 'Bilingual']);
+
+    // Re-applying the same tag (different case) does not duplicate it.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id], 'tag' => 'bilingual',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Bilingual']);
+
+    // Remove — case-insensitive, leaves other tags intact.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'untag', 'candidate_ids' => [$a->id, $b->id], 'tag' => 'BILINGUAL',
+    ])->assertRedirect();
+    expect($a->fresh()->tags)->toBe([]);
+    expect($b->fresh()->tags)->toBe(['Rehire']);
+
+    // A tag action requires a non-empty tag.
+    $this->actingAs($this->hr)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id],
+    ])->assertSessionHasErrors('tag');
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.applications.bulk'), [
+        'action' => 'tag', 'candidate_ids' => [$a->id], 'tag' => 'x',
+    ])->assertForbidden();
+});
+
 test('the interview reminder command sends once for tomorrow', function () {
     $tz = config('app.worker_timezone', 'Pacific/Auckland');
     ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
@@ -1005,4 +1044,233 @@ test('the pipeline surfaces a candidate average interview score for ranking', fu
 
             return true;
         }));
+});
+
+/* ---- Offer approval chain ---- */
+
+test('an offer must be submitted, approved (or declined) before it can be sent', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    $req = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-appr-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
+    ]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_pending', 'personal_email' => 'c.appr@example.test', 'created_by' => $this->hr->id]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
+        'position_title' => 'Support Worker', 'status' => 'active',
+    ]);
+    $offer = HrOffer::create([
+        'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'draft', 'created_by' => $this->hr->id,
+    ]);
+
+    // A draft offer cannot be sent.
+    $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();
+    expect($offer->fresh()->sent_at)->toBeNull();
+
+    // Submit → pending_approval, notifies the hiring-manager approver.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('pending_approval');
+    expect($offer->fresh()->approval_requested_at)->not->toBeNull();
+    Notification::assertSentTo($manager, OfferApprovalNotification::class);
+
+    // Decline → declined with reason, notifies the creator.
+    $this->actingAs($manager)->post(route('hr.offers.decline-approval', $offer->id), ['reason' => 'Rate too high'])->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('declined');
+    expect($offer->fresh()->approval_declined_reason)->toBe('Rate too high');
+    Notification::assertSentTo($this->hr, OfferApprovalNotification::class);
+
+    // Resubmit then approve → approved (creator notified), now sendable.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.approve', $offer->id))->assertRedirect();
+    expect($offer->fresh()->approval_status)->toBe('approved');
+
+    $this->actingAs($this->hr)->post(route('hr.offers.send', $offer->id))->assertRedirect();
+    expect($offer->fresh()->sent_at)->not->toBeNull();
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.offers.submit-approval', $offer->id))->assertForbidden();
+});
+
+test('the hub surfaces offer approval states and the approve/send nudges', function () {
+    // An offer awaiting sign-off (the approver's queue).
+    $ctxA = makeApplicant($this->hr->id, 'offer_pending');
+    $pending = makeOffer($ctxA, 'draft', $this->hr->id, $this->site->id);
+    $pending->update(['approval_status' => 'pending_approval', 'approval_requested_at' => now()]);
+
+    // An approved-but-unsent offer (ready to send).
+    $ctxB = makeApplicant($this->hr->id, 'offer_pending');
+    makeOffer($ctxB, 'draft', $this->hr->id, $this->site->id); // makeOffer defaults approval_status='approved'
+
+    // An approver-declined offer surfaces distinctly (not as a fresh "draft").
+    $ctxC = makeApplicant($this->hr->id, 'offer_pending');
+    $declined = makeOffer($ctxC, 'draft', $this->hr->id, $this->site->id);
+    $declined->update(['approval_status' => 'declined', 'approval_declined_reason' => 'Rate too high']);
+
+    $response = $this->actingAs($this->hr)->get(route('hr.recruitment.index'));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('offers.list', fn ($list) => collect($list)
+            ->contains(fn ($o) => (int) $o['id'] === (int) $pending->id && $o['status'] === 'pending_approval')
+            && collect($list)->contains(fn ($o) => (int) $o['id'] === (int) $declined->id && $o['status'] === 'changes_requested'))
+        ->where('needs', fn ($needs) => collect($needs)->contains(fn ($n) => $n['key'] === 'offers_approval')
+            && collect($needs)->contains(fn ($n) => $n['key'] === 'offers_send'))
+    );
+});
+
+test('stuck pending-approval offers escalate to the hiring manager once', function () {
+    Notification::fake();
+    $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $req = HrJobRequisition::query()->create([
+        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-rem-'.uniqid(),
+        'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
+    ]);
+    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_pending', 'personal_email' => 'c.rem@example.test', 'created_by' => $this->hr->id]);
+    $application = HrApplication::factory()->create([
+        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
+        'position_title' => 'Support Worker', 'status' => 'active',
+    ]);
+
+    // Stale: pending approval for 3 days, never reminded → eligible.
+    $stale = HrOffer::create([
+        'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'pending_approval', 'approval_requested_at' => now()->subDays(3), 'created_by' => $this->hr->id,
+    ]);
+
+    // Fresh: submitted today → NOT yet eligible (under the 2-day threshold).
+    $fresh = HrOffer::create([
+        'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'pending_approval', 'approval_requested_at' => now(), 'created_by' => $this->hr->id,
+    ]);
+
+    $this->artisan('recruitment:send-offer-approval-reminders')->assertExitCode(0);
+
+    Notification::assertSentTo($manager, OfferApprovalNotification::class);
+    Notification::assertSentToTimes($manager, OfferApprovalNotification::class, 1);
+    expect($stale->fresh()->approval_reminder_sent_at)->not->toBeNull();
+    expect($fresh->fresh()->approval_reminder_sent_at)->toBeNull();
+
+    // Idempotent: a second run does not re-nudge (reminder timestamp now set).
+    $this->artisan('recruitment:send-offer-approval-reminders')->assertExitCode(0);
+    Notification::assertSentToTimes($manager, OfferApprovalNotification::class, 1);
+});
+
+test('the candidate timeline records the offer approval history', function () {
+    $approver = User::factory()->create(['role' => 'hr', 'name' => 'Mana Approver', 'approved_at' => now()]);
+    $ctx = makeApplicant($this->hr->id, 'offer_pending');
+    HrOffer::create([
+        'application_id' => $ctx['application']->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'approved', 'approval_requested_at' => now()->subDay(),
+        'approved_at' => now(), 'approved_by' => $approver->id, 'created_by' => $this->hr->id,
+    ]);
+
+    $response = $this->actingAs($this->hr)->get(route('hr.candidates.show', $ctx['candidate']->id));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('activityLog', fn ($log) => collect($log)
+            ->contains(fn ($e) => $e['description'] === 'Offer submitted for approval')
+            && collect($log)->contains(fn ($e) => $e['description'] === 'Offer approved' && ($e['actor'] ?? null) === 'Mana Approver'))
+    );
+});
+
+test('the approval timeline keeps a declined entry after the offer is re-approved (durable audit trail)', function () {
+    $manager = User::factory()->create(['role' => 'hr', 'name' => 'Aroha Manager', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    $ctx = makeApplicant($this->hr->id, 'offer_pending');
+    $offer = HrOffer::create([
+        'application_id' => $ctx['application']->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'draft', 'created_by' => $this->hr->id,
+    ]);
+
+    // Drive the real transitions so the append-only audit trail is written.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.decline-approval', $offer->id), ['reason' => 'Rate too high'])->assertRedirect();
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.approve', $offer->id))->assertRedirect();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.candidates.show', $ctx['candidate']->id));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('activityLog', fn ($log) => collect($log)
+            // The decline survives the later re-approval — impossible with state derivation.
+            ->contains(fn ($e) => str_contains($e['description'], 'sent back for changes') && str_contains($e['description'], 'Rate too high'))
+            // Final approval is attributed to the approver.
+            && collect($log)->contains(fn ($e) => $e['description'] === 'Offer approved' && ($e['actor'] ?? null) === 'Aroha Manager')
+            // Both submissions are retained (append-only, not collapsed).
+            && collect($log)->filter(fn ($e) => $e['description'] === 'Offer submitted for approval')->count() === 2)
+    );
+});
+
+test('a candidate can be tagged and the tags surface in the hub and profile', function () {
+    $ctx = makeApplicant($this->hr->id, 'screening');
+    $candidate = $ctx['candidate'];
+
+    // Tag endpoint trims, dedupes, and drops blanks.
+    $this->actingAs($this->hr)
+        ->post(route('hr.candidates.tags.update', $candidate->id), ['tags' => ['Rehire', ' rural ', 'Rehire', '']])
+        ->assertRedirect();
+    expect($candidate->fresh()->tags)->toBe(['Rehire', 'rural']);
+
+    // Surfaces on the pipeline row and the candidate profile payload.
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
+        ->where('candidates', fn ($list) => collect($list)
+            ->contains(fn ($c) => (int) $c['id'] === (int) $candidate->id && in_array('Rehire', $c['tags'], true))));
+    $this->actingAs($this->hr)->get(route('hr.candidates.show', $candidate->id))->assertInertia(fn ($page) => $page
+        ->where('candidate.tags', ['Rehire', 'rural']));
+
+    // Manage-gated.
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.candidates.tags.update', $candidate->id), ['tags' => ['x']])->assertForbidden();
+});
+
+test('a manager can rename (merging) and delete a tag across every candidate', function () {
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b = makeApplicant($this->hr->id, 'interview')['candidate'];
+    $c = makeApplicant($this->hr->id, 'references')['candidate'];
+    $a->update(['tags' => ['Rural', 'Rehire']]);
+    $b->update(['tags' => ['rural']]);      // case-variant of Rural
+    $c->update(['tags' => ['Regional']]);
+
+    // Rename across all — case-insensitive match, other tags untouched.
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'rural', 'to' => 'Coastal'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire', 'Coastal']);
+    expect($b->fresh()->tags)->toBe(['Coastal']);
+    expect($c->fresh()->tags)->toBe(['Regional']); // untouched
+
+    // Merge: renaming into an existing tag de-duplicates (Coastal → Regional).
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'Coastal', 'to' => 'Regional'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire', 'Regional']);
+    expect($b->fresh()->tags)->toBe(['Regional']);
+
+    // Vocabulary aggregator surfaces distinct tags with counts.
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
+        ->where('support.tags', fn ($tags) => collect($tags)
+            ->contains(fn ($t) => $t['tag'] === 'Regional' && $t['count'] === 3)));
+
+    // Delete removes the tag everywhere.
+    $this->actingAs($this->hr)->post(route('hr.tags.delete'), ['tag' => 'regional'])->assertRedirect();
+    expect($a->fresh()->tags)->toBe(['Rehire']);
+    expect($b->fresh()->tags)->toBe([]);
+    expect($c->fresh()->tags)->toBe([]);
+
+    // Blank rename target is rejected (TrimStrings empties it → required fails); both endpoints are manage-gated.
+    $this->actingAs($this->hr)->post(route('hr.tags.rename'), ['from' => 'Rehire', 'to' => '   '])->assertSessionHasErrors('to');
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->actingAs($viewer)->post(route('hr.tags.rename'), ['from' => 'Rehire', 'to' => 'x'])->assertForbidden();
+    $this->actingAs($viewer)->post(route('hr.tags.delete'), ['tag' => 'Rehire'])->assertForbidden();
 });

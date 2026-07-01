@@ -26,9 +26,6 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Download,
-    File,
-    FileImage,
-    FileSpreadsheet,
     FileText,
     Filter,
     FolderOpen,
@@ -42,6 +39,15 @@ import {
     Upload,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+
+import {
+    categoryTone,
+    expiryStatus,
+    fileTypeInfo,
+    formatBytes,
+    formatDocDate,
+    labelize,
+} from '@/components/hr/document-library-kit';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -74,111 +80,16 @@ interface Props {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const FILE_ICONS: Record<
-    string,
-    { icon: typeof File; color: string; bg: string }
-> = {
-    pdf: {
-        icon: FileText,
-        color: 'text-status-critical',
-        bg: 'bg-status-critical-bg',
-    },
-    doc: { icon: FileText, color: 'text-status-info', bg: 'bg-status-info-bg' },
-    docx: {
-        icon: FileText,
-        color: 'text-status-info',
-        bg: 'bg-status-info-bg',
-    },
-    xls: {
-        icon: FileSpreadsheet,
-        color: 'text-status-success',
-        bg: 'bg-status-success-bg',
-    },
-    xlsx: {
-        icon: FileSpreadsheet,
-        color: 'text-status-success',
-        bg: 'bg-status-success-bg',
-    },
-    csv: {
-        icon: FileSpreadsheet,
-        color: 'text-status-success',
-        bg: 'bg-status-success-bg',
-    },
-    jpg: {
-        icon: FileImage,
-        color: 'text-status-warning',
-        bg: 'bg-status-warning-bg',
-    },
-    jpeg: {
-        icon: FileImage,
-        color: 'text-status-warning',
-        bg: 'bg-status-warning-bg',
-    },
-    png: {
-        icon: FileImage,
-        color: 'text-status-warning',
-        bg: 'bg-status-warning-bg',
-    },
-    gif: {
-        icon: FileImage,
-        color: 'text-status-warning',
-        bg: 'bg-status-warning-bg',
-    },
-};
-
-function getFileInfo(mime?: string, name?: string) {
-    const ext = (name ?? '').split('.').pop()?.toLowerCase() ?? '';
-    return (
-        FILE_ICONS[ext] ?? {
-            icon: File,
-            color: 'text-primary',
-            bg: 'bg-primary/10',
-        }
-    );
-}
-
 const NONE = '__none__';
 
-const CATEGORY_COLORS: Record<string, string> = {
-    contract: 'bg-status-info-bg text-status-info',
-    letter: 'bg-primary/10 text-primary',
-    policy: 'bg-status-success-bg text-status-success',
-    certificate: 'bg-status-warning-bg text-status-warning',
-    offer: 'bg-status-critical-bg text-status-critical',
-    other: 'bg-muted text-foreground',
-};
-
-function formatLabel(s: string) {
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-function formatDate(v?: string | null) {
-    if (!v) return '\u2014';
-    const d = new Date(v);
-    return isNaN(d.getTime())
-        ? v
-        : d.toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          });
-}
-function formatBytes(b: number) {
-    if (b < 1024) return `${b} B`;
-    if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`;
-    return `${(b / 1048576).toFixed(1)} MB`;
-}
-
-function isExpiringSoon(date: string | null) {
-    if (!date) return false;
-    const d = new Date(date);
-    const now = new Date();
-    return d > now && d.getTime() - now.getTime() < 30 * 86400000;
-}
-
-function isExpired(date: string | null) {
-    if (!date) return false;
-    return new Date(date) < new Date();
-}
+// Presentational helpers (file icons, category tones, formatters, expiry) are
+// shared with the Documents hub + self-service via document-library-kit.
+// The single-employee library keeps its tighter 30-day "expiring" window.
+const isExpiringSoon = (date: string | null) => expiryStatus(date, 30)?.state === 'expiring';
+const isExpired = (date: string | null) => expiryStatus(date, 30)?.state === 'expired';
+const getFileInfo = fileTypeInfo;
+const formatLabel = labelize;
+const formatDate = formatDocDate;
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -613,7 +524,7 @@ export default function StaffDocuments({
                                                     {d.category && (
                                                         <Badge
                                                             variant="outline"
-                                                            className={`h-4 border-0 px-1 text-[8px] ${CATEGORY_COLORS[d.category] || 'bg-muted text-muted-foreground'}`}
+                                                            className={`h-4 border-0 px-1 text-[8px] ${categoryTone(d.category)}`}
                                                         >
                                                             {formatLabel(
                                                                 d.category,
@@ -788,7 +699,7 @@ export default function StaffDocuments({
                                                 <td className="hidden px-4 py-2.5 md:table-cell">
                                                     {d.category ? (
                                                         <Badge
-                                                            className={`border-0 text-[10px] capitalize ${CATEGORY_COLORS[d.category] ?? 'bg-muted text-muted-foreground'}`}
+                                                            className={`border-0 text-[10px] capitalize ${categoryTone(d.category)}`}
                                                         >
                                                             {formatLabel(
                                                                 d.category,

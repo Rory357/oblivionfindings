@@ -61,9 +61,9 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     // Payroll hub
     '/hr/payroll',
     '/hr/payroll/payslips',
-    // Onboarding hub
+    // Onboarding hub (Emails is now an in-hub tab, not a separate page)
     '/hr/onboarding',
-    '/hr/onboarding/emails',
+    '/hr/onboarding?tab=emails',
     // Reports hub — folded Analytics + Headcount dashboards
     '/hr/analytics',
     '/hr/headcount',

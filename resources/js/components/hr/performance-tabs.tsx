@@ -26,7 +26,7 @@ const TAB_URLS: Record<PerformanceTab, string> = {
     overview: '/hr/performance',
     reviews: '/hr/performance/reviews',
     goals: '/hr/goals',
-    development: '/hr/goals/development',
+    development: '/hr/goals?tab=development',
     competencies: '/hr/performance/competencies',
     feedback: '/hr/feedback',
     pips: '/hr/performance/pips',

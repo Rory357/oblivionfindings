@@ -36,6 +36,7 @@
         <env name="DB_DATABASE" value="oblivion_findings_codex_test"/>
         <env name="DB_USERNAME" value="testUser"/>
         <env name="DB_PASSWORD" value="test101"/>
+        <env name="DB_EMULATE_PREPARES" value="true"/>
         <env name="APP_URL" value="http://localhost"/>
         <env name="APP_DEBUG" value="true"/>
         <env name="MAIL_MAILER" value="array"/>

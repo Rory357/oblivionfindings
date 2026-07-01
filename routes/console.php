@@ -21,6 +21,7 @@ use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
 use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
 use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
+use App\Domain\Hr\Jobs\PublishDueAnnouncementsJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendAssetRemindersJob;
@@ -80,6 +81,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// Escalate offers stuck awaiting sign-off (≥2 days) to the hiring manager: 08:20 NZ
+app(Schedule::class)
+    ->command('recruitment:send-offer-approval-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:20');
+
 // PPE compliance reminders: worker unacknowledged/fit-test digests + H&S lead
 // overdue-inspection/expiring/condemned digests — every day 08:15 NZ.
 app(Schedule::class)
@@ -92,6 +99,18 @@ app(Schedule::class)
     ->command('emar:escalate-overdue-cd-checks')
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:30');
+
+// OKR & development reminders: check-in due / overdue / KR-due / dev review: 08:00 NZ
+app(Schedule::class)
+    ->command('hr:goal-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00');
+
+// Weekly OKR digest to objective owners: Monday 08:00 NZ
+app(Schedule::class)
+    ->command('hr:goal-weekly-digest')
+    ->timezone('Pacific/Auckland')
+    ->weeklyOn(1, '08:00');
 
 // HR calendar event reminders: every minute, fire any reminder whose lead time
 // lands in the last minute (de-duped via last_sent_at).
@@ -153,6 +172,13 @@ app(Schedule::class)
     ->job(new ProcessControlRoomSignals)
     ->timezone('Pacific/Auckland')
     ->everyMinute();
+
+// Fire scheduled HR announcements the moment their publish time arrives
+app(Schedule::class)
+    ->job(new PublishDueAnnouncementsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // Control Room SLA breach checks
 app(Schedule::class)
@@ -303,6 +329,13 @@ app(Schedule::class)
     ->command('hr:onboarding-emails')
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00')
+    ->withoutOverlapping();
+
+// Onboarding task reminders: nudge assignees about overdue / due-soon tasks: daily 08:15
+app(Schedule::class)
+    ->command('hr:onboarding-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:15')
     ->withoutOverlapping();
 
 // Vacancy check: reconcile position headcounts + report understaffed positions: daily 06:30

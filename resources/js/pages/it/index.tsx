@@ -1,0 +1,177 @@
+/* eslint-disable no-restricted-syntax -- Design-preview wireframe: intentionally
+ * static mock data + styled native elements so the IT & Provisioning shape can be
+ * reviewed before the backend is built. Every colour is a semantic design token.
+ * See docs/IT_PROVISIONING_WIREFRAME.md for the build-out spec. */
+import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/react';
+import {
+    KeyRound,
+    Laptop,
+    Mail,
+    Server,
+    Ticket,
+    TriangleAlert,
+} from 'lucide-react';
+
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it' }];
+
+/* ── Mock data (static wireframe) ───────────────────────────────────── */
+
+const PROVISIONING = [
+    { id: 1, employee: 'Aroha Ngata', item: 'Microsoft 365 account', type: 'account', assignee: 'IT Helpdesk', status: 'pending', source: 'Onboarding · Support Worker' },
+    { id: 2, employee: 'Aroha Ngata', item: 'Care app login', type: 'access', assignee: 'IT Helpdesk', status: 'pending', source: 'Onboarding · Support Worker' },
+    { id: 3, employee: 'James Whitfield', item: 'Laptop (field kit)', type: 'equipment', assignee: 'David Cho', status: 'in_progress', source: 'Onboarding · Registered Nurse' },
+    { id: 4, employee: 'Priya Sharma', item: 'Door fob & site access', type: 'access', assignee: 'David Cho', status: 'in_progress', source: 'Onboarding · Support Worker' },
+    { id: 5, employee: 'Hana Williams', item: 'Microsoft 365 account', type: 'account', assignee: 'IT Helpdesk', status: 'done', source: 'Onboarding · Registered Nurse' },
+];
+
+const TICKETS = [
+    { id: 101, title: 'Password reset — payroll portal', requester: 'Mere Tipene', priority: 'high', status: 'pending', age: '2h' },
+    { id: 102, title: 'Printer offline — Sunnyside Lodge', requester: 'David Cho', priority: 'normal', status: 'in_progress', age: '5h' },
+    { id: 103, title: 'New shared mailbox for roster team', requester: 'Grace Mbeki', priority: 'normal', status: 'pending', age: '1d' },
+    { id: 104, title: 'VPN access for remote coordinator', requester: 'Daniel Park', priority: 'low', status: 'done', age: '3d' },
+];
+
+const typeIcon: Record<string, typeof Mail> = {
+    account: Mail,
+    access: KeyRound,
+    equipment: Laptop,
+};
+
+const statusVariant: Record<string, StatusVariant> = {
+    pending: 'warning',
+    in_progress: 'info',
+    done: 'success',
+};
+
+const statusLabel: Record<string, string> = {
+    pending: 'Pending',
+    in_progress: 'In progress',
+    done: 'Done',
+};
+
+const priorityVariant: Record<string, StatusVariant> = {
+    high: 'critical',
+    normal: 'info',
+    low: 'neutral',
+};
+
+export default function ItIndex() {
+    const [tab, setTab] = useHrTab('provisioning');
+
+    const tabItems: HrTabItem[] = [
+        { id: 'provisioning', label: 'Provisioning', icon: Server, tone: 'primary', badge: PROVISIONING.filter((r) => r.status !== 'done').length },
+        { id: 'tickets', label: 'Tickets', icon: Ticket, tone: 'info', badge: TICKETS.filter((r) => r.status !== 'done').length },
+    ];
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="IT & Provisioning" />
+            <div className="flex flex-col gap-5 p-4 sm:p-6">
+                {/* Hero */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 px-9 py-8 text-primary-foreground">
+                    <div className="flex items-center gap-4">
+                        <span className="grid h-[54px] w-[54px] flex-none place-items-center rounded-2xl border border-white/20 bg-white/15">
+                            <Server className="h-6 w-6" />
+                        </span>
+                        <div>
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">IT &amp; Provisioning</h1>
+                            <p className="mt-1 text-[13px] font-medium text-white/75">
+                                Account, access &amp; equipment requests — and the IT helpdesk queue.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Design-preview banner (honest: not yet functional) */}
+                <div className="flex items-start gap-3 rounded-xl border border-status-warning/40 bg-status-warning-bg px-4 py-3 text-status-warning">
+                    <TriangleAlert className="mt-0.5 h-4.5 w-4.5 flex-none" />
+                    <div className="text-[13px] leading-relaxed text-foreground">
+                        <span className="font-bold">Design preview.</span> This page is a wireframe with sample data — the
+                        actions aren&apos;t wired up yet. It shows how IT provisioning requests generated by onboarding
+                        (and general IT tickets) would be worked. See{' '}
+                        <code className="rounded bg-muted px-1 py-0.5 text-[12px]">docs/IT_PROVISIONING_WIREFRAME.md</code>{' '}
+                        for what must be built to make it real.
+                    </div>
+                </div>
+
+                <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
+
+                {tab === 'provisioning' && (
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card opacity-95">
+                        <div className="grid grid-cols-[2fr_2fr_1.5fr_1fr_90px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <span>Employee</span>
+                            <span>Item</span>
+                            <span>Assignee</span>
+                            <span>Status</span>
+                            <span />
+                        </div>
+                        {PROVISIONING.map((r) => {
+                            const Icon = typeIcon[r.type] ?? Server;
+                            return (
+                                <div key={r.id} className="grid grid-cols-[2fr_2fr_1.5fr_1fr_90px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0">
+                                    <div className="min-w-0">
+                                        <div className="truncate text-[13.5px] font-semibold">{r.employee}</div>
+                                        <div className="truncate text-[11.5px] text-muted-foreground">{r.source}</div>
+                                    </div>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                            <Icon className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="truncate text-[13px]">{r.item}</span>
+                                    </div>
+                                    <span className="truncate text-[12.5px] text-muted-foreground">{r.assignee}</span>
+                                    <span>
+                                        <StatusBadge variant={statusVariant[r.status]} size="sm">
+                                            {statusLabel[r.status]}
+                                        </StatusBadge>
+                                    </span>
+                                    <button type="button" disabled title="Not yet functional" className="cursor-not-allowed rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground opacity-60">
+                                        Fulfil
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {tab === 'tickets' && (
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card opacity-95">
+                        <div className="grid grid-cols-[3fr_1.5fr_1fr_1fr_70px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                            <span>Ticket</span>
+                            <span>Requester</span>
+                            <span>Priority</span>
+                            <span>Status</span>
+                            <span>Age</span>
+                        </div>
+                        {TICKETS.map((r) => (
+                            <div key={r.id} className="grid grid-cols-[3fr_1.5fr_1fr_1fr_70px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                        <Ticket className="h-3.5 w-3.5" />
+                                    </span>
+                                    <span className="truncate text-[13px] font-semibold">{r.title}</span>
+                                </div>
+                                <span className="truncate text-[12.5px] text-muted-foreground">{r.requester}</span>
+                                <span>
+                                    <StatusBadge variant={priorityVariant[r.priority]} size="sm">
+                                        {r.priority[0].toUpperCase() + r.priority.slice(1)}
+                                    </StatusBadge>
+                                </span>
+                                <span>
+                                    <StatusBadge variant={statusVariant[r.status]} size="sm">
+                                        {statusLabel[r.status]}
+                                    </StatusBadge>
+                                </span>
+                                <span className="text-[12px] text-muted-foreground">{r.age}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </AppLayout>
+    );
+}

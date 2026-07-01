@@ -21,6 +21,8 @@ class HrEngagementSurvey extends Model
         'survey_type',
         'status',
         'is_anonymous',
+        'audience_type',
+        'audience_site_ids',
         'starts_at',
         'ends_at',
         'created_by',
@@ -32,6 +34,7 @@ class HrEngagementSurvey extends Model
 
     protected $casts = [
         'is_anonymous' => 'boolean',
+        'audience_site_ids' => 'array',
         'starts_at' => 'date',
         'ends_at' => 'date',
         'published_at' => 'datetime',

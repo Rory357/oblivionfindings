@@ -29,6 +29,6 @@ test('hr development goals page loads', function () {
         $browser->loginAs($user)
             ->visit('/hr/goals/development')
             ->waitForText('Development', 10)
-            ->assertPathIs('/hr/goals/development');
+            ->assertPathIs('/hr/goals');
     });
 });

@@ -349,17 +349,23 @@ class HrNotificationService
      */
     protected function getUsersWithPermission(array $permissions, ?int $tenantId): Collection
     {
+        // Users are tenanted by `organization_id` (there is no users.tenant_id);
+        // the HR domain's tenant id == the user's organization id.
         return User::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->when($tenantId, fn ($q) => $q->where('organization_id', $tenantId))
             ->where(function ($query) use ($permissions) {
+                // Inside whereHas() the closure receives a plain Eloquent Builder,
+                // not the BelongsToMany relation, so wherePivot() is NOT available —
+                // it would fall through to dynamicWhere() and emit a bogus
+                // `where pivot = ?`. Reference the pivot column explicitly instead.
                 $query->whereHas('roles.permissions', fn ($permissionQuery) => $permissionQuery->whereIn('key', $permissions))
                     ->orWhereHas('permissionOverrides', fn ($permissionQuery) => $permissionQuery
                         ->whereIn('permissions.key', $permissions)
-                        ->wherePivot('allowed', true));
+                        ->where('permission_user.allowed', true));
             })
             ->whereDoesntHave('permissionOverrides', fn ($permissionQuery) => $permissionQuery
                 ->whereIn('permissions.key', $permissions)
-                ->wherePivot('allowed', false))
+                ->where('permission_user.allowed', false))
             ->distinct()
             ->get();
     }

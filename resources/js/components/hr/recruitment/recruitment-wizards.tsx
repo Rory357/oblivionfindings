@@ -59,6 +59,7 @@ export type RecruitmentSupport = {
     employment_types: string[];
     document_categories: Record<string, string>;
     stages: string[];
+    tags: { tag: string; count: number }[];
 };
 
 export type WizardKind =

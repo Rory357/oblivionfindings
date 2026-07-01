@@ -155,6 +155,9 @@ class ESignatureController extends Controller
             'document_id' => ['required', 'integer', 'exists:hr_documents,id'],
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['required', 'integer', 'exists:users,id'],
+            'order' => ['nullable', 'in:parallel,sequential'],
+            'due_at' => ['nullable', 'date'],
+            'message' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $document = HrDocument::findOrFail($validated['document_id']);
@@ -163,8 +166,47 @@ class ESignatureController extends Controller
             $document,
             $validated['user_ids'],
             $user->id,
+            [
+                'order' => $validated['order'] ?? 'parallel',
+                'due_at' => $validated['due_at'] ?? null,
+                'message' => $validated['message'] ?? null,
+            ],
         );
 
         return redirect()->back()->with('success', 'Signature requests sent.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Sender-side actions (nudge / resend / cancel)                      */
+    /* ------------------------------------------------------------------ */
+
+    public function nudge(Request $request, HrDocumentSignature $signature)
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('hr.signatures.manage') || $user->canDo('hr.documents.manage')), 403);
+
+        $this->signatureService->nudge($signature);
+
+        return redirect()->back()->with('success', 'Reminder sent to signer.');
+    }
+
+    public function resend(Request $request, HrDocumentSignature $signature)
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('hr.signatures.manage') || $user->canDo('hr.documents.manage')), 403);
+
+        $this->signatureService->resend($signature);
+
+        return redirect()->back()->with('success', 'Signature request resent.');
+    }
+
+    public function cancel(Request $request, HrDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && ($user->canDo('hr.signatures.manage') || $user->canDo('hr.documents.manage')), 403);
+
+        $count = $this->signatureService->cancelForDocument($document);
+
+        return redirect()->back()->with('success', $count . ' outstanding request(s) cancelled.');
     }
 }

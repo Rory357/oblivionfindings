@@ -1,17 +1,6 @@
 /* eslint-disable no-restricted-syntax -- Awaiting-signature cards, folder tiles
  * and the Review & sign action are bespoke surfaces sized to the design handoff. */
-import { router } from '@inertiajs/react';
-import {
-    Award,
-    Download,
-    Eye,
-    FileText,
-    Folder,
-    PenLine,
-    ScrollText,
-    ShieldCheck,
-    Wallet,
-} from 'lucide-react';
+import { Download, Eye, FileText, PenLine } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,11 +11,17 @@ import {
     type PendingSignature,
 } from '@/components/hr';
 import {
+    expiryStatus,
+    folderMeta,
+    formatDocDate,
+    labelize,
+} from '@/components/hr/document-library-kit';
+import {
     ShiftContextMenu,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { Card } from '@/components/ui/card';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
 interface Doc {
@@ -49,49 +44,6 @@ interface Props {
     categories: string[];
 }
 
-const FOLDER_ICON: Record<string, { icon: typeof Folder; tone: string }> = {
-    contracts: { icon: FileText, tone: 'bg-accent text-primary' },
-    contract: { icon: FileText, tone: 'bg-accent text-primary' },
-    compliance: { icon: ShieldCheck, tone: 'bg-status-info-bg text-status-info' },
-    policy: { icon: ScrollText, tone: 'bg-status-warning-bg text-status-warning' },
-    payslips: { icon: Wallet, tone: 'bg-status-success-bg text-status-success' },
-    certificate: { icon: Award, tone: 'bg-status-warning-bg text-status-warning' },
-    certificates: { icon: Award, tone: 'bg-status-warning-bg text-status-warning' },
-};
-
-function folderMeta(name: string) {
-    return (
-        FOLDER_ICON[name.toLowerCase()] ?? {
-            icon: Folder,
-            tone: 'bg-muted text-muted-foreground',
-        }
-    );
-}
-
-function titleCase(s: string): string {
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function fmtDate(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-}
-
-/** Expiry → StatusBadge. */
-function expiry(iso: string | null): { label: string; variant: StatusVariant } | null {
-    if (!iso) return null;
-    const days = Math.round(
-        (new Date(iso).getTime() - Date.now()) / 86_400_000,
-    );
-    if (days < 0) return { label: `Expired ${fmtDate(iso)}`, variant: 'critical' };
-    if (days <= 60) return { label: `Expires ${fmtDate(iso)}`, variant: 'warning' };
-    return { label: `Valid to ${new Date(iso).getFullYear()}`, variant: 'success' };
-}
-
 function downloadDoc(id: number) {
     const a = document.createElement('a');
     a.href = `/hr/my/documents/${id}/download`;
@@ -107,7 +59,7 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
     const folders = useMemo(() => {
         const map = new Map<string, number>();
         for (const d of documents) {
-            const key = d.folder ?? (d.category ? titleCase(d.category) : 'Other');
+            const key = d.folder ?? (d.category ? labelize(d.category) : 'Other');
             map.set(key, (map.get(key) ?? 0) + 1);
         }
         return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
@@ -128,7 +80,7 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                     label: 'View details',
                     onClick: () =>
                         toast.info(d.title ?? d.original_name, {
-                            description: `${d.folder ?? titleCase(d.category ?? 'Document')} · added ${fmtDate(d.created_at)}`,
+                            description: `${d.folder ?? labelize(d.category ?? 'Document')} · added ${formatDocDate(d.created_at)}`,
                         }),
                 },
                 {
@@ -204,7 +156,7 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                                             <Icon className="h-[18px] w-[18px]" />
                                         </span>
                                         <div className="mt-2.5 text-[13.5px] font-bold">
-                                            {titleCase(f.name)}
+                                            {labelize(f.name)}
                                         </div>
                                         <div className="text-[11.5px] text-muted-foreground">
                                             {f.count} document{f.count === 1 ? '' : 's'}
@@ -233,7 +185,7 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                     ) : (
                         <div className="px-2 pb-2">
                             {documents.map((d) => {
-                                const exp = expiry(d.expires_at);
+                                const exp = expiryStatus(d.expires_at);
                                 return (
                                     <div
                                         key={d.id}
@@ -248,8 +200,8 @@ export default function MyDocuments({ myHr, pendingSignatures, documents }: Prop
                                                 {d.title ?? d.original_name}
                                             </div>
                                             <div className="text-[11.5px] text-muted-foreground">
-                                                {d.folder ?? titleCase(d.category ?? 'Document')}{' '}
-                                                · added {fmtDate(d.created_at)}
+                                                {d.folder ?? labelize(d.category ?? 'Document')}{' '}
+                                                · added {formatDocDate(d.created_at)}
                                             </div>
                                         </div>
                                         {d.signed_by_employee ? (

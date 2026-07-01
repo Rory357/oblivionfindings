@@ -23,12 +23,14 @@ class HrDevelopmentGoal extends Model
         'description',
         'category',
         'competency_area',
+        'competency_id',
         'target_level',
         'current_level',
         'status',
         'progress_percent',
         'start_date',
         'due_date',
+        'next_review_at',
         'completed_at',
         'review_frequency',
         'review_notes',
@@ -42,8 +44,25 @@ class HrDevelopmentGoal extends Model
         'progress_percent' => 'integer',
         'start_date' => 'date',
         'due_date' => 'date',
+        'next_review_at' => 'date',
         'completed_at' => 'date',
     ];
+
+    /** Days between reviews for each cadence. */
+    public const REVIEW_CADENCE_DAYS = [
+        'weekly' => 7,
+        'fortnightly' => 14,
+        'monthly' => 30,
+        'quarterly' => 90,
+    ];
+
+    /** The next review date from a base date + the plan's cadence. */
+    public function nextReviewFrom(\DateTimeInterface $base): ?\Illuminate\Support\Carbon
+    {
+        $days = self::REVIEW_CADENCE_DAYS[$this->review_frequency] ?? null;
+
+        return $days ? \Illuminate\Support\Carbon::parse($base)->addDays($days) : null;
+    }
 
     public function employee(): BelongsTo
     {
@@ -59,6 +78,12 @@ class HrDevelopmentGoal extends Model
     public function goal(): BelongsTo
     {
         return $this->belongsTo(HrGoal::class, 'hr_goal_id');
+    }
+
+    /** Optional formal competency this plan develops. */
+    public function competency(): BelongsTo
+    {
+        return $this->belongsTo(HrCompetency::class, 'competency_id');
     }
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder
