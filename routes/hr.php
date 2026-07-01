@@ -919,11 +919,27 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::prefix('announcements')->name('announcements.')->group(function () {
         Route::get('/', [AnnouncementController::class, 'index'])->name('index');
 
+        // Manager-only command-center mutations. Static segments are declared
+        // before the {announcement} wildcard so they aren't swallowed by it.
         Route::middleware('permission:hr.announcements.manage')->group(function () {
             Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
+            Route::get('/export', [AnnouncementController::class, 'export'])->name('export');
+            Route::get('/preview', [AnnouncementController::class, 'preview'])->name('preview');
             Route::post('/', [AnnouncementController::class, 'store'])->name('store');
+            Route::post('/bulk', [AnnouncementController::class, 'bulk'])->name('bulk');
+            Route::post('/remind-bulk', [AnnouncementController::class, 'remindBulk'])->name('remind-bulk');
+            Route::post('/{id}/restore', [AnnouncementController::class, 'restore'])->name('restore');
+            Route::put('/{announcement}', [AnnouncementController::class, 'update'])->name('update');
+            Route::patch('/{announcement}', [AnnouncementController::class, 'update']);
+            Route::delete('/{announcement}', [AnnouncementController::class, 'destroy'])->name('destroy');
+            Route::post('/{announcement}/publish', [AnnouncementController::class, 'publishNow'])->name('publish');
+            Route::post('/{announcement}/remind', [AnnouncementController::class, 'remind'])->name('remind');
+            Route::post('/{announcement}/acknowledge-for', [AnnouncementController::class, 'acknowledgeFor'])->name('acknowledge-for');
+            Route::get('/{announcement}/tracking/export', [AnnouncementController::class, 'trackingExport'])->name('tracking.export');
+            Route::get('/{announcement}/tracking', [AnnouncementController::class, 'tracking'])->name('tracking');
         });
 
+        Route::get('/attachments/{attachment}', [AnnouncementController::class, 'downloadAttachment'])->name('attachments.show');
         Route::post('/{announcement}/acknowledge', [AnnouncementController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{announcement}', [AnnouncementController::class, 'show'])->name('show');
     });

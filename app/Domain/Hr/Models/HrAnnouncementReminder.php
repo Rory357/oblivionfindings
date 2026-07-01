@@ -7,24 +7,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class HrAnnouncementAcknowledgement extends Model
+class HrAnnouncementReminder extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'announcement_id',
         'user_id',
-        'acknowledged_by',
-        'acknowledged_at',
+        'reminded_by',
+        'reminded_at',
     ];
 
     protected $casts = [
-        'acknowledged_at' => 'datetime',
+        'reminded_at' => 'datetime',
     ];
-
-    /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
-    /* ------------------------------------------------------------------ */
 
     public function announcement(): BelongsTo
     {
@@ -33,6 +29,6 @@ class HrAnnouncementAcknowledgement extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }
