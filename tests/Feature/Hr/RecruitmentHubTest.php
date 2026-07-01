@@ -1274,3 +1274,23 @@ test('a manager can rename (merging) and delete a tag across every candidate', f
     $this->actingAs($viewer)->post(route('hr.tags.rename'), ['from' => 'Rehire', 'to' => 'x'])->assertForbidden();
     $this->actingAs($viewer)->post(route('hr.tags.delete'), ['tag' => 'Rehire'])->assertForbidden();
 });
+
+test('the hub flags possible duplicate candidates and nudges to review them', function () {
+    // Same email as an INACTIVE candidate — the intake guard (active-only) misses this.
+    $active = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
+    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'withdrawn', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
+
+    // Same name + phone (differently formatted), different email — same person, no email match.
+    $x = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'new', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021 555 0000', 'personal_email' => 'aroha1@example.test', 'created_by' => $this->hr->id]);
+    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'interview', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021-555-0000', 'personal_email' => 'aroha2@example.test', 'created_by' => $this->hr->id]);
+
+    // A genuinely unique candidate is not flagged.
+    $solo = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'new', 'first_name' => 'Solo', 'last_name' => 'Unique', 'personal_phone' => '027 111 2222', 'personal_email' => 'solo@example.test', 'created_by' => $this->hr->id]);
+
+    $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
+        ->where('candidates', fn ($list) => collect($list)
+            ->contains(fn ($c) => (int) $c['id'] === (int) $active->id && $c['possible_duplicate'] === 'email')
+            && collect($list)->contains(fn ($c) => (int) $c['id'] === (int) $x->id && $c['possible_duplicate'] === 'name')
+            && collect($list)->contains(fn ($c) => (int) $c['id'] === (int) $solo->id && $c['possible_duplicate'] === null))
+        ->where('needs', fn ($needs) => collect($needs)->contains(fn ($n) => $n['key'] === 'duplicates')));
+});
