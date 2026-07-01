@@ -49,6 +49,25 @@ class ComplianceMatrixService
         $requirements = $this->getApplicableRequirements($user);
 
         foreach ($requirements as $requirement) {
+            $existing = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+                ->where('user_id', $user->id)
+                ->where('requirement_id', $requirement->id)
+                ->first();
+
+            // A manually recorded status (or active exemption) is authoritative — the
+            // nightly source-record sweep must not clobber it. Re-derive only its
+            // status from its own dates so it still ages from compliant → expiring →
+            // expired, preserving the evidence file, notes and valid_from a manager set.
+            if ($existing && ($existing->evidence_type === 'manual' || $existing->exemption_reason)) {
+                $existing->update([
+                    'status' => $this->deriveManualStatus($existing, $requirement),
+                    'last_checked_at' => now(),
+                    'next_check_at' => now()->addDay(),
+                ]);
+
+                continue;
+            }
+
             $status = $this->checkRequirement($user, $requirement);
 
             HrStaffComplianceStatus::updateOrCreate(
@@ -68,6 +87,40 @@ class ComplianceMatrixService
                 ]
             );
         }
+    }
+
+    /**
+     * Re-derive a manually recorded / exempted status from its own dates. An active
+     * exemption holds the row compliant until exempted_until passes; otherwise the
+     * stored expires_at drives compliant → expiring_soon → expired.
+     */
+    protected function deriveManualStatus(HrStaffComplianceStatus $status, HrComplianceRequirement $requirement): string
+    {
+        if ($status->exemption_reason) {
+            if ($status->exempted_until === null || $status->exempted_until->isFuture()) {
+                return 'compliant';
+            }
+        }
+
+        // A status someone explicitly marked not_started stays not_started.
+        if ($status->status === 'not_started' && $status->expires_at === null && $status->valid_from === null) {
+            return 'not_started';
+        }
+
+        if ($status->expires_at === null) {
+            return $status->status === 'not_started' ? 'not_started' : 'compliant';
+        }
+
+        if ($status->expires_at->isPast()) {
+            return 'expired';
+        }
+
+        $reminderDays = $requirement->renewal_reminder_days ?: 30;
+        if ($status->expires_at->diffInDays(now(), true) <= $reminderDays) {
+            return 'expiring_soon';
+        }
+
+        return 'compliant';
     }
 
     /**
