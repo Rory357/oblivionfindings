@@ -96,7 +96,7 @@ test('approving an expense claim posts a balanced GL journal', function () {
     $claim = makeSubmittedExpenseClaim($this->worker->id);
 
     $this->actingAs($this->hr)
-        ->post(route('hr.expenses.approve', $claim))
+        ->post(route('hr.compensation.expenses.approve', $claim))
         ->assertRedirect();
 
     $claim->refresh();
@@ -130,7 +130,7 @@ test('the expense GL post guards against double-posting (one journal per claim)'
     createExpenseOpenPeriod();
     $claim = makeSubmittedExpenseClaim($this->worker->id);
 
-    $this->actingAs($this->hr)->post(route('hr.expenses.approve', $claim))->assertRedirect();
+    $this->actingAs($this->hr)->post(route('hr.compensation.expenses.approve', $claim))->assertRedirect();
     $claim->refresh();
     expect($claim->journal_id)->not->toBeNull();
 
@@ -154,7 +154,7 @@ test('a user without hr.expenses.approve cannot approve a claim', function () {
 
     // worker has no approve permission.
     $this->actingAs($this->worker)
-        ->post(route('hr.expenses.approve', $claim))
+        ->post(route('hr.compensation.expenses.approve', $claim))
         ->assertForbidden();
 
     expect($claim->fresh()->journal_id)->toBeNull();

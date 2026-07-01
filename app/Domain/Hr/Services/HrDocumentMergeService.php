@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentTemplate;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -108,27 +109,58 @@ class HrDocumentMergeService
         $slug = Str::slug((string) ($template->name ?: 'template'));
         $stamp = now()->format('Ymd_His');
 
-        $filename = "hr-documents/{$profile->tenant_id}/{$profile->id}/generated_{$slug}_{$stamp}.html";
+        $title = $template->name . ' - ' . now()->format('d M Y');
+        $pdf = $this->renderPdf($this->wrapHtml($title, $mergedContent));
 
-        Storage::disk('private')->put($filename, $mergedContent);
-        $sizeBytes = (int) (Storage::disk('private')->size($filename) ?: strlen($mergedContent));
+        $filename = "hr-documents/{$profile->tenant_id}/{$profile->id}/generated_{$slug}_{$stamp}.pdf";
+
+        Storage::disk('private')->put($filename, $pdf);
+        $sizeBytes = (int) (Storage::disk('private')->size($filename) ?: strlen($pdf));
 
         return HrDocument::create([
             'tenant_id' => $profile->tenant_id,
             'employee_profile_id' => $profile->id,
             'template_id' => $template->id,
-            'title' => $template->name . ' - ' . now()->format('d M Y'),
+            'title' => $title,
             'category' => $template->category,
             'storage_disk' => 'private',
             'storage_path' => $filename,
-            'original_name' => basename($filename),
-            'mime_type' => 'text/html',
+            'original_name' => $slug . '.pdf',
+            'mime_type' => 'application/pdf',
             'size_bytes' => $sizeBytes,
             'is_restricted' => false,
             'generated_from_template' => true,
             'created_by' => $generatedBy,
             'uploaded_by' => $generatedBy,
         ]);
+    }
+
+    /**
+     * Render an HTML string to a PDF binary using dompdf.
+     */
+    public function renderPdf(string $html): string
+    {
+        return Pdf::loadHTML($html)->setPaper('a4')->output();
+    }
+
+    /**
+     * Wrap merged content (which may be plain text or partial HTML) in a
+     * minimal, print-friendly HTML shell so dompdf produces a tidy A4 page.
+     */
+    public function wrapHtml(string $title, string $content): string
+    {
+        $looksLikeHtml = preg_match('/<\s*(html|body|p|div|h[1-6]|table)\b/i', $content) === 1;
+        $body = $looksLikeHtml ? $content : nl2br(e($content));
+        $safeTitle = e($title);
+
+        return <<<HTML
+        <!DOCTYPE html>
+        <html lang="en"><head><meta charset="utf-8"><style>
+        @page { margin: 28mm 22mm; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; line-height: 1.7; color: #1a1523; }
+        h1 { font-size: 18px; margin: 0 0 18px; }
+        </style></head><body><h1>{$safeTitle}</h1>{$body}</body></html>
+        HTML;
     }
 
     /**
@@ -143,6 +175,43 @@ class HrDocumentMergeService
     public function preview(HrDocumentTemplate $template, HrEmployeeProfile $profile, ?HrOffer $offer = null, array $extra = []): string
     {
         return $this->mergeTemplate($template, $profile, $offer, $extra);
+    }
+
+    /**
+     * Preview a merged template and report which tokens were resolved vs left
+     * unresolved, for the live preview step of the Generate wizard.
+     *
+     * @return array{content: string, resolved: list<string>, unresolved: list<string>}
+     */
+    public function previewReport(HrDocumentTemplate $template, HrEmployeeProfile $profile, ?HrOffer $offer = null, array $extra = []): array
+    {
+        $rawContent = $template->content ?? '';
+
+        // Tokens present in the source template.
+        preg_match_all('/\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}/', $rawContent, $sourceMatches);
+        $sourceTokens = array_values(array_unique($sourceMatches[0]));
+
+        $merged = $this->mergeTemplate($template, $profile, $offer, $extra);
+
+        // Whatever {{...}} survive the merge are unresolved.
+        preg_match_all('/\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}/', $rawContent, $afterMatches);
+        $mergeData = $this->buildMergeData($profile, $offer, $extra);
+        $resolved = [];
+        $unresolved = [];
+        foreach ($sourceTokens as $token) {
+            $normalised = preg_replace('/\s+/', '', $token);
+            if (array_key_exists($normalised, $mergeData) && $this->normalizeValue($mergeData[$normalised]) !== '') {
+                $resolved[] = $token;
+            } else {
+                $unresolved[] = $token;
+            }
+        }
+
+        return [
+            'content' => $merged,
+            'resolved' => $resolved,
+            'unresolved' => $unresolved,
+        ];
     }
 
     /**

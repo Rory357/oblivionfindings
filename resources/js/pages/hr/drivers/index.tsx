@@ -1,17 +1,17 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { ComplianceTabs } from '@/components/hr';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { StatTile } from '@/components/page/stat-tile';
+import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -19,625 +19,254 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import { Ban, Car, CheckCircle2, Plus } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Ban, Car, CheckCircle2, Clock, Download, FileText, MoreVertical, Pencil, Plus, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+
+import {
+    AvatarBubble,
+    ComplianceContextMenu,
+    DRIVER_BADGE,
+    useContextMenu,
+    type CtxItem,
+} from '@/pages/hr/compliance/components/compliance-bits';
+import { ComplianceHubHeader, type HeroPayload } from '@/pages/hr/compliance/components/compliance-hub-header';
+import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from '@/pages/hr/compliance/components/compliance-wizards';
+import type { PersonOption } from '@/components/hr/people-picker';
 
 interface DriverRecord {
     id: number;
-    user: { id: number; name: string };
-    licence_class: string;
-    licence_number: string;
-    licence_expiry?: string | null;
-    licence_expires_at?: string | null;
-    status: 'eligible' | 'pending_review' | 'suspended' | 'expired';
-    approved_at: string | null;
-    suspended_at: string | null;
+    user?: { id: number; name: string };
+    licence_class: string | null;
+    licence_number: string | null;
+    licence_endorsements: string[] | null;
+    licence_expires_at: string | null;
+    status: string;
+    can_drive_clients: boolean;
 }
 
-interface Employee {
-    user_id: number;
-    name: string;
-    position_title: string | null;
+interface Paginator<T> {
+    data: T[];
+    links: { url: string | null; label: string; active: boolean }[];
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
 }
 
 interface Props {
-    records: {
-        data: DriverRecord[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-    };
-    summary: {
-        total: number;
-        eligible: number;
-        expiring: number;
-        pending: number;
-        suspended: number;
-    };
-    employees: Employee[];
+    hero: HeroPayload;
+    records: Paginator<DriverRecord>;
+    summary: { total: number; eligible: number; expiring: number; suspended: number; pending: number };
+    wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     filters: { status: string | null; q: string };
-    can: { manage?: boolean };
+    can: { manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Driver Eligibility', href: '/hr/compliance/drivers' },
+    { title: 'Staff compliance', href: '/hr/compliance' },
+    { title: 'Drivers', href: '/hr/compliance/drivers' },
 ];
 
-const statusConfig: Record<string, { className: string; label: string }> = {
-    eligible: {
-        className:
-            'border-status-success/30 bg-status-success-bg text-status-success',
-        label: 'Eligible',
-    },
-    pending_review: {
-        className:
-            'border-status-warning/30 bg-status-warning-bg text-status-warning',
-        label: 'Pending Review',
-    },
-    suspended: {
-        className:
-            'border-status-critical/30 bg-status-critical-bg text-status-critical',
-        label: 'Suspended',
-    },
-    expired: {
-        className: 'border-border/30 bg-muted text-muted-foreground',
-        label: 'Expired',
-    },
-};
+function fmtDate(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+const isExpired = (iso: string | null) => !!iso && new Date(iso).getTime() < Date.now();
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+export default function DriversIndex({ hero, records, summary, wizard, filters, can }: Props) {
+    const [wz, setWz] = useState<WizardState>(null);
+    const [search, setSearch] = useState(filters.q ?? '');
+    const [suspend, setSuspend] = useState<DriverRecord | null>(null);
+    const [reason, setReason] = useState('');
+    const searchRef = useRef<HTMLInputElement>(null);
+    const { ctx, open: openCtx, close: closeCtx } = useContextMenu();
 
-const emptyForm = {
-    user_id: '',
-    licence_number: '',
-    licence_class: '',
-    licence_endorsements: '',
-    licence_expires_at: '',
-    incident_free_since: '',
-    notes: '',
-};
+    useEffect(() => {
+        const t = setTimeout(() => {
+            if (search === (filters.q ?? '')) return;
+            router.get('/hr/compliance/drivers', { q: search || undefined, status: filters.status || undefined }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 350);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
 
-export default function DriversIndex({
-    records,
-    summary,
-    employees,
-    filters,
-    can,
-}: Props) {
-    const { errors } = usePage<{ errors: Record<string, string> }>().props;
-    const [createOpen, setCreateOpen] = useState(false);
-    const [form, setForm] = useState(emptyForm);
-    const [suspendId, setSuspendId] = useState<number | null>(null);
-    const [suspendReason, setSuspendReason] = useState('');
+    const approve = (d: DriverRecord) =>
+        router.post(`/hr/compliance/drivers/${d.id}/approve`, {}, { preserveScroll: true, onSuccess: () => toast.success(`${d.user?.name} approved.`), onError: () => toast.error('Could not approve.') });
 
-    const set = (key: string, value: string) =>
-        setForm((prev) => ({ ...prev, [key]: value }));
-
-    const fieldError = (field: string) =>
-        errors?.[field] ? (
-            <p className="mt-1 text-xs text-status-critical">{errors[field]}</p>
-        ) : null;
-
-    function applyFilter(key: string, value: string | null) {
-        router.get(
-            '/hr/compliance/drivers',
-            { ...filters, [key]: value || undefined },
-            { preserveState: true, replace: true },
-        );
-    }
-
-    const submitCreate = (e: FormEvent) => {
-        e.preventDefault();
-        router.post(
-            '/hr/compliance/drivers',
-            {
-                ...form,
-                licence_endorsements: form.licence_endorsements
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                incident_free_since: form.incident_free_since || null,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setCreateOpen(false);
-                    setForm(emptyForm);
-                },
-            },
-        );
+    const doSuspend = () => {
+        if (!suspend) return;
+        router.post(`/hr/compliance/drivers/${suspend.id}/suspend`, { suspension_reason: reason }, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Driving privileges suspended.'),
+            onError: () => toast.error('Could not suspend.'),
+        });
+        setSuspend(null);
+        setReason('');
     };
 
-    const approve = (record: DriverRecord) => {
-        router.post(
-            `/hr/compliance/drivers/${record.id}/approve`,
-            {},
-            { preserveScroll: true },
-        );
-    };
-
-    const submitSuspend = (e: FormEvent) => {
-        e.preventDefault();
-        if (suspendId === null) return;
-        router.post(
-            `/hr/compliance/drivers/${suspendId}/suspend`,
-            { suspension_reason: suspendReason },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSuspendId(null);
-                    setSuspendReason('');
-                },
-            },
-        );
-    };
-
-    const colSpan = can.manage ? 7 : 6;
+    const rowMenu = (d: DriverRecord): CtxItem[] => [
+        { icon: FileText, label: 'Open', onClick: () => router.visit(`/hr/compliance/drivers/${d.id}`) },
+        ...(can.manage
+            ? [
+                  { icon: Pencil, label: 'Edit', onClick: () => router.visit(`/hr/compliance/drivers/${d.id}`) },
+                  { icon: CheckCircle2, label: 'Approve', tone: 'success' as const, onClick: () => approve(d) },
+                  { icon: Ban, label: 'Suspend', tone: 'critical' as const, onClick: () => setSuspend(d) },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Driver Eligibility" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={Car}
-                        title="Driver Eligibility Register"
-                        description="Staff driving licence status, eligibility, and expiry tracking."
-                        stats={[
-                            { label: 'Total', value: summary.total },
-                            { label: 'Eligible', value: summary.eligible },
-                            { label: 'Expiring', value: summary.expiring },
-                            { label: 'Suspended', value: summary.suspended },
-                        ]}
-                        actions={
-                            can.manage ? (
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setForm(emptyForm);
-                                        setCreateOpen(true);
-                                    }}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Driver
-                                </Button>
-                            ) : null
-                        }
-                    />
-                }
-            >
-                <ComplianceTabs active="drivers" />
+            <Head title="Driver register" />
+            <div className="space-y-4 px-4 py-4 lg:px-6">
+                <ComplianceHubHeader hero={hero} active="drivers" can={{ manage: true, vetting: true, driver: can.manage }} onWizard={(type) => setWz({ type })} />
 
-                {/* Summary Cards */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {summary.total}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Eligible
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-success">
-                                {summary.eligible}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Pending
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-warning">
-                                {summary.pending}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Suspended
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-critical">
-                                {summary.suspended}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Expiring
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-muted-foreground">
-                                {summary.expiring}
-                            </p>
-                        </CardContent>
-                    </Card>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <StatTile label="Total" value={summary.total} icon={Car} tone="info" />
+                    <StatTile label="Eligible" value={summary.eligible} icon={CheckCircle2} tone="success" />
+                    <StatTile label="Pending" value={summary.pending} icon={Clock} tone="warning" />
+                    <StatTile label="Suspended" value={summary.suspended} icon={Ban} tone="critical" />
+                    <StatTile label="Expiring" value={summary.expiring} icon={Clock} tone="warning" />
                 </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-3">
-                    <Input
-                        placeholder="Search by name or licence..."
-                        defaultValue={filters.q}
-                        className="w-64"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter')
-                                applyFilter(
-                                    'q',
-                                    (e.target as HTMLInputElement).value,
-                                );
-                        }}
-                    />
-                    <Select
-                        value={filters.status || '__none__'}
-                        onValueChange={(v) =>
-                            applyFilter('status', v === '__none__' ? null : v)
-                        }
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All Status" />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[12.5px] text-muted-foreground">NZTA licence classes &amp; endorsements · shift-eligibility hard-stop</p>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => (window.location.href = '/hr/compliance/export?dataset=drivers')}>
+                            <Download className="h-4 w-4" /> Export
+                        </Button>
+                        {can.manage && (
+                            <Button onClick={() => setWz({ type: 'driver' })}>
+                                <Plus className="h-4 w-4" /> Add driver
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                    <div className="relative min-w-[220px] flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            ref={searchRef}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search drivers…"
+                            className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                        />
+                    </div>
+                    <Select value={filters.status || 'all'} onValueChange={(v) => router.get('/hr/compliance/drivers', { status: v === 'all' ? undefined : v, q: filters.q || undefined }, { preserveScroll: true, preserveState: true })}>
+                        <SelectTrigger className="h-9 w-[160px]" aria-label="Status filter">
+                            <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__none__">All Status</SelectItem>
+                            <SelectItem value="all">All statuses</SelectItem>
                             <SelectItem value="eligible">Eligible</SelectItem>
-                            <SelectItem value="pending_review">
-                                Pending Review
-                            </SelectItem>
-                            <SelectItem value="expiring">Expiring</SelectItem>
+                            <SelectItem value="pending_review">Pending</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
+                            <SelectItem value="expiring">Expiring</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                {/* Table */}
-                <Card>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="border-b bg-muted/50">
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <table className="w-full text-[13px]">
+                        <thead>
+                            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+                                <th className="px-3 py-3 font-semibold">Driver</th>
+                                <th className="px-3 py-3 font-semibold">Licence</th>
+                                <th className="px-3 py-3 font-semibold">Endorsements</th>
+                                <th className="px-3 py-3 font-semibold">Status</th>
+                                <th className="px-3 py-3 font-semibold">Expires</th>
+                                <th className="w-10" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {records.data.length === 0 ? (
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Name
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Licence Class
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Licence Number
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Expiry
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Status
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Approved
-                                    </th>
-                                    {can.manage && (
-                                        <th className="px-4 py-3 text-right font-medium">
-                                            Actions
-                                        </th>
-                                    )}
+                                    <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                                        <Car className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                                        No driver records.
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {records.data.map((record) => {
-                                    const config =
-                                        statusConfig[record.status] ||
-                                        statusConfig.pending_review;
+                            ) : (
+                                records.data.map((d) => {
+                                    const expired = isExpired(d.licence_expires_at);
+                                    const statusKey = expired ? 'expired' : d.status;
+                                    const badge = DRIVER_BADGE[statusKey] ?? DRIVER_BADGE.none;
                                     return (
-                                        <tr
-                                            key={record.id}
-                                            className="hover:bg-muted/30"
-                                        >
-                                            <td className="px-4 py-3 font-medium">
-                                                {record.user.name}
+                                        <tr key={d.id} onContextMenu={(e) => openCtx(e, rowMenu(d))} className="border-b border-border last:border-0 hover:bg-muted/60">
+                                            <td className="px-3 py-2.5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <AvatarBubble name={d.user?.name ?? '?'} size={30} />
+                                                    <Link href={`/hr/compliance/drivers/${d.id}`} className="font-semibold text-primary hover:underline">
+                                                        {d.user?.name ?? 'Unknown'}
+                                                    </Link>
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-3">
-                                                {record.licence_class}
+                                            <td className="px-3 py-2.5">
+                                                <div className="font-semibold">Class {d.licence_class ?? '—'}</div>
+                                                <div className="font-mono text-[11px] text-muted-foreground">{d.licence_number ?? '—'}</div>
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {record.licence_number}
+                                            <td className="px-3 py-2.5">
+                                                {d.licence_endorsements && d.licence_endorsements.length > 0 ? (
+                                                    <span className="flex flex-wrap gap-1">
+                                                        {d.licence_endorsements.map((e) => (
+                                                            <span key={e} className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-md bg-accent px-1.5 text-[11px] font-bold text-primary">
+                                                                {e}
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {record.licence_expires_at ||
-                                                    record.licence_expiry ||
-                                                    '-'}
+                                            <td className="px-3 py-2.5">
+                                                <StatusBadge variant={badge.variant}>{badge.label}</StatusBadge>
                                             </td>
-                                            <td className="px-4 py-3">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={config.className}
-                                                >
-                                                    {config.label}
-                                                </Badge>
+                                            <td className="px-3 py-2.5">
+                                                <span className={expired ? 'font-semibold text-status-critical' : 'text-muted-foreground'}>{fmtDate(d.licence_expires_at)}</span>
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {record.approved_at || '—'}
+                                            <td className="px-3 py-2.5 text-right">
+                                                <button onClick={(e) => openCtx(e, rowMenu(d))} aria-label="Driver actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </button>
                                             </td>
-                                            {can.manage && (
-                                                <td className="px-4 py-3">
-                                                    <div className="flex justify-end gap-2">
-                                                        {record.status !==
-                                                            'eligible' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    approve(
-                                                                        record,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                                Approve
-                                                            </Button>
-                                                        )}
-                                                        {record.status ===
-                                                            'eligible' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setSuspendReason(
-                                                                        '',
-                                                                    );
-                                                                    setSuspendId(
-                                                                        record.id,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Ban className="mr-1 h-3 w-3" />
-                                                                Suspend
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            )}
                                         </tr>
                                     );
-                                })}
-                                {records.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={colSpan}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            No driver eligibility records found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </CardContent>
-                </Card>
-
-                {/* Pagination */}
-                {records.last_page > 1 && (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Showing{' '}
-                            {(records.current_page - 1) * records.per_page + 1}{' '}
-                            to{' '}
-                            {Math.min(
-                                records.current_page * records.per_page,
-                                records.total,
-                            )}{' '}
-                            of {records.total} results
-                        </p>
-                        <LaravelPagination links={records.links} />
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                    <div className="flex items-center justify-between border-t border-border px-4 py-3 text-[12.5px] text-muted-foreground">
+                        <span>Showing {records.from ?? 0}–{records.to ?? 0} of {records.total}</span>
+                        {records.last_page > 1 && <LaravelPagination links={records.links} />}
                     </div>
-                )}
-            </PageLayout>
+                </div>
+            </div>
 
-            {/* Add Driver Dialog */}
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Add Driver Eligibility Record</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitCreate} className="space-y-4">
-                        <div>
-                            <Label htmlFor="user_id">Staff Member</Label>
-                            <Select
-                                value={form.user_id}
-                                onValueChange={(val) => set('user_id', val)}
-                            >
-                                <SelectTrigger id="user_id">
-                                    <SelectValue placeholder="Select a staff member" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {employees.map((emp) => (
-                                        <SelectItem
-                                            key={emp.user_id}
-                                            value={String(emp.user_id)}
-                                        >
-                                            {emp.name}
-                                            {emp.position_title
-                                                ? ` — ${emp.position_title}`
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {fieldError('user_id')}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <Label htmlFor="licence_number">
-                                    Licence Number
-                                </Label>
-                                <Input
-                                    id="licence_number"
-                                    value={form.licence_number}
-                                    onChange={(e) =>
-                                        set('licence_number', e.target.value)
-                                    }
-                                    required
-                                />
-                                {fieldError('licence_number')}
-                            </div>
-                            <div>
-                                <Label htmlFor="licence_class">
-                                    Licence Class
-                                </Label>
-                                <Input
-                                    id="licence_class"
-                                    placeholder="e.g. Class 1"
-                                    value={form.licence_class}
-                                    onChange={(e) =>
-                                        set('licence_class', e.target.value)
-                                    }
-                                    required
-                                />
-                                {fieldError('licence_class')}
-                            </div>
-                        </div>
-                        <div>
-                            <Label htmlFor="licence_endorsements">
-                                Endorsements
-                            </Label>
-                            <Input
-                                id="licence_endorsements"
-                                placeholder="Comma-separated, e.g. P, V"
-                                value={form.licence_endorsements}
-                                onChange={(e) =>
-                                    set('licence_endorsements', e.target.value)
-                                }
-                            />
-                            {fieldError('licence_endorsements')}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <Label htmlFor="licence_expires_at">
-                                    Licence Expiry
-                                </Label>
-                                <Input
-                                    id="licence_expires_at"
-                                    type="date"
-                                    min={todayIso()}
-                                    value={form.licence_expires_at}
-                                    onChange={(e) =>
-                                        set('licence_expires_at', e.target.value)
-                                    }
-                                    required
-                                />
-                                {fieldError('licence_expires_at')}
-                            </div>
-                            <div>
-                                <Label htmlFor="incident_free_since">
-                                    Incident-free Since
-                                </Label>
-                                <Input
-                                    id="incident_free_since"
-                                    type="date"
-                                    max={todayIso()}
-                                    value={form.incident_free_since}
-                                    onChange={(e) =>
-                                        set(
-                                            'incident_free_since',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                {fieldError('incident_free_since')}
-                            </div>
-                        </div>
-                        <div>
-                            <Label htmlFor="notes">Notes</Label>
-                            <Textarea
-                                id="notes"
-                                value={form.notes}
-                                onChange={(e) => set('notes', e.target.value)}
-                            />
-                            {fieldError('notes')}
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setCreateOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={!form.user_id}>
-                                Add Record
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <AlertDialog open={!!suspend} onOpenChange={(o) => !o && setSuspend(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Suspend {suspend?.user?.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>Record a reason. This removes the driver's client-transport eligibility.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for suspension…" className="min-h-[88px]" />
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Button variant="destructive" disabled={!reason.trim()} onClick={doSuspend}>
+                            Suspend
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
-            {/* Suspend Dialog */}
-            <Dialog
-                open={suspendId !== null}
-                onOpenChange={(o) => !o && setSuspendId(null)}
-            >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Suspend Driving Privileges</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitSuspend} className="space-y-4">
-                        <div>
-                            <Label htmlFor="suspension_reason">
-                                Reason for suspension
-                            </Label>
-                            <Textarea
-                                id="suspension_reason"
-                                value={suspendReason}
-                                onChange={(e) =>
-                                    setSuspendReason(e.target.value)
-                                }
-                                placeholder="Why are driving privileges being suspended?"
-                                required
-                            />
-                            {fieldError('suspension_reason')}
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setSuspendId(null)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="destructive"
-                                disabled={!suspendReason.trim()}
-                            >
-                                Suspend
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <ComplianceContextMenu ctx={ctx} onClose={closeCtx} />
+            <ComplianceWizards state={wz} onClose={() => setWz(null)} people={wizard.people} requirements={wizard.requirements} roles={wizard.roles} siteTypes={wizard.siteTypes} />
         </AppLayout>
     );
 }

@@ -71,6 +71,7 @@ type HubCandidate = {
     full_name: string;
     email: string;
     source: string;
+    tags: string[];
     stage: string;
     days: number;
     stale: boolean;
@@ -219,7 +220,7 @@ export default function RecruitmentHub(props: Props) {
         return candidates.filter((c) => {
             if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
             if (q) {
-                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''}`.toLowerCase();
+                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''} ${c.tags.join(' ')}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
@@ -508,6 +509,7 @@ export default function RecruitmentHub(props: Props) {
                                 onSend={(o) => sendOffer(o, false)}
                                 onResend={(o) => sendOffer(o, true)}
                                 onConvert={(o) => openWizard('convert', { offerId: o.id, candidateName: o.candidate, role: o.role })}
+                                onAction={offerAction}
                             />
                         ) : null}
 
@@ -583,6 +585,26 @@ export default function RecruitmentHub(props: Props) {
                 else toast.success(resend ? `Offer link resent to ${o.candidate}` : `Offer emailed to ${o.candidate}`);
             },
         });
+    }
+
+    function offerAction(offerId: number, action: 'submit' | 'approve' | 'decline') {
+        const urls: Record<typeof action, string> = {
+            submit: `/hr/recruitment/offers/${offerId}/submit-approval`,
+            approve: `/hr/recruitment/offers/${offerId}/approve`,
+            decline: `/hr/recruitment/offers/${offerId}/decline-approval`,
+        };
+        const onSuccess = (pg: { props: object }) => {
+            const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+            if (f?.error) toast.error(f.error);
+            else toast.success(f?.success ?? 'Done');
+        };
+        if (action === 'decline') {
+            const reason = window.prompt('Reason for requesting changes (optional):');
+            if (reason === null) return; // cancelled
+            router.post(urls.decline, { reason }, { preserveScroll: true, onSuccess });
+            return;
+        }
+        router.post(urls[action], {}, { preserveScroll: true, onSuccess });
     }
 }
 
@@ -782,6 +804,14 @@ function PipelineTab({
                                 <span className="min-w-0">
                                     <span className="block truncate text-[13.5px] font-semibold">{c.full_name}</span>
                                     <span className="block truncate text-[11.5px] text-muted-foreground">{c.email}</span>
+                                    {c.tags.length > 0 ? (
+                                        <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                            {c.tags.slice(0, 3).map((t) => (
+                                                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t}</span>
+                                            ))}
+                                            {c.tags.length > 3 ? <span className="text-[10px] text-muted-foreground">+{c.tags.length - 3}</span> : null}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </button>
                             <span>
@@ -1097,6 +1127,8 @@ const OFFER_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'info' 
     accepted: 'success',
     sent: 'info',
     approved: 'info',
+    pending_approval: 'warning',
+    changes_requested: 'warning',
     declined: 'critical',
     withdrawn: 'critical',
     draft: 'neutral',
@@ -1108,12 +1140,14 @@ function OffersTab({
     onSend,
     onResend,
     onConvert,
+    onAction,
 }: {
     offers: { summary: { key: string; label: string; count: number; color: string }[]; list: OfferRow[] };
     canManage: boolean;
     onSend: (o: OfferRow) => void;
     onResend: (o: OfferRow) => void;
     onConvert: (o: OfferRow) => void;
+    onAction: (offerId: number, action: 'submit' | 'approve' | 'decline') => void;
 }) {
     return (
         <div>
@@ -1144,8 +1178,15 @@ function OffersTab({
                             {canManage ? (
                                 o.status === 'accepted' ? (
                                     <button type="button" onClick={() => onConvert(o)} className="h-[34px] rounded-[9px] bg-primary px-3.5 text-[12.5px] font-bold text-primary-foreground">Convert</button>
-                                ) : o.status === 'draft' || o.status === 'approved' ? (
+                                ) : o.status === 'approved' ? (
                                     <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Send</button>
+                                ) : o.status === 'pending_approval' ? (
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => onAction(o.id, 'approve')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Approve</button>
+                                        <button type="button" onClick={() => onAction(o.id, 'decline')} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Decline</button>
+                                    </div>
+                                ) : o.status === 'draft' || o.status === 'changes_requested' ? (
+                                    <button type="button" onClick={() => onAction(o.id, 'submit')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Submit</button>
                                 ) : o.status === 'sent' ? (
                                     <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
                                 ) : (

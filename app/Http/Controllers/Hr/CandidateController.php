@@ -17,6 +17,7 @@ use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
+use App\Domain\Hr\Notifications\OfferApprovalNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -185,6 +186,7 @@ class CandidateController extends Controller
             'personal_phone' => $candidate->personal_phone,
             'source' => $candidate->source,
             'source_detail' => $candidate->source_detail,
+            'tags' => array_values((array) ($candidate->tags ?? [])),
             'notes' => $candidate->notes,
             'created_at' => optional($candidate->created_at)->toDateString(),
             'applications' => $candidate->applications->map(function (HrApplication $application) use ($candidate) {
@@ -306,16 +308,48 @@ class CandidateController extends Controller
                 ];
             }
             if ($app->offer) {
+                $offer = $app->offer;
                 $activityLog[] = [
                     'type' => 'offer',
-                    'description' => "Offer created - {$app->offer->position_title}",
-                    'timestamp' => optional($app->offer->created_at)->diffForHumans() ?? '',
+                    'description' => "Offer created - {$offer->position_title}",
+                    'timestamp' => optional($offer->created_at)->diffForHumans() ?? '',
                 ];
-                if ($app->offer->response) {
+                // Approval chain: submitted → approved / sent back for changes.
+                if ($offer->approval_requested_at) {
                     $activityLog[] = [
                         'type' => 'offer',
-                        'description' => "Offer {$app->offer->response}",
-                        'timestamp' => optional($app->offer->response_at)->diffForHumans() ?? '',
+                        'description' => 'Offer submitted for approval',
+                        'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->approval_status === 'approved' && $offer->approved_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer approved',
+                        'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
+                        'actor' => $offer->approvedBy?->name,
+                    ];
+                }
+                if ($offer->approval_status === 'declined') {
+                    $reason = $offer->approval_declined_reason;
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
+                        'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->sent_at) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => 'Offer sent to candidate',
+                        'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
+                    ];
+                }
+                if ($offer->response) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => "Offer {$offer->response}",
+                        'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
                     ];
                 }
             }
@@ -391,6 +425,31 @@ class CandidateController extends Controller
         $candidate->update($validated);
 
         return redirect()->back()->with('success', 'Candidate updated successfully.');
+    }
+
+    /** Replace a candidate's tags (deduped, trimmed). Lightweight surface for the tag editor. */
+    public function updateTags(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $validated = $request->validate([
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:100'],
+        ]);
+
+        $tags = collect($validated['tags'] ?? [])
+            ->map(fn ($tag) => trim((string) $tag))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $candidate->update(['tags' => $tags, 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Tags updated.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -1218,6 +1277,7 @@ class CandidateController extends Controller
             'approval_status' => 'approved',
             'approved_by' => $user->id,
             'approved_at' => now(),
+            'approval_declined_reason' => null,
             'updated_by' => $user->id,
         ]);
 
@@ -1229,7 +1289,84 @@ class CandidateController extends Controller
             'approved_by' => $user->id,
         ]);
 
+        // Tell the offer's creator it's cleared to send (unless they approved it themselves).
+        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        if ($creator && (int) $creator->id !== (int) $user->id) {
+            $this->notifyOfferApproval($creator, $offer, 'approved', $application->candidate?->full_name ?? 'a candidate');
+        }
+
         return redirect()->back()->with('success', 'Offer approved.');
+    }
+
+    /** Submit a draft/declined offer for sign-off, notifying the hiring manager. */
+    public function submitOfferApproval(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $application = $offer->application()->with(['candidate', 'requisition.hiringManager'])->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if ($offer->sent_at) {
+            return redirect()->back()->with('error', 'This offer has already been sent.');
+        }
+        if ($offer->approval_status === 'approved') {
+            return redirect()->back()->with('error', 'This offer is already approved.');
+        }
+
+        $offer->update([
+            'approval_status' => 'pending_approval',
+            'approval_requested_at' => now(),
+            'approval_declined_reason' => null,
+            'approval_reminder_sent_at' => null,
+            'updated_by' => $user->id,
+        ]);
+
+        $approver = $application->requisition?->hiringManager;
+        if ($approver) {
+            $this->notifyOfferApproval($approver, $offer, 'requested', $application->candidate?->full_name ?? 'a candidate');
+        }
+
+        return redirect()->back()->with('success', 'Offer submitted for approval.');
+    }
+
+    /** Decline a pending offer back to the creator with an optional reason. */
+    public function declineOfferApproval(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $application = $offer->application()->with('candidate')->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if ($offer->approval_status === 'approved' || $offer->sent_at) {
+            return redirect()->back()->with('error', 'This offer can no longer be declined.');
+        }
+
+        $validated = $request->validate(['reason' => ['nullable', 'string', 'max:2000']]);
+
+        $offer->update([
+            'approval_status' => 'declined',
+            'approval_declined_reason' => $validated['reason'] ?? null,
+            'updated_by' => $user->id,
+        ]);
+
+        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        if ($creator) {
+            $this->notifyOfferApproval($creator, $offer, 'declined', $application->candidate?->full_name ?? 'a candidate', $validated['reason'] ?? null);
+        }
+
+        return redirect()->back()->with('success', 'Offer declined.');
+    }
+
+    /** Best-effort offer-approval notification to a real user. */
+    private function notifyOfferApproval(\App\Models\User $recipient, HrOffer $offer, string $type, string $candidateName, ?string $reason = null): void
+    {
+        try {
+            $recipient->notify(new OfferApprovalNotification($offer, $type, $candidateName, $reason));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function respondOffer(Request $request, HrOffer $offer)

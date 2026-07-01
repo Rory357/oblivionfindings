@@ -106,11 +106,14 @@ class CompensationService
      * shared by every Compensation & Benefits surface so the hero is identical
      * across the hub. Salary fields are encrypted → placement runs in PHP.
      *
+     * @param  \Illuminate\Support\Collection<int, HrEmployeeProfile>|null  $employees
+     *   Pre-loaded active employees (bands() already has them) so we don't decrypt
+     *   the whole workforce twice in one request. Loaded on demand when null.
      * @return array<string, int|float>
      */
-    public function heroStats(int $tenantId, User $user): array
+    public function heroStats(int $tenantId, User $user, ?\Illuminate\Support\Collection $employees = null): array
     {
-        $employees = HrEmployeeProfile::query()
+        $employees ??= HrEmployeeProfile::query()
             ->where('tenant_id', $tenantId)
             ->active()
             ->get(['id', 'position_role', 'annual_salary', 'hourly_rate']);
