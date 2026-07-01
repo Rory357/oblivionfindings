@@ -79,6 +79,7 @@ type HubCandidate = {
     stale: boolean;
     score?: number | null;
     score_count?: number;
+    possible_duplicate?: 'email' | 'name' | null;
     requisition?: { id: number; title: string } | null;
 };
 
@@ -190,6 +191,7 @@ export default function RecruitmentHub(props: Props) {
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('all');
     const [tagFilter, setTagFilter] = useState<string | null>(null);
+    const [dupOnly, setDupOnly] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
     const [manageTagsOpen, setManageTagsOpen] = useState(false);
@@ -224,6 +226,7 @@ export default function RecruitmentHub(props: Props) {
         const tagQ = tagFilter?.toLowerCase() ?? null;
         return candidates.filter((c) => {
             if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
+            if (dupOnly && !c.possible_duplicate) return false;
             if (tagQ && !c.tags.some((t) => t.toLowerCase() === tagQ)) return false;
             if (q) {
                 const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''} ${c.tags.join(' ')}`.toLowerCase();
@@ -231,7 +234,7 @@ export default function RecruitmentHub(props: Props) {
             }
             return true;
         });
-    }, [candidates, search, stageFilter, tagFilter]);
+    }, [candidates, search, stageFilter, tagFilter, dupOnly]);
 
     /* ---- actions ---- */
     const advance = (c: HubCandidate) => {
@@ -469,6 +472,8 @@ export default function RecruitmentHub(props: Props) {
                                 setStageFilter={setStageFilter}
                                 tagFilter={tagFilter}
                                 setTagFilter={setTagFilter}
+                                dupOnly={dupOnly}
+                                setDupOnly={setDupOnly}
                                 selected={selected}
                                 toggleSelect={toggleSelect}
                                 toggleAll={toggleAll}
@@ -682,6 +687,8 @@ function PipelineTab({
     setStageFilter,
     tagFilter,
     setTagFilter,
+    dupOnly,
+    setDupOnly,
     selected,
     toggleSelect,
     toggleAll,
@@ -706,6 +713,8 @@ function PipelineTab({
     setStageFilter: (v: string) => void;
     tagFilter: string | null;
     setTagFilter: (v: string | null) => void;
+    dupOnly: boolean;
+    setDupOnly: (v: boolean) => void;
     selected: number[];
     toggleSelect: (id: number) => void;
     toggleAll: () => void;
@@ -768,6 +777,16 @@ function PipelineTab({
                         className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 text-[12.5px] font-semibold text-primary hover:bg-primary/15"
                     >
                         Tag: {tagFilter} <span aria-hidden className="text-[13px] leading-none">✕</span>
+                    </button>
+                ) : null}
+                {dupOnly ? (
+                    <button
+                        type="button"
+                        onClick={() => setDupOnly(false)}
+                        title="Clear duplicate filter"
+                        className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning-bg px-3 text-[12.5px] font-semibold text-status-warning"
+                    >
+                        Possible duplicates <span aria-hidden className="text-[13px] leading-none">✕</span>
                     </button>
                 ) : null}
                 <button
@@ -866,6 +885,18 @@ function PipelineTab({
                                 <span className="min-w-0">
                                     <span className="block truncate text-[13.5px] font-semibold">{c.full_name}</span>
                                     <span className="block truncate text-[11.5px] text-muted-foreground">{c.email}</span>
+                                    {c.possible_duplicate ? (
+                                        <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => { e.stopPropagation(); setDupOnly(true); }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setDupOnly(true); } }}
+                                            title={c.possible_duplicate === 'email' ? 'Possible duplicate — shares an email with another candidate' : 'Possible duplicate — shares a name and phone with another candidate'}
+                                            className="mt-0.5 inline-flex w-fit cursor-pointer items-center gap-1 rounded bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-warning hover:brightness-95"
+                                        >
+                                            <span aria-hidden>⚠</span> Possible duplicate
+                                        </span>
+                                    ) : null}
                                     {c.tags.length > 0 ? (
                                         <span className="mt-0.5 flex flex-wrap items-center gap-1">
                                             {c.tags.slice(0, 3).map((t) => (

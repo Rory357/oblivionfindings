@@ -173,6 +173,16 @@ class RecruitmentController extends Controller
             $needs[] = ['key' => 'stuck', 'label' => "{$stuck} ".str('candidate')->plural($stuck).' stuck >7d', 'tab' => 'pipeline'];
         }
 
+        $dupIds = array_keys($this->duplicateHints($tenantId));
+        $duplicates = $dupIds === [] ? 0 : HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $dupIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
+            ->count();
+        if ($duplicates > 0) {
+            $needs[] = ['key' => 'duplicates', 'label' => "{$duplicates} possible ".str('duplicate')->plural($duplicates), 'tab' => 'pipeline'];
+        }
+
         return $needs;
     }
 
@@ -203,7 +213,9 @@ class RecruitmentController extends Controller
             ->get()
             ->keyBy('candidate_id');
 
-        return $candidates->map(function (HrCandidate $c) use ($staleDays, $scoreByCandidate) {
+        $dupHints = $this->duplicateHints($tenantId);
+
+        return $candidates->map(function (HrCandidate $c) use ($staleDays, $scoreByCandidate, $dupHints) {
             $app = $c->applications->first();
             $days = $c->current_stage_entered_at ? (int) $c->current_stage_entered_at->diffInDays(now()) : 0;
             $scoreRow = $scoreByCandidate->get($c->id);
@@ -217,6 +229,7 @@ class RecruitmentController extends Controller
                 'email' => $c->personal_email,
                 'source' => $c->source,
                 'tags' => array_values((array) ($c->tags ?? [])),
+                'possible_duplicate' => $dupHints[$c->id] ?? null,
                 'stage' => $c->status,
                 'days' => $days,
                 'stale' => $days > $staleDays,
@@ -584,6 +597,53 @@ class RecruitmentController extends Controller
     /* ------------------------------------------------------------------ */
     /*  Wizard support lists                                              */
     /* ------------------------------------------------------------------ */
+
+    /**
+     * Flag candidates that look like duplicates of another candidate — a safety
+     * net beyond the intake guard (which only blocks an exact email within the
+     * *active* pipeline). Matches on email (across all statuses, so returning
+     * applicants surface) or on name+phone (same person, different email).
+     *
+     * @return array<int, 'email'|'name'> candidateId => reason
+     */
+    private function duplicateHints(?int $tenantId): array
+    {
+        $rows = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->get(['id', 'first_name', 'last_name', 'personal_email', 'personal_phone']);
+
+        $byEmail = [];
+        $byNamePhone = [];
+        foreach ($rows as $row) {
+            $email = mb_strtolower(trim((string) $row->personal_email));
+            if ($email !== '') {
+                $byEmail[$email][] = $row->id;
+            }
+            $phone = preg_replace('/\D+/', '', (string) $row->personal_phone);
+            $name = mb_strtolower(trim($row->first_name.' '.$row->last_name));
+            if ($phone !== '' && $name !== '') {
+                $byNamePhone[$name.'|'.$phone][] = $row->id;
+            }
+        }
+
+        $hints = [];
+        foreach ($byEmail as $ids) {
+            if (count($ids) > 1) {
+                foreach ($ids as $id) {
+                    $hints[$id] = 'email';
+                }
+            }
+        }
+        foreach ($byNamePhone as $ids) {
+            if (count($ids) > 1) {
+                foreach ($ids as $id) {
+                    $hints[$id] ??= 'name'; // don't override a stronger email match
+                }
+            }
+        }
+
+        return $hints;
+    }
 
     private function buildSupport(?int $tenantId): array
     {

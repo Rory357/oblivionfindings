@@ -3,7 +3,10 @@
 namespace App\Observers;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\AssetService;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Domain\Hr\Services\PositionService;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Keeps `HrPosition.current_headcount` in step with reality as employees are
@@ -16,7 +19,11 @@ use App\Domain\Hr\Services\PositionService;
  */
 class HrEmployeeProfileObserver
 {
-    public function __construct(private readonly PositionService $positions) {}
+    public function __construct(
+        private readonly PositionService $positions,
+        private readonly AssetService $assets,
+        private readonly HrNotificationService $notifications,
+    ) {}
 
     public function saved(HrEmployeeProfile $profile): void
     {
@@ -25,6 +32,27 @@ class HrEmployeeProfileObserver
         // A transfer changes the count of both the old and the new position.
         if ($profile->wasChanged('position_id')) {
             $this->sync($profile->getOriginal('position_id'));
+        }
+
+        // Offboarding loop: the moment an employee is deactivated, flag any
+        // equipment they still hold so HR can recover it before they walk.
+        if ($profile->wasChanged('is_active') && $profile->is_active === false) {
+            $this->flagLeaverHeldAssets($profile);
+        }
+    }
+
+    private function flagLeaverHeldAssets(HrEmployeeProfile $profile): void
+    {
+        try {
+            $alerts = $this->assets->leaverHeldAlerts($profile);
+            if ($alerts !== []) {
+                $this->notifications->sendAssetAlerts($alerts);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to flag leaver-held assets on offboarding', [
+                'profile_id' => $profile->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

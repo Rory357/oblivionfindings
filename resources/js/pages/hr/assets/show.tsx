@@ -1,15 +1,46 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+/* eslint-disable no-restricted-syntax -- The asset detail mirrors the hub chrome:
+ * a compact brand header with lifecycle action buttons over sub-tabbed sections
+ * (Details · History · Maintenance · Documents · Activity). Rows are custom
+ * layouts, not shadcn <Card> cases; colours stay token-based. Zero confirm():
+ * every lifecycle action is a reviewed wizard modal. */
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    ArrowLeft,
+    Boxes,
+    CheckCircle2,
+    ExternalLink,
+    FileText,
+    Pencil,
+    QrCode,
+    RotateCcw,
+    Trash2,
+    Truck,
+    Upload,
+    UserCheck,
+    Wrench,
+} from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+
+import {
+    categoryIcon,
+    categoryLabel,
+    fdate,
+    nzd,
+    PersonAvatar,
+    StatusPill,
+    type AssetStatus,
+    type CategoryOption,
+    type StaffOption,
+} from '@/components/hr/asset-parts';
+import {
+    AssetWizard,
+    type AssetModal,
+    type EditableAsset,
+} from '@/components/hr/asset-wizards';
+import PageShell from '@/components/page-shell';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -17,575 +48,511 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import { Archive, RotateCcw, UserPlus, Wrench } from 'lucide-react';
-import { FormEvent, useState } from 'react';
 
-interface Assignment {
+interface AssignmentHistory {
     id: number;
-    assigned_at: string;
+    assignee: string | null;
+    assigned_at: string | null;
     returned_at: string | null;
+    due_at: string | null;
     condition_on_assign: string | null;
     condition_on_return: string | null;
-    notes: string | null;
-    employee_profile: {
-        id: number;
-        user: { id: number; name: string };
-    };
-    assigned_by_user: { id: number; name: string };
+    assigned_by: string | null;
 }
 
-interface Asset {
+interface MaintenanceLog {
     id: number;
-    asset_tag: string;
+    type: string;
+    vendor: string | null;
+    cost: number | null;
+    sent_at: string | null;
+    expected_back_at: string | null;
+    completed_at: string | null;
+    outcome: string | null;
+    notes: string | null;
+}
+
+interface DocumentRow {
+    id: number;
+    title: string;
+    category: string;
+    effective_at: string | null;
+    expiry_at: string | null;
+    uploaded_by: string | null;
+    created_at: string | null;
+}
+
+interface AssetDetail {
+    id: number;
+    tag: string;
     name: string;
     category: string;
-    serial_number: string | null;
+    status: AssetStatus;
     make: string | null;
     model: string | null;
+    serial: string | null;
+    cost: number | null;
+    supplier: string | null;
     purchase_date: string | null;
-    purchase_cost: string | null;
-    warranty_expiry: string | null;
-    status: string;
+    warranty: string | null;
+    condition: string | null;
+    depreciation_method: string | null;
+    useful_life_years: number | null;
+    qr_token: string | null;
+    fleet: boolean;
+    fleet_asset: { id: number; name: string; asset_tag: string | null; registration_number: string | null; status: string } | null;
     notes: string | null;
-    current_assignment: Assignment | null;
-    assignments: Assignment[];
-}
-
-interface Employee {
-    id: number;
-    user_id: number;
-    position_title: string | null;
-    user: { id: number; name: string };
+    disposal_reason: string | null;
+    disposed_at: string | null;
+    disposal_value: number | null;
+    current_assignment: { assignment_id: number; assignee: string | null; role: string | null; since: string | null; due_by: string | null } | null;
+    assignments: AssignmentHistory[];
+    maintenance_logs: MaintenanceLog[];
+    documents: DocumentRow[];
 }
 
 interface Props {
-    asset: Asset;
-    employees: Employee[];
+    asset: AssetDetail;
+    staff: StaffOption[];
+    categories: CategoryOption[];
     can: { manage: boolean };
 }
 
-const statusColors: Record<string, string> = {
-    available: 'bg-status-success-bg text-status-success',
-    assigned: 'bg-status-info-bg text-status-info',
-    maintenance: 'bg-status-warning-bg text-status-warning',
-    retired: 'bg-muted text-foreground',
-};
+type DetailTab = 'details' | 'history' | 'maintenance' | 'documents' | 'activity';
 
-const categoryLabels: Record<string, string> = {
-    laptop: 'Laptop',
-    phone: 'Phone',
-    tablet: 'Tablet',
-    vehicle: 'Vehicle',
-    key: 'Key',
-    card: 'Card',
-    uniform: 'Uniform',
-    other: 'Other',
-};
+const TABS: Array<{ id: DetailTab; label: string }> = [
+    { id: 'details', label: 'Details' },
+    { id: 'history', label: 'Assignment history' },
+    { id: 'maintenance', label: 'Maintenance' },
+    { id: 'documents', label: 'Documents' },
+    { id: 'activity', label: 'Activity' },
+];
 
-const formatDate = (value?: string | null) => {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          });
-};
+const DOC_CATEGORIES = [
+    { value: 'invoice', label: 'Invoice / receipt' },
+    { value: 'certificate', label: 'Certificate / warranty' },
+    { value: 'manual', label: 'Manual' },
+    { value: 'handover', label: 'Handover form' },
+    { value: 'photo', label: 'Photo' },
+];
 
-const formatDateTime = (value?: string | null) => {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
-};
-
-const formatCurrency = (value: string | null) => {
-    if (!value) return '-';
-    const num = parseFloat(value);
-    if (Number.isNaN(num)) return value;
-    return new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(num);
-};
-
-export default function AssetShow({ asset, employees, can }: Props) {
-    const [assignOpen, setAssignOpen] = useState(false);
-    const [returnOpen, setReturnOpen] = useState(false);
-    const [assignForm, setAssignForm] = useState({
-        employee_profile_id: '',
-        assigned_at: new Date().toISOString().split('T')[0],
-        condition_on_assign: '',
-        notes: '',
-    });
-    const [returnForm, setReturnForm] = useState({
-        returned_at: new Date().toISOString().split('T')[0],
-        condition_on_return: '',
-        notes: '',
-    });
-
+export default function AssetShow({ asset, staff, categories, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
-        { title: 'Assets', href: '/hr/assets' },
-        {
-            title: `${asset.asset_tag} - ${asset.name}`,
-            href: `/hr/assets/${asset.id}`,
-        },
+        { title: 'Asset Management', href: '/hr/assets' },
+        { title: asset.tag, href: `/hr/assets/${asset.id}` },
     ];
 
-    const submitAssign = (e: FormEvent) => {
-        e.preventDefault();
-        router.post(`/hr/assets/${asset.id}/assign`, assignForm, {
-            onSuccess: () => setAssignOpen(false),
-        });
+    const [tab, setTab] = useState<DetailTab>('details');
+    const [modal, setModal] = useState<AssetModal | null>(null);
+    const Icon = categoryIcon(asset.category);
+
+    const editable: EditableAsset = {
+        id: asset.id,
+        tag: asset.tag,
+        name: asset.name,
+        category: asset.category,
+        make: asset.make,
+        model: asset.model,
+        serial: asset.serial,
+        cost: asset.cost,
+        supplier: asset.supplier,
+        warranty: asset.warranty,
+        purchase_date: asset.purchase_date,
+        condition: asset.condition,
+        depreciation_method: asset.depreciation_method,
+        useful_life_years: asset.useful_life_years,
+        fleet_asset_id: asset.fleet_asset?.id ?? null,
+        qr_token: asset.qr_token,
     };
 
-    const submitReturn = (e: FormEvent) => {
-        e.preventDefault();
-        if (!asset.current_assignment) return;
-        router.post(
-            `/hr/assets/assignments/${asset.current_assignment.id}/return`,
-            returnForm,
-            {
-                onSuccess: () => setReturnOpen(false),
-            },
-        );
-    };
-
-    const sendToMaintenance = () => {
-        if (
-            confirm(
-                'Send this asset to maintenance? It will be marked unavailable until returned to service.',
-            )
-        ) {
-            router.post(`/hr/assets/${asset.id}/maintenance`);
-        }
-    };
-
-    const returnFromMaintenance = () => {
-        if (confirm('Return this asset to service (back to available)?')) {
-            router.post(`/hr/assets/${asset.id}/return-from-maintenance`);
-        }
-    };
-
-    const retireAsset = () => {
-        if (
-            confirm(
-                'Retire this asset? This decommissions it and removes it from the active pool.',
-            )
-        ) {
-            router.post(`/hr/assets/${asset.id}/retire`);
-        }
-    };
+    const ref = { id: asset.id, name: asset.name, tag: asset.tag };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${asset.asset_tag} - ${asset.name}`} />
+            <Head title={`${asset.name} · Asset`} />
 
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        variant="compact"
-                        backHref="/hr/assets"
-                        title={
-                            <span className="flex items-center gap-2">
-                                {asset.name}
-                                <Badge
-                                    variant="outline"
-                                    className="font-mono text-xs"
+            <PageShell>
+                {/* compact header */}
+                <div
+                    className="relative overflow-hidden rounded-[20px] p-6 text-primary-foreground"
+                    style={{
+                        background:
+                            'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 58%, color-mix(in oklch, var(--primary) 90%, white 8%))',
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={() => router.visit('/hr/assets')}
+                        className="mb-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-primary-foreground/80 hover:text-primary-foreground"
+                    >
+                        <ArrowLeft className="h-4 w-4" /> Asset Management
+                    </button>
+                    <div className="flex flex-wrap items-start gap-4">
+                        <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl border border-primary-foreground/20 bg-primary-foreground/15">
+                            <Icon className="h-7 w-7" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                <h1 className="text-[24px] leading-tight font-extrabold tracking-tight">{asset.name}</h1>
+                                <StatusPill status={asset.status} />
+                            </div>
+                            <div className="mt-1 font-mono text-[12.5px] text-primary-foreground/75">
+                                {asset.tag}{asset.serial ? ` · ${asset.serial}` : ''} · {categoryLabel(asset.category)}
+                            </div>
+                            {asset.fleet && asset.fleet_asset ? (
+                                <a
+                                    href={`/fleet-assets/assets/${asset.fleet_asset.id}`}
+                                    className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-primary-foreground/25 bg-primary-foreground/[0.12] px-2.5 py-1 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/20"
                                 >
-                                    {asset.asset_tag}
-                                </Badge>
-                                <span
-                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[asset.status] ?? ''}`}
-                                >
-                                    {asset.status}
-                                </span>
-                            </span>
-                        }
-                        description={
-                            <>
-                                {categoryLabels[asset.category] || asset.category}
-                                {asset.make && ` - ${asset.make}`}
-                                {asset.model && ` ${asset.model}`}
-                            </>
-                        }
-                        actions={
-                            can.manage ? (
-                                <>
-                                    {asset.status === 'available' && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setAssignOpen(true)}
-                                        >
-                                            <UserPlus className="mr-1.5 h-4 w-4" />
-                                            Assign
-                                        </Button>
-                                    )}
-                                    {asset.status === 'assigned' &&
-                                        asset.current_assignment && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setReturnOpen(true)
-                                                }
-                                            >
-                                                <RotateCcw className="mr-1.5 h-4 w-4" />
-                                                Return
-                                            </Button>
-                                        )}
-                                    {asset.status === 'available' && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={sendToMaintenance}
-                                        >
-                                            <Wrench className="mr-1.5 h-4 w-4" />
-                                            Maintenance
-                                        </Button>
-                                    )}
-                                    {asset.status === 'maintenance' && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={returnFromMaintenance}
-                                        >
-                                            <RotateCcw className="mr-1.5 h-4 w-4" />
-                                            Return to service
-                                        </Button>
-                                    )}
-                                    {(asset.status === 'available' ||
-                                        asset.status === 'maintenance') && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={retireAsset}
-                                        >
-                                            <Archive className="mr-1.5 h-4 w-4" />
-                                            Retire
-                                        </Button>
-                                    )}
-                                </>
-                            ) : undefined
-                        }
-                    />
-                }
-            >
-                {/* Asset Details */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Asset Details
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                            <div>
-                                <span className="text-muted-foreground">
-                                    Serial Number
-                                </span>
-                                <p className="mt-0.5 font-mono">
-                                    {asset.serial_number || '-'}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">
-                                    Purchase Date
-                                </span>
-                                <p className="mt-0.5">
-                                    {formatDate(asset.purchase_date)}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">
-                                    Purchase Cost
-                                </span>
-                                <p className="mt-0.5">
-                                    {formatCurrency(asset.purchase_cost)}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">
-                                    Warranty Expiry
-                                </span>
-                                <p className="mt-0.5">
-                                    {formatDate(asset.warranty_expiry)}
-                                </p>
-                            </div>
+                                    <Truck className="h-3.5 w-3.5" /> Linked to Fleet register
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            ) : null}
                         </div>
-                        {asset.notes && (
-                            <div className="mt-4 text-sm">
-                                <span className="text-muted-foreground">
-                                    Notes
-                                </span>
-                                <p className="mt-0.5">{asset.notes}</p>
-                            </div>
-                        )}
-                        {asset.current_assignment && (
-                            <div className="mt-4 rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm">
-                                <span className="font-medium text-status-info">
-                                    Currently Assigned to:
-                                </span>{' '}
-                                <span>
-                                    {
-                                        asset.current_assignment
-                                            .employee_profile?.user?.name
-                                    }
-                                </span>
-                                <span className="ml-2 text-status-info">
-                                    since{' '}
-                                    {formatDate(
-                                        asset.current_assignment.assigned_at,
-                                    )}
-                                </span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
 
-                {/* Assignment History */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Assignment History
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Assigned</TableHead>
-                                    <TableHead>Returned</TableHead>
-                                    <TableHead>Condition (Assign)</TableHead>
-                                    <TableHead>Condition (Return)</TableHead>
-                                    <TableHead>Assigned By</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {asset.assignments?.map((assignment) => (
-                                    <TableRow key={assignment.id}>
-                                        <TableCell className="font-medium">
-                                            {
-                                                assignment.employee_profile
-                                                    ?.user?.name
-                                            }
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatDateTime(
-                                                assignment.assigned_at,
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {assignment.returned_at ? (
-                                                formatDateTime(
-                                                    assignment.returned_at,
-                                                )
-                                            ) : (
-                                                <Badge variant="outline">
-                                                    Current
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {assignment.condition_on_assign ||
-                                                '-'}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {assignment.condition_on_return ||
-                                                '-'}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {assignment.assigned_by_user?.name}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {!asset.assignments?.length && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-8 text-center text-sm text-muted-foreground"
-                                        >
-                                            No assignment history.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </PageLayout>
+                        {/* actions */}
+                        <div className="flex flex-wrap gap-2">
+                            <ActionBtn icon={QrCode} label="Print QR" onClick={() => window.open(`/hr/assets/${asset.id}/qr.svg`, '_blank')} />
+                            {can.manage && !asset.fleet ? (
+                                <ActionBtn icon={Pencil} label="Edit" onClick={() => setModal({ type: 'new', asset: editable })} />
+                            ) : null}
+                            {can.manage && asset.status === 'available' ? (
+                                <ActionBtn primary icon={UserCheck} label="Assign" onClick={() => setModal({ type: 'assign', asset: ref })} />
+                            ) : null}
+                            {can.manage && asset.status === 'assigned' && asset.current_assignment ? (
+                                <ActionBtn primary icon={RotateCcw} label="Return" onClick={() => setModal({ type: 'return', assignmentId: asset.current_assignment!.assignment_id, asset: { ...ref, assignee: asset.current_assignment!.assignee } })} />
+                            ) : null}
+                            {can.manage && asset.status !== 'retired' && asset.status !== 'maintenance' && !asset.fleet ? (
+                                <ActionBtn icon={Wrench} label="Log repair" onClick={() => setModal({ type: 'maintenance', asset: ref })} />
+                            ) : null}
+                            {can.manage && asset.status === 'maintenance' ? (
+                                <ActionBtn primary icon={CheckCircle2} label="Return to service" onClick={() => setModal({ type: 'rfs', asset: ref })} />
+                            ) : null}
+                            {can.manage && (asset.status === 'available' || asset.status === 'maintenance') && !asset.fleet ? (
+                                <ActionBtn icon={Trash2} label="Retire" onClick={() => setModal({ type: 'retire', asset: ref })} />
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
 
-            {/* Assign Dialog */}
-            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Assign Asset</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitAssign} className="space-y-4">
-                        <div>
-                            <Label>Employee</Label>
-                            <Select
-                                value={assignForm.employee_profile_id}
-                                onValueChange={(val) =>
-                                    setAssignForm((p) => ({
-                                        ...p,
-                                        employee_profile_id: val,
-                                    }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select employee" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {employees.map((emp) => (
-                                        <SelectItem
-                                            key={emp.id}
-                                            value={String(emp.id)}
-                                        >
-                                            {emp.user?.name}{' '}
-                                            {emp.position_title
-                                                ? `- ${emp.position_title}`
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label>Assigned Date</Label>
-                            <Input
-                                type="date"
-                                value={assignForm.assigned_at}
-                                onChange={(e) =>
-                                    setAssignForm((p) => ({
-                                        ...p,
-                                        assigned_at: e.target.value,
-                                    }))
-                                }
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label>Condition on Assignment</Label>
-                            <Input
-                                value={assignForm.condition_on_assign}
-                                onChange={(e) =>
-                                    setAssignForm((p) => ({
-                                        ...p,
-                                        condition_on_assign: e.target.value,
-                                    }))
-                                }
-                                placeholder="e.g. New, Good, Fair"
-                            />
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={assignForm.notes}
-                                onChange={(e) =>
-                                    setAssignForm((p) => ({
-                                        ...p,
-                                        notes: e.target.value,
-                                    }))
-                                }
-                            />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setAssignOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit">Assign</Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                {/* sub-tabs */}
+                <div className="mt-5 mb-4 flex flex-wrap gap-1.5 border-b border-border">
+                    {TABS.map((t) => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setTab(t.id)}
+                            className={cn('relative px-3 py-2 text-[13px] font-semibold transition-colors', tab === t.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
+                        >
+                            {t.label}
+                            {tab === t.id ? <span className="absolute -bottom-px left-0 h-0.5 w-full rounded-full bg-primary" /> : null}
+                        </button>
+                    ))}
+                </div>
 
-            {/* Return Dialog */}
-            <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Return Asset</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitReturn} className="space-y-4">
-                        <div>
-                            <Label>Return Date</Label>
-                            <Input
-                                type="date"
-                                value={returnForm.returned_at}
-                                onChange={(e) =>
-                                    setReturnForm((p) => ({
-                                        ...p,
-                                        returned_at: e.target.value,
-                                    }))
-                                }
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label>Condition on Return</Label>
-                            <Input
-                                value={returnForm.condition_on_return}
-                                onChange={(e) =>
-                                    setReturnForm((p) => ({
-                                        ...p,
-                                        condition_on_return: e.target.value,
-                                    }))
-                                }
-                                placeholder="e.g. Good, Damaged, Fair"
-                            />
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={returnForm.notes}
-                                onChange={(e) =>
-                                    setReturnForm((p) => ({
-                                        ...p,
-                                        notes: e.target.value,
-                                    }))
-                                }
-                            />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setReturnOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit">Return Asset</Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                {tab === 'details' && <DetailsTab asset={asset} />}
+                {tab === 'history' && <HistoryTab assignments={asset.assignments} />}
+                {tab === 'maintenance' && <MaintenanceLogsTab logs={asset.maintenance_logs} />}
+                {tab === 'documents' && <DocumentsTab asset={asset} canManage={can.manage} />}
+                {tab === 'activity' && <ActivityTab asset={asset} />}
+            </PageShell>
+
+            <AssetWizard modal={modal} staff={staff} categories={categories} onClose={() => setModal(null)} />
         </AppLayout>
+    );
+}
+
+function ActionBtn({ icon: Icon, label, onClick, primary }: { icon: typeof QrCode; label: string; onClick: () => void; primary?: boolean }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'inline-flex h-9 items-center gap-2 rounded-[9px] px-3 text-[12.5px] font-bold transition-colors',
+                primary
+                    ? 'bg-primary-foreground text-primary hover:scale-[1.02]'
+                    : 'border border-primary-foreground/[0.28] bg-primary-foreground/[0.12] text-primary-foreground hover:bg-primary-foreground/20',
+            )}
+        >
+            <Icon className="h-4 w-4" /> {label}
+        </button>
+    );
+}
+
+function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <div className={cn('rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]', className)}>{children}</div>;
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+        <div className="flex justify-between gap-4 border-b border-border py-2 last:border-b-0">
+            <span className="text-[12.5px] text-muted-foreground">{label}</span>
+            <span className="text-right text-[12.5px] font-semibold">{value ?? '—'}</span>
+        </div>
+    );
+}
+
+function DetailsTab({ asset }: { asset: AssetDetail }) {
+    return (
+        <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+            <Panel>
+                <div className="mb-3 text-[15px] font-bold">Specifications &amp; purchase</div>
+                <Row label="Make / model" value={[asset.make, asset.model].filter(Boolean).join(' ') || '—'} />
+                <Row label="Serial number" value={asset.serial ? <span className="font-mono">{asset.serial}</span> : '—'} />
+                <Row label="Condition at intake" value={asset.condition ?? '—'} />
+                <Row label="Purchase date" value={fdate(asset.purchase_date)} />
+                <Row label="Purchase cost" value={nzd(asset.cost)} />
+                <Row label="Supplier" value={asset.supplier ?? '—'} />
+                <Row label="Warranty expiry" value={fdate(asset.warranty)} />
+                <Row label="Depreciation" value={asset.depreciation_method === 'diminishing' ? 'Diminishing value' : asset.depreciation_method === 'straight' ? 'Straight-line' : '—'} />
+                <Row label="Useful life" value={asset.useful_life_years ? `${asset.useful_life_years} years` : '—'} />
+                {asset.status === 'retired' ? (
+                    <>
+                        <Row label="Disposal reason" value={asset.disposal_reason ?? '—'} />
+                        <Row label="Disposed" value={fdate(asset.disposed_at)} />
+                        <Row label="Disposal value" value={nzd(asset.disposal_value)} />
+                    </>
+                ) : null}
+                {asset.notes ? (
+                    <div className="mt-3 rounded-xl bg-muted/50 p-3 text-[13px] text-muted-foreground">{asset.notes}</div>
+                ) : null}
+            </Panel>
+
+            <Panel>
+                <div className="mb-3 text-[15px] font-bold">Current assignment</div>
+                {asset.current_assignment ? (
+                    <div className="flex items-center gap-3">
+                        <PersonAvatar name={asset.current_assignment.assignee} size={42} />
+                        <div className="min-w-0">
+                            <div className="text-[14px] font-bold">{asset.current_assignment.assignee}</div>
+                            <div className="text-[12px] text-muted-foreground">{asset.current_assignment.role ?? '—'}</div>
+                            <div className="mt-1 text-[12px] text-muted-foreground">
+                                Since {fdate(asset.current_assignment.since)}
+                                {asset.current_assignment.due_by ? ` · due ${fdate(asset.current_assignment.due_by)}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="py-6 text-center text-[13px] text-muted-foreground">Not currently assigned.</div>
+                )}
+            </Panel>
+        </div>
+    );
+}
+
+function HistoryTab({ assignments }: { assignments: AssignmentHistory[] }) {
+    return (
+        <Panel>
+            <div className="mb-3 text-[15px] font-bold">Assignment history</div>
+            {assignments.length === 0 ? (
+                <div className="py-8 text-center text-[13px] text-muted-foreground">No assignments recorded yet.</div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] border-collapse text-[13px]">
+                        <thead>
+                            <tr className="border-b border-border text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <th className="py-2 pr-3">Employee</th>
+                                <th className="py-2 pr-3">Assigned</th>
+                                <th className="py-2 pr-3">Returned</th>
+                                <th className="py-2 pr-3">Condition</th>
+                                <th className="py-2">By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {assignments.map((a) => (
+                                <tr key={a.id} className="border-b border-border last:border-b-0">
+                                    <td className="py-2.5 pr-3 font-semibold">{a.assignee ?? '—'}</td>
+                                    <td className="py-2.5 pr-3 text-muted-foreground">{fdate(a.assigned_at)}</td>
+                                    <td className="py-2.5 pr-3 text-muted-foreground">{a.returned_at ? fdate(a.returned_at) : <span className="font-semibold text-status-info">Active</span>}</td>
+                                    <td className="py-2.5 pr-3 text-muted-foreground">
+                                        {[a.condition_on_assign, a.condition_on_return].filter(Boolean).join(' → ') || '—'}
+                                    </td>
+                                    <td className="py-2.5 text-muted-foreground">{a.assigned_by ?? '—'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </Panel>
+    );
+}
+
+function MaintenanceLogsTab({ logs }: { logs: MaintenanceLog[] }) {
+    return (
+        <Panel>
+            <div className="mb-3 text-[15px] font-bold">Maintenance history</div>
+            {logs.length === 0 ? (
+                <div className="py-8 text-center text-[13px] text-muted-foreground">No repairs or services logged.</div>
+            ) : (
+                <div className="flex flex-col">
+                    {logs.map((log, i) => (
+                        <div key={log.id} className={cn('flex items-start gap-3 py-3', i ? 'border-t border-border' : '')}>
+                            <span className="grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-status-warning-bg text-status-warning">
+                                <Wrench className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[13px] font-bold capitalize">{log.type}</span>
+                                    {log.vendor ? <span className="text-[12.5px] text-muted-foreground">· {log.vendor}</span> : null}
+                                    {log.cost != null ? <span className="text-[12.5px] font-semibold tabular-nums">· {nzd(log.cost)}</span> : null}
+                                    {log.completed_at ? (
+                                        <span className="rounded-full bg-status-success-bg px-2 py-px text-[11px] font-bold text-status-success">Closed</span>
+                                    ) : (
+                                        <span className="rounded-full bg-status-warning-bg px-2 py-px text-[11px] font-bold text-status-warning">Open</span>
+                                    )}
+                                </div>
+                                <div className="mt-0.5 text-[12px] text-muted-foreground">
+                                    Sent {fdate(log.sent_at)}
+                                    {log.expected_back_at ? ` · expected ${fdate(log.expected_back_at)}` : ''}
+                                    {log.completed_at ? ` · completed ${fdate(log.completed_at)}` : ''}
+                                    {log.outcome ? ` · ${log.outcome}` : ''}
+                                </div>
+                                {log.notes ? <div className="mt-1 text-[12.5px]">{log.notes}</div> : null}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Panel>
+    );
+}
+
+function DocumentsTab({ asset, canManage }: { asset: AssetDetail; canManage: boolean }) {
+    const fileRef = useRef<HTMLInputElement>(null);
+    const form = useForm<{ title: string; category: string; file: File | null }>({
+        title: '',
+        category: 'invoice',
+        file: null,
+    });
+
+    const submit = () => {
+        if (!form.data.file) {
+            toast.error('Choose a file to upload.');
+            return;
+        }
+        form.post(`/hr/assets/${asset.id}/documents`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                if (fileRef.current) fileRef.current.value = '';
+                toast.success('Document uploaded.');
+            },
+        });
+    };
+
+    const remove = (id: number) =>
+        router.delete(`/hr/assets/documents/${id}`, { preserveScroll: true });
+
+    return (
+        <div className="flex flex-col gap-4">
+            {canManage ? (
+                <Panel>
+                    <div className="mb-3 text-[15px] font-bold">Upload a document</div>
+                    <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_auto]">
+                        <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="e.g. AppleCare certificate" />
+                        <Select value={form.data.category} onValueChange={(v) => form.setData('category', v)}>
+                            <SelectTrigger aria-label="Document category">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {DOC_CATEGORIES.map((c) => (
+                                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)}
+                            className="text-[12.5px] file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-[12.5px] file:font-semibold"
+                        />
+                    </div>
+                    <div className="mt-3 flex items-center gap-3">
+                        <Button onClick={submit} disabled={form.processing || !form.data.title || !form.data.file}>
+                            <Upload className="h-4 w-4" /> {form.processing ? 'Uploading…' : 'Upload'}
+                        </Button>
+                        <span className="text-[11.5px] text-muted-foreground">PDF, image or Office file up to 20 MB. Stored privately.</span>
+                    </div>
+                    {form.errors.file ? <div className="mt-2 text-[12px] text-status-critical">{form.errors.file}</div> : null}
+                </Panel>
+            ) : null}
+
+            <Panel>
+                <div className="mb-3 text-[15px] font-bold">Document library</div>
+                {asset.documents.length === 0 ? (
+                    <div className="py-8 text-center text-[13px] text-muted-foreground">No documents attached yet.</div>
+                ) : (
+                    <div className="flex flex-col">
+                        {asset.documents.map((d, i) => (
+                            <div key={d.id} className={cn('flex items-center gap-3 py-2.5', i ? 'border-t border-border' : '')}>
+                                <span className="grid h-9 w-9 flex-none place-items-center rounded-[9px] bg-muted text-muted-foreground">
+                                    <FileText className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <div className="truncate text-[13px] font-semibold">{d.title}</div>
+                                    <div className="text-[11.5px] text-muted-foreground capitalize">
+                                        {d.category}{d.uploaded_by ? ` · ${d.uploaded_by}` : ''}{d.created_at ? ` · ${fdate(d.created_at)}` : ''}
+                                    </div>
+                                </div>
+                                <a href={`/hr/assets/documents/${d.id}/download`} className="rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold hover:bg-accent">Download</a>
+                                {canManage ? (
+                                    <button type="button" onClick={() => remove(d.id)} aria-label="Remove document" className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Panel>
+        </div>
+    );
+}
+
+function ActivityTab({ asset }: { asset: AssetDetail }) {
+    const events = useMemo(() => {
+        const out: Array<{ at: string | null; icon: typeof Boxes; tone: string; text: string }> = [];
+        for (const a of asset.assignments) {
+            if (a.assigned_at) out.push({ at: a.assigned_at, icon: UserCheck, tone: 'var(--primary)', text: `Assigned to ${a.assignee ?? 'staff'}` });
+            if (a.returned_at) out.push({ at: a.returned_at, icon: RotateCcw, tone: 'var(--status-info)', text: `Returned by ${a.assignee ?? 'staff'}` });
+        }
+        for (const m of asset.maintenance_logs) {
+            if (m.sent_at) out.push({ at: m.sent_at, icon: Wrench, tone: 'var(--status-warning)', text: `Sent to ${m.vendor ?? 'repair'} (${m.type})` });
+            if (m.completed_at) out.push({ at: m.completed_at, icon: CheckCircle2, tone: 'var(--status-success)', text: `Returned to service${m.outcome ? ` · ${m.outcome}` : ''}` });
+        }
+        for (const d of asset.documents) {
+            if (d.created_at) out.push({ at: d.created_at, icon: FileText, tone: 'var(--category-fleet)', text: `Document added · ${d.title}` });
+        }
+        return out.filter((e) => e.at).sort((a, b) => (b.at! > a.at! ? 1 : -1));
+    }, [asset]);
+
+    return (
+        <Panel>
+            <div className="mb-3 text-[15px] font-bold">Activity timeline</div>
+            {events.length === 0 ? (
+                <div className="py-8 text-center text-[13px] text-muted-foreground">No activity recorded yet.</div>
+            ) : (
+                <div className="flex flex-col gap-0.5">
+                    {events.map((e, i) => {
+                        const Icon = e.icon;
+                        return (
+                            <div key={i} className="flex items-center gap-3 py-2">
+                                <span className="grid h-8 w-8 flex-none place-items-center rounded-[9px] bg-muted" style={{ color: e.tone }}>
+                                    <Icon className="h-4 w-4" />
+                                </span>
+                                <span className="flex-1 text-[13px] font-medium">{e.text}</span>
+                                <span className="flex-none text-[11.5px] text-muted-foreground">{fdate(e.at)}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </Panel>
     );
 }
