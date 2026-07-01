@@ -30,7 +30,16 @@ export interface TemplateTask {
     sort_order: number;
     assigned_to_role: string | null;
     sign_off_required: boolean;
+    course_code?: string | null;
 }
+
+export interface CourseOption {
+    code: string;
+    title: string;
+    is_mandatory: boolean;
+}
+
+const NO_COURSE = '__none__';
 
 export interface TemplateRow {
     id: number;
@@ -53,6 +62,7 @@ const blankTask = (sortOrder = 1): TemplateTask => ({
     sort_order: sortOrder,
     assigned_to_role: '',
     sign_off_required: false,
+    course_code: '',
 });
 
 export function TemplateDialog({
@@ -61,12 +71,14 @@ export function TemplateDialog({
     template,
     roleOptions,
     siteTypeOptions,
+    courseOptions = [],
 }: {
     open: boolean;
     onClose: () => void;
     template: TemplateRow | null;
     roleOptions: string[];
     siteTypeOptions: string[];
+    courseOptions?: CourseOption[];
 }) {
     const form = useForm<{
         template_id: string;
@@ -98,6 +110,7 @@ export function TemplateDialog({
                               description: t.description || '',
                               assigned_to_role: t.assigned_to_role || '',
                               sort_order: t.sort_order || i + 1,
+                              course_code: t.course_code || '',
                           }))
                         : [blankTask()],
             });
@@ -144,6 +157,8 @@ export function TemplateDialog({
                     sort_order: Number(t.sort_order || i + 1),
                     assigned_to_role: t.assigned_to_role?.trim() || null,
                     sign_off_required: Boolean(t.sign_off_required),
+                    course_code:
+                        t.category === 'induction' ? t.course_code?.trim() || null : null,
                 }))
                 .filter((t) => t.title !== ''),
         }));
@@ -269,6 +284,32 @@ export function TemplateDialog({
                                         />
                                     </div>
                                 </div>
+                                {task.category === 'induction' && (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">
+                                            Auto-enrol course{' '}
+                                            <span className="font-normal text-muted-foreground">
+                                                (optional — defaults to mandatory courses)
+                                            </span>
+                                        </Label>
+                                        <Select
+                                            value={task.course_code || NO_COURSE}
+                                            onValueChange={(v) => setTask(i, { course_code: v === NO_COURSE ? '' : v })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Mandatory courses" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value={NO_COURSE}>Mandatory courses (default)</SelectItem>
+                                                {courseOptions.map((c) => (
+                                                    <SelectItem key={c.code} value={c.code}>
+                                                        {c.title} ({c.code})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-5">
                                         <label className="flex items-center gap-2 text-xs">

@@ -26,7 +26,7 @@ import {
     initials,
     prettyLabel,
 } from '@/components/hr/onboarding/shared';
-import { TemplateDialog, type TemplateRow } from '@/components/hr/onboarding/template-dialog';
+import { TemplateDialog, type CourseOption, type TemplateRow } from '@/components/hr/onboarding/template-dialog';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
@@ -91,6 +91,7 @@ interface Props {
     owners: Array<{ id: number; name: string | null }>;
     newHireOptions: NewHireOptions;
     templateRoleOptions: string[];
+    courseOptions: CourseOption[];
     siteTypeOptions: string[];
     filters: { status: string | null; q: string };
     can: { manage: boolean };
@@ -122,6 +123,7 @@ export default function OnboardingIndex(props: Props) {
         owners,
         newHireOptions,
         templateRoleOptions,
+        courseOptions,
         siteTypeOptions,
         filters,
         can,
@@ -367,6 +369,7 @@ export default function OnboardingIndex(props: Props) {
                         template={templateDialog.row}
                         roleOptions={templateRoleOptions}
                         siteTypeOptions={siteTypeOptions}
+                        courseOptions={courseOptions}
                     />
                     <EmailDialog
                         open={emailDialog.open}

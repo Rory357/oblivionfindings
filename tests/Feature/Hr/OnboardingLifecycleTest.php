@@ -145,6 +145,26 @@ test('a template can be duplicated', function () {
     expect(HrOnboardingTemplate::query()->where('role', 'support_worker')->count())->toBe(2);
 });
 
+test('saving a template persists a per-task course_code for induction auto-enrol', function () {
+    $this->actingAs($this->hr)
+        ->put('/hr/onboarding/templates', [
+            'role' => 'support_worker',
+            'site_type' => 'all',
+            'is_active' => true,
+            'tasks' => [
+                ['category' => 'induction', 'title' => 'H&S induction', 'is_required' => true, 'sort_order' => 1, 'course_code' => 'HS-IND'],
+            ],
+        ])
+        ->assertRedirect();
+
+    $template = HrOnboardingTemplate::query()->where('role', 'support_worker')->firstOrFail();
+    expect($template->tasks[0]['course_code'])->toBe('HS-IND');
+});
+
+test('the IT & Provisioning wireframe renders for an onboarding manager', function () {
+    $this->actingAs($this->hr)->get('/it')->assertOk();
+});
+
 test('bulk archive closes the selected checklists', function () {
     $a = lifecycleChecklist(lifecycleProfile());
     $b = lifecycleChecklist(lifecycleProfile());

@@ -29,6 +29,8 @@ class StoreOnboardingTemplateRequest extends FormRequest
             'tasks.*.sort_order' => ['nullable', 'integer', 'min:1'],
             'tasks.*.assigned_to_role' => ['nullable', 'string', 'max:100'],
             'tasks.*.sign_off_required' => ['sometimes', 'boolean'],
+            // Optional training course to auto-enrol into (induction tasks).
+            'tasks.*.course_code' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

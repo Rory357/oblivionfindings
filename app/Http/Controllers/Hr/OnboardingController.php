@@ -92,6 +92,7 @@ class OnboardingController extends Controller
             'owners' => $this->tenantUserOptions($tenantId),
             'newHireOptions' => $this->newHireOptions($tenantId),
             'templateRoleOptions' => $this->roleOptions(),
+            'courseOptions' => $this->courseOptions($tenantId),
             'siteTypeOptions' => ['all', 'head_office', 'house', 'facility', 'residential'],
             'filters' => [
                 'status' => $status,
@@ -960,6 +961,7 @@ class OnboardingController extends Controller
                         'sort_order' => (int) ($task['sort_order'] ?? ($index + 1)),
                         'assigned_to_role' => $task['assigned_to_role'] ?? null,
                         'sign_off_required' => (bool) ($task['sign_off_required'] ?? false),
+                        'course_code' => $task['course_code'] ?? null,
                     ])
                     ->values();
 
@@ -1097,6 +1099,30 @@ class OnboardingController extends Controller
             'roles' => $this->roleOptions(),
             'employment_types' => ['full_time', 'part_time', 'casual', 'fixed_term'],
         ];
+    }
+
+    /**
+     * Active training courses (code + title) for the template editor's per-task
+     * course picker — the code is what enrolInductionCourses() matches on.
+     */
+    private function courseOptions(int $tenantId): \Illuminate\Support\Collection
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('hr_courses')) {
+            return collect();
+        }
+
+        return \App\Domain\Hr\Models\HrCourse::query()
+            ->forTenant($tenantId)
+            ->active()
+            ->whereNotNull('code')
+            ->orderBy('title')
+            ->get(['code', 'title', 'is_mandatory'])
+            ->map(fn ($c) => [
+                'code' => $c->code,
+                'title' => $c->title,
+                'is_mandatory' => (bool) $c->is_mandatory,
+            ])
+            ->values();
     }
 
     /** @return array<int, string> */
