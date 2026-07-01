@@ -148,10 +148,27 @@ class PerformanceReviewController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
-        $review->load(['employee:id,name', 'reviewer:id,name']);
+        $review->load(['employee:id,name', 'reviewer:id,name', 'reviewGoals.goal:id,title']);
 
         return Inertia::render('hr/performance/show-review', [
             'review' => $review,
+            // Structured review goals (falls back to the legacy JSON blob for
+            // reviews created before the child table existed).
+            'reviewGoals' => $review->reviewGoals->isNotEmpty()
+                ? $review->reviewGoals->map(fn ($g) => [
+                    'id' => $g->id,
+                    'description' => $g->description,
+                    'status' => $g->status,
+                    'rating' => $g->rating,
+                    'goal' => $g->goal ? ['id' => $g->goal->id, 'title' => $g->goal->title] : null,
+                ])->all()
+                : collect($review->reviewGoalList())->map(fn ($d, $i) => [
+                    'id' => -1 - $i,
+                    'description' => $d,
+                    'status' => 'open',
+                    'rating' => null,
+                    'goal' => null,
+                ])->all(),
             'can' => [
                 'manage' => $user->canDo('hr.performance.manage'),
             ],
@@ -180,13 +197,17 @@ class PerformanceReviewController extends Controller
 
         $data = $request->validated();
 
-        HrPerformanceReview::create([
+        $review = HrPerformanceReview::create([
             'tenant_id' => $tenantId,
             'reviewer_user_id' => $user->id,
             'status' => 'draft',
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        if (array_key_exists('goals', $data)) {
+            $review->syncReviewGoals($data['goals'] ?? []);
+        }
 
         return redirect()->back()->with('success', 'Performance review created.');
     }
@@ -233,6 +254,10 @@ class PerformanceReviewController extends Controller
         $data['updated_by'] = $user->id;
 
         $review->update($data);
+
+        if (array_key_exists('goals', $data)) {
+            $review->syncReviewGoals($data['goals'] ?? []);
+        }
 
         return redirect()->back()->with('success', 'Performance review updated.');
     }

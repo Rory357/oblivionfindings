@@ -46,12 +46,28 @@ type PerformanceReview = {
     created_at: string;
 };
 
+type ReviewGoal = {
+    id: number;
+    description: string;
+    status: string;
+    rating: number | null;
+    goal: { id: number; title: string } | null;
+};
+
 type Props = {
     review: PerformanceReview;
+    reviewGoals?: ReviewGoal[];
     can: { manage: boolean };
 };
 
-export default function ShowReview({ review, can }: Props) {
+const GOAL_STATUS_STYLE: Record<string, string> = {
+    open: 'bg-status-info-bg text-status-info',
+    met: 'bg-status-success-bg text-status-success',
+    partially_met: 'bg-status-warning-bg text-status-warning',
+    missed: 'bg-status-critical-bg text-status-critical',
+};
+
+export default function ShowReview({ review, reviewGoals = [], can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Performance & Supervision', href: '/hr/performance' },
@@ -299,7 +315,7 @@ export default function ShowReview({ review, can }: Props) {
                     </Card>
                 </div>
 
-                {review.goals && review.goals.length > 0 && (
+                {reviewGoals.length > 0 && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
@@ -309,15 +325,32 @@ export default function ShowReview({ review, can }: Props) {
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-2">
-                                {review.goals.map((goal, index) => (
+                                {reviewGoals.map((g, index) => (
                                     <li
-                                        key={index}
+                                        key={g.id}
                                         className="flex items-start gap-2 text-sm"
                                     >
                                         <span className="font-medium text-muted-foreground">
                                             {index + 1}.
                                         </span>
-                                        <span>{goal}</span>
+                                        <span className="flex-1">
+                                            {g.description}
+                                            {g.goal && (
+                                                <a
+                                                    href={`/hr/goals/${g.goal.id}`}
+                                                    className="ml-2 text-xs font-medium text-primary hover:underline"
+                                                >
+                                                    ↗ {g.goal.title}
+                                                </a>
+                                            )}
+                                        </span>
+                                        {g.status && g.status !== 'open' && (
+                                            <span
+                                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${GOAL_STATUS_STYLE[g.status] ?? 'bg-muted text-muted-foreground'}`}
+                                            >
+                                                {g.status.replace('_', ' ')}
+                                            </span>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

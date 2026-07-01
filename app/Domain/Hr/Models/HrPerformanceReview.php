@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrPerformanceReview extends Model
 {
@@ -67,6 +68,49 @@ class HrPerformanceReview extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewer_user_id');
+    }
+
+    /** Structured review goals (supersedes the legacy `goals` JSON blob). */
+    public function reviewGoals(): HasMany
+    {
+        return $this->hasMany(HrReviewGoal::class, 'performance_review_id')->orderBy('sort_order');
+    }
+
+    /**
+     * Review goals as a list of description strings, preferring the structured
+     * child rows and falling back to the legacy JSON blob during the transition.
+     */
+    public function reviewGoalList(): array
+    {
+        if ($this->relationLoaded('reviewGoals') ? $this->reviewGoals->isNotEmpty() : $this->reviewGoals()->exists()) {
+            return $this->reviewGoals()->orderBy('sort_order')->pluck('description')->all();
+        }
+
+        return collect($this->goals ?? [])
+            ->map(fn ($g) => is_array($g) ? ($g['description'] ?? $g['title'] ?? '') : (string) $g)
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Replace this review's structured goals from a plain list of strings
+     * (dual-writes the legacy JSON column so nothing regresses mid-transition).
+     */
+    public function syncReviewGoals(array $descriptions): void
+    {
+        $clean = collect($descriptions)->map(fn ($d) => trim((string) $d))->filter()->values();
+
+        $this->reviewGoals()->delete();
+        $clean->each(fn ($desc, $i) => $this->reviewGoals()->create([
+            'tenant_id' => $this->tenant_id,
+            'description' => mb_substr($desc, 0, 500),
+            'status' => 'open',
+            'sort_order' => $i,
+        ]));
+
+        // Keep the JSON column in sync until the read path is fully cut over.
+        $this->forceFill(['goals' => $clean->all()])->saveQuietly();
     }
 
     /* ------------------------------------------------------------------ */
