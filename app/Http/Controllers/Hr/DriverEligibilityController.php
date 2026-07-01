@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
+use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Hr\Services\ComplianceMatrixService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DriverEligibilityController extends Controller
 {
+    use BuildsComplianceHero;
+    use ProvidesComplianceWizardData;
     use ResolvesHrTenant;
 
     /* ------------------------------------------------------------------ */
@@ -68,13 +74,80 @@ class DriverEligibilityController extends Controller
             ->values();
 
         return Inertia::render('hr/drivers/index', [
+            'hero' => $this->complianceHero($user, $tenantId),
             'records' => $records,
             'summary' => $summary,
             'employees' => $employees,
+            'wizard' => $this->complianceWizardData($tenantId),
             'filters' => [
                 'status' => $status,
                 'q' => $search,
             ],
+            'can' => [
+                'manage' => $user->canDo('hr.driver.manage'),
+            ],
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Show — driver licence detail page                                  */
+    /* ------------------------------------------------------------------ */
+
+    public function show(Request $request, HrDriverEligibility $eligibility)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.driver.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $eligibility->tenant_id);
+
+        $eligibility->load(['user:id,name,email', 'approvedBy:id,name']);
+
+        $isExpired = $eligibility->licence_expires_at && $eligibility->licence_expires_at->isPast();
+
+        // Build a lightweight history timeline from the record's own stamps.
+        $history = collect();
+        if ($eligibility->created_at) {
+            $history->push(['title' => 'Record created', 'date' => $eligibility->created_at->toDayDateTimeString(), 'tone' => 'neutral']);
+        }
+        if ($eligibility->can_drive_clients_approved_at) {
+            $history->push([
+                'title' => 'Approved for driving shifts',
+                'date' => $eligibility->can_drive_clients_approved_at->toDayDateTimeString()
+                    . ($eligibility->approvedBy ? ' · ' . $eligibility->approvedBy->name : ''),
+                'tone' => 'success',
+            ]);
+        }
+        if ($eligibility->status === 'suspended') {
+            $history->push([
+                'title' => 'Suspended' . ($eligibility->suspension_reason ? ' — ' . $eligibility->suspension_reason : ''),
+                'date' => optional($eligibility->last_reviewed_at ?? $eligibility->updated_at)->toDayDateTimeString(),
+                'tone' => 'critical',
+            ]);
+        }
+        if ($isExpired) {
+            $history->push(['title' => 'Licence expired', 'date' => $eligibility->licence_expires_at->toFormattedDateString(), 'tone' => 'critical']);
+        }
+
+        return Inertia::render('hr/drivers/show', [
+            'driver' => [
+                'id' => $eligibility->id,
+                'user_id' => $eligibility->user_id,
+                'name' => $eligibility->user?->name ?? 'Unknown',
+                'email' => $eligibility->user?->email,
+                'licence_number' => $eligibility->licence_number,
+                'licence_class' => $eligibility->licence_class,
+                'licence_endorsements' => $eligibility->licence_endorsements ?? [],
+                'licence_expires_at' => optional($eligibility->licence_expires_at)->toDateString(),
+                'incident_free_since' => optional($eligibility->incident_free_since)->toDateString(),
+                'can_drive_clients' => (bool) $eligibility->can_drive_clients,
+                'status' => $isExpired ? 'expired' : $eligibility->status,
+                'raw_status' => $eligibility->status,
+                'suspension_reason' => $eligibility->suspension_reason,
+                'notes' => $eligibility->notes,
+                'last_reviewed_at' => optional($eligibility->last_reviewed_at)->toDateString(),
+                'next_review_at' => optional($eligibility->next_review_at)->toDateString(),
+            ],
+            'history' => $history->sortBy('date')->values(),
             'can' => [
                 'manage' => $user->canDo('hr.driver.manage'),
             ],
@@ -130,6 +203,8 @@ class DriverEligibilityController extends Controller
             'created_by'      => $user->id,
         ]);
 
+        $this->reevaluateCompliance($validated['user_id']);
+
         return redirect()->back()->with('success', 'Driver eligibility record created.');
     }
 
@@ -159,6 +234,8 @@ class DriverEligibilityController extends Controller
         $validated['updated_by'] = $user->id;
         $validated['last_reviewed_at'] = now();
         $eligibility->update($validated);
+
+        $this->reevaluateCompliance($eligibility->user_id);
 
         return redirect()->back()->with('success', 'Driver eligibility record updated.');
     }
@@ -205,6 +282,8 @@ class DriverEligibilityController extends Controller
             ]);
         }
 
+        $this->reevaluateCompliance($eligibility->user_id);
+
         return redirect()->back()->with('success', 'Driver approved to transport clients.');
     }
 
@@ -243,6 +322,20 @@ class DriverEligibilityController extends Controller
             ]);
         }
 
+        $this->reevaluateCompliance($eligibility->user_id);
+
         return redirect()->back()->with('success', 'Driving privileges suspended.');
+    }
+
+    /**
+     * Refresh the driver's cached compliance so any driver_licence hard-stop
+     * reflects the licence change immediately (not just at the nightly sweep).
+     */
+    private function reevaluateCompliance(int $userId): void
+    {
+        $user = User::find($userId);
+        if ($user) {
+            app(ComplianceMatrixService::class)->evaluateStaff($user);
+        }
     }
 }

@@ -177,6 +177,43 @@ test('restricted documents require manage to download', function () {
         ->assertOk();
 });
 
+test('the audit endpoint merges document changes with signature events', function () {
+    $document = makeDocument($this->profile->id);
+    $document->update(['title' => 'Employment Agreement (v2)']); // audit: update
+
+    HrDocumentSignature::query()->create([
+        'tenant_id' => 1, 'document_id' => $document->id, 'signer_user_id' => $this->worker->id,
+        'status' => 'signed', 'signed_at' => now(), 'ip_address' => '10.0.0.1',
+        'requested_by' => $this->manager->id, 'requested_at' => now()->subDay(),
+    ]);
+
+    $response = $this->actingAs($this->manager)->getJson("/hr/documents/{$document->id}/audit");
+    $response->assertOk();
+
+    $labels = collect($response->json('entries'))->pluck('label')->implode(' | ');
+    expect($labels)->toContain('Sent for signature');
+    expect($labels)->toContain('Signed');
+});
+
+test('the signature-due reminder sweep notifies and stamps once', function () {
+    $document = makeDocument($this->profile->id);
+
+    $sig = HrDocumentSignature::query()->create([
+        'tenant_id' => 1, 'document_id' => $document->id, 'signer_user_id' => $this->worker->id,
+        'status' => 'pending', 'requested_by' => $this->manager->id, 'requested_at' => now(),
+        'due_at' => now()->addDay()->toDateString(), // inside the 2-day window
+    ]);
+
+    \Illuminate\Support\Facades\Notification::fake();
+    (new \App\Domain\Hr\Jobs\SendExpiryRemindersJob(1))->handle();
+
+    \Illuminate\Support\Facades\Notification::assertSentTo(
+        $this->worker,
+        \App\Domain\Hr\Notifications\SignatureReminderNotification::class,
+    );
+    expect($sig->fresh()->reminder_sent_at)->not->toBeNull();
+});
+
 test('bulk operations move and delete documents', function () {
     $a = makeDocument($this->profile->id);
     $b = makeDocument($this->profile->id);

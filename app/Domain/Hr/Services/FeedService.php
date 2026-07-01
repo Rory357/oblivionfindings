@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
+use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
@@ -437,7 +438,7 @@ class FeedService
                 $q->where(fn ($sub) => $sub->where('title', 'like', $term)->orWhere('content', 'like', $term));
             })
             ->withCount('acknowledgements')
-            ->with('creator:id,name')
+            ->with(['creator:id,name', 'targets'])
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
             ->limit(10)
@@ -476,39 +477,16 @@ class FeedService
     }
 
     /**
-     * Active employees expected to acknowledge an announcement, scoped to its
-     * target audience (all / department / site / role) — the denominator for the
-     * "X of Y acknowledged" progress. Mirrors AnnouncementController's recipient
-     * resolution. Floored at 1 so the progress bar never divides by zero.
+     * Active employees expected to acknowledge an announcement — the denominator
+     * for the "X of Y acknowledged" progress. Delegates to the shared
+     * {@see AnnouncementAudienceResolver} so the feed denominator, the publish
+     * recipient list and the Tracking roster can never drift apart. Floored at 1
+     * so the progress bar never divides by zero.
      */
     private function announcementAudienceCount(HrAnnouncement $announcement, ?int $tenantId): int
     {
-        $targetValue = trim((string) $announcement->target_value);
-
-        return max(1, HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->whereNotNull('user_id')
-            ->when($announcement->target_audience === 'department' && $targetValue !== '', function ($query) use ($targetValue) {
-                $query->where('department', $targetValue);
-            })
-            ->when($announcement->target_audience === 'site' && $targetValue !== '', function ($query) use ($targetValue) {
-                $query->where(function ($siteQuery) use ($targetValue) {
-                    if (is_numeric($targetValue)) {
-                        $siteQuery->where('primary_site_id', (int) $targetValue)
-                            ->orWhereJsonContains('secondary_site_ids', (int) $targetValue);
-                    } else {
-                        $siteQuery->whereRaw('1 = 0');
-                    }
-                });
-            })
-            ->when($announcement->target_audience === 'role' && $targetValue !== '', function ($query) use ($targetValue) {
-                $query->where(function ($roleQuery) use ($targetValue) {
-                    $roleQuery->where('position_role', $targetValue)
-                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('role', $targetValue))
-                        ->orWhereHas('user.roles', fn ($rolePivotQuery) => $rolePivotQuery->where('name', $targetValue));
-                });
-            })
-            ->count());
+        return app(AnnouncementAudienceResolver::class)
+            ->countForAnnouncement($announcement, $tenantId);
     }
 
     /**

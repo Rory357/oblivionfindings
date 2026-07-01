@@ -1,11 +1,7 @@
-import { PageHero, PageLayout } from '@/components/page';
-import { ComplianceTabs } from '@/components/hr';
-import { Badge } from '@/components/ui/badge';
+import { StatTile } from '@/components/page/stat-tile';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Select,
     SelectContent,
@@ -13,396 +9,227 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, Clock, Plus, Search, ShieldCheck } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    Download,
+    FileText,
+    MoreVertical,
+    Pencil,
+    Plus,
+    Search,
+    ShieldCheck,
+    UserCheck,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
-type BreadcrumbItem = { title: string; href: string };
+import {
+    AvatarBubble,
+    ComplianceContextMenu,
+    useContextMenu,
+    type CtxItem,
+} from '@/pages/hr/compliance/components/compliance-bits';
+import { ComplianceHubHeader, type HeroPayload } from '@/pages/hr/compliance/components/compliance-hub-header';
+import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from '@/pages/hr/compliance/components/compliance-wizards';
+import type { PersonOption } from '@/components/hr/people-picker';
 
-type VettingCheck = {
+interface Check {
     id: number;
-    user: { id: number; name: string; email?: string };
+    user?: { id: number; name: string };
     check_type: string;
-    status: string;
-    check_date: string | null;
-    issue_date: string | null;
-    expires_at: string | null;
+    provider: string | null;
     reference_number: string | null;
-};
+    status: string;
+    expires_at: string | null;
+}
 
-type Props = {
-    checks: {
-        data: VettingCheck[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
-    summary: {
-        total: number;
-        clear: number;
-        expiring: number;
-        expired: number;
-        pending: number;
-        flagged: number;
-    };
-    filters: {
-        status: string | null;
-        q: string | null;
-    };
+interface Paginator<T> {
+    data: T[];
+    links: { url: string | null; label: string; active: boolean }[];
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+}
+
+interface Props {
+    hero: HeroPayload;
+    checks: Paginator<Check>;
+    summary: { total: number; clear: number; pending: number; flagged: number; expired: number; expiring: number };
+    wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
+    filters: { status: string | null; q: string };
     can: { manage: boolean };
-};
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
+    { title: 'Staff compliance', href: '/hr/compliance' },
     { title: 'Vetting', href: '/hr/compliance/vetting' },
 ];
 
-const formatDate = (value?: string | null) => {
-    if (!value) return '--';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          });
-};
+function statusVariant(s: string): 'success' | 'warning' | 'critical' | 'neutral' {
+    if (s === 'clear') return 'success';
+    if (['expired', 'failed', 'flagged'].includes(s)) return 'critical';
+    if (['conditional', 'renewal_due', 'pending', 'requested', 'in_progress'].includes(s)) return 'warning';
+    return 'neutral';
+}
 
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'clear':
-            return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'pending':
-        case 'requested':
-            return 'bg-status-info-bg text-status-info border-status-info/30';
-        case 'flagged':
-        case 'adverse':
-            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
-        case 'renewal_due':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
-};
+function fmtDate(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-const isExpiringSoon = (expiresAt: string | null) => {
-    if (!expiresAt) return false;
-    const d = new Date(expiresAt);
-    const now = new Date();
-    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-    return (
-        d.getTime() - now.getTime() < thirtyDays && d.getTime() > now.getTime()
-    );
-};
+export default function VettingIndex({ hero, checks, summary, wizard, filters, can }: Props) {
+    const [wz, setWz] = useState<WizardState>(null);
+    const [search, setSearch] = useState(filters.q ?? '');
+    const searchRef = useRef<HTMLInputElement>(null);
+    const { ctx, open: openCtx, close: closeCtx } = useContextMenu();
 
-const isExpired = (expiresAt: string | null) => {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) < new Date();
-};
+    useEffect(() => {
+        const t = setTimeout(() => {
+            if (search === (filters.q ?? '')) return;
+            router.get('/hr/compliance/vetting', { q: search || undefined, status: filters.status || undefined }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 350);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
 
-const statuses = [
-    'clear',
-    'pending',
-    'requested',
-    'flagged',
-    'adverse',
-    'renewal_due',
-    'expired',
-    'expiring',
-    'action',
-];
+    const post = (url: string, msg: string) =>
+        router.post(url, {}, { preserveScroll: true, onSuccess: () => toast.success(msg), onError: () => toast.error('Action failed.') });
 
-export default function VettingIndex({ checks, summary, filters, can }: Props) {
-    const NONE = '__none__';
-
-    const onFilter = (next: Partial<typeof filters>) => {
-        router.get(
-            '/hr/compliance/vetting',
-            { ...filters, ...next },
-            { preserveState: true, preserveScroll: true },
-        );
-    };
+    const rowMenu = (c: Check): CtxItem[] => [
+        { icon: ShieldCheck, label: 'Open', onClick: () => router.visit(`/hr/compliance/vetting/${c.id}`) },
+        ...(can.manage
+            ? [
+                  { icon: Pencil, label: 'Edit', onClick: () => router.visit(`/hr/compliance/vetting/${c.id}/edit`) },
+                  { icon: CheckCircle2, label: 'Mark cleared', tone: 'success' as const, onClick: () => post(`/hr/compliance/vetting/${c.id}/clear`, 'Marked cleared.') },
+                  { icon: Clock, label: 'Request renewal', onClick: () => post(`/hr/compliance/vetting/${c.id}/renew`, 'Renewal requested.') },
+                  {
+                      icon: FileText,
+                      label: 'Record consent',
+                      onClick: () =>
+                          router.post(`/hr/compliance/vetting/${c.id}/consent`, { consent_given: true }, { preserveScroll: true, onSuccess: () => toast.success('Consent recorded.') }),
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Vetting Register" />
+            <Head title="Vetting register" />
+            <div className="space-y-4 px-4 py-4 lg:px-6">
+                <ComplianceHubHeader hero={hero} active="vetting" can={{ manage: true, vetting: can.manage, driver: true }} onWizard={(type) => setWz({ type })} />
 
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={ShieldCheck}
-                        title="Vetting Register"
-                        description="Staff background checks, DBS, and vetting records."
-                        stats={[
-                            { label: 'Total', value: summary.total },
-                            { label: 'Clear', value: summary.clear },
-                            { label: 'Expiring', value: summary.expiring },
-                            { label: 'Expired', value: summary.expired },
-                        ]}
-                        actions={
-                            can.manage ? (
-                                <Link href="/hr/compliance/vetting/create">
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Check
-                                    </Button>
-                                </Link>
-                            ) : undefined
-                        }
-                    />
-                }
-            >
-                <ComplianceTabs active="vetting" />
-
-                <div className="grid gap-4 sm:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total Records
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {summary.total}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Clear
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-status-success" />
-                                <div className="text-2xl font-bold text-status-success">
-                                    {summary.clear}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Expiring Soon
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-status-warning" />
-                                <div
-                                    className={`text-2xl font-bold ${summary.expiring > 0 ? 'text-status-warning' : ''}`}
-                                >
-                                    {summary.expiring}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Expired
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                {summary.expired > 0 && (
-                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
-                                )}
-                                <div
-                                    className={`text-2xl font-bold ${summary.expired > 0 ? 'text-status-critical' : ''}`}
-                                >
-                                    {summary.expired}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Pending
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {summary.pending}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Flagged
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-status-critical">
-                                {summary.flagged}
-                            </div>
-                        </CardContent>
-                    </Card>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <StatTile label="Total" value={summary.total} icon={UserCheck} tone="info" />
+                    <StatTile label="Clear" value={summary.clear} icon={CheckCircle2} tone="success" />
+                    <StatTile label="Pending" value={summary.pending} icon={Clock} tone="warning" />
+                    <StatTile label="Flagged" value={summary.flagged} icon={ShieldCheck} tone="critical" />
+                    <StatTile label="Expired" value={summary.expired} icon={ShieldCheck} tone="critical" />
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="sm:col-span-2">
-                            <Label className="text-xs text-muted-foreground">
-                                Search
-                            </Label>
-                            <div className="relative">
-                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by staff name or reference..."
-                                    value={filters.q || ''}
-                                    onChange={(e) =>
-                                        onFilter({ q: e.target.value })
-                                    }
-                                    className="pl-9"
-                                />
-                            </div>
-                        </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[12.5px] text-muted-foreground">Police vetting · MOJ criminal record · Children's Act safety checks</p>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => (window.location.href = '/hr/compliance/export?dataset=vetting')}>
+                            <Download className="h-4 w-4" /> Export
+                        </Button>
+                        {can.manage && (
+                            <Button onClick={() => setWz({ type: 'vetting' })}>
+                                <Plus className="h-4 w-4" /> Add vetting check
+                            </Button>
+                        )}
+                    </div>
+                </div>
 
-                        <div>
-                            <Label className="text-xs text-muted-foreground">
-                                Status
-                            </Label>
-                            <Select
-                                value={filters.status ?? NONE}
-                                onValueChange={(v) =>
-                                    onFilter({ status: v === NONE ? null : v })
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={NONE}>
-                                        All Statuses
-                                    </SelectItem>
-                                    {statuses.map((s) => (
-                                        <SelectItem
-                                            key={s}
-                                            value={s}
-                                            className="capitalize"
-                                        >
-                                            {s.replace(/_/g, ' ')}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
+                    <div className="relative min-w-[220px] flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            ref={searchRef}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search staff…"
+                            className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                        />
+                    </div>
+                    <Select value={filters.status || 'all'} onValueChange={(v) => router.get('/hr/compliance/vetting', { status: v === 'all' ? undefined : v, q: filters.q || undefined }, { preserveScroll: true, preserveState: true })}>
+                        <SelectTrigger className="h-9 w-[160px]" aria-label="Status filter">
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All statuses</SelectItem>
+                            <SelectItem value="clear">Clear</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="flagged">Flagged</SelectItem>
+                            <SelectItem value="expired">Expired</SelectItem>
+                            <SelectItem value="renewal_due">Renewal due</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                <Card>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Staff Member</TableHead>
-                                    <TableHead>Check Type</TableHead>
-                                    <TableHead>Reference</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Issued</TableHead>
-                                    <TableHead>Expires</TableHead>
-                                    <TableHead className="w-20"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {checks.data.map((check) => (
-                                    <TableRow key={check.id}>
-                                        <TableCell>
-                                            <div className="font-medium">
-                                                {check.user.name}
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <table className="w-full text-[13px]">
+                        <thead>
+                            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+                                <th className="px-3 py-3 font-semibold">Staff member</th>
+                                <th className="px-3 py-3 font-semibold">Check type</th>
+                                <th className="px-3 py-3 font-semibold">Provider</th>
+                                <th className="px-3 py-3 font-semibold">Reference</th>
+                                <th className="px-3 py-3 font-semibold">Status</th>
+                                <th className="px-3 py-3 font-semibold">Expires</th>
+                                <th className="w-10" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {checks.data.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                                        <UserCheck className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                                        No vetting checks recorded.
+                                    </td>
+                                </tr>
+                            ) : (
+                                checks.data.map((c) => (
+                                    <tr key={c.id} onContextMenu={(e) => openCtx(e, rowMenu(c))} className="border-b border-border last:border-0 hover:bg-muted/60">
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                                <AvatarBubble name={c.user?.name ?? '?'} size={30} />
+                                                <Link href={`/hr/compliance/vetting/${c.id}`} className="font-semibold text-primary hover:underline">
+                                                    {c.user?.name ?? 'Unknown'}
+                                                </Link>
                                             </div>
-                                            {check.user.email && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    {check.user.email}
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="capitalize">
-                                            {check.check_type.replace(
-                                                /_/g,
-                                                ' ',
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {check.reference_number || '--'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                className={getStatusColor(
-                                                    check.status,
-                                                )}
-                                            >
-                                                {check.status.replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatDate(
-                                                check.issue_date ||
-                                                    check.check_date,
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span
-                                                className={
-                                                    isExpired(check.expires_at)
-                                                        ? 'font-semibold text-status-critical'
-                                                        : isExpiringSoon(
-                                                                check.expires_at,
-                                                            )
-                                                          ? 'font-medium text-status-warning'
-                                                          : ''
-                                                }
-                                            >
-                                                {formatDate(check.expires_at)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Link
-                                                href={`/hr/compliance/vetting/${check.id}`}
-                                                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-                                            >
-                                                View
-                                            </Link>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {!checks.data.length && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={7}
-                                            className="py-8 text-center text-sm text-muted-foreground"
-                                        >
-                                            No vetting records found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                        </td>
+                                        <td className="px-3 py-2.5">{c.check_type.replace(/_/g, ' ')}</td>
+                                        <td className="px-3 py-2.5 text-muted-foreground">{c.provider ?? '—'}</td>
+                                        <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{c.reference_number ?? '—'}</td>
+                                        <td className="px-3 py-2.5">
+                                            <StatusBadge variant={statusVariant(c.status)}>{c.status.replace(/_/g, ' ')}</StatusBadge>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-muted-foreground">{fmtDate(c.expires_at)}</td>
+                                        <td className="px-3 py-2.5 text-right">
+                                            <button onClick={(e) => openCtx(e, rowMenu(c))} aria-label="Check actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                    <div className="flex items-center justify-between border-t border-border px-4 py-3 text-[12.5px] text-muted-foreground">
+                        <span>Showing {checks.from ?? 0}–{checks.to ?? 0} of {checks.total}</span>
+                        {checks.last_page > 1 && <LaravelPagination links={checks.links} />}
+                    </div>
+                </div>
+            </div>
 
-                {checks?.links?.length ? (
-                    <LaravelPagination links={checks.links} />
-                ) : null}
-            </PageLayout>
+            <ComplianceContextMenu ctx={ctx} onClose={closeCtx} />
+            <ComplianceWizards state={wz} onClose={() => setWz(null)} people={wizard.people} requirements={wizard.requirements} roles={wizard.roles} siteTypes={wizard.siteTypes} />
         </AppLayout>
     );
 }

@@ -13,13 +13,14 @@ test('hr onboarding index loads', function () {
     });
 });
 
-test('hr onboarding create page loads', function () {
+test('hr onboarding create route redirects to the hub', function () {
+    // Legacy single-field create page retired — /create redirects to the hub wizard.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/hr/onboarding/create')
             ->waitForText('Onboarding', 10)
-            ->assertPathIs('/hr/onboarding/create');
+            ->assertPathIs('/hr/onboarding');
     });
 });
 
@@ -43,22 +44,13 @@ test('hr offboarding create page loads', function () {
     });
 });
 
-test('hr onboarding emails page loads', function () {
+test('hr onboarding emails tab loads in the hub', function () {
+    // Emails is now an in-hub tab; the legacy /emails route redirects to the hub.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/hr/onboarding/emails')
-            ->waitForText('Email', 10)
-            ->assertPathIs('/hr/onboarding/emails');
-    });
-});
-
-test('hr onboarding email log page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/hr/onboarding/emails/log')
-            ->waitForText('Log', 10)
-            ->assertPathIs('/hr/onboarding/emails/log');
+            ->waitForText('Onboarding', 10)
+            ->assertPathIs('/hr/onboarding');
     });
 });

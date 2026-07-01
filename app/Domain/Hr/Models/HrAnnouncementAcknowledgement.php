@@ -14,6 +14,7 @@ class HrAnnouncementAcknowledgement extends Model
     protected $fillable = [
         'announcement_id',
         'user_id',
+        'acknowledged_by',
         'acknowledged_at',
     ];
 

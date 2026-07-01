@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrEngagementActionPlan extends Model
 {
@@ -17,6 +18,9 @@ class HrEngagementActionPlan extends Model
         'survey_id',
         'tenant_id',
         'owner_user_id',
+        'staff_user_id',
+        'source_type',
+        'source_id',
         'title',
         'description',
         'priority',
@@ -42,6 +46,16 @@ class HrEngagementActionPlan extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'staff_user_id');
+    }
+
+    public function notes(): HasMany
+    {
+        return $this->hasMany(HrEngagementActionPlanNote::class, 'plan_id')->latest();
     }
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

@@ -19,12 +19,14 @@ class HrGoalFactory extends Factory
             'tenant_id' => 1,
             'user_id' => User::factory(),
             'title' => fake()->sentence(5),
-            'goal_type' => fake()->randomElement(['individual', 'team', 'department', 'okr']),
+            'goal_type' => fake()->randomElement(['individual', 'team', 'company']),
             'start_date' => $startDate,
             'due_date' => $dueDate,
             'created_by' => User::factory(),
-            'status' => fake()->randomElement(['not_started', 'in_progress', 'completed', 'cancelled']),
-            'priority' => fake()->randomElement(['low', 'medium', 'high', 'critical']),
+            'status' => fake()->randomElement(['draft', 'active', 'completed', 'cancelled']),
+            'confidence' => fake()->randomElement(['on_track', 'at_risk', 'off_track']),
+            'checkin_frequency' => 'fortnightly',
+            'priority' => fake()->randomElement(['low', 'medium', 'high']),
         ];
     }
 }
