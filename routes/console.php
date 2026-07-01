@@ -21,6 +21,7 @@ use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
 use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
 use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
+use App\Domain\Hr\Jobs\PublishDueAnnouncementsJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
@@ -170,6 +171,13 @@ app(Schedule::class)
     ->job(new ProcessControlRoomSignals)
     ->timezone('Pacific/Auckland')
     ->everyMinute();
+
+// Fire scheduled HR announcements the moment their publish time arrives
+app(Schedule::class)
+    ->job(new PublishDueAnnouncementsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // Control Room SLA breach checks
 app(Schedule::class)
