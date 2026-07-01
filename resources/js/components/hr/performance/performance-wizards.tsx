@@ -269,7 +269,8 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     start_date: today(),
                     due_date: d.due,
                     status: 'active',
-                    key_results: lines(d.krs),
+                    // Canonical goals hub validates key results as objects.
+                    key_results: lines(d.krs).map((title) => ({ title })),
                     stay: true,
                 },
             }),

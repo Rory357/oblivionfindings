@@ -232,6 +232,14 @@ export default function PerformanceHub(props: Props) {
     const del = (url: string, msg: string) => {
         router.delete(url, { preserveScroll: true, preserveState: true, onSuccess: () => toast.success(msg), onError: () => toast.error('Action failed.') });
     };
+    const putStatus = (url: string, status: string, msg: string) => {
+        router.put(url, { status }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => toast.success(msg),
+            onError: () => toast.error('Action failed.'),
+        });
+    };
 
     // Hero handlers ------------------------------------------------------
     const heroHandlers = {
@@ -356,10 +364,10 @@ export default function PerformanceHub(props: Props) {
                 return [
                     open(`/hr/goals/${id}`),
                     { icon: <Pencil className="h-4 w-4" />, label: 'Edit', onClick: () => router.visit(`/hr/goals/${id}`) },
-                    { icon: <Check className="h-4 w-4" />, label: 'Activate', onClick: () => post(`/hr/goals/${id}/transition`, { action: 'activate' }, 'Goal activated') },
-                    { icon: <Check className="h-4 w-4" />, label: 'Complete', onClick: () => post(`/hr/goals/${id}/transition`, { action: 'complete' }, 'Goal completed') },
+                    { icon: <Check className="h-4 w-4" />, label: 'Activate', onClick: () => putStatus(`/hr/goals/${id}`, 'active', 'Goal activated') },
+                    { icon: <Check className="h-4 w-4" />, label: 'Complete', onClick: () => putStatus(`/hr/goals/${id}`, 'completed', 'Goal completed') },
                     { sep: true },
-                    { icon: <XCircle className="h-4 w-4" />, label: 'Cancel', tone: 'critical', onClick: () => post(`/hr/goals/${id}/transition`, { action: 'cancel' }, 'Goal cancelled') },
+                    { icon: <XCircle className="h-4 w-4" />, label: 'Cancel', tone: 'critical', onClick: () => putStatus(`/hr/goals/${id}`, 'cancelled', 'Goal cancelled') },
                 ];
             case 'development':
                 return [
@@ -464,6 +472,7 @@ export default function PerformanceHub(props: Props) {
                             exportPdf={exportPdf}
                             post={post}
                             del={del}
+                            putStatus={putStatus}
                         />
                     </div>
                 </div>
@@ -503,6 +512,7 @@ type BodyProps = {
     exportPdf: () => void;
     post: (url: string, data: Record<string, unknown>, msg: string) => void;
     del: (url: string, msg: string) => void;
+    putStatus: (url: string, status: string, msg: string) => void;
 };
 
 function Body(b: BodyProps) {
@@ -780,7 +790,7 @@ function BulkActions({ b }: { b: BodyProps }) {
                 type="button"
                 className={link}
                 onClick={() => {
-                    targets.forEach((r) => b.post(`/hr/goals/${r.id}/transition`, { action: 'complete' }, 'Completed'));
+                    targets.forEach((r) => b.putStatus(`/hr/goals/${r.id}`, 'completed', 'Completed'));
                     toast.success(`Completing ${targets.length} ${targets.length === 1 ? 'goal' : 'goals'}…`);
                     b.setSelected([]);
                 }}

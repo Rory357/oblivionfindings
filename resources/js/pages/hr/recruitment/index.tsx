@@ -20,6 +20,7 @@ import {
     Search,
     Send,
     Sparkles,
+    Tags,
     UserCheck,
     Users,
     XCircle,
@@ -32,6 +33,7 @@ import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
+import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
     RecruitmentWizards,
     type RecruitmentSupport,
@@ -71,6 +73,7 @@ type HubCandidate = {
     full_name: string;
     email: string;
     source: string;
+    tags: string[];
     stage: string;
     days: number;
     stale: boolean;
@@ -186,8 +189,10 @@ export default function RecruitmentHub(props: Props) {
     const [tab, setTab] = useHrTab('pipeline', { param: 'tab', syncUrl: true });
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('all');
+    const [tagFilter, setTagFilter] = useState<string | null>(null);
     const [selected, setSelected] = useState<number[]>([]);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+    const [manageTagsOpen, setManageTagsOpen] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [moreOpen, setMoreOpen] = useState(false);
     const [sheetId, setSheetId] = useState<number | null>(null);
@@ -216,15 +221,17 @@ export default function RecruitmentHub(props: Props) {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
+        const tagQ = tagFilter?.toLowerCase() ?? null;
         return candidates.filter((c) => {
             if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
+            if (tagQ && !c.tags.some((t) => t.toLowerCase() === tagQ)) return false;
             if (q) {
-                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''}`.toLowerCase();
+                const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''} ${c.tags.join(' ')}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
         });
-    }, [candidates, search, stageFilter]);
+    }, [candidates, search, stageFilter, tagFilter]);
 
     /* ---- actions ---- */
     const advance = (c: HubCandidate) => {
@@ -274,6 +281,27 @@ export default function RecruitmentHub(props: Props) {
                     const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
                     if (f?.error) toast.error(f.error);
                     else toast.success(f?.success ?? `${selected.length} candidates updated`);
+                    setSelected([]);
+                },
+            },
+        );
+    };
+
+    const bulkTag = () => {
+        if (selected.length === 0) return;
+        const tag = window.prompt(`Tag to apply to ${selected.length} candidate(s):`);
+        if (tag === null) return; // cancelled
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+        router.post(
+            '/hr/recruitment/applications/bulk',
+            { action: 'tag', candidate_ids: selected, tag: trimmed },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else toast.success(f?.success ?? `${selected.length} candidates tagged`);
                     setSelected([]);
                 },
             },
@@ -439,17 +467,21 @@ export default function RecruitmentHub(props: Props) {
                                 setSearch={setSearch}
                                 stageFilter={stageFilter}
                                 setStageFilter={setStageFilter}
+                                tagFilter={tagFilter}
+                                setTagFilter={setTagFilter}
                                 selected={selected}
                                 toggleSelect={toggleSelect}
                                 toggleAll={toggleAll}
                                 clearSelection={() => setSelected([])}
                                 onExport={() => exportData('pipeline')}
+                                onManageTags={() => setManageTagsOpen(true)}
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
                                 onBulkAdvance={() => bulkAction('advance')}
                                 onBulkReject={() => bulkAction('reject')}
                                 onBulkPool={() => bulkAction('pool')}
                                 onBulkEmail={() => setBulkEmailOpen(true)}
+                                onBulkTag={bulkTag}
                                 canManage={can.manage}
                             />
                         ) : null}
@@ -508,6 +540,7 @@ export default function RecruitmentHub(props: Props) {
                                 onSend={(o) => sendOffer(o, false)}
                                 onResend={(o) => sendOffer(o, true)}
                                 onConvert={(o) => openWizard('convert', { offerId: o.id, candidateName: o.candidate, role: o.role })}
+                                onAction={offerAction}
                             />
                         ) : null}
 
@@ -569,6 +602,7 @@ export default function RecruitmentHub(props: Props) {
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
             {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
             <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} templates={email_templates} canManage={can.manage} />
+            <TagManagerDialog open={manageTagsOpen} onClose={() => setManageTagsOpen(false)} tags={support.tags} canManage={can.manage} />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -583,6 +617,26 @@ export default function RecruitmentHub(props: Props) {
                 else toast.success(resend ? `Offer link resent to ${o.candidate}` : `Offer emailed to ${o.candidate}`);
             },
         });
+    }
+
+    function offerAction(offerId: number, action: 'submit' | 'approve' | 'decline') {
+        const urls: Record<typeof action, string> = {
+            submit: `/hr/recruitment/offers/${offerId}/submit-approval`,
+            approve: `/hr/recruitment/offers/${offerId}/approve`,
+            decline: `/hr/recruitment/offers/${offerId}/decline-approval`,
+        };
+        const onSuccess = (pg: { props: object }) => {
+            const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+            if (f?.error) toast.error(f.error);
+            else toast.success(f?.success ?? 'Done');
+        };
+        if (action === 'decline') {
+            const reason = window.prompt('Reason for requesting changes (optional):');
+            if (reason === null) return; // cancelled
+            router.post(urls.decline, { reason }, { preserveScroll: true, onSuccess });
+            return;
+        }
+        router.post(urls[action], {}, { preserveScroll: true, onSuccess });
     }
 }
 
@@ -626,17 +680,21 @@ function PipelineTab({
     setSearch,
     stageFilter,
     setStageFilter,
+    tagFilter,
+    setTagFilter,
     selected,
     toggleSelect,
     toggleAll,
     clearSelection,
     onExport,
+    onManageTags,
     onOpen,
     onCtx,
     onBulkAdvance,
     onBulkReject,
     onBulkPool,
     onBulkEmail,
+    onBulkTag,
     canManage,
 }: {
     rows: HubCandidate[];
@@ -646,17 +704,21 @@ function PipelineTab({
     setSearch: (v: string) => void;
     stageFilter: string;
     setStageFilter: (v: string) => void;
+    tagFilter: string | null;
+    setTagFilter: (v: string | null) => void;
     selected: number[];
     toggleSelect: (id: number) => void;
     toggleAll: () => void;
     clearSelection: () => void;
     onExport: () => void;
+    onManageTags: () => void;
     onOpen: (c: HubCandidate) => void;
     onCtx: (e: MouseEvent, c: HubCandidate) => void;
     onBulkAdvance: () => void;
     onBulkReject: () => void;
     onBulkPool: () => void;
     onBulkEmail: () => void;
+    onBulkTag: () => void;
     canManage: boolean;
 }) {
     const chips = [
@@ -698,6 +760,16 @@ function PipelineTab({
                         );
                     })}
                 </div>
+                {tagFilter ? (
+                    <button
+                        type="button"
+                        onClick={() => setTagFilter(null)}
+                        title="Clear tag filter"
+                        className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 text-[12.5px] font-semibold text-primary hover:bg-primary/15"
+                    >
+                        Tag: {tagFilter} <span aria-hidden className="text-[13px] leading-none">✕</span>
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={() => setSortByScore((s) => !s)}
@@ -706,6 +778,15 @@ function PipelineTab({
                 >
                     <BarChart3 className="h-3.5 w-3.5" /> {sortByScore ? 'Top scored' : 'Sort by score'}
                 </button>
+                {canManage ? (
+                    <button
+                        type="button"
+                        onClick={onManageTags}
+                        className="inline-flex h-[38px] items-center gap-2 rounded-[10px] border border-border bg-card px-3.5 text-[13px] font-semibold hover:bg-muted"
+                    >
+                        <Tags className="h-3.5 w-3.5" /> Tags
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={onExport}
@@ -727,6 +808,9 @@ function PipelineTab({
                     </button>
                     <button type="button" onClick={onBulkPool} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
                         Add to pool
+                    </button>
+                    <button type="button" onClick={onBulkTag} className="rounded-lg border border-border bg-card px-2.5 py-1 text-[12.5px] font-semibold hover:bg-muted">
+                        Tag
                     </button>
                     <button type="button" onClick={onBulkReject} className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-2.5 py-1 text-[12.5px] font-semibold text-status-critical">
                         Reject
@@ -782,6 +866,22 @@ function PipelineTab({
                                 <span className="min-w-0">
                                     <span className="block truncate text-[13.5px] font-semibold">{c.full_name}</span>
                                     <span className="block truncate text-[11.5px] text-muted-foreground">{c.email}</span>
+                                    {c.tags.length > 0 ? (
+                                        <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                            {c.tags.slice(0, 3).map((t) => (
+                                                <span
+                                                    key={t}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={(e) => { e.stopPropagation(); setTagFilter(t); }}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setTagFilter(t); } }}
+                                                    title={`Filter by “${t}”`}
+                                                    className={`cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${tagFilter?.toLowerCase() === t.toLowerCase() ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
+                                                >{t}</span>
+                                            ))}
+                                            {c.tags.length > 3 ? <span className="text-[10px] text-muted-foreground">+{c.tags.length - 3}</span> : null}
+                                        </span>
+                                    ) : null}
                                 </span>
                             </button>
                             <span>
@@ -1097,6 +1197,8 @@ const OFFER_VARIANT: Record<string, 'success' | 'warning' | 'critical' | 'info' 
     accepted: 'success',
     sent: 'info',
     approved: 'info',
+    pending_approval: 'warning',
+    changes_requested: 'warning',
     declined: 'critical',
     withdrawn: 'critical',
     draft: 'neutral',
@@ -1108,12 +1210,14 @@ function OffersTab({
     onSend,
     onResend,
     onConvert,
+    onAction,
 }: {
     offers: { summary: { key: string; label: string; count: number; color: string }[]; list: OfferRow[] };
     canManage: boolean;
     onSend: (o: OfferRow) => void;
     onResend: (o: OfferRow) => void;
     onConvert: (o: OfferRow) => void;
+    onAction: (offerId: number, action: 'submit' | 'approve' | 'decline') => void;
 }) {
     return (
         <div>
@@ -1144,8 +1248,15 @@ function OffersTab({
                             {canManage ? (
                                 o.status === 'accepted' ? (
                                     <button type="button" onClick={() => onConvert(o)} className="h-[34px] rounded-[9px] bg-primary px-3.5 text-[12.5px] font-bold text-primary-foreground">Convert</button>
-                                ) : o.status === 'draft' || o.status === 'approved' ? (
+                                ) : o.status === 'approved' ? (
                                     <button type="button" onClick={() => onSend(o)} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Send</button>
+                                ) : o.status === 'pending_approval' ? (
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => onAction(o.id, 'approve')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Approve</button>
+                                        <button type="button" onClick={() => onAction(o.id, 'decline')} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Decline</button>
+                                    </div>
+                                ) : o.status === 'draft' || o.status === 'changes_requested' ? (
+                                    <button type="button" onClick={() => onAction(o.id, 'submit')} className="h-[34px] rounded-[9px] border border-primary bg-primary/10 px-3.5 text-[12.5px] font-bold text-primary">Submit</button>
                                 ) : o.status === 'sent' ? (
                                     <button type="button" onClick={() => onResend(o)} className="h-[34px] rounded-[9px] border border-border bg-card px-3.5 text-[12.5px] font-semibold">Resend link</button>
                                 ) : (

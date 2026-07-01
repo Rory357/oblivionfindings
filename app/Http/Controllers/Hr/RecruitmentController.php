@@ -137,13 +137,22 @@ class RecruitmentController extends Controller
     {
         $needs = [];
 
-        $offersAwaitingApproval = HrOffer::query()
-            ->where('approval_status', 'draft')
+        $offersToApprove = HrOffer::query()
+            ->where('approval_status', 'pending_approval')
             ->whereNull('sent_at')
             ->whereNull('response')
             ->count();
-        if ($offersAwaitingApproval > 0) {
-            $needs[] = ['key' => 'offers_approval', 'label' => "{$offersAwaitingApproval} ".str('offer')->plural($offersAwaitingApproval).' to send', 'tab' => 'offers'];
+        if ($offersToApprove > 0) {
+            $needs[] = ['key' => 'offers_approval', 'label' => "{$offersToApprove} ".str('offer')->plural($offersToApprove).' to approve', 'tab' => 'offers'];
+        }
+
+        $offersToSend = HrOffer::query()
+            ->where('approval_status', 'approved')
+            ->whereNull('sent_at')
+            ->whereNull('response')
+            ->count();
+        if ($offersToSend > 0) {
+            $needs[] = ['key' => 'offers_send', 'label' => "{$offersToSend} ".str('offer')->plural($offersToSend).' to send', 'tab' => 'offers'];
         }
 
         $interviewsToScore = HrInterview::query()
@@ -207,6 +216,7 @@ class RecruitmentController extends Controller
                 'full_name' => $c->full_name,
                 'email' => $c->personal_email,
                 'source' => $c->source,
+                'tags' => array_values((array) ($c->tags ?? [])),
                 'stage' => $c->status,
                 'days' => $days,
                 'stale' => $days > $staleDays,
@@ -383,7 +393,9 @@ class RecruitmentController extends Controller
                 'accepted' => 'Ready to convert',
                 'declined' => 'Declined'.($o->response_notes ? ' — '.str($o->response_notes)->limit(20) : ''),
                 'approved' => 'Ready to send',
-                default => 'Not yet sent',
+                'pending_approval' => 'Awaiting sign-off',
+                'changes_requested' => 'Changes requested',
+                default => 'Not yet submitted',
             };
 
             return [
@@ -404,7 +416,9 @@ class RecruitmentController extends Controller
 
         return [
             'summary' => [
-                ['key' => 'draft', 'label' => 'Draft', 'count' => $count('draft') + $count('approved'), 'color' => 'var(--muted-foreground)'],
+                ['key' => 'draft', 'label' => 'Draft', 'count' => $count('draft') + $count('changes_requested'), 'color' => 'var(--muted-foreground)'],
+                ['key' => 'pending_approval', 'label' => 'Awaiting approval', 'count' => $count('pending_approval'), 'color' => 'var(--status-warning)'],
+                ['key' => 'approved', 'label' => 'Ready to send', 'count' => $count('approved'), 'color' => 'var(--status-info)'],
                 ['key' => 'sent', 'label' => 'Sent', 'count' => $count('sent'), 'color' => 'var(--status-info)'],
                 ['key' => 'accepted', 'label' => 'Accepted', 'count' => $count('accepted'), 'color' => 'var(--status-success)'],
                 ['key' => 'declined', 'label' => 'Declined', 'count' => $count('declined'), 'color' => 'var(--status-critical)'],
@@ -427,8 +441,16 @@ class RecruitmentController extends Controller
         if ($o->sent_at !== null) {
             return 'sent';
         }
+        if ($o->approval_status === 'pending_approval') {
+            return 'pending_approval';
+        }
         if ($o->approval_status === 'approved') {
             return 'approved';
+        }
+        // Sent back by the approver — distinct from a fresh draft so the hub
+        // can flag it and offer a resubmit rather than mislabelling it "Draft".
+        if ($o->approval_status === 'declined') {
+            return 'changes_requested';
         }
 
         return 'draft';
@@ -609,6 +631,44 @@ class RecruitmentController extends Controller
             'employment_types' => self::EMPLOYMENT_TYPES,
             'document_categories' => \App\Domain\Hr\Models\HrCandidateDocument::CATEGORIES ?? [],
             'stages' => self::FLOW,
+            'tags' => $this->buildTagVocabulary($tenantId),
         ];
+    }
+
+    /**
+     * Distinct candidate tags with usage counts, grouped case-insensitively
+     * (canonical casing = the most-used variant). Drives the Manage-tags surface.
+     *
+     * @return list<array{tag: string, count: int}>
+     */
+    private function buildTagVocabulary(?int $tenantId): array
+    {
+        $rows = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereNotNull('tags')
+            ->get(['id', 'tags']);
+
+        $counts = [];   // lowercase key => count
+        $casing = [];   // lowercase key => [exact casing => times seen]
+        foreach ($rows as $row) {
+            foreach ((array) ($row->tags ?? []) as $tag) {
+                $tag = trim((string) $tag);
+                if ($tag === '') {
+                    continue;
+                }
+                $key = mb_strtolower($tag);
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+                $casing[$key][$tag] = ($casing[$key][$tag] ?? 0) + 1;
+            }
+        }
+        arsort($counts);
+
+        $out = [];
+        foreach ($counts as $key => $count) {
+            arsort($casing[$key]);
+            $out[] = ['tag' => (string) array_key_first($casing[$key]), 'count' => $count];
+        }
+
+        return $out;
     }
 }

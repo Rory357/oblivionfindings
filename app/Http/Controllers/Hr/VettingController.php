@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
+use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\StaffBackgroundCheck;
@@ -13,6 +15,8 @@ use Inertia\Inertia;
 
 class VettingController extends Controller
 {
+    use BuildsComplianceHero;
+    use ProvidesComplianceWizardData;
     use ResolvesHrTenant;
 
     /* ------------------------------------------------------------------ */
@@ -61,8 +65,10 @@ class VettingController extends Controller
         ];
 
         return Inertia::render('hr/vetting/index', [
+            'hero' => $this->complianceHero($user, $tenantId),
             'checks' => $checks,
             'summary' => $summary,
+            'wizard' => $this->complianceWizardData($tenantId),
             'filters' => [
                 'status' => $status,
                 'q' => $search,

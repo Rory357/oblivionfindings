@@ -1,39 +1,41 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
-import { ComplianceTabs } from '@/components/hr';
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import {
-    CheckSquare,
-    Pencil,
-    Plus,
-    Settings,
-    Shield,
-    ShieldCheck,
-    Square,
-    Trash2,
-} from 'lucide-react';
-import { FormEventHandler, useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { Check, Copy, MoreVertical, Pencil, Plus, Power, ShieldCheck, Users } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
-interface ComplianceRequirement {
+import {
+    CHECK_TYPE_BADGE,
+    ComplianceContextMenu,
+    useContextMenu,
+    type CtxItem,
+} from './components/compliance-bits';
+import { ComplianceHubHeader, type HeroPayload } from './components/compliance-hub-header';
+import { ComplianceWizards, type ReqOption, type RoleOption, type WizardState } from './components/compliance-wizards';
+import type { PersonOption } from '@/components/hr/people-picker';
+
+interface Requirement {
     id: number;
     name: string;
-    type: string;
-    description: string | null;
-    renewal_period_months: number | null;
-    is_mandatory: boolean;
+    code: string;
+    category: string;
+    check_type: string;
+    validity_months: number | null;
+    renewal_reminder_days: number | null;
+    hard_stop: boolean;
     is_active: boolean;
 }
 
@@ -46,689 +48,231 @@ interface MatrixEntry {
 }
 
 interface Props {
-    requirements: ComplianceRequirement[];
-    roles: string[];
+    hero: HeroPayload;
+    requirements: Requirement[];
     matrixEntries: MatrixEntry[];
+    roles: string[];
+    siteTypes: string[];
+    wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     can: { manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/people' },
-    { title: 'Compliance', href: '/hr/compliance' },
+    { title: 'HR', href: '/hr' },
+    { title: 'Staff compliance', href: '/hr/compliance' },
     { title: 'Matrix', href: '/hr/compliance/matrix' },
 ];
 
-const requirementTypeOptions = [
-    { value: 'certification', label: 'Certification' },
-    { value: 'training', label: 'Training' },
-    { value: 'document', label: 'Document' },
-    { value: 'check', label: 'Background Check' },
-    { value: 'license', label: 'License' },
-    { value: 'other', label: 'Other' },
-];
+function humanize(role: string) {
+    return role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-export default function ComplianceMatrix({
-    requirements,
-    roles,
-    matrixEntries,
-    can,
-}: Props) {
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
+export default function ComplianceMatrix({ hero, requirements, matrixEntries, roles, wizard, can }: Props) {
+    const [wz, setWz] = useState<WizardState>(null);
+    const [deactivate, setDeactivate] = useState<Requirement | null>(null);
+    const { ctx, open: openCtx, close: closeCtx } = useContextMenu();
 
-    const addForm = useForm({
-        name: '',
-        type: '',
-        description: '',
-        renewal_period_months: '',
-        is_mandatory: true,
-    });
-
-    const editForm = useForm({
-        name: '',
-        type: '',
-        description: '',
-        renewal_period_months: '',
-        is_mandatory: true,
-    });
-
-    const handleAddSubmit: FormEventHandler = (e) => {
-        e.preventDefault();
-        addForm.post('/hr/compliance/requirements', {
-            preserveScroll: true,
-            onSuccess: () => {
-                addForm.reset();
-                setShowAddForm(false);
-            },
-        });
+    const cellLevel = (reqId: number, role: string): 0 | 1 | 2 => {
+        const e = matrixEntries.find((m) => m.requirement_id === reqId && m.role === role && !m.site_type);
+        if (!e) return 0;
+        return e.is_mandatory ? 2 : 1;
     };
 
-    const handleEditSubmit: FormEventHandler = (e) => {
-        e.preventDefault();
-        if (!editingId) return;
-        editForm.put(`/hr/compliance/requirements/${editingId}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEditingId(null);
-                editForm.reset();
-            },
-        });
-    };
-
-    function startEdit(req: ComplianceRequirement) {
-        setEditingId(req.id);
-        editForm.setData({
-            name: req.name,
-            type: req.type,
-            description: req.description || '',
-            renewal_period_months: req.renewal_period_months
-                ? String(req.renewal_period_months)
-                : '',
-            is_mandatory: req.is_mandatory,
-        });
-    }
-
-    function deleteRequirement(id: number) {
-        if (confirm('Are you sure you want to delete this requirement?')) {
-            router.delete(`/hr/compliance/requirements/${id}`, {
-                preserveScroll: true,
-            });
-        }
-    }
-
-    function toggleMatrixEntry(
-        requirementId: number,
-        role: string,
-        currentlyEnabled: boolean,
-    ) {
+    const cycleCell = (reqId: number, role: string) => {
         if (!can.manage) return;
-        const action = currentlyEnabled ? 'unassign' : 'assign';
-        const mandatory = currentlyEnabled
-            ? isEntryMandatory(requirementId, role)
-            : true;
+        const level = cellLevel(reqId, role);
+        const payload =
+            level === 0
+                ? { requirement_id: reqId, role, site_type: null, is_mandatory: false, action: 'assign' }
+                : level === 1
+                  ? { requirement_id: reqId, role, site_type: null, is_mandatory: true, action: 'assign' }
+                  : { requirement_id: reqId, role, site_type: null, is_mandatory: true, action: 'unassign' };
+        router.post('/hr/compliance/matrix', payload, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Assignment updated.'),
+            onError: () => toast.error('Could not update the matrix.'),
+        });
+    };
 
-        router.post(
-            '/hr/compliance/matrix',
-            {
-                requirement_id: requirementId,
-                role,
-                is_mandatory: mandatory,
-                action,
-            },
-            { preserveScroll: true },
-        );
-    }
+    const reqMenu = (q: Requirement): CtxItem[] => [
+        { icon: Pencil, label: 'Edit', onClick: () => setWz({ type: 'requirement', preset: { ...q } }) },
+        { icon: Users, label: 'Assign to roles', onClick: () => setWz({ type: 'assign', preset: { requirement_id: q.id } }) },
+        { icon: Copy, label: 'Duplicate', onClick: () => setWz({ type: 'requirement', preset: { name: `${q.name} (copy)`, category: q.category, check_type: q.check_type, hard_stop: q.hard_stop } }) },
+        { icon: Power, label: 'Deactivate', tone: 'critical', onClick: () => setDeactivate(q) },
+    ];
 
-    function isEntryEnabled(requirementId: number, role: string): boolean {
-        return matrixEntries.some(
-            (e) => e.requirement_id === requirementId && e.role === role,
-        );
-    }
-
-    function isEntryMandatory(requirementId: number, role: string): boolean {
-        return matrixEntries.some(
-            (e) =>
-                e.requirement_id === requirementId &&
-                e.role === role &&
-                e.is_mandatory,
-        );
-    }
+    const doDeactivate = () => {
+        if (!deactivate) return;
+        router.delete(`/hr/compliance/requirements/${deactivate.id}`, {
+            preserveScroll: true,
+            onSuccess: () => toast.success(`Deactivated ${deactivate.code}.`),
+        });
+        setDeactivate(null);
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Compliance Matrix" />
-            <PageLayout
-                hero={
-                    <PageHero category="hr"
-                        icon={ShieldCheck}
-                        title="Compliance Matrix"
-                        description="Configure compliance requirements and role assignments."
-                        stats={[
-                            { label: 'Requirements', value: requirements.length },
-                            { label: 'Active', value: requirements.filter((r) => r.is_active).length },
-                            { label: 'Roles', value: roles.length },
-                        ]}
-                        actions={
-                            <>
-                                <Button
-                                    variant="outline"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/hr/compliance">Dashboard</Link>
-                                </Button>
-                                {can.manage && (
-                                    <Button onClick={() => setShowAddForm(!showAddForm)}>
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        Add Requirement
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    />
-                }
-            >
-                <ComplianceTabs active="matrix" />
+            <Head title="Compliance matrix" />
+            <div className="space-y-4 px-4 py-4 lg:px-6">
+                <ComplianceHubHeader hero={hero} active="matrix" counts={{ matrix: requirements.length || undefined }} can={{ manage: can.manage, vetting: true, driver: true }} onWizard={(type) => setWz({ type })} />
 
-                {/* Add Requirement Form */}
-                {showAddForm && can.manage && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Add New Requirement</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form
-                                onSubmit={handleAddSubmit}
-                                className="space-y-4"
-                            >
-                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <div>
-                                        <Label htmlFor="add_name">Name *</Label>
-                                        <Input
-                                            id="add_name"
-                                            value={addForm.data.name}
-                                            onChange={(e) =>
-                                                addForm.setData(
-                                                    'name',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                        {addForm.errors.name && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {addForm.errors.name}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label>Type *</Label>
-                                        <Select
-                                            value={
-                                                addForm.data.type || '__none__'
-                                            }
-                                            onValueChange={(v) =>
-                                                addForm.setData(
-                                                    'type',
-                                                    v === '__none__' ? '' : v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__none__">
-                                                    Select type
-                                                </SelectItem>
-                                                {requirementTypeOptions.map(
-                                                    (t) => (
-                                                        <SelectItem
-                                                            key={t.value}
-                                                            value={t.value}
-                                                        >
-                                                            {t.label}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {addForm.errors.type && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {addForm.errors.type}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="add_renewal">
-                                            Renewal Period (months)
-                                        </Label>
-                                        <Input
-                                            id="add_renewal"
-                                            type="number"
-                                            value={
-                                                addForm.data
-                                                    .renewal_period_months
-                                            }
-                                            onChange={(e) =>
-                                                addForm.setData(
-                                                    'renewal_period_months',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g. 12"
-                                        />
-                                    </div>
-                                    <div className="flex items-end gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id="add_mandatory"
-                                                checked={
-                                                    addForm.data.is_mandatory
-                                                }
-                                                onChange={(e) =>
-                                                    addForm.setData(
-                                                        'is_mandatory',
-                                                        e.target.checked,
-                                                    )
-                                                }
-                                                className="h-4 w-4 rounded"
-                                            />
-                                            <Label htmlFor="add_mandatory">
-                                                Mandatory
-                                            </Label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label htmlFor="add_description">
-                                        Description
-                                    </Label>
-                                    <Input
-                                        id="add_description"
-                                        value={addForm.data.description}
-                                        onChange={(e) =>
-                                            addForm.setData(
-                                                'description',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        type="submit"
-                                        disabled={addForm.processing}
-                                    >
-                                        {addForm.processing
-                                            ? 'Adding...'
-                                            : 'Add Requirement'}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowAddForm(false)}
-                                    >
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
+                {/* Requirements library */}
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-bold">Requirements library</h2>
+                        <p className="mt-0.5 text-[12.5px] text-muted-foreground">Define what staff must hold, then assign by role &amp; site type.</p>
+                    </div>
+                    {can.manage && (
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setWz({ type: 'assign' })}>
+                                Bulk assign
+                            </Button>
+                            <Button onClick={() => setWz({ type: 'requirement' })}>
+                                <Plus className="h-4 w-4" /> Add requirement
+                            </Button>
+                        </div>
+                    )}
+                </div>
 
-                {/* Requirements List */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Settings className="h-5 w-5" />
-                            Requirements ({requirements.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="border-b bg-muted/50">
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <table className="w-full text-[13px]">
+                        <thead>
+                            <tr className="border-b border-border bg-muted text-left text-muted-foreground">
+                                <th className="px-3 py-3 font-semibold">Code</th>
+                                <th className="px-3 py-3 font-semibold">Requirement</th>
+                                <th className="px-3 py-3 font-semibold">Check type</th>
+                                <th className="px-3 py-3 text-center font-semibold">Validity</th>
+                                <th className="px-3 py-3 text-center font-semibold">Reminder</th>
+                                <th className="px-3 py-3 text-center font-semibold">Hard-stop</th>
+                                <th className="w-10" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {requirements.length === 0 ? (
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Requirement
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Type
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-medium">
-                                        Renewal
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-medium">
-                                        Mandatory
-                                    </th>
-                                    <th className="px-4 py-3 text-center font-medium">
-                                        Status
-                                    </th>
-                                    {can.manage && <th className="px-4 py-3" />}
+                                    <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                                        <ShieldCheck className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                                        No requirements yet. Add one to start tracking.
+                                    </td>
+                                </tr>
+                            ) : (
+                                requirements.map((q) => {
+                                    const tb = CHECK_TYPE_BADGE[q.check_type] ?? CHECK_TYPE_BADGE.manual;
+                                    return (
+                                        <tr key={q.id} onContextMenu={(e) => openCtx(e, reqMenu(q))} className="border-b border-border last:border-0 hover:bg-muted/60">
+                                            <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{q.code}</td>
+                                            <td className="px-3 py-2.5">
+                                                <div className="font-semibold">{q.name}</div>
+                                                <div className="text-[11px] text-muted-foreground">{q.category}</div>
+                                            </td>
+                                            <td className="px-3 py-2.5">
+                                                <StatusBadge variant={tb.variant}>{tb.label}</StatusBadge>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center text-muted-foreground">{q.validity_months ? `${q.validity_months} mo` : '—'}</td>
+                                            <td className="px-3 py-2.5 text-center text-muted-foreground">{q.renewal_reminder_days ? `${q.renewal_reminder_days} d` : '—'}</td>
+                                            <td className="px-3 py-2.5 text-center">
+                                                {q.hard_stop ? <StatusBadge variant="critical">Hard-stop</StatusBadge> : <StatusBadge variant="neutral">Soft</StatusBadge>}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right">
+                                                <button onClick={(e) => openCtx(e, reqMenu(q))} aria-label="Requirement actions" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Role × requirement grid */}
+                <div>
+                    <h2 className="text-base font-bold">Role × requirement assignment</h2>
+                    <p className="mt-0.5 text-[12.5px] text-muted-foreground">Click a cell to cycle: none → assigned → mandatory.</p>
+                </div>
+                {roles.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                        No role assignments yet. Use <span className="font-semibold text-foreground">Bulk assign</span> to map requirements to roles.
+                    </div>
+                ) : (
+                    <div className="overflow-auto rounded-xl border border-border bg-card">
+                        <table className="w-full min-w-[760px] text-[12.5px]">
+                            <thead>
+                                <tr className="bg-muted">
+                                    <th className="sticky left-0 z-10 min-w-[200px] bg-muted px-3 py-2.5 text-left font-semibold text-muted-foreground">Requirement</th>
+                                    {roles.map((r) => (
+                                        <th key={r} className="min-w-[96px] px-2 py-2.5 text-center font-semibold text-muted-foreground">
+                                            {humanize(r)}
+                                        </th>
+                                    ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
-                                {requirements.map((req) =>
-                                    editingId === req.id ? (
-                                        <tr
-                                            key={req.id}
-                                            className="bg-muted/20"
-                                        >
-                                            <td
-                                                colSpan={can.manage ? 6 : 5}
-                                                className="px-4 py-3"
-                                            >
-                                                <form
-                                                    onSubmit={handleEditSubmit}
-                                                    className="space-y-3"
-                                                >
-                                                    <div className="grid gap-3 sm:grid-cols-4">
-                                                        <div>
-                                                            <Input
-                                                                value={
-                                                                    editForm
-                                                                        .data
-                                                                        .name
-                                                                }
-                                                                onChange={(e) =>
-                                                                    editForm.setData(
-                                                                        'name',
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="Name"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <Select
-                                                                value={
-                                                                    editForm
-                                                                        .data
-                                                                        .type ||
-                                                                    '__none__'
-                                                                }
-                                                                onValueChange={(
-                                                                    v,
-                                                                ) =>
-                                                                    editForm.setData(
-                                                                        'type',
-                                                                        v ===
-                                                                            '__none__'
-                                                                            ? ''
-                                                                            : v,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Type" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="__none__">
-                                                                        Select
-                                                                        type
-                                                                    </SelectItem>
-                                                                    {requirementTypeOptions.map(
-                                                                        (t) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    t.value
-                                                                                }
-                                                                                value={
-                                                                                    t.value
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    t.label
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Input
-                                                                type="number"
-                                                                value={
-                                                                    editForm
-                                                                        .data
-                                                                        .renewal_period_months
-                                                                }
-                                                                onChange={(e) =>
-                                                                    editForm.setData(
-                                                                        'renewal_period_months',
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                placeholder="Renewal months"
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={
-                                                                    editForm
-                                                                        .data
-                                                                        .is_mandatory
-                                                                }
-                                                                onChange={(e) =>
-                                                                    editForm.setData(
-                                                                        'is_mandatory',
-                                                                        e.target
-                                                                            .checked,
-                                                                    )
-                                                                }
-                                                                className="h-4 w-4 rounded"
-                                                            />
-                                                            <Label>
-                                                                Mandatory
-                                                            </Label>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
-                                                            disabled={
-                                                                editForm.processing
-                                                            }
-                                                        >
-                                                            Save
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setEditingId(
-                                                                    null,
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancel
-                                                        </Button>
-                                                    </div>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        <tr
-                                            key={req.id}
-                                            className="hover:bg-muted/30"
-                                        >
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium">
-                                                    {req.name}
-                                                </div>
-                                                {req.description && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {req.description}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge
-                                                    variant="outline"
-                                                    className="capitalize"
-                                                >
-                                                    {req.type.replace('_', ' ')}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {req.renewal_period_months
-                                                    ? `${req.renewal_period_months} months`
-                                                    : '\u2014'}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {req.is_mandatory ? (
-                                                    <Badge variant="default">
-                                                        Required
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">
-                                                        Optional
-                                                    </Badge>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <Badge
-                                                    variant={
-                                                        req.is_active
-                                                            ? 'default'
-                                                            : 'secondary'
-                                                    }
-                                                >
-                                                    {req.is_active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </td>
-                                            {can.manage && (
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                startEdit(req)
-                                                            }
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                deleteRequirement(
-                                                                    req.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                                        </Button>
-                                                    </div>
+                            <tbody>
+                                {requirements.map((q) => (
+                                    <tr key={q.id} className="border-b border-border last:border-0">
+                                        <td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold">{q.name}</td>
+                                        {roles.map((role) => {
+                                            const level = cellLevel(q.id, role);
+                                            return (
+                                                <td key={role} className="p-1.5 text-center">
+                                                    <button
+                                                        type="button"
+                                                        disabled={!can.manage}
+                                                        onClick={() => cycleCell(q.id, role)}
+                                                        aria-label={`${q.name} for ${humanize(role)}`}
+                                                        className={`grid h-[26px] w-[26px] place-items-center rounded-md border transition-colors ${
+                                                            level === 2
+                                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                                : level === 1
+                                                                  ? 'border-primary/40 bg-accent text-primary'
+                                                                  : 'border-border bg-transparent hover:bg-muted'
+                                                        }`}
+                                                    >
+                                                        {level > 0 ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                                                    </button>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    ),
-                                )}
-                                {requirements.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={can.manage ? 6 : 5}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            <Shield className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                            <p>
-                                                No compliance requirements
-                                                configured yet.
-                                            </p>
-                                        </td>
+                                            );
+                                        })}
                                     </tr>
-                                )}
+                                ))}
                             </tbody>
                         </table>
-                    </CardContent>
-                </Card>
-
-                {/* Role Matrix */}
-                {requirements.length > 0 && roles.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Shield className="h-5 w-5" />
-                                Role Assignment Matrix
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="overflow-x-auto p-0">
-                            <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/50">
-                                    <tr>
-                                        <th className="sticky left-0 bg-muted/50 px-4 py-3 text-left font-medium">
-                                            Requirement
-                                        </th>
-                                        {roles.map((role) => (
-                                            <th
-                                                key={role}
-                                                className="px-3 py-3 text-center font-medium whitespace-nowrap capitalize"
-                                            >
-                                                {role.replace('_', ' ')}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {requirements
-                                        .filter((r) => r.is_active)
-                                        .map((req) => (
-                                            <tr
-                                                key={req.id}
-                                                className="hover:bg-muted/30"
-                                            >
-                                                <td className="sticky left-0 bg-background px-4 py-3 font-medium">
-                                                    {req.name}
-                                                </td>
-                                                {roles.map((role) => {
-                                                    const enabled =
-                                                        isEntryEnabled(
-                                                            req.id,
-                                                            role,
-                                                        );
-                                                    const mandatory =
-                                                        isEntryMandatory(
-                                                            req.id,
-                                                            role,
-                                                        );
-                                                    return (
-                                                        <td
-                                                            key={role}
-                                                            className="px-3 py-3 text-center"
-                                                        >
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                    toggleMatrixEntry(
-                                                                        req.id,
-                                                                        role,
-                                                                        enabled,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    !can.manage
-                                                                }
-                                                                className={`h-7 w-7 ${can.manage ? 'cursor-pointer' : 'cursor-default'}`}
-                                                                title={
-                                                                    enabled
-                                                                        ? mandatory
-                                                                            ? 'Mandatory'
-                                                                            : 'Optional'
-                                                                        : 'Not required'
-                                                                }
-                                                            >
-                                                                {enabled ? (
-                                                                    <CheckSquare
-                                                                        className={`h-5 w-5 ${mandatory ? 'text-primary' : 'text-muted-foreground'}`}
-                                                                    />
-                                                                ) : (
-                                                                    <Square className="h-5 w-5 text-muted-foreground/30" />
-                                                                )}
-                                                            </Button>
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))}
-                                </tbody>
-                            </table>
-                        </CardContent>
-                    </Card>
+                    </div>
                 )}
-            </PageLayout>
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                    <Legend className="border border-border" label="None" />
+                    <Legend className="border border-primary/40 bg-accent" label="Assigned" />
+                    <Legend className="bg-primary" label="Mandatory" />
+                </div>
+            </div>
+
+            <AlertDialog open={!!deactivate} onOpenChange={(o) => !o && setDeactivate(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Deactivate {deactivate?.code}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This deactivates “{deactivate?.name}” and removes its role assignments. Recorded staff statuses are kept for audit.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={doDeactivate}>Deactivate</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <ComplianceContextMenu ctx={ctx} onClose={closeCtx} />
+            <ComplianceWizards state={wz} onClose={() => setWz(null)} people={wizard.people} requirements={wizard.requirements} roles={wizard.roles} siteTypes={wizard.siteTypes} />
         </AppLayout>
+    );
+}
+
+function Legend({ className, label }: { className: string; label: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            <span className={`h-3.5 w-3.5 rounded ${className}`} />
+            {label}
+        </span>
     );
 }

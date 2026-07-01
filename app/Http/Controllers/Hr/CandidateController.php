@@ -17,6 +17,7 @@ use App\Domain\Hr\Models\HrTalentPool;
 use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
+use App\Domain\Hr\Notifications\OfferApprovalNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -185,6 +186,7 @@ class CandidateController extends Controller
             'personal_phone' => $candidate->personal_phone,
             'source' => $candidate->source,
             'source_detail' => $candidate->source_detail,
+            'tags' => array_values((array) ($candidate->tags ?? [])),
             'notes' => $candidate->notes,
             'created_at' => optional($candidate->created_at)->toDateString(),
             'applications' => $candidate->applications->map(function (HrApplication $application) use ($candidate) {
@@ -306,17 +308,56 @@ class CandidateController extends Controller
                 ];
             }
             if ($app->offer) {
+                $offer = $app->offer;
                 $activityLog[] = [
                     'type' => 'offer',
-                    'description' => "Offer created - {$app->offer->position_title}",
-                    'timestamp' => optional($app->offer->created_at)->diffForHumans() ?? '',
+                    'description' => "Offer created - {$offer->position_title}",
+                    'timestamp' => optional($offer->created_at)->diffForHumans() ?? '',
                 ];
-                if ($app->offer->response) {
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => "Offer {$app->offer->response}",
-                        'timestamp' => optional($app->offer->response_at)->diffForHumans() ?? '',
-                    ];
+                // Approval history: prefer the append-only audit trail (durable +
+                // actor-attributed + survives a decline→resubmit loop); fall back to
+                // the current-state derivation for offers with no audit rows yet.
+                $approvalTrail = $this->offerApprovalTrail($offer);
+                if (! empty($approvalTrail)) {
+                    array_push($activityLog, ...$approvalTrail);
+                } else {
+                    if ($offer->approval_requested_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer submitted for approval',
+                            'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->approval_status === 'approved' && $offer->approved_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer approved',
+                            'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
+                            'actor' => $offer->approvedBy?->name,
+                        ];
+                    }
+                    if ($offer->approval_status === 'declined') {
+                        $reason = $offer->approval_declined_reason;
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
+                            'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->sent_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer sent to candidate',
+                            'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->response) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => "Offer {$offer->response}",
+                            'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
+                        ];
+                    }
                 }
             }
         }
@@ -391,6 +432,107 @@ class CandidateController extends Controller
         $candidate->update($validated);
 
         return redirect()->back()->with('success', 'Candidate updated successfully.');
+    }
+
+    /** Replace a candidate's tags (deduped, trimmed). Lightweight surface for the tag editor. */
+    public function updateTags(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $validated = $request->validate([
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:100'],
+        ]);
+
+        $tags = collect($validated['tags'] ?? [])
+            ->map(fn ($tag) => trim((string) $tag))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $candidate->update(['tags' => $tags, 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Tags updated.');
+    }
+
+    /** Rename (and thereby merge) a tag across every candidate that carries it. */
+    public function renameTag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'from' => ['required', 'string', 'max:100'],
+            'to' => ['required', 'string', 'max:100'],
+        ]);
+        $from = trim($validated['from']);
+        $to = trim($validated['to']);
+        if ($from === '' || $to === '') {
+            return redirect()->back()->with('error', 'Both the current and new tag are required.');
+        }
+
+        $affected = $this->rewriteTagAcrossCandidates($tenantId, $from, $to, $user->id);
+
+        return redirect()->back()->with('success', $affected === 0
+            ? 'No candidates carried that tag.'
+            : "Renamed \u{201C}{$from}\u{201D} to \u{201C}{$to}\u{201D} on {$affected} ".str('candidate')->plural($affected).'.');
+    }
+
+    /** Remove a tag from every candidate that carries it. */
+    public function deleteTag(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate(['tag' => ['required', 'string', 'max:100']]);
+        $tag = trim($validated['tag']);
+        if ($tag === '') {
+            return redirect()->back()->with('error', 'Enter a tag to remove.');
+        }
+
+        $affected = $this->rewriteTagAcrossCandidates($tenantId, $tag, null, $user->id);
+
+        return redirect()->back()->with('success', $affected === 0
+            ? 'No candidates carried that tag.'
+            : "Removed \u{201C}{$tag}\u{201D} from {$affected} ".str('candidate')->plural($affected).'.');
+    }
+
+    /**
+     * Rename (to != null) or delete (to == null) a tag across every candidate
+     * carrying a case-insensitive variant of it. Returns the number changed.
+     */
+    private function rewriteTagAcrossCandidates(?int $tenantId, string $from, ?string $to, int $userId): int
+    {
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereNotNull('tags')
+            ->get(['id', 'tags']);
+
+        $affected = 0;
+        foreach ($candidates as $candidate) {
+            $tags = collect((array) ($candidate->tags ?? []))
+                ->map(fn ($t) => trim((string) $t))
+                ->filter();
+            if (! $tags->contains(fn ($t) => strcasecmp($t, $from) === 0)) {
+                continue;
+            }
+            // Drop every variant of the source tag...
+            $tags = $tags->reject(fn ($t) => strcasecmp($t, $from) === 0);
+            // ...and, for a rename, add the target unless a variant already exists (merge).
+            if ($to !== null && ! $tags->contains(fn ($t) => strcasecmp($t, $to) === 0)) {
+                $tags->push($to);
+            }
+            $candidate->update(['tags' => $tags->values()->all(), 'updated_by' => $userId]);
+            $affected++;
+        }
+
+        return $affected;
     }
 
     /* ------------------------------------------------------------------ */
@@ -477,12 +619,18 @@ class CandidateController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool'])],
+            'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool', 'tag', 'untag'])],
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['integer'],
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
             'reason' => ['nullable', 'string', 'max:2000'],
+            'tag' => ['required_if:action,tag,untag', 'nullable', 'string', 'max:100'],
         ]);
+
+        $tag = trim((string) ($validated['tag'] ?? ''));
+        if (in_array($validated['action'], ['tag', 'untag'], true) && $tag === '') {
+            return redirect()->back()->with('error', 'Enter a tag to apply or remove.');
+        }
 
         $candidates = HrCandidate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
@@ -498,6 +646,21 @@ class CandidateController extends Controller
                     $this->recruitmentService->advanceStage($candidate, $validated['target_stage'] ?? null, $user->id);
                 } elseif ($validated['action'] === 'pool') {
                     $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', null, null);
+                } elseif ($validated['action'] === 'tag' || $validated['action'] === 'untag') {
+                    $tags = collect((array) ($candidate->tags ?? []))
+                        ->map(fn ($t) => trim((string) $t))
+                        ->filter()
+                        ->values();
+                    if ($validated['action'] === 'tag') {
+                        // Case-insensitive add: skip when a variant already exists
+                        // (preserves the original casing) rather than duplicating.
+                        if (! $tags->contains(fn ($t) => strcasecmp($t, $tag) === 0)) {
+                            $tags->push($tag);
+                        }
+                    } else {
+                        $tags = $tags->reject(fn ($t) => strcasecmp($t, $tag) === 0);
+                    }
+                    $candidate->update(['tags' => $tags->values()->all(), 'updated_by' => $user->id]);
                 } else {
                     $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
                     $candidate->applications()
@@ -513,6 +676,8 @@ class CandidateController extends Controller
         $verb = match ($validated['action']) {
             'advance' => 'advanced',
             'pool' => 'added to the talent pool',
+            'tag' => "tagged \u{201C}{$tag}\u{201D}",
+            'untag' => "untagged \u{201C}{$tag}\u{201D}",
             default => 'rejected',
         };
         $message = "{$done} candidate(s) {$verb}".($skipped > 0 ? ", {$skipped} skipped" : '').'.';
@@ -1218,6 +1383,7 @@ class CandidateController extends Controller
             'approval_status' => 'approved',
             'approved_by' => $user->id,
             'approved_at' => now(),
+            'approval_declined_reason' => null,
             'updated_by' => $user->id,
         ]);
 
@@ -1229,7 +1395,133 @@ class CandidateController extends Controller
             'approved_by' => $user->id,
         ]);
 
+        // Tell the offer's creator it's cleared to send (unless they approved it themselves).
+        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        if ($creator && (int) $creator->id !== (int) $user->id) {
+            $this->notifyOfferApproval($creator, $offer, 'approved', $application->candidate?->full_name ?? 'a candidate');
+        }
+
         return redirect()->back()->with('success', 'Offer approved.');
+    }
+
+    /** Submit a draft/declined offer for sign-off, notifying the hiring manager. */
+    public function submitOfferApproval(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $application = $offer->application()->with(['candidate', 'requisition.hiringManager'])->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if ($offer->sent_at) {
+            return redirect()->back()->with('error', 'This offer has already been sent.');
+        }
+        if ($offer->approval_status === 'approved') {
+            return redirect()->back()->with('error', 'This offer is already approved.');
+        }
+
+        $offer->update([
+            'approval_status' => 'pending_approval',
+            'approval_requested_at' => now(),
+            'approval_declined_reason' => null,
+            'approval_reminder_sent_at' => null,
+            'updated_by' => $user->id,
+        ]);
+
+        $approver = $application->requisition?->hiringManager;
+        if ($approver) {
+            $this->notifyOfferApproval($approver, $offer, 'requested', $application->candidate?->full_name ?? 'a candidate');
+        }
+
+        return redirect()->back()->with('success', 'Offer submitted for approval.');
+    }
+
+    /** Decline a pending offer back to the creator with an optional reason. */
+    public function declineOfferApproval(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $application = $offer->application()->with('candidate')->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+
+        if ($offer->approval_status === 'approved' || $offer->sent_at) {
+            return redirect()->back()->with('error', 'This offer can no longer be declined.');
+        }
+
+        $validated = $request->validate(['reason' => ['nullable', 'string', 'max:2000']]);
+
+        $offer->update([
+            'approval_status' => 'declined',
+            'approval_declined_reason' => $validated['reason'] ?? null,
+            'updated_by' => $user->id,
+        ]);
+
+        $creator = $offer->created_by ? \App\Models\User::find($offer->created_by) : null;
+        if ($creator) {
+            $this->notifyOfferApproval($creator, $offer, 'declined', $application->candidate?->full_name ?? 'a candidate', $validated['reason'] ?? null);
+        }
+
+        return redirect()->back()->with('success', 'Offer declined.');
+    }
+
+    /** Best-effort offer-approval notification to a real user. */
+    private function notifyOfferApproval(\App\Models\User $recipient, HrOffer $offer, string $type, string $candidateName, ?string $reason = null): void
+    {
+        try {
+            $recipient->notify(new OfferApprovalNotification($offer, $type, $candidateName, $reason));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * Build the offer's approval history from the append-only audit trail so the
+     * timeline is durable (a decline survives a later re-approval) and shows who
+     * did what — rather than being re-derived from the offer's current state.
+     * Returns [] when the offer has no audit rows (falls back to state derivation).
+     */
+    private function offerApprovalTrail(HrOffer $offer): array
+    {
+        $logs = \App\Models\AuditLog::query()
+            ->where('auditable_type', $offer->getMorphClass())
+            ->where('auditable_id', $offer->getKey())
+            ->where('action', 'hroffer.update')
+            ->orderBy('created_at')
+            ->get(['user_id', 'meta', 'created_at']);
+
+        if ($logs->isEmpty()) {
+            return [];
+        }
+
+        $names = \App\Models\User::query()
+            ->whereIn('id', $logs->pluck('user_id')->filter()->unique()->all())
+            ->pluck('name', 'id');
+
+        $trail = [];
+        foreach ($logs as $log) {
+            $after = (array) data_get($log->meta, 'after', []);
+            $actor = $log->user_id ? ($names[$log->user_id] ?? null) : null;
+            $ts = optional($log->created_at)->diffForHumans() ?? '';
+            $status = $after['approval_status'] ?? null;
+
+            if ($status === 'pending_approval') {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer submitted for approval', 'timestamp' => $ts, 'actor' => $actor];
+            } elseif ($status === 'approved') {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer approved', 'timestamp' => $ts, 'actor' => $actor];
+            } elseif ($status === 'declined') {
+                $reason = $after['approval_declined_reason'] ?? null;
+                $trail[] = ['type' => 'offer', 'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''), 'timestamp' => $ts, 'actor' => $actor];
+            }
+            if (! empty($after['sent_at'])) {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer sent to candidate', 'timestamp' => $ts, 'actor' => $actor];
+            }
+            if (! empty($after['response'])) {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer '.$after['response'], 'timestamp' => $ts, 'actor' => $actor];
+            }
+        }
+
+        return $trail;
     }
 
     public function respondOffer(Request $request, HrOffer $offer)

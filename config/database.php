@@ -60,7 +60,12 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+                // Opt-in client-side prepares (off by default → prod unchanged).
+                // Tests set DB_EMULATE_PREPARES=true to dodge the MySQL 1615
+                // "prepared statement needs to be re-prepared" flake that hits
+                // RbacSeeder under repeated migrate:fresh / concurrent test DBs.
+                PDO::ATTR_EMULATE_PREPARES => filter_var(env('DB_EMULATE_PREPARES', false), FILTER_VALIDATE_BOOL) ?: null,
+            ], fn ($value) => $value !== null) : [],
         ],
 
         'mariadb' => [

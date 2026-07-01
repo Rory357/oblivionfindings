@@ -14,7 +14,7 @@ class ExpenseService
     /**
      * Expense categories supported by the system.
      */
-    public const CATEGORIES = ['travel', 'meals', 'accommodation', 'supplies', 'mileage', 'development', 'other'];
+    public const CATEGORIES = ['travel', 'meals', 'accommodation', 'supplies', 'mileage', 'training', 'development', 'other'];
 
     /**
      * Create a new expense claim with optional items.
@@ -75,6 +75,8 @@ class ExpenseService
             'receipt_path' => $data['receipt_path'] ?? null,
             'tax_amount' => $data['tax_amount'] ?? null,
             'notes' => $data['notes'] ?? null,
+            'source_type' => $data['source_type'] ?? null,
+            'source_id' => $data['source_id'] ?? null,
         ]);
 
         $this->recalculateTotal($claim);

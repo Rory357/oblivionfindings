@@ -1,21 +1,22 @@
+/* eslint-disable no-restricted-syntax -- The detail header, weighted ring, sub-tab
+ * strip and KR rows mirror the Goals & OKR design prototype and use styled native
+ * controls. Every colour is a semantic design token. */
 import {
-    GoalDialog,
-    type GoalOption,
-    type ParentGoalOption,
-} from '@/components/hr/performance/goal-dialog';
-import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EvidenceAttachment } from '@/components/hr/performance/evidence-attachment';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    Avatar,
+    type Confidence,
+    type Cycle,
+    formatDate,
+    type Objective,
+    PRIORITY_DOT,
+    ProgressBar,
+    RAG,
+    RagPill,
+    STATUS_BADGE,
+    TypeBadge,
+} from '@/components/hr/goals/okr-shared';
+import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
+import { ObjectiveWizard } from '@/components/hr/goals/objective-wizard';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -23,63 +24,47 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ConfirmAction } from '@/pages/sites/_confirm-action';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
-    BarChart3,
-    Calendar,
-    ChevronUp,
-    History,
+    ArrowLeft,
+    Check,
+    CheckCircle2,
+    Download,
     ListChecks,
     Pencil,
     Plus,
     Sprout,
     Target,
     Trash2,
-    TrendingUp,
-    User,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-import {
-    CartesianGrid,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+import { useState } from 'react';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface KeyResult {
+interface DetailKr {
     id: number;
     title: string;
+    kr_type: string;
+    start_value: number;
     target_value: number;
     current_value: number;
     unit: string | null;
+    weight: number;
     progress_percentage: number;
     status: string;
-    due_date: string;
+    confidence: Confidence;
+    due_date: string | null;
     owner: { id: number; name: string } | null;
 }
 
 interface ChildGoal {
     id: number;
     title: string;
-    goal_type: string;
+    goal_type: 'company' | 'team' | 'individual';
     status: string;
+    confidence: Confidence;
     priority: string;
     progress_percentage: number;
     user: { name: string } | null;
@@ -92,15 +77,19 @@ interface GoalUpdate {
     previous_value: string | null;
     new_value: string | null;
     progress_percentage: number;
+    confidence: Confidence | null;
     comment: string | null;
     created_at: string;
 }
 
-interface DevelopmentPlan {
+interface LinkedPlan {
     id: number;
     title: string;
+    competency_area: string | null;
     status: string;
     progress_percent: number;
+    current_level: number | null;
+    target_level: number | null;
     employee: string | null;
 }
 
@@ -108,1296 +97,441 @@ interface Goal {
     id: number;
     title: string;
     description: string | null;
-    goal_type: string;
+    goal_type: 'company' | 'team' | 'individual';
     category: string | null;
+    tags: string[];
     status: string;
+    confidence: Confidence;
     priority: string;
+    checkin_frequency: string | null;
     progress_percentage: number;
-    evidence_path: string | null;
     target_value: number | null;
     current_value: number | null;
     unit: string | null;
     start_date: string;
     due_date: string;
     completed_at: string | null;
+    cycle: { id: number; name: string } | null;
+    cycle_id: number | null;
     user: { id: number; name: string } | null;
     creator: string | null;
     parent_goal_id: number | null;
     parent_goal: { id: number; title: string; goal_type: string } | null;
     child_goals: ChildGoal[];
-    key_results: KeyResult[];
+    key_results: DetailKr[];
     updates: GoalUpdate[];
-    development_goals: DevelopmentPlan[];
-}
-
-interface UserItem {
-    id: number;
-    name: string;
+    development_goals: LinkedPlan[];
 }
 
 interface Props {
     goal: Goal;
-    users: UserItem[];
-    goalTypes: GoalOption[];
-    priorities: GoalOption[];
-    parentGoals: ParentGoalOption[];
+    users: Array<{ id: number; name: string }>;
+    parentGoals: Array<{ id: number; title: string }>;
+    cycles: Cycle[];
     can: { manage: boolean; updateProgress: boolean };
 }
 
-/* ------------------------------------------------------------------ */
-/*  Colour helpers                                                     */
-/* ------------------------------------------------------------------ */
+type SubTab = 'krs' | 'history' | 'children' | 'plans';
 
-const statusColours: Record<string, string> = {
-    not_started: 'bg-muted text-foreground border-border',
-    in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
-    completed:
-        'bg-status-success-bg text-status-success border-status-success/30',
-    cancelled:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-};
-
-const statusBadgeWhite: Record<string, string> = {
-    not_started: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-    in_progress: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-    completed: 'bg-status-success text-primary-foreground border-status-success/30',
-    cancelled: 'bg-status-critical text-primary-foreground border-status-critical/30',
-};
-
-const priorityColours: Record<string, string> = {
-    low: 'bg-muted text-foreground',
-    medium: 'bg-status-warning-bg text-status-warning',
-    high: 'bg-status-critical-bg text-status-critical',
-    critical: 'bg-status-critical-bg text-status-critical',
-};
-
-const priorityBadgeWhite: Record<string, string> = {
-    low: 'bg-primary-foreground/10 text-primary-foreground/80 border-primary-foreground/20',
-    medium: 'bg-status-warning text-primary-foreground border-status-warning/30',
-    high: 'bg-status-critical text-primary-foreground border-status-critical/30',
-    critical: 'bg-status-critical text-primary-foreground border-status-critical/40',
-};
-
-const typeBadgeWhite: Record<string, string> = {
-    individual: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-    team: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-    company: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-    department: 'bg-primary-foreground/10 text-primary-foreground/90 border-primary-foreground/20',
-};
-
-function progressBarColour(pct: number): string {
-    if (pct > 66) return 'bg-status-success';
-    if (pct >= 33) return 'bg-status-warning';
-    return 'bg-status-critical';
-}
-
-function krStatusColour(status: string): string {
-    switch (status) {
-        case 'completed':
-            return 'bg-status-success';
-        case 'in_progress':
-            return 'bg-status-info';
-        case 'at_risk':
-            return 'bg-status-warning';
-        case 'behind':
-            return 'bg-status-critical';
-        default:
-            return 'bg-muted';
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Date formatting (NZ locale)                                        */
-/* ------------------------------------------------------------------ */
-
-function formatDate(value?: string | null): string {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          });
-}
-
-function formatDateTime(value?: string | null): string {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime())
-        ? value
-        : d.toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
-}
-
-function capitalize(str: string): string {
-    return str.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-
-export default function GoalShow({
-    goal,
-    users,
-    goalTypes,
-    priorities,
-    parentGoals,
-    can,
-}: Props) {
+export default function GoalShow({ goal, users, parentGoals, cycles, can }: Props) {
+    const [subtab, setSubtab] = useState<SubTab>('krs');
     const [editOpen, setEditOpen] = useState(false);
     const [addChildOpen, setAddChildOpen] = useState(false);
-    const [showKrForm, setShowKrForm] = useState(false);
-    const [editingKrId, setEditingKrId] = useState<number | null>(null);
-    const [krUpdateValue, setKrUpdateValue] = useState('');
-    const [progressOpen, setProgressOpen] = useState(false);
-
-    /* Progress update form */
-    const [progressForm, setProgressForm] = useState({
-        current_value: '',
-        progress_percentage: String(goal.progress_percentage),
-        comment: '',
-    });
-
-    /* Key Result creation form */
-    const krForm = useForm({
-        title: '',
-        target_value: '',
-        unit: '',
-        due_date: '',
-        owner_id: '',
-    });
+    const [checkinOpen, setCheckinOpen] = useState(false);
+    const [krDialog, setKrDialog] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
-        { title: 'Goals', href: '/hr/goals' },
+        { title: 'Goals & OKRs', href: '/hr/goals' },
         { title: goal.title, href: `/hr/goals/${goal.id}` },
     ];
 
-    /* ---- Actions ---- */
+    const rag = RAG[goal.confidence];
 
-    function submitKeyResult(e: FormEvent) {
-        e.preventDefault();
-        krForm.post(`/hr/goals/${goal.id}/key-results`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                krForm.reset();
-                setShowKrForm(false);
-            },
-        });
-    }
+    // Construct an Objective for the wizards / check-in from the detail payload.
+    const asObjective: Objective = {
+        ...goal,
+        last_checkin_at: null,
+        last_checkin_days: null,
+        development_count: goal.development_goals.length,
+        key_results_count: goal.key_results.length,
+        key_results: goal.key_results,
+    } as unknown as Objective;
 
-    function updateKeyResultValue(krId: number) {
-        router.put(
-            `/hr/goals/key-results/${krId}`,
-            {
-                current_value: krUpdateValue,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setEditingKrId(null);
-                    setKrUpdateValue('');
-                },
-            },
-        );
-    }
+    const markStatus = (status: string) => router.put(`/hr/goals/${goal.id}`, { status }, { preserveScroll: true });
+    const deleteKr = (id: number) => {
+        if (confirm('Delete this key result?')) router.delete(`/hr/goals/key-results/${id}`, { preserveScroll: true });
+    };
+    const archive = () => {
+        if (confirm(`Archive “${goal.title}”?`)) markStatus('cancelled');
+    };
+    const exportCsv = () => {
+        window.location.href = goal.cycle_id ? `/hr/goals/export?cycle=${goal.cycle_id}` : '/hr/goals/export';
+    };
 
-    function deleteKeyResult(krId: number) {
-        if (confirm('Are you sure you want to delete this key result?')) {
-            router.delete(`/hr/goals/key-results/${krId}`, {
-                preserveScroll: true,
-            });
-        }
-    }
+    const subTabs: { key: SubTab; label: string; count: number }[] = [
+        { key: 'krs', label: 'Key results', count: goal.key_results.length },
+        { key: 'history', label: 'History', count: goal.updates.length },
+        { key: 'children', label: 'Children', count: goal.child_goals.length },
+        { key: 'plans', label: 'Linked plans', count: goal.development_goals.length },
+    ];
 
-    function deleteGoal() {
-        router.delete(`/hr/goals/${goal.id}`);
-    }
-
-    function submitProgress(e: FormEvent) {
-        e.preventDefault();
-        router.post(
-            `/hr/goals/${goal.id}/progress`,
-            {
-                current_value: progressForm.current_value || null,
-                progress_percentage: progressForm.progress_percentage,
-                comment: progressForm.comment || null,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setProgressOpen(false);
-                    setProgressForm({
-                        current_value: '',
-                        progress_percentage: String(goal.progress_percentage),
-                        comment: '',
-                    });
-                },
-            },
-        );
-    }
-
-    /* ---- Chart data ---- */
-    const chartData = (goal.updates ?? [])
-        .slice()
-        .reverse()
-        .map((u) => ({
-            date: formatDate(u.created_at),
-            progress: u.progress_percentage,
-        }));
+    const detailBtn =
+        'inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-semibold hover:bg-muted';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={goal.title} />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* ============================================================ */}
-                {/*  PAGE HERO                                                    */}
-                {/* ============================================================ */}
-                {(() => {
-                    const statusTone: PageHeroBadge['tone'] =
-                        goal.status === 'completed'
-                            ? 'success'
-                            : goal.status === 'cancelled'
-                              ? 'critical'
-                              : 'default';
-                    const priorityTone: PageHeroBadge['tone'] =
-                        goal.priority === 'high' || goal.priority === 'critical'
-                            ? 'critical'
-                            : goal.priority === 'medium'
-                              ? 'warning'
-                              : 'default';
+            <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 p-6">
+                <Link href="/hr/goals" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground">
+                    <ArrowLeft className="h-4 w-4" /> Back to hub
+                </Link>
 
-                    const heroBadges: PageHeroBadge[] = [
-                        { label: capitalize(goal.status), tone: statusTone },
-                        {
-                            label: `${capitalize(goal.priority)} Priority`,
-                            tone: priorityTone,
-                        },
-                        { label: capitalize(goal.goal_type) },
-                    ];
+                {goal.parent_goal && (
+                    <Link href={`/hr/goals/${goal.parent_goal.id}`} className="-mt-2 text-[11.5px] font-semibold text-primary">
+                        ↑ {goal.parent_goal.title}
+                    </Link>
+                )}
 
-                    const heroMeta: PageHeroMetaItem[] = [];
-                    if (goal.user) heroMeta.push({ icon: User, label: goal.user.name });
-                    heroMeta.push({
-                        icon: Calendar,
-                        label: `${formatDate(goal.start_date)} – ${formatDate(goal.due_date)}`,
-                    });
-                    if (goal.category)
-                        heroMeta.push({ icon: Target, label: goal.category });
-                    if (goal.parent_goal)
-                        heroMeta.push({
-                            label: `Parent: ${goal.parent_goal.title}`,
-                            href: `/hr/goals/${goal.parent_goal.id}`,
-                        });
-
-                    const heroStats: { label: string; value: string }[] = [
-                        { label: 'Progress', value: `${goal.progress_percentage}%` },
-                    ];
-                    if (goal.target_value !== null && goal.target_value !== undefined) {
-                        heroStats.push({
-                            label: goal.unit ?? 'Target',
-                            value: `${goal.current_value ?? 0}/${goal.target_value}`,
-                        });
-                    }
-
-                    return (
-                        <PageHero category="hr"
-                            icon={Target}
-                            backHref="/hr/goals"
-                            title={goal.title}
-                            description={goal.description ?? undefined}
-                            meta={heroMeta}
-                            badges={heroBadges}
-                            stats={heroStats}
-                            actions={
-                                can.manage ? (
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setEditOpen(true)}
-                                        >
-                                            <Pencil className="mr-1.5 h-4 w-4" />
-                                            Edit goal
-                                        </Button>
-                                        <ConfirmAction
-                                            title="Delete objective?"
-                                            description={`Delete "${goal.title}"? This removes it from the goals list. Key results and history are kept and the objective can be restored by an administrator.`}
-                                            confirmLabel="Delete objective"
-                                            onConfirm={deleteGoal}
-                                        >
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                            >
-                                                <Trash2 className="mr-1.5 h-4 w-4" />
-                                                Delete
-                                            </Button>
-                                        </ConfirmAction>
-                                    </div>
-                                ) : undefined
-                            }
-                        />
-                    );
-                })()}
-
-                {/* ============================================================ */}
-                {/*  TABS                                                         */}
-                {/* ============================================================ */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Evidence</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <EvidenceAttachment
-                            uploadUrl={`/hr/goals/${goal.id}/evidence`}
-                            viewUrl={`/hr/goals/${goal.id}/evidence`}
-                            hasEvidence={!!goal.evidence_path}
-                            canManage={can.manage || can.updateProgress}
-                        />
-                    </CardContent>
-                </Card>
-
-                <Tabs defaultValue="key-results">
-                    <TabsList>
-                        <TabsTrigger value="key-results" className="gap-1.5">
-                            <ListChecks className="h-4 w-4" />
-                            Key Results
-                        </TabsTrigger>
-                        <TabsTrigger value="child-goals" className="gap-1.5">
-                            <Target className="h-4 w-4" />
-                            Child Goals
-                        </TabsTrigger>
-                        <TabsTrigger value="history" className="gap-1.5">
-                            <History className="h-4 w-4" />
-                            Progress History
-                        </TabsTrigger>
-                        <TabsTrigger value="dev-plans" className="gap-1.5">
-                            <Sprout className="h-4 w-4" />
-                            Development Plans
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* -------------------------------------------------------- */}
-                    {/*  TAB: Key Results                                         */}
-                    {/* -------------------------------------------------------- */}
-                    <TabsContent value="key-results">
-                        <div className="space-y-4">
-                            {/* Add Key Result button */}
-                            {can.manage && (
-                                <div className="flex justify-end">
-                                    <Button
-                                        size="sm"
-                                        variant={
-                                            showKrForm ? 'secondary' : 'default'
-                                        }
-                                        onClick={() => setShowKrForm((p) => !p)}
-                                    >
-                                        {showKrForm ? (
-                                            <>
-                                                <ChevronUp className="mr-1.5 h-4 w-4" />
-                                                Cancel
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Add Key Result
-                                            </>
-                                        )}
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Add Key Result form (collapsible) */}
-                            {showKrForm && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
-                                            New Key Result
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <form
-                                            onSubmit={submitKeyResult}
-                                            className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                                        >
-                                            <div className="sm:col-span-2">
-                                                <Label htmlFor="kr-title">
-                                                    Title
-                                                </Label>
-                                                <Input
-                                                    id="kr-title"
-                                                    value={krForm.data.title}
-                                                    onChange={(e) =>
-                                                        krForm.setData(
-                                                            'title',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. Increase customer satisfaction score"
-                                                    required
-                                                />
-                                                {krForm.errors.title && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {krForm.errors.title}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="kr-target">
-                                                    Target Value
-                                                </Label>
-                                                <Input
-                                                    id="kr-target"
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={
-                                                        krForm.data.target_value
-                                                    }
-                                                    onChange={(e) =>
-                                                        krForm.setData(
-                                                            'target_value',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="100"
-                                                    required
-                                                />
-                                                {krForm.errors.target_value && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {
-                                                            krForm.errors
-                                                                .target_value
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="kr-unit">
-                                                    Unit
-                                                </Label>
-                                                <Input
-                                                    id="kr-unit"
-                                                    value={krForm.data.unit}
-                                                    onChange={(e) =>
-                                                        krForm.setData(
-                                                            'unit',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. %, points, hours"
-                                                />
-                                                {krForm.errors.unit && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {krForm.errors.unit}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="kr-due">
-                                                    Due Date
-                                                </Label>
-                                                <Input
-                                                    id="kr-due"
-                                                    type="date"
-                                                    value={krForm.data.due_date}
-                                                    onChange={(e) =>
-                                                        krForm.setData(
-                                                            'due_date',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                {krForm.errors.due_date && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {krForm.errors.due_date}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="kr-owner">
-                                                    Owner
-                                                </Label>
-                                                <Select
-                                                    value={krForm.data.owner_id}
-                                                    onValueChange={(val) =>
-                                                        krForm.setData(
-                                                            'owner_id',
-                                                            val,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger id="kr-owner">
-                                                        <SelectValue placeholder="Select owner" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {users.map((u) => (
-                                                            <SelectItem
-                                                                key={u.id}
-                                                                value={String(
-                                                                    u.id,
-                                                                )}
-                                                            >
-                                                                {u.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                {krForm.errors.owner_id && (
-                                                    <p className="mt-1 text-xs text-status-critical">
-                                                        {krForm.errors.owner_id}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="flex justify-end gap-2 sm:col-span-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setShowKrForm(false)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={krForm.processing}
-                                                >
-                                                    {krForm.processing
-                                                        ? 'Creating...'
-                                                        : 'Create Key Result'}
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Key Results list */}
-                            {goal.key_results.length > 0 ? (
-                                <div className="space-y-3">
-                                    {goal.key_results.map((kr) => (
-                                        <Card key={kr.id}>
-                                            <CardContent className="pt-5">
-                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 className="text-sm font-semibold">
-                                                                {kr.title}
-                                                            </h3>
-                                                            <Badge
-                                                                className={
-                                                                    statusColours[
-                                                                        kr
-                                                                            .status
-                                                                    ] ??
-                                                                    'bg-muted text-foreground'
-                                                                }
-                                                            >
-                                                                {capitalize(
-                                                                    kr.status,
-                                                                )}
-                                                            </Badge>
-                                                        </div>
-
-                                                        {/* Full-width progress bar */}
-                                                        <div className="mt-2">
-                                                            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                                <span>
-                                                                    {
-                                                                        kr.current_value
-                                                                    }{' '}
-                                                                    /{' '}
-                                                                    {
-                                                                        kr.target_value
-                                                                    }{' '}
-                                                                    {kr.unit ??
-                                                                        ''}
-                                                                </span>
-                                                                <span>
-                                                                    {
-                                                                        kr.progress_percentage
-                                                                    }
-                                                                    %
-                                                                </span>
-                                                            </div>
-                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                                                                <div
-                                                                    className={`h-full rounded-full transition-all ${progressBarColour(kr.progress_percentage)}`}
-                                                                    style={{
-                                                                        width: `${Math.min(kr.progress_percentage, 100)}%`,
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                                            {kr.owner && (
-                                                                <span className="flex items-center gap-1">
-                                                                    <User className="h-3 w-3" />
-                                                                    {
-                                                                        kr.owner
-                                                                            .name
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                            {kr.due_date && (
-                                                                <span className="flex items-center gap-1">
-                                                                    <Calendar className="h-3 w-3" />
-                                                                    {formatDate(
-                                                                        kr.due_date,
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Actions */}
-                                                    <div className="flex shrink-0 items-center gap-1.5">
-                                                        {can.updateProgress && (
-                                                            <>
-                                                                {editingKrId ===
-                                                                kr.id ? (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <Input
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            className="h-8 w-24 text-xs"
-                                                                            value={
-                                                                                krUpdateValue
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                setKrUpdateValue(
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            placeholder={String(
-                                                                                kr.current_value,
-                                                                            )}
-                                                                            autoFocus
-                                                                        />
-                                                                        <Button
-                                                                            size="sm"
-                                                                            className="h-8 text-xs"
-                                                                            onClick={() =>
-                                                                                updateKeyResultValue(
-                                                                                    kr.id,
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                !krUpdateValue
-                                                                            }
-                                                                        >
-                                                                            Save
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="h-8 text-xs"
-                                                                            onClick={() => {
-                                                                                setEditingKrId(
-                                                                                    null,
-                                                                                );
-                                                                                setKrUpdateValue(
-                                                                                    '',
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Cancel
-                                                                        </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="h-8 text-xs"
-                                                                        onClick={() => {
-                                                                            setEditingKrId(
-                                                                                kr.id,
-                                                                            );
-                                                                            setKrUpdateValue(
-                                                                                String(
-                                                                                    kr.current_value,
-                                                                                ),
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <Pencil className="mr-1 h-3 w-3" />
-                                                                        Update
-                                                                    </Button>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        {can.manage && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
-                                                                onClick={() =>
-                                                                    deleteKeyResult(
-                                                                        kr.id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <Card>
-                                    <CardContent className="py-10 text-center">
-                                        <ListChecks className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            No key results yet.
-                                        </p>
-                                        {can.manage && (
-                                            <Button
-                                                size="sm"
-                                                className="mt-3"
-                                                onClick={() =>
-                                                    setShowKrForm(true)
-                                                }
-                                            >
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Add First Key Result
-                                            </Button>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    </TabsContent>
-
-                    {/* -------------------------------------------------------- */}
-                    {/*  TAB: Child Goals                                         */}
-                    {/* -------------------------------------------------------- */}
-                    <TabsContent value="child-goals">
-                        <div className="space-y-4">
-                            {can.manage && (
-                                <div className="flex justify-end">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setAddChildOpen(true)}
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Child Goal
-                                    </Button>
-                                </div>
-                            )}
-
-                            {goal.child_goals.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    {goal.child_goals.map((child) => (
-                                        <Link
-                                            key={child.id}
-                                            href={`/hr/goals/${child.id}`}
-                                            className="block"
-                                        >
-                                            <Card className="h-full transition-shadow hover:shadow-md">
-                                                <CardContent className="pt-5">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <h3 className="text-sm leading-snug font-semibold">
-                                                            {child.title}
-                                                        </h3>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="shrink-0 text-xs capitalize"
-                                                        >
-                                                            {capitalize(
-                                                                child.goal_type,
-                                                            )}
-                                                        </Badge>
-                                                    </div>
-
-                                                    {/* Progress bar */}
-                                                    <div className="mt-3">
-                                                        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                                                            <span>
-                                                                {
-                                                                    child.progress_percentage
-                                                                }
-                                                                %
-                                                            </span>
-                                                            <Badge
-                                                                className={`px-1.5 py-0 text-[10px] ${statusColours[child.status] ?? 'bg-muted text-foreground'}`}
-                                                            >
-                                                                {capitalize(
-                                                                    child.status,
-                                                                )}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                                            <div
-                                                                className={`h-full rounded-full transition-all ${progressBarColour(child.progress_percentage)}`}
-                                                                style={{
-                                                                    width: `${Math.min(child.progress_percentage, 100)}%`,
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                                                            <User className="h-3 w-3" />
-                                                            {child.user?.name ??
-                                                                'Unassigned'}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <ListChecks className="h-3 w-3" />
-                                                            {
-                                                                child.key_results_count
-                                                            }{' '}
-                                                            KR
-                                                            {child.key_results_count !==
-                                                            1
-                                                                ? 's'
-                                                                : ''}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="mt-2">
-                                                        <Badge
-                                                            className={`px-1.5 py-0 text-[10px] ${priorityColours[child.priority] ?? 'bg-muted text-foreground'}`}
-                                                        >
-                                                            {capitalize(
-                                                                child.priority,
-                                                            )}
-                                                        </Badge>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
-                                    ))}
-                                </div>
-                            ) : (
-                                <Card>
-                                    <CardContent className="py-10 text-center">
-                                        <Target className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            No child goals yet.
-                                        </p>
-                                        {can.manage && (
-                                            <Button
-                                                size="sm"
-                                                className="mt-3"
-                                                onClick={() =>
-                                                    setAddChildOpen(true)
-                                                }
-                                            >
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Add First Child Goal
-                                            </Button>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    </TabsContent>
-
-                    {/* -------------------------------------------------------- */}
-                    {/*  TAB: Development Plans                                    */}
-                    {/* -------------------------------------------------------- */}
-                    <TabsContent value="dev-plans">
-                        <div className="space-y-4">
-                            {goal.development_goals.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    {goal.development_goals.map((plan) => (
-                                        <Link
-                                            key={plan.id}
-                                            href="/hr/goals/development"
-                                            className="block"
-                                        >
-                                            <Card className="h-full transition-shadow hover:shadow-md">
-                                                <CardContent className="pt-5">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <h3 className="text-sm leading-snug font-semibold">
-                                                            {plan.title}
-                                                        </h3>
-                                                        <Badge
-                                                            className={`shrink-0 px-1.5 py-0 text-[10px] ${statusColours[plan.status] ?? 'bg-muted text-foreground'}`}
-                                                        >
-                                                            {capitalize(
-                                                                plan.status.replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                ),
-                                                            )}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                                                            <User className="h-3 w-3" />
-                                                            {plan.employee ??
-                                                                'Unassigned'}
-                                                        </span>
-                                                        <span>
-                                                            {
-                                                                plan.progress_percent
-                                                            }
-                                                            %
-                                                        </span>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
-                                    ))}
-                                </div>
-                            ) : (
-                                <Card>
-                                    <CardContent className="py-10 text-center">
-                                        <Sprout className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            No development plans roll up into this
-                                            objective yet.
-                                        </p>
-                                        {can.manage && (
-                                            <Button
-                                                size="sm"
-                                                className="mt-3"
-                                                asChild
-                                            >
-                                                <Link href="/hr/goals/development">
-                                                    <Plus className="mr-1.5 h-4 w-4" />
-                                                    Manage development plans
-                                                </Link>
-                                            </Button>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    </TabsContent>
-
-                    {/* -------------------------------------------------------- */}
-                    {/*  TAB: Progress History                                    */}
-                    {/* -------------------------------------------------------- */}
-                    <TabsContent value="history">
-                        <div className="space-y-4">
-                            {/* Update Progress button */}
-                            {can.updateProgress && (
-                                <div className="flex justify-end">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setProgressOpen(true)}
-                                    >
-                                        <TrendingUp className="mr-1.5 h-4 w-4" />
-                                        Update Progress
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Progress Chart */}
-                            {chartData.length >= 2 && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <BarChart3 className="h-4 w-4" />
-                                            Progress Over Time
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="h-64">
-                                            <ResponsiveContainer
-                                                width="100%"
-                                                height="100%"
-                                            >
-                                                <LineChart
-                                                    data={chartData}
-                                                    margin={{
-                                                        top: 5,
-                                                        right: 20,
-                                                        left: 0,
-                                                        bottom: 5,
-                                                    }}
-                                                >
-                                                    <CartesianGrid
-                                                        strokeDasharray="3 3"
-                                                        className="stroke-muted"
-                                                    />
-                                                    <XAxis
-                                                        dataKey="date"
-                                                        tick={{ fontSize: 11 }}
-                                                        className="text-muted-foreground"
-                                                    />
-                                                    <YAxis
-                                                        domain={[0, 100]}
-                                                        tick={{ fontSize: 11 }}
-                                                        className="text-muted-foreground"
-                                                        tickFormatter={(v) =>
-                                                            `${v}%`
-                                                        }
-                                                    />
-                                                    <Tooltip
-                                                        formatter={(
-                                                            value?: number,
-                                                        ) => [
-                                                            `${value ?? 0}%`,
-                                                            'Progress',
-                                                        ]}
-                                                        contentStyle={{
-                                                            borderRadius: '8px',
-                                                            border: '1px solid hsl(var(--border))',
-                                                            backgroundColor:
-                                                                'hsl(var(--background))',
-                                                            fontSize: '12px',
-                                                        }}
-                                                    />
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="progress"
-                                                        stroke="hsl(var(--primary))"
-                                                        strokeWidth={2}
-                                                        dot={{
-                                                            r: 4,
-                                                            fill: 'hsl(var(--primary))',
-                                                        }}
-                                                        activeDot={{ r: 6 }}
-                                                    />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Timeline */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <History className="h-4 w-4" />
-                                        Update Timeline
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {goal.updates.length > 0 ? (
-                                        <div className="relative space-y-0">
-                                            {goal.updates.map((update, idx) => (
-                                                <div
-                                                    key={update.id}
-                                                    className="relative flex gap-4 pb-6 last:pb-0"
-                                                >
-                                                    {/* Timeline line */}
-                                                    {idx <
-                                                        goal.updates.length -
-                                                            1 && (
-                                                        <div className="absolute top-6 left-[11px] h-full w-0.5 bg-border" />
-                                                    )}
-                                                    {/* Timeline dot */}
-                                                    <div className="relative z-10 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-background">
-                                                        <div className="h-2 w-2 rounded-full bg-primary" />
-                                                    </div>
-                                                    {/* Content */}
-                                                    <div className="min-w-0 flex-1 rounded-lg border p-3">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-sm font-medium">
-                                                                {
-                                                                    update.user_name
-                                                                }
-                                                            </span>
-                                                            <span className="shrink-0 text-xs text-muted-foreground">
-                                                                {formatDateTime(
-                                                                    update.created_at,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                                                            <span className="flex items-center gap-1">
-                                                                <TrendingUp className="h-3 w-3" />
-                                                                {
-                                                                    update.progress_percentage
-                                                                }
-                                                                %
-                                                            </span>
-                                                            {update.previous_value !==
-                                                                null &&
-                                                                update.new_value !==
-                                                                    null && (
-                                                                    <span>
-                                                                        Value:{' '}
-                                                                        {
-                                                                            update.previous_value
-                                                                        }{' '}
-                                                                        &rarr;{' '}
-                                                                        {
-                                                                            update.new_value
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                        </div>
-                                                        {update.comment && (
-                                                            <p className="mt-1.5 text-sm text-foreground/80">
-                                                                {update.comment}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="py-8 text-center">
-                                            <History className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                                            <p className="mt-2 text-sm text-muted-foreground">
-                                                No progress updates yet.
-                                            </p>
-                                            {can.updateProgress && (
-                                                <Button
-                                                    size="sm"
-                                                    className="mt-3"
-                                                    onClick={() =>
-                                                        setProgressOpen(true)
-                                                    }
-                                                >
-                                                    <TrendingUp className="mr-1.5 h-4 w-4" />
-                                                    Record First Update
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </TabsContent>
-                </Tabs>
-            </div>
-
-            {/* ============================================================ */}
-            {/*  Progress Update Dialog                                       */}
-            {/* ============================================================ */}
-            <Dialog open={progressOpen} onOpenChange={setProgressOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Update Progress</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitProgress} className="space-y-4">
-                        {goal.target_value !== null &&
-                            goal.target_value !== undefined && (
-                                <div>
-                                    <Label htmlFor="progress-value">
-                                        Current Value{' '}
-                                        {goal.unit ? `(${goal.unit})` : ''}
-                                    </Label>
-                                    <Input
-                                        id="progress-value"
-                                        type="number"
-                                        step="0.01"
-                                        value={progressForm.current_value}
-                                        onChange={(e) =>
-                                            setProgressForm((p) => ({
-                                                ...p,
-                                                current_value: e.target.value,
-                                            }))
-                                        }
-                                        placeholder={`Target: ${goal.target_value}`}
-                                    />
-                                </div>
-                            )}
-                        <div>
-                            <Label htmlFor="progress-pct">
-                                Progress Percentage
-                            </Label>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    id="progress-pct"
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={progressForm.progress_percentage}
-                                    onChange={(e) =>
-                                        setProgressForm((p) => ({
-                                            ...p,
-                                            progress_percentage: e.target.value,
-                                        }))
-                                    }
-                                    className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
-                                />
-                                <span className="w-12 text-right text-sm font-medium">
-                                    {progressForm.progress_percentage}%
+                {/* header card */}
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                    <div className="flex flex-wrap items-start gap-6">
+                        <div
+                            className="relative h-24 w-24 shrink-0 rounded-full"
+                            style={{ background: `conic-gradient(${ragVar(goal.confidence)} ${goal.progress_percentage}%, var(--muted) 0)` }}
+                        >
+                            <div className="absolute inset-[9px] grid place-items-center rounded-full bg-card">
+                                <span className="text-2xl font-extrabold tabular-nums">
+                                    {goal.progress_percentage}
+                                    <span className="text-sm">%</span>
+                                </span>
+                                <span className="text-[8.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                                    {goal.key_results.length ? 'Weighted' : 'Manual'}
                                 </span>
                             </div>
                         </div>
-                        <div>
-                            <Label htmlFor="progress-comment">Comment</Label>
-                            <Textarea
-                                id="progress-comment"
-                                value={progressForm.comment}
-                                onChange={(e) =>
-                                    setProgressForm((p) => ({
-                                        ...p,
-                                        comment: e.target.value,
-                                    }))
-                                }
-                                placeholder="Describe what was accomplished..."
-                                rows={3}
-                            />
+                        <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <TypeBadge type={goal.goal_type} />
+                                <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold capitalize', STATUS_BADGE[goal.status])}>{goal.status}</span>
+                                <span className={cn('inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold', rag.chip)}>
+                                    <span className={cn('h-1.5 w-1.5 rounded-full', rag.dot)} /> {rag.label}
+                                </span>
+                                {goal.cycle && <span className="text-[11.5px] text-muted-foreground">{goal.cycle.name}</span>}
+                                <span className={cn('h-2 w-2 rounded-full', PRIORITY_DOT[goal.priority])} title={`${goal.priority} priority`} />
+                            </div>
+                            <h1 className="text-[22px] font-extrabold leading-tight tracking-tight">{goal.title}</h1>
+                            {goal.description && <p className="mt-2 max-w-2xl text-[13px] text-muted-foreground">{goal.description}</p>}
+                            <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Avatar name={goal.user?.name} /> {goal.user?.name ?? '—'}
+                                </span>
+                                {goal.category && <span>· {goal.category}</span>}
+                                <span>· {formatDate(goal.start_date, true)} → {formatDate(goal.due_date, true)}</span>
+                            </div>
+                            {goal.tags.length > 0 && (
+                                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                    {goal.tags.map((t) => (
+                                        <span key={t} className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                            {t}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setProgressOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit">Save Update</Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                    </div>
 
+                    <div className="mt-5 flex flex-wrap gap-2">
+                        {can.updateProgress && (
+                            <button type="button" onClick={() => setCheckinOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground">
+                                <CheckCircle2 className="h-4 w-4" /> Log check-in
+                            </button>
+                        )}
+                        {can.manage && (
+                            <>
+                                <button type="button" onClick={() => setEditOpen(true)} className={detailBtn}>
+                                    <Pencil className="h-3.5 w-3.5" /> Edit
+                                </button>
+                                <button type="button" onClick={() => setKrDialog(true)} className={detailBtn}>
+                                    <Plus className="h-3.5 w-3.5" /> Add KR
+                                </button>
+                                <button type="button" onClick={() => setAddChildOpen(true)} className={detailBtn}>
+                                    Add child
+                                </button>
+                                {goal.status !== 'completed' && (
+                                    <button type="button" onClick={() => markStatus('completed')} className={detailBtn}>
+                                        <Check className="h-3.5 w-3.5" /> Complete
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        <button type="button" onClick={exportCsv} className={detailBtn}>
+                            <Download className="h-3.5 w-3.5" /> Export
+                        </button>
+                        {can.manage && (
+                            <button type="button" onClick={archive} className="inline-flex items-center gap-1.5 rounded-lg border border-status-critical/30 bg-card px-3 py-2 text-[12.5px] font-semibold text-status-critical hover:bg-status-critical-bg">
+                                <Trash2 className="h-3.5 w-3.5" /> Archive
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* sub-tabs */}
+                <div className="inline-flex gap-1 self-start rounded-xl border border-border bg-card p-1.5 shadow-sm">
+                    {subTabs.map((t) => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setSubtab(t.key)}
+                            className={cn('inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold', subtab === t.key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}
+                        >
+                            {t.label}
+                            <span className="inline-flex items-center rounded-full bg-muted/70 px-1.5 text-[10px] font-bold tabular-nums">{t.count}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* KEY RESULTS */}
+                {subtab === 'krs' && (
+                    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                        {goal.key_results.length === 0 ? (
+                            <p className="px-5 py-10 text-center text-[13px] text-muted-foreground">No key results — this objective uses manual progress.</p>
+                        ) : (
+                            goal.key_results.map((k) => (
+                                <div key={k.id} className="flex items-center gap-3.5 border-b border-border/60 px-4 py-3.5 last:border-0">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[13.5px] font-semibold">{k.title}</span>
+                                            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold capitalize text-muted-foreground">{k.kr_type}</span>
+                                            <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">w{k.weight}</span>
+                                        </div>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[12px] text-muted-foreground">
+                                            <span>Baseline <strong className="text-foreground">{k.start_value}</strong></span>
+                                            <span>→ Now <strong className="text-foreground">{k.current_value}</strong></span>
+                                            <span>→ Target <strong className="text-foreground">{k.target_value}</strong></span>
+                                            {k.owner && <span>· {k.owner.name}</span>}
+                                        </div>
+                                    </div>
+                                    <RagPill confidence={k.confidence} />
+                                    <div className="flex w-[140px] items-center gap-2">
+                                        <ProgressBar pct={k.progress_percentage} className="h-1.5" />
+                                        <span className="w-8 text-right text-xs font-bold tabular-nums">{k.progress_percentage}%</span>
+                                    </div>
+                                    {can.updateProgress && (
+                                        <button type="button" onClick={() => setCheckinOpen(true)} className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold hover:bg-muted">
+                                            Check in
+                                        </button>
+                                    )}
+                                    {can.manage && (
+                                        <button type="button" onClick={() => deleteKr(k.id)} aria-label="Delete key result" className="grid h-7 w-7 place-items-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted">
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                        {can.manage && (
+                            <button type="button" onClick={() => setKrDialog(true)} className="flex w-full items-center gap-2 px-4 py-3.5 text-[12.5px] font-semibold text-primary hover:bg-muted/40">
+                                <Plus className="h-4 w-4" /> Add key result
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* HISTORY */}
+                {subtab === 'history' && (
+                    <div className="rounded-xl border border-border bg-card px-5 py-2 shadow-sm">
+                        {goal.updates.length === 0 ? (
+                            <p className="py-8 text-center text-[13px] text-muted-foreground">No check-ins logged yet.</p>
+                        ) : (
+                            goal.updates.map((h) => (
+                                <div key={h.id} className="flex gap-3.5 border-b border-border/60 py-3.5 last:border-0">
+                                    <Avatar name={h.user_name} className="h-8 w-8 text-[11px]" />
+                                    <div className="flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-[13px] font-semibold">{h.user_name}</span>
+                                            <span className="text-[11.5px] text-muted-foreground">{h.created_at}</span>
+                                            {h.confidence && <RagPill confidence={h.confidence} />}
+                                            <span className="ml-auto text-[13px] font-extrabold tabular-nums">{h.progress_percentage}%</span>
+                                        </div>
+                                        {h.comment && <p className="mt-1 text-[12.5px] text-muted-foreground">{h.comment}</p>}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {/* CHILDREN */}
+                {subtab === 'children' && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {goal.child_goals.length === 0 ? (
+                            <div className="col-span-full rounded-xl border border-dashed border-border px-5 py-10 text-center text-[13px] text-muted-foreground">
+                                No child objectives.{' '}
+                                {can.manage && (
+                                    <button type="button" onClick={() => setAddChildOpen(true)} className="font-semibold text-primary">
+                                        Add one ›
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            goal.child_goals.map((c) => (
+                                <Link key={c.id} href={`/hr/goals/${c.id}`} className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <TypeBadge type={c.goal_type} />
+                                        <span className={cn('h-1.5 w-1.5 rounded-full', RAG[c.confidence].dot)} />
+                                    </div>
+                                    <div className="mb-2.5 text-[13.5px] font-semibold leading-snug">{c.title}</div>
+                                    <div className="flex items-center gap-2">
+                                        <ProgressBar pct={c.progress_percentage} className="h-1.5" />
+                                        <span className="text-xs font-bold tabular-nums">{c.progress_percentage}%</span>
+                                    </div>
+                                    <div className="mt-2 text-[11.5px] text-muted-foreground">{c.user?.name ?? '—'} · {c.key_results_count} KR</div>
+                                </Link>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {/* LINKED PLANS */}
+                {subtab === 'plans' && (
+                    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                        {goal.development_goals.length === 0 ? (
+                            <p className="px-5 py-10 text-center text-[13px] text-muted-foreground">No linked development plans.</p>
+                        ) : (
+                            goal.development_goals.map((p) => (
+                                <div key={p.id} className="flex items-center gap-3 border-b border-border/60 px-4 py-3 last:border-0">
+                                    <Avatar name={p.employee} className="h-9 w-9 text-[12px]" />
+                                    <div className="flex-1">
+                                        <div className="text-[13px] font-semibold">{p.employee ?? '—'}</div>
+                                        <div className="text-[11.5px] text-muted-foreground">
+                                            {p.competency_area ?? p.title} · level {p.current_level ?? 0}→{p.target_level ?? 0}
+                                        </div>
+                                    </div>
+                                    <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold capitalize', STATUS_BADGE[p.status] ?? 'bg-muted text-muted-foreground')}>{p.status.replace('_', ' ')}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* wizards */}
             {can.manage && (
-                <GoalDialog
+                <ObjectiveWizard
                     open={editOpen}
                     onClose={() => setEditOpen(false)}
                     owners={users}
-                    goalTypes={goalTypes}
-                    priorities={priorities}
                     parentGoals={parentGoals}
-                    goal={{
-                        id: goal.id,
-                        user: goal.user,
-                        title: goal.title,
-                        description: goal.description,
-                        goal_type: goal.goal_type,
-                        category: goal.category,
-                        priority: goal.priority,
-                        parent_goal_id: goal.parent_goal_id,
-                        target_value: goal.target_value,
-                        unit: goal.unit,
-                        start_date: goal.start_date,
-                        due_date: goal.due_date,
-                    }}
+                    cycles={cycles}
+                    defaultCycleId={goal.cycle_id}
+                    goal={asObjective}
                 />
             )}
-
             {can.manage && (
-                <GoalDialog
+                <ObjectiveWizard
                     open={addChildOpen}
                     onClose={() => setAddChildOpen(false)}
                     owners={users}
-                    goalTypes={goalTypes}
-                    priorities={priorities}
                     parentGoals={parentGoals}
+                    cycles={cycles}
+                    defaultCycleId={goal.cycle_id}
                     prefillParentId={goal.id}
                 />
             )}
+            <CheckinWizard open={checkinOpen} onClose={() => setCheckinOpen(false)} objective={asObjective} />
+            {can.manage && krDialog && <AddKrDialog goalId={goal.id} owners={users} onClose={() => setKrDialog(false)} />}
         </AppLayout>
+    );
+}
+
+function ragVar(c: Confidence) {
+    return c === 'on_track' ? 'var(--status-success, #16a34a)' : c === 'at_risk' ? 'var(--status-warning, #d97706)' : 'var(--status-critical, #dc2626)';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Add key result dialog                                             */
+/* ------------------------------------------------------------------ */
+
+const KR_TYPES = [
+    { value: 'number', label: 'Number' },
+    { value: 'percent', label: 'Percent' },
+    { value: 'currency', label: 'Currency' },
+    { value: 'milestone', label: 'Milestone' },
+    { value: 'boolean', label: 'Yes / No' },
+];
+
+function AddKrDialog({ goalId, owners, onClose }: { goalId: number; owners: { id: number; name: string }[]; onClose: () => void }) {
+    const form = useForm({
+        title: '',
+        kr_type: 'percent',
+        start_value: '0',
+        target_value: '100',
+        unit: '%',
+        weight: '1',
+        owner_id: '',
+    });
+
+    const submit = () => {
+        form.transform((d) => ({
+            ...d,
+            start_value: Number(d.start_value) || 0,
+            target_value: Number(d.target_value) || 0,
+            weight: Number(d.weight) || 1,
+            owner_id: d.owner_id || null,
+        }));
+        form.post(`/hr/goals/${goalId}/key-results`, { preserveScroll: true, onSuccess: onClose });
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-6" onClick={onClose}>
+            <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <h3 className="flex items-center gap-2 text-base font-bold">
+                    <ListChecks className="h-4 w-4 text-primary" /> Add key result
+                </h3>
+                <div className="mt-4 flex flex-col gap-3">
+                    <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Key result title" />
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <Select value={form.data.kr_type} onValueChange={(v) => form.setData('kr_type', v)}>
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {KR_TYPES.map((t) => (
+                                    <SelectItem key={t.value} value={t.value}>
+                                        {t.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Input value={form.data.start_value} onChange={(e) => form.setData('start_value', e.target.value)} placeholder="Baseline" />
+                        <Input value={form.data.target_value} onChange={(e) => form.setData('target_value', e.target.value)} placeholder="Target" />
+                        <Input value={form.data.unit} onChange={(e) => form.setData('unit', e.target.value)} placeholder="Unit" />
+                        <Input value={form.data.weight} onChange={(e) => form.setData('weight', e.target.value)} placeholder="Weight" />
+                        <Select value={form.data.owner_id} onValueChange={(v) => form.setData('owner_id', v)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Owner" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {owners.map((o) => (
+                                    <SelectItem key={o.id} value={String(o.id)}>
+                                        {o.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="mt-5 flex justify-end gap-2">
+                    <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={submit} disabled={form.processing || !form.data.title.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                        {form.processing ? 'Saving…' : 'Add key result'}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }

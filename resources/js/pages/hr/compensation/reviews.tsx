@@ -1,7 +1,6 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { PageLayout } from '@/components/page';
 import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import { StatusBadge } from '@/components/hr/status-badge';
 import {
     ReviewBuilderDialog,
     type ReviewBuilderBand,
@@ -28,7 +28,7 @@ import {
 } from '@/components/hr/review-builder-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { ClipboardCheck, Eye, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -70,21 +70,6 @@ const formatDate = (value?: string | null) => {
               month: 'short',
               year: 'numeric',
           });
-};
-
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'planning':
-            return 'bg-muted text-foreground border-border';
-        case 'in_progress':
-            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
-        case 'approved':
-            return 'bg-status-success-bg text-status-success border-status-success/30';
-        case 'applied':
-            return 'bg-status-info-bg text-status-info border-status-info/30';
-        default:
-            return 'bg-muted text-foreground border-border';
-    }
 };
 
 const getCycleLabel = (cycle: string) => {
@@ -129,120 +114,102 @@ export default function CompensationReviews({
             <PageLayout hero={<CompensationHero stats={stats} />}>
                 <CompensationTabs active="reviews" />
 
-                {can.manage ? (
-                    <div className="flex justify-end">
+                {/* Inline toolbar — status filter + New review (bands idiom) */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Select
+                        value={filters.status ?? NONE}
+                        onValueChange={(v) =>
+                            onFilter({ status: v === NONE ? null : v })
+                        }
+                    >
+                        <SelectTrigger className="w-full sm:max-w-xs" aria-label="Filter by status">
+                            <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={NONE}>All statuses</SelectItem>
+                            {statuses.map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">
+                                    {s.replace(/_/g, ' ')}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {can.manage ? (
                         <Button size="sm" onClick={() => setBuilderOpen(true)}>
                             <Plus className="mr-1.5 h-4 w-4" />
                             New review
                         </Button>
-                    </div>
-                ) : null}
+                    ) : null}
+                </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div>
-                            <Label className="text-xs text-muted-foreground">
-                                Status
-                            </Label>
-                            <Select
-                                value={filters.status ?? NONE}
-                                onValueChange={(v) =>
-                                    onFilter({ status: v === NONE ? null : v })
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={NONE}>
-                                        All Statuses
-                                    </SelectItem>
-                                    {statuses.map((s) => (
-                                        <SelectItem
-                                            key={s}
-                                            value={s}
-                                            className="capitalize"
-                                        >
-                                            {s.replace(/_/g, ' ')}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Title</TableHead>
-                                    <TableHead>Cycle</TableHead>
-                                    <TableHead>Effective Date</TableHead>
-                                    <TableHead>Employees</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Created By</TableHead>
-                                    <TableHead className="w-20"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {reviews.data.map((review) => (
-                                    <TableRow key={review.id}>
-                                        <TableCell className="font-medium">
-                                            {review.title}
-                                        </TableCell>
-                                        <TableCell>
-                                            {getCycleLabel(review.review_cycle)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatDate(review.effective_date)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {review.items_count}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                className={getStatusColor(
-                                                    review.status,
-                                                )}
-                                            >
-                                                {review.status.replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {review.creator?.name ?? '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Link
-                                                href={`/hr/compensation/reviews/${review.id}`}
-                                                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-                                            >
-                                                View
-                                            </Link>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {!reviews.data.length && (
+                {reviews.data.length > 0 ? (
+                    <Card>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell
-                                            colSpan={7}
-                                            className="py-8 text-center text-sm text-muted-foreground"
-                                        >
-                                            No compensation reviews found.
-                                        </TableCell>
+                                        <TableHead>Title</TableHead>
+                                        <TableHead>Cycle</TableHead>
+                                        <TableHead>Effective</TableHead>
+                                        <TableHead>Employees</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Created by</TableHead>
+                                        <TableHead className="w-16 text-right"></TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {reviews.data.map((review) => (
+                                        <TableRow key={review.id}>
+                                            <TableCell className="font-medium">
+                                                {review.title}
+                                            </TableCell>
+                                            <TableCell>{getCycleLabel(review.review_cycle)}</TableCell>
+                                            <TableCell>{formatDate(review.effective_date)}</TableCell>
+                                            <TableCell className="tabular-nums">{review.items_count}</TableCell>
+                                            <TableCell>
+                                                <StatusBadge
+                                                    status={review.status}
+                                                    tone={review.status === 'applied' ? 'info' : undefined}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {review.creator?.name ?? '—'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                    <Link
+                                                        href={`/hr/compensation/reviews/${review.id}`}
+                                                        aria-label={`View ${review.title}`}
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <EmptyState
+                        icon={ClipboardCheck}
+                        heading={filters.status ? 'No reviews match this status' : 'No pay reviews yet'}
+                        description={
+                            filters.status
+                                ? 'Try clearing the status filter.'
+                                : 'Start a pay review to plan and apply salary adjustments across your people.'
+                        }
+                        action={
+                            can.manage && !filters.status ? (
+                                <Button size="sm" onClick={() => setBuilderOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New review
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                )}
 
                 {reviews?.links?.length ? (
                     <LaravelPagination links={reviews.links} />

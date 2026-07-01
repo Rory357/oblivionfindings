@@ -47,6 +47,7 @@ class LiveComplianceValidator
                 'credential' => $this->validateCredentialRequirements($user, $reqs),
                 'background_check' => $this->validateBackgroundCheckRequirements($user, $reqs),
                 'policy_attestation' => $this->validateAttestationRequirements($user, $reqs),
+                'driver_licence' => $this->validateDriverLicenceRequirements($user, $reqs),
                 'manual' => $this->validateManualRequirements($user, $reqs),
                 default => [],
             };
@@ -84,20 +85,39 @@ class LiveComplianceValidator
      */
     protected function validateTrainingRequirements(User $user, Collection $requirements): array
     {
-        $referenceIds = $requirements->pluck('reference_id')->filter()->unique()->values()->all();
+        $legacyRefs = $requirements->pluck('reference_id')->filter()->unique()->values()->all();
 
-        // Batch load: best completed record per training course.
-        $records = $user->staffTrainingRecords()
-            ->whereIn('training_course_id', $referenceIds)
-            ->whereIn('status', ['completed', 'passed'])
-            ->orderByDesc('completed_at')
-            ->get()
-            ->keyBy('training_course_id');
+        // Resolve canonical HrCourse ids for these requirements in one query
+        // (requirement id → hr_course_id) via the HrCourse back-link.
+        $hrCourseByReq = \App\Domain\Hr\Models\HrCourse::query()
+            ->whereIn('compliance_requirement_id', $requirements->pluck('id')->all() ?: [0])
+            ->pluck('id', 'compliance_requirement_id');
+        $hrCourseIds = $hrCourseByReq->values()->all();
+
+        // Batch load completed records matching EITHER link (canonical or legacy),
+        // most-recent first. Matching either guarantees no wrongful shift block.
+        $records = collect();
+        if ($legacyRefs || $hrCourseIds) {
+            $records = $user->staffTrainingRecords()
+                ->whereIn('status', ['completed', 'passed'])
+                ->where(function ($q) use ($legacyRefs, $hrCourseIds) {
+                    if ($legacyRefs) {
+                        $q->orWhereIn('training_course_id', $legacyRefs);
+                    }
+                    if ($hrCourseIds) {
+                        $q->orWhereIn('hr_course_id', $hrCourseIds);
+                    }
+                })
+                ->orderByDesc('completed_at')
+                ->get();
+        }
 
         $failures = [];
 
         foreach ($requirements as $req) {
-            $record = $records->get($req->reference_id);
+            $hrCourseId = $hrCourseByReq->get($req->id);
+            $record = $records->first(fn ($r) => ($hrCourseId && (int) $r->hr_course_id === (int) $hrCourseId)
+                || ($req->reference_id && (int) $r->training_course_id === (int) $req->reference_id));
 
             if (! $record) {
                 $failures[] = $this->failure($req, "{$req->name} training is missing or not completed.");
@@ -211,6 +231,37 @@ class LiveComplianceValidator
                 if ($expiresAt->isPast()) {
                     $failures[] = $this->failure($req, "{$req->name} attestation expired on {$expiresAt->format('j M Y')}.", $expiresAt);
                 }
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * Driver-licence requirements validate against the live HrDriverEligibility
+     * record: a missing record, a suspended driver, or an expired licence blocks
+     * assignment to a driving shift.
+     *
+     * @return array<int, array{requirement: string, code: string, reason: string, expires_at: string|null}>
+     */
+    protected function validateDriverLicenceRequirements(User $user, Collection $requirements): array
+    {
+        $record = $user->hrDriverEligibility;
+        $failures = [];
+
+        foreach ($requirements as $req) {
+            if (! $record) {
+                $failures[] = $this->failure($req, "{$req->name}: no driver eligibility record.");
+                continue;
+            }
+
+            if ($record->status === 'suspended') {
+                $failures[] = $this->failure($req, "{$req->name}: driving privileges suspended.");
+                continue;
+            }
+
+            if ($record->licence_expires_at && $record->licence_expires_at->isPast()) {
+                $failures[] = $this->failure($req, "{$req->name} expired on {$record->licence_expires_at->format('j M Y')}.", $record->licence_expires_at);
             }
         }
 

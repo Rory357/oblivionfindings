@@ -20,14 +20,22 @@ class HrCourseSession extends Model
         'start_time',
         'end_time',
         'location',
+        'online_link',
         'facilitator',
+        'trainer_id',
         'max_participants',
+        'waitlist_enabled',
         'status',
+        'notes',
+        'cancelled_at',
+        'cancellation_reason',
     ];
 
     protected $casts = [
         'session_date' => 'date',
         'max_participants' => 'integer',
+        'waitlist_enabled' => 'boolean',
+        'cancelled_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -44,6 +52,11 @@ class HrCourseSession extends Model
         return $this->hasMany(HrCourseEnrollment::class, 'session_id');
     }
 
+    public function trainer(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'trainer_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
@@ -56,6 +69,7 @@ class HrCourseSession extends Model
     public function scopeUpcoming(Builder $query): Builder
     {
         return $query->where('session_date', '>=', now()->toDateString())
-            ->where('status', 'scheduled');
+            ->where('status', 'scheduled')
+            ->whereNull('cancelled_at');
     }
 }
