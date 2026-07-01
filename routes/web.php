@@ -138,6 +138,14 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
+// IT & Provisioning — DESIGN PREVIEW (wireframe only, no backend yet).
+// Renders static mock data so the shape can be reviewed before the
+// it_provisioning_requests / it_tickets subsystem is built. See
+// docs/IT_PROVISIONING_WIREFRAME.md for the build-out spec.
+Route::get('/it', fn () => Inertia::render('it/index'))
+    ->middleware(['auth', 'permission:hr.onboarding.manage'])
+    ->name('it.index');
+
 Route::get('/my-roster/data', [RosterController::class, 'data'])
     ->middleware(['auth'])
     ->name('my-roster.data');

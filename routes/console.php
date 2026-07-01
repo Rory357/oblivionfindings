@@ -323,6 +323,13 @@ app(Schedule::class)
     ->dailyAt('08:00')
     ->withoutOverlapping();
 
+// Onboarding task reminders: nudge assignees about overdue / due-soon tasks: daily 08:15
+app(Schedule::class)
+    ->command('hr:onboarding-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:15')
+    ->withoutOverlapping();
+
 // Vacancy check: reconcile position headcounts + report understaffed positions: daily 06:30
 app(Schedule::class)
     ->command('hr:check-vacancies')

@@ -40,6 +40,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DOC_CATEGORY_ICON } from '@/components/hr/document-library-kit';
 import { DocumentsHero, type DocsHeroNeed } from '@/components/hr/documents-hero';
 import { useLeaveContextMenu, type LeaveCtxItem } from '@/components/hr/leave-context-menu';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
@@ -155,16 +156,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
     { title: 'Documents', href: '/hr/documents' },
 ];
-
-const CATEGORY_ICON: Record<string, LucideIcon> = {
-    contract: FileText,
-    certificate: Award,
-    letter: Mail,
-    offer: Mail,
-    policy: Scroll,
-    payslip: FileText,
-    other: FileText,
-};
 
 const FOLDER_META: Record<string, { icon: LucideIcon; bg: string; fg: string }> = {
     Contracts: { icon: FileText, bg: 'bg-accent', fg: 'text-primary' },
@@ -759,7 +750,7 @@ function LibraryTab({
                 ) : (
                     filteredDocs.map((d, i) => {
                         const sel = selected.includes(d.id);
-                        const Icon = CATEGORY_ICON[d.category] ?? FileText;
+                        const Icon = DOC_CATEGORY_ICON[d.category] ?? FileText;
                         const rowMenu = buildRowMenu(d, { onView, onSend, canManage });
                         return (
                             <div
@@ -1151,16 +1142,52 @@ function PoliciesTab({ policies, canView, canManage }: { policies: Policy[]; can
 /*  Inline viewer (slide-over)                                        */
 /* ------------------------------------------------------------------ */
 
-function DocViewer({ doc, onClose, onSend }: { doc: DocRow | null; onClose: () => void; onSend: (d: DocRow) => void }) {
-    if (!doc) return null;
-    const Icon = CATEGORY_ICON[doc.category] ?? FileText;
+const AUDIT_ICON: Record<string, LucideIcon> = {
+    upload: Upload,
+    pencil: Pencil,
+    trash: Trash2,
+    send: Send,
+    check: Check,
+    alert: AlertTriangle,
+};
 
-    const timeline: { label: string; who: string; at: string; icon: LucideIcon }[] = [
+type AuditEntry = { label: string; who: string; at: string | null; icon: string };
+
+function DocViewer({ doc, onClose, onSend }: { doc: DocRow | null; onClose: () => void; onSend: (d: DocRow) => void }) {
+    const [audit, setAudit] = useState<AuditEntry[] | null>(null);
+
+    useEffect(() => {
+        if (!doc) {
+            setAudit(null);
+            return;
+        }
+        let cancelled = false;
+        setAudit(null);
+        fetch(`/hr/documents/${doc.id}/audit`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+            .then((data: { entries: AuditEntry[] }) => { if (!cancelled) setAudit(data.entries); })
+            .catch(() => { if (!cancelled) setAudit([]); });
+        return () => { cancelled = true; };
+    }, [doc]);
+
+    if (!doc) return null;
+    const Icon = DOC_CATEGORY_ICON[doc.category] ?? FileText;
+
+    // Real audit log (fetched) with a derived fallback while loading / on error.
+    const derived: { label: string; who: string; at: string; icon: LucideIcon }[] = [
         { label: 'Uploaded', who: doc.created_by, at: doc.created_at ?? '', icon: Upload },
     ];
-    if (doc.signature) timeline.push({ label: 'Sent for signature', who: doc.created_by, at: '', icon: Send });
-    if (doc.signature === 'signed') timeline.push({ label: 'Signed', who: doc.employee?.name ?? 'Employee', at: '', icon: Check });
-    if (doc.signature === 'declined') timeline.push({ label: 'Declined', who: doc.employee?.name ?? 'Employee', at: '', icon: AlertTriangle });
+    if (doc.signature) derived.push({ label: 'Sent for signature', who: doc.created_by, at: '', icon: Send });
+    if (doc.signature === 'signed') derived.push({ label: 'Signed', who: doc.employee?.name ?? 'Employee', at: '', icon: Check });
+    if (doc.signature === 'declined') derived.push({ label: 'Declined', who: doc.employee?.name ?? 'Employee', at: '', icon: AlertTriangle });
+
+    const timeline: { label: string; who: string; at: string; icon: LucideIcon }[] =
+        audit && audit.length > 0
+            ? audit.map((e) => ({ label: e.label, who: e.who, at: e.at ?? '', icon: AUDIT_ICON[e.icon] ?? FileText }))
+            : derived;
 
     return (
         <Sheet open onOpenChange={(o) => !o && onClose()}>

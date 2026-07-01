@@ -553,6 +553,18 @@ function buildIconNavItems({
         }
     }
 
+    // IT & Provisioning — design preview surface for the account/access/equipment
+    // requests that onboarding IT tasks should feed. Gated to onboarding managers
+    // until the backend ships (see docs/IT_PROVISIONING_WIREFRAME.md).
+    if (can?.hr?.onboarding?.manage) {
+        items.push({
+            id: 'it-provisioning',
+            icon: Server,
+            label: 'IT & Provisioning',
+            href: '/it',
+        });
+    }
+
     // HR — visible if the user has any HR capability (they always have My HR
     // because all employees can view their own records, but non-employees
     // with no HR grant shouldn't see the icon at all).
