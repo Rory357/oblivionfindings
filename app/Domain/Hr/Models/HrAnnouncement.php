@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Announcement;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -9,10 +10,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrAnnouncement extends Model
 {
-    use HasFactory, AuditableChanges;
+    use HasFactory, AuditableChanges, SoftDeletes;
 
     protected static function newFactory()
     {
@@ -24,10 +26,16 @@ class HrAnnouncement extends Model
         'title',
         'content',
         'priority',
+        'status',
         'target_audience',
         'target_value',
         'published_at',
         'expires_at',
+        'ack_deadline',
+        'recurrence',
+        'recurrence_ends_at',
+        'recurrence_parent_id',
+        'inbox_announcement_id',
         'is_pinned',
         'requires_acknowledgement',
         'created_by',
@@ -36,6 +44,8 @@ class HrAnnouncement extends Model
     protected $casts = [
         'published_at' => 'datetime',
         'expires_at' => 'datetime',
+        'ack_deadline' => 'datetime',
+        'recurrence_ends_at' => 'datetime',
         'is_pinned' => 'boolean',
         'requires_acknowledgement' => 'boolean',
     ];
@@ -54,6 +64,26 @@ class HrAnnouncement extends Model
         return $this->hasMany(HrAnnouncementAcknowledgement::class, 'announcement_id');
     }
 
+    public function targets(): HasMany
+    {
+        return $this->hasMany(HrAnnouncementTarget::class, 'announcement_id');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(HrAnnouncementAttachment::class, 'announcement_id');
+    }
+
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(HrAnnouncementReminder::class, 'announcement_id');
+    }
+
+    public function inboxAnnouncement(): BelongsTo
+    {
+        return $this->belongsTo(Announcement::class, 'inbox_announcement_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
@@ -63,9 +93,14 @@ class HrAnnouncement extends Model
         return $query->where('tenant_id', $tenantId);
     }
 
+    /**
+     * Live notices — explicitly published, in date window. Honours both the
+     * legacy published_at semantics and the new status column.
+     */
     public function scopePublished(Builder $query): Builder
     {
-        return $query->whereNotNull('published_at')
+        return $query->where('status', 'published')
+            ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
     }
 
@@ -76,5 +111,15 @@ class HrAnnouncement extends Model
                 $q->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
             });
+    }
+
+    public function scopeScheduled(Builder $query): Builder
+    {
+        return $query->whereIn('status', ['draft', 'scheduled']);
+    }
+
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->where('status', 'archived');
     }
 }

@@ -38,9 +38,9 @@ test('a manager can soft-delete an OKR objective and it leaves the goals list', 
 
     $this->assertSoftDeleted('hr_goals', ['id' => $goal->id]);
 
-    $response = $this->actingAs($this->hr)->get('/hr/goals');
+    $response = $this->actingAs($this->hr)->get('/hr/goals?cycle=all');
     $response->assertOk();
-    expect(collect($response->inertiaProps('goals')['data'])->pluck('id'))
+    expect(collect($response->inertiaProps('objectives'))->pluck('id'))
         ->not->toContain($goal->id);
 });
 
@@ -63,9 +63,12 @@ test('a manager can soft-delete a development plan and it leaves the development
 
     $this->assertSoftDeleted('hr_development_goals', ['id' => $plan->id]);
 
-    $response = $this->actingAs($this->hr)->get('/hr/goals/development');
+    // Development folded into the hub — old URL redirects to the tab.
+    $this->actingAs($this->hr)->get('/hr/goals/development')->assertRedirect('/hr/goals?tab=development');
+
+    $response = $this->actingAs($this->hr)->get('/hr/goals?cycle=all');
     $response->assertOk();
-    expect(collect($response->inertiaProps('goals')['data'])->pluck('id'))
+    expect(collect($response->inertiaProps('developmentPlans'))->pluck('id'))
         ->not->toContain($plan->id);
 });
 

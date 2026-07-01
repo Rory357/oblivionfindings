@@ -5,6 +5,6 @@
 export { RecognitionWizard } from './recognition-wizard';
 export type { RecognitionPerson, RecognitionDefaults } from './recognition-wizard';
 export { ComposeWizard } from './compose-wizard';
-export { AnnounceWizard } from './announce-wizard';
-export type { AnnouncementSite } from './announce-wizard';
+// AnnounceWizard retired → replaced by the single command-center composer at
+// '@/components/hr/announcement-wizard' (mounted in /hr/announcements and the feed).
 export { RecognitionInsightsDialog } from './recognition-insights-dialog';

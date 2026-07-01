@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
+use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
@@ -13,6 +15,8 @@ use Inertia\Inertia;
 
 class ComplianceMatrixController extends Controller
 {
+    use BuildsComplianceHero;
+    use ProvidesComplianceWizardData;
     use ResolvesHrTenant;
 
     /* ------------------------------------------------------------------ */
@@ -60,10 +64,12 @@ class ComplianceMatrixController extends Controller
         $siteTypes = $matrixEntries->pluck('site_type')->filter()->unique()->sort()->values();
 
         return Inertia::render('hr/compliance/matrix', [
+            'hero' => $this->complianceHero($user, $tenantId),
             'requirements' => $requirements,
             'matrixEntries' => $matrixEntries,
             'roles' => $roles,
             'siteTypes' => $siteTypes,
+            'wizard' => $this->complianceWizardData($tenantId),
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),
             ],
@@ -94,14 +100,48 @@ class ComplianceMatrixController extends Controller
             'is_active'             => ['sometimes', 'boolean'],
         ]);
 
-        HrComplianceRequirement::create([
+        $requirement = HrComplianceRequirement::create([
             ...$validated,
             'tenant_id'  => $tenantId,
             'is_active'  => $validated['is_active'] ?? true,
             'created_by' => $user->id,
         ]);
 
+        $this->syncAssignment($request, $requirement, $tenantId);
+
         return redirect()->back()->with('success', 'Compliance requirement created.');
+    }
+
+    /**
+     * Optional Assignment step from the Requirement wizard: create matrix rows for
+     * each role × site-type the requirement now applies to. Additive — never
+     * deletes existing rows the user didn't touch.
+     */
+    private function syncAssignment(Request $request, HrComplianceRequirement $requirement, ?int $tenantId): void
+    {
+        $roles = array_filter((array) $request->input('roles', []));
+        if (empty($roles)) {
+            return;
+        }
+
+        $siteTypes = array_filter((array) $request->input('site_types', []));
+        if (empty($siteTypes)) {
+            $siteTypes = [null];
+        }
+
+        foreach ($roles as $role) {
+            foreach ($siteTypes as $siteType) {
+                HrComplianceMatrix::updateOrCreate(
+                    [
+                        'tenant_id' => $tenantId,
+                        'requirement_id' => $requirement->id,
+                        'role' => $role,
+                        'site_type' => $siteType,
+                    ],
+                    ['is_mandatory' => (bool) $requirement->hard_stop],
+                );
+            }
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -131,6 +171,8 @@ class ComplianceMatrixController extends Controller
 
         $validated['updated_by'] = $user->id;
         $requirement->update($validated);
+
+        $this->syncAssignment($request, $requirement, $tenantId);
 
         return redirect()->back()->with('success', 'Compliance requirement updated.');
     }

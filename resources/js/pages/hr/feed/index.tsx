@@ -1,11 +1,11 @@
 /* eslint-disable no-restricted-syntax -- The composer bar + filter tabs are
  * bespoke on-page surfaces (raw <button>/<input>) styled with semantic tokens. */
 import {
-    AnnounceWizard,
     ComposeWizard,
     RecognitionInsightsDialog,
     RecognitionWizard,
 } from '@/components/recognition';
+import { AnnouncementWizard, type AnnouncementSegments } from '@/components/hr/announcement-wizard';
 import { type RecognitionDefaults } from '@/components/recognition/recognition-wizard';
 import { FeedHero, type FeedCelebration, type FeedMetrics } from '@/components/hr/feed-hero';
 import { PageLayout } from '@/components/page';
@@ -350,7 +350,19 @@ export default function FeedIndex({
                 defaults={recogDefaults}
             />
             <ComposeWizard open={composeOpen} onClose={() => setComposeOpen(false)} sites={sites} />
-            <AnnounceWizard open={announceOpen} onClose={() => setAnnounceOpen(false)} sites={sites} />
+            <AnnouncementWizard
+                open={announceOpen}
+                onClose={() => setAnnounceOpen(false)}
+                segments={
+                    {
+                        all_count: 0,
+                        sites: sites.map((s) => ({ key: String(s.id), label: s.name, count: 0 })),
+                        departments: [],
+                        roles: [],
+                    } satisfies AnnouncementSegments
+                }
+                onSuccess={() => router.reload({ only: ['announcements'] })}
+            />
             <RecognitionInsightsDialog
                 open={insightsOpen}
                 onClose={() => setInsightsOpen(false)}
