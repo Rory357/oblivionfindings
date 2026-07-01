@@ -8,6 +8,8 @@ use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Hr\Services\ComplianceMatrixService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -201,6 +203,8 @@ class DriverEligibilityController extends Controller
             'created_by'      => $user->id,
         ]);
 
+        $this->reevaluateCompliance($validated['user_id']);
+
         return redirect()->back()->with('success', 'Driver eligibility record created.');
     }
 
@@ -230,6 +234,8 @@ class DriverEligibilityController extends Controller
         $validated['updated_by'] = $user->id;
         $validated['last_reviewed_at'] = now();
         $eligibility->update($validated);
+
+        $this->reevaluateCompliance($eligibility->user_id);
 
         return redirect()->back()->with('success', 'Driver eligibility record updated.');
     }
@@ -276,6 +282,8 @@ class DriverEligibilityController extends Controller
             ]);
         }
 
+        $this->reevaluateCompliance($eligibility->user_id);
+
         return redirect()->back()->with('success', 'Driver approved to transport clients.');
     }
 
@@ -314,6 +322,20 @@ class DriverEligibilityController extends Controller
             ]);
         }
 
+        $this->reevaluateCompliance($eligibility->user_id);
+
         return redirect()->back()->with('success', 'Driving privileges suspended.');
+    }
+
+    /**
+     * Refresh the driver's cached compliance so any driver_licence hard-stop
+     * reflects the licence change immediately (not just at the nightly sweep).
+     */
+    private function reevaluateCompliance(int $userId): void
+    {
+        $user = User::find($userId);
+        if ($user) {
+            app(ComplianceMatrixService::class)->evaluateStaff($user);
+        }
     }
 }

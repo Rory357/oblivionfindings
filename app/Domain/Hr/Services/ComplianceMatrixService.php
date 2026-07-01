@@ -450,6 +450,31 @@ class ComplianceMatrixService
                 }
                 break;
 
+            case 'driver_licence':
+                $record = $user->hrDriverEligibility;
+
+                if ($record) {
+                    $result['evidence_type'] = 'driver_licence';
+                    $result['evidence_id'] = $record->id;
+                    $result['valid_from'] = optional($record->can_drive_clients_approved_at)->toDateString();
+                    $result['expires_at'] = optional($record->licence_expires_at)->toDateString();
+
+                    if ($record->status === 'suspended') {
+                        $result['status'] = 'expired';
+                    } elseif ($record->licence_expires_at && $record->licence_expires_at->isPast()) {
+                        $result['status'] = 'expired';
+                    } elseif ($record->licence_expires_at
+                        && $record->licence_expires_at->isFuture()
+                        && $record->licence_expires_at->diffInDays(now(), true) <= ($requirement->renewal_reminder_days ?: 30)) {
+                        $result['status'] = 'expiring_soon';
+                    } elseif ($record->status === 'eligible') {
+                        $result['status'] = 'compliant';
+                    } else {
+                        $result['status'] = 'not_started'; // pending_review
+                    }
+                }
+                break;
+
             case 'manual':
                 $existing = HrStaffComplianceStatus::where('user_id', $user->id)
                     ->where('requirement_id', $requirement->id)

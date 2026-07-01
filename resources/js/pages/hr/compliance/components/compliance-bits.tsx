@@ -36,6 +36,7 @@ export const CHECK_TYPE_BADGE: Record<string, { label: string; variant: Variant 
     credential: { label: 'Credential', variant: 'info' },
     background_check: { label: 'Background', variant: 'warning' },
     policy_attestation: { label: 'Attestation', variant: 'neutral' },
+    driver_licence: { label: 'Driver licence', variant: 'info' },
     manual: { label: 'Manual', variant: 'neutral' },
 };
 

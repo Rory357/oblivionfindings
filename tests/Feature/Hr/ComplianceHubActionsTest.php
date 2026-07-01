@@ -197,6 +197,77 @@ test('staff export streams a csv', function () {
     expect($response->headers->get('content-type'))->toContain('text/csv');
 });
 
+test('an expired driver licence hard-stops shift assignment', function () {
+    $req = HrComplianceRequirement::query()->create([
+        'tenant_id' => 1,
+        'code' => 'DL-01',
+        'name' => 'Valid Driver Licence',
+        'category' => 'Eligibility',
+        'check_type' => 'driver_licence',
+        'hard_stop' => true,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+    ]);
+    HrComplianceMatrix::query()->create([
+        'tenant_id' => 1,
+        'requirement_id' => $req->id,
+        'role' => 'support_worker',
+        'site_type' => null,
+        'is_mandatory' => true,
+    ]);
+    $supportRole = Role::query()->where('name', 'support_worker')->first();
+    $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
+
+    HrDriverEligibility::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $this->staff->id,
+        'licence_number' => 'AB123456',
+        'licence_class' => '2',
+        'licence_expires_at' => now()->subMonth()->toDateString(),
+        'status' => 'eligible',
+    ]);
+
+    $result = app(\App\Domain\Hr\Services\ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
+
+    expect($result['blocked'])->toBeTrue();
+    expect(collect($result['failures'])->pluck('code'))->toContain('DL-01');
+});
+
+test('a current driver licence does not hard-stop shift assignment', function () {
+    $req = HrComplianceRequirement::query()->create([
+        'tenant_id' => 1,
+        'code' => 'DL-01',
+        'name' => 'Valid Driver Licence',
+        'category' => 'Eligibility',
+        'check_type' => 'driver_licence',
+        'hard_stop' => true,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+    ]);
+    HrComplianceMatrix::query()->create([
+        'tenant_id' => 1,
+        'requirement_id' => $req->id,
+        'role' => 'support_worker',
+        'site_type' => null,
+        'is_mandatory' => true,
+    ]);
+    $supportRole = Role::query()->where('name', 'support_worker')->first();
+    $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
+
+    HrDriverEligibility::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $this->staff->id,
+        'licence_number' => 'AB123456',
+        'licence_class' => '2',
+        'licence_expires_at' => now()->addYears(3)->toDateString(),
+        'status' => 'eligible',
+    ]);
+
+    $result = app(\App\Domain\Hr\Services\ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
+
+    expect(collect($result['failures'])->pluck('code'))->not->toContain('DL-01');
+});
+
 test('driver show page renders for a record', function () {
     $driver = HrDriverEligibility::query()->create([
         'tenant_id' => 1,

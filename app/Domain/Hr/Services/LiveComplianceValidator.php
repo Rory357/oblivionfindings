@@ -47,6 +47,7 @@ class LiveComplianceValidator
                 'credential' => $this->validateCredentialRequirements($user, $reqs),
                 'background_check' => $this->validateBackgroundCheckRequirements($user, $reqs),
                 'policy_attestation' => $this->validateAttestationRequirements($user, $reqs),
+                'driver_licence' => $this->validateDriverLicenceRequirements($user, $reqs),
                 'manual' => $this->validateManualRequirements($user, $reqs),
                 default => [],
             };
@@ -230,6 +231,37 @@ class LiveComplianceValidator
                 if ($expiresAt->isPast()) {
                     $failures[] = $this->failure($req, "{$req->name} attestation expired on {$expiresAt->format('j M Y')}.", $expiresAt);
                 }
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * Driver-licence requirements validate against the live HrDriverEligibility
+     * record: a missing record, a suspended driver, or an expired licence blocks
+     * assignment to a driving shift.
+     *
+     * @return array<int, array{requirement: string, code: string, reason: string, expires_at: string|null}>
+     */
+    protected function validateDriverLicenceRequirements(User $user, Collection $requirements): array
+    {
+        $record = $user->hrDriverEligibility;
+        $failures = [];
+
+        foreach ($requirements as $req) {
+            if (! $record) {
+                $failures[] = $this->failure($req, "{$req->name}: no driver eligibility record.");
+                continue;
+            }
+
+            if ($record->status === 'suspended') {
+                $failures[] = $this->failure($req, "{$req->name}: driving privileges suspended.");
+                continue;
+            }
+
+            if ($record->licence_expires_at && $record->licence_expires_at->isPast()) {
+                $failures[] = $this->failure($req, "{$req->name} expired on {$record->licence_expires_at->format('j M Y')}.", $record->licence_expires_at);
             }
         }
 

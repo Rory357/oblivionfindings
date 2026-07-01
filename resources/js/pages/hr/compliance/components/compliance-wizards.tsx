@@ -91,6 +91,7 @@ const CHECK_TYPE_TILES = [
     { key: 'credential', label: 'Credential', description: 'Held qualification' },
     { key: 'background_check', label: 'Background check', description: 'Police / MOJ' },
     { key: 'policy_attestation', label: 'Attestation', description: 'Signed policy' },
+    { key: 'driver_licence', label: 'Driver licence', description: 'From the driver register' },
     { key: 'manual', label: 'Manual', description: 'Recorded by hand' },
 ];
 
