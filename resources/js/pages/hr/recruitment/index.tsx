@@ -187,6 +187,7 @@ export default function RecruitmentHub(props: Props) {
     const [tab, setTab] = useHrTab('pipeline', { param: 'tab', syncUrl: true });
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState<string>('all');
+    const [tagFilter, setTagFilter] = useState<string | null>(null);
     const [selected, setSelected] = useState<number[]>([]);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -217,15 +218,17 @@ export default function RecruitmentHub(props: Props) {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
+        const tagQ = tagFilter?.toLowerCase() ?? null;
         return candidates.filter((c) => {
             if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
+            if (tagQ && !c.tags.some((t) => t.toLowerCase() === tagQ)) return false;
             if (q) {
                 const hay = `${c.full_name} ${c.email} ${c.requisition?.title ?? ''} ${c.tags.join(' ')}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
         });
-    }, [candidates, search, stageFilter]);
+    }, [candidates, search, stageFilter, tagFilter]);
 
     /* ---- actions ---- */
     const advance = (c: HubCandidate) => {
@@ -461,6 +464,8 @@ export default function RecruitmentHub(props: Props) {
                                 setSearch={setSearch}
                                 stageFilter={stageFilter}
                                 setStageFilter={setStageFilter}
+                                tagFilter={tagFilter}
+                                setTagFilter={setTagFilter}
                                 selected={selected}
                                 toggleSelect={toggleSelect}
                                 toggleAll={toggleAll}
@@ -670,6 +675,8 @@ function PipelineTab({
     setSearch,
     stageFilter,
     setStageFilter,
+    tagFilter,
+    setTagFilter,
     selected,
     toggleSelect,
     toggleAll,
@@ -691,6 +698,8 @@ function PipelineTab({
     setSearch: (v: string) => void;
     stageFilter: string;
     setStageFilter: (v: string) => void;
+    tagFilter: string | null;
+    setTagFilter: (v: string | null) => void;
     selected: number[];
     toggleSelect: (id: number) => void;
     toggleAll: () => void;
@@ -744,6 +753,16 @@ function PipelineTab({
                         );
                     })}
                 </div>
+                {tagFilter ? (
+                    <button
+                        type="button"
+                        onClick={() => setTagFilter(null)}
+                        title="Clear tag filter"
+                        className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 text-[12.5px] font-semibold text-primary hover:bg-primary/15"
+                    >
+                        Tag: {tagFilter} <span aria-hidden className="text-[13px] leading-none">✕</span>
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={() => setSortByScore((s) => !s)}
@@ -834,7 +853,15 @@ function PipelineTab({
                                     {c.tags.length > 0 ? (
                                         <span className="mt-0.5 flex flex-wrap items-center gap-1">
                                             {c.tags.slice(0, 3).map((t) => (
-                                                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t}</span>
+                                                <span
+                                                    key={t}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={(e) => { e.stopPropagation(); setTagFilter(t); }}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setTagFilter(t); } }}
+                                                    title={`Filter by “${t}”`}
+                                                    className={`cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${tagFilter?.toLowerCase() === t.toLowerCase() ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary'}`}
+                                                >{t}</span>
                                             ))}
                                             {c.tags.length > 3 ? <span className="text-[10px] text-muted-foreground">+{c.tags.length - 3}</span> : null}
                                         </span>
