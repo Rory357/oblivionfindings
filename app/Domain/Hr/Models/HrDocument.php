@@ -8,6 +8,7 @@ use Database\Factories\Hr\HrDocumentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrDocument extends Model
 {
@@ -32,6 +33,7 @@ class HrDocument extends Model
         'size_bytes',
         'is_restricted',
         'generated_from_template',
+        'version',
         'sent_to_employee',
         'sent_at',
         'signed_by_employee',
@@ -45,6 +47,7 @@ class HrDocument extends Model
 
     protected $casts = [
         'size_bytes' => 'integer',
+        'version' => 'integer',
         'is_restricted' => 'boolean',
         'generated_from_template' => 'boolean',
         'sent_to_employee' => 'boolean',
@@ -77,5 +80,10 @@ class HrDocument extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function signatures(): HasMany
+    {
+        return $this->hasMany(HrDocumentSignature::class, 'document_id');
     }
 }

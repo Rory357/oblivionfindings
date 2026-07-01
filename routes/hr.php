@@ -136,6 +136,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/recruitment/candidates/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
         Route::put('/recruitment/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/{candidate}/tags', [CandidateController::class, 'updateTags'])->name('candidates.tags.update')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/applications/{application}/advance', [CandidateController::class, 'advanceApplication'])->name('applications.advance')
             ->middleware('permission:hr.recruitment.manage');
 
@@ -189,6 +191,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/submit-approval', [CandidateController::class, 'submitOfferApproval'])->name('offers.submit-approval')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/decline-approval', [CandidateController::class, 'declineOfferApproval'])->name('offers.decline-approval')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
             ->middleware('permission:hr.recruitment.manage');
@@ -483,12 +489,19 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.documents.view')->group(function () {
         Route::get('/documents', [HrDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/export', [HrDocumentController::class, 'export'])->name('documents.export');
         Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])->name('documents.download');
+        Route::get('/documents/{document}/signed', [HrDocumentController::class, 'downloadSigned'])->name('documents.signed');
 
         Route::middleware('permission:hr.documents.manage')->group(function () {
             Route::get('/documents/upload', [HrDocumentController::class, 'createUpload'])->name('documents.upload');
             Route::post('/documents', [HrDocumentController::class, 'store'])->name('documents.store');
             Route::post('/documents/generate', [HrDocumentController::class, 'generate'])->name('documents.generate');
+            Route::post('/documents/preview', [HrDocumentController::class, 'preview'])->name('documents.preview');
+            Route::get('/documents/bulk-download', [HrDocumentController::class, 'bulkDownload'])->name('documents.bulk-download');
+            Route::post('/documents/bulk-delete', [HrDocumentController::class, 'bulkDestroy'])->name('documents.bulk-delete');
+            Route::post('/documents/move', [HrDocumentController::class, 'move'])->name('documents.move');
+            Route::put('/documents/{document}', [HrDocumentController::class, 'update'])->name('documents.update');
             Route::delete('/documents/{document}', [HrDocumentController::class, 'destroy'])->name('documents.destroy');
             Route::get('/documents/templates', [HrDocumentController::class, 'templates'])->name('documents.templates');
             Route::get('/documents/templates/create', [HrDocumentController::class, 'createTemplate'])->name('documents.templates.create');
@@ -976,9 +989,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
         Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
         Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
-        Route::post('/request', [ESignatureController::class, 'request'])
-            ->middleware('permission:hr.signatures.manage|hr.documents.manage')
-            ->name('request');
+        Route::middleware('permission:hr.signatures.manage|hr.documents.manage')->group(function () {
+            Route::post('/request', [ESignatureController::class, 'request'])->name('request');
+            Route::post('/{signature}/nudge', [ESignatureController::class, 'nudge'])->name('nudge');
+            Route::post('/{signature}/resend', [ESignatureController::class, 'resend'])->name('resend');
+            Route::post('/document/{document}/cancel', [ESignatureController::class, 'cancel'])->name('cancel');
+        });
     });
 
     /*
