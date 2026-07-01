@@ -267,12 +267,25 @@ class AnnouncementController extends Controller
         $userAcknowledged = $announcement->acknowledgements->contains('user_id', $user->id);
         $canManage = (bool) $user->canDo('hr.announcements.manage');
 
+        // Reuse the existing polymorphic feed reaction/reply rows so the thread
+        // shown here is the SAME data as the Community feed (subject_type=announcement).
+        $feed = app(\App\Domain\Hr\Services\FeedService::class);
+        $reactions = $feed->feedReactionSummaries('announcement', [$announcement->id], $user->id)[$announcement->id]
+            ?? ['counts' => [], 'mine' => []];
+        $replies = $feed->feedReplyThreads('announcement', [$announcement->id])[$announcement->id] ?? [];
+
         return Inertia::render('hr/announcements/show', [
             'announcement' => $this->detailPayload($announcement, $tenantId),
             'tracking' => $canManage ? $this->trackingData($announcement, $tenantId) : null,
             'userAcknowledged' => $userAcknowledged,
             'segments' => $canManage ? $this->segmentOptions($tenantId) : null,
-            'can' => ['manage' => $canManage],
+            'reactions' => $reactions,
+            'replies' => $replies,
+            'reactionEmojis' => \App\Domain\Hr\Services\FeedService::REACTION_EMOJIS,
+            'can' => [
+                'manage' => $canManage,
+                'react' => (bool) $user->canDo('hr.recognition.give'),
+            ],
         ]);
     }
 

@@ -17,6 +17,7 @@ import {
     type WizardStep,
 } from '@/components/hr/wizard';
 import { FileDropzone, StagedFileCard, formatFileSize } from '@/components/ui/file-dropzone';
+import { fireConfetti } from '@/lib/confetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -255,6 +256,9 @@ export function AnnouncementWizard({
             preserveScroll: true,
             onSuccess: () => {
                 onSuccess?.();
+                if (intent === 'publish' && recipientCount && recipientCount > 0) {
+                    fireConfetti();
+                }
                 if (keepOpen && !editing) {
                     reset();
                     toast.success('Saved — start another');

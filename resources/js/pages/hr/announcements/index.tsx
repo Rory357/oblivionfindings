@@ -30,8 +30,10 @@ import {
     Copy,
     FileDown,
     Info,
+    LayoutGrid,
     LayoutList,
     Link as LinkIcon,
+    List,
     MapPin,
     Megaphone,
     MoreHorizontal,
@@ -42,6 +44,7 @@ import {
     Search,
     Send,
     SlidersHorizontal,
+    Star,
     Trash2,
     User,
     Users,
@@ -229,6 +232,25 @@ export default function AnnouncementsIndex(props: Props) {
     const [editing, setEditing] = useState<{ id: number; initial: AnnouncementWizardInitial } | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
     const { open: openCtx, element: ctxElement } = useAnnouncementContextMenu();
+    const [defaultTab, setDefaultTab] = useState<string>(() =>
+        (typeof window !== 'undefined' && localStorage.getItem('hr.announcements.defaultTab')) || 'all',
+    );
+
+    // Honour the saved default view on a bare landing (no ?tab=).
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const hasTab = new URLSearchParams(window.location.search).has('tab');
+        if (!hasTab && defaultTab !== 'all' && defaultTab !== tab) {
+            router.get('/hr/announcements', { tab: defaultTab }, { preserveScroll: true, replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const setAsDefault = (id: string) => {
+        localStorage.setItem('hr.announcements.defaultTab', id);
+        setDefaultTab(id);
+        toast.success(`"${id}" is now your default view`);
+    };
 
     const go = (next: Partial<Filters & { tab: string; announcement: number }>) => {
         router.get(
@@ -395,6 +417,13 @@ export default function AnnouncementsIndex(props: Props) {
                         value={tab}
                         onChange={(next) => router.get('/hr/announcements', { tab: next }, { preserveScroll: true })}
                         items={tabs}
+                        decorations={{ [defaultTab]: <Star className="h-3 w-3 fill-current text-status-warning" /> }}
+                        onItemContextMenu={(id, e) =>
+                            openCtx([
+                                { kind: 'item', label: 'Set as default view', icon: Star, onSelect: () => setAsDefault(id) },
+                                { kind: 'item', label: 'Open', icon: LinkIcon, onSelect: () => router.get('/hr/announcements', { tab: id }, { preserveScroll: true }) },
+                            ])(e)
+                        }
                     />
                 </div>
 
@@ -473,6 +502,13 @@ type ListPanelProps = Props & {
 function ListPanel(props: ListPanelProps) {
     const { announcements, filters, priorities, statuses, can, search, setSearch, searchRef, go, selected, setSelected, openComposer, openEditor, openCtx, post } = props;
     const data = announcements?.data ?? [];
+    const [density, setDensity] = useState<'cards' | 'table'>(() =>
+        (typeof window !== 'undefined' && (localStorage.getItem('hr.announcements.density') as 'cards' | 'table')) || 'cards',
+    );
+    const changeDensity = (d: 'cards' | 'table') => {
+        setDensity(d);
+        if (typeof window !== 'undefined') localStorage.setItem('hr.announcements.density', d);
+    };
 
     const toggleSelect = (id: number) => setSelected(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
 
@@ -525,8 +561,16 @@ function ListPanel(props: ListPanelProps) {
                     <option value="priority">Priority</option>
                     <option value="title">Title A–Z</option>
                 </select>
+                <div className="ml-auto inline-flex h-9 overflow-hidden rounded-lg border border-border">
+                    <button onClick={() => changeDensity('cards')} aria-label="Card view" className={`inline-flex items-center px-2.5 ${density === 'cards' ? 'bg-accent text-primary' : 'bg-card text-muted-foreground'}`}>
+                        <LayoutGrid className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => changeDensity('table')} aria-label="Table view" className={`inline-flex items-center border-l border-border px-2.5 ${density === 'table' ? 'bg-accent text-primary' : 'bg-card text-muted-foreground'}`}>
+                        <List className="h-4 w-4" />
+                    </button>
+                </div>
                 {can.manage && (
-                    <button onClick={openComposer} className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90">
+                    <button onClick={openComposer} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90">
                         <Plus className="h-4 w-4" /> New
                     </button>
                 )}
@@ -548,6 +592,49 @@ function ListPanel(props: ListPanelProps) {
             {/* cards */}
             {data.length === 0 ? (
                 <EmptyState icon={Megaphone} heading="No announcements" description={filters.search ? 'No announcements match your search.' : 'Compose your first announcement to get started.'} />
+            ) : density === 'table' ? (
+                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                    <table className="w-full border-collapse text-[12.5px]">
+                        <thead>
+                            <tr className="text-left text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                                {can.manage && <th className="w-8 px-3 py-2.5" />}
+                                <th className="px-4 py-2.5 font-semibold">Title</th>
+                                <th className="px-3 py-2.5 font-semibold">Priority</th>
+                                <th className="px-3 py-2.5 font-semibold">Status</th>
+                                <th className="px-3 py-2.5 font-semibold">Audience</th>
+                                <th className="px-3 py-2.5 font-semibold">Ack</th>
+                                <th className="px-4 py-2.5" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map((a) => {
+                                const pm = PRIORITY_META[a.priority] ?? PRIORITY_META.normal;
+                                const sel = selected.includes(a.id);
+                                return (
+                                    <tr key={a.id} className="border-t border-border" onContextMenu={openCtx(cardMenu(a))}>
+                                        {can.manage && (
+                                            <td className="px-3 py-2.5">
+                                                <button onClick={() => toggleSelect(a.id)} aria-label={sel ? 'Deselect' : 'Select'} className={`grid h-4 w-4 place-items-center rounded border ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>{sel && <CheckCheck className="h-2.5 w-2.5" />}</button>
+                                            </td>
+                                        )}
+                                        <td className="px-4 py-2.5">
+                                            <button onClick={() => router.visit(`/hr/announcements/${a.id}`)} className="flex items-center gap-1.5 font-semibold hover:underline">
+                                                {a.is_pinned && <Pin className="h-3 w-3" style={{ color: 'var(--hr-amber)' }} />}{a.title}
+                                            </button>
+                                        </td>
+                                        <td className="px-3 py-2.5"><StatusBadge variant={pm.variant} size="sm">{pm.label}</StatusBadge></td>
+                                        <td className="px-3 py-2.5"><StatusBadge variant={STATUS_VARIANT[a.status] ?? 'neutral'} size="sm">{a.status}</StatusBadge></td>
+                                        <td className="px-3 py-2.5 text-muted-foreground">{a.audience} — {a.audience_size}</td>
+                                        <td className="px-3 py-2.5 tabular-nums">{a.requires_acknowledgement ? `${a.ack_pct}%` : '—'}</td>
+                                        <td className="px-4 py-2.5 text-right">
+                                            <button onClick={openCtx(cardMenu(a))} aria-label="Actions" className="grid h-7 w-7 place-items-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent"><MoreHorizontal className="h-4 w-4" /></button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             ) : (
                 data.map((a) => {
                     const pm = PRIORITY_META[a.priority] ?? PRIORITY_META.normal;

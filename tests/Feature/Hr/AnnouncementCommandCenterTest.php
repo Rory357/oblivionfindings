@@ -194,6 +194,40 @@ test('the filtered list export streams a CSV', function () {
         ->assertHeader('content-type', 'text/csv; charset=UTF-8');
 });
 
+test('the detail page renders with the reaction/reply thread payload', function () {
+    $a = HrAnnouncement::factory()->create(['tenant_id' => 1, 'created_by' => $this->hr->id, 'status' => 'published', 'published_at' => now()]);
+    $a->targets()->create(['type' => 'all', 'value' => null]);
+
+    $this->actingAs($this->hr)->get("/hr/announcements/{$a->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/announcements/show')
+            ->has('reactions')
+            ->has('replies')
+            ->has('reactionEmojis')
+            ->where('can.manage', true));
+});
+
+test('a staff member with recognition rights can react to and reply on an announcement', function () {
+    $a = HrAnnouncement::factory()->create(['tenant_id' => 1, 'created_by' => $this->hr->id, 'status' => 'published', 'published_at' => now()]);
+
+    // Attach the worker to the support_worker role so it carries the seeded
+    // hr.recognition.give permission (the react/reply routes gate on it).
+    $this->worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+    ]);
+
+    $this->actingAs($this->worker)->post('/hr/feed/react', [
+        'subject_type' => 'announcement', 'subject_id' => $a->id, 'emoji' => 'heart',
+    ])->assertRedirect();
+    $this->assertDatabaseHas('hr_feed_reactions', ['subject_type' => 'announcement', 'subject_id' => $a->id, 'user_id' => $this->worker->id, 'emoji' => 'heart']);
+
+    $this->actingAs($this->worker)->post('/hr/feed/reply', [
+        'subject_type' => 'announcement', 'subject_id' => $a->id, 'body' => 'Thanks for the update!',
+    ])->assertRedirect();
+    $this->assertDatabaseHas('hr_feed_replies', ['subject_type' => 'announcement', 'subject_id' => $a->id, 'body' => 'Thanks for the update!']);
+});
+
 test('a non-manager cannot reach command-center mutations', function () {
     $a = HrAnnouncement::factory()->create(['tenant_id' => 1, 'created_by' => $this->hr->id, 'status' => 'published', 'published_at' => now()]);
 

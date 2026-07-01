@@ -8,7 +8,7 @@ import {
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
     AlertTriangle,
@@ -26,6 +26,7 @@ import {
     Paperclip,
     Pencil,
     Pin,
+    Send,
     Users,
 } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
@@ -65,13 +66,21 @@ type Tracking = {
     roster: RosterRow[];
 } | null;
 
+type ReplyItem = { id: number; user_name: string; body: string; created_at: string | null };
+type Reactions = { counts: Record<string, number>; mine: string[] };
+
 type Props = {
     announcement: Announcement;
     tracking: Tracking;
     userAcknowledged: boolean;
     segments: AnnouncementSegments | null;
-    can: { manage: boolean };
+    reactions: Reactions;
+    replies: ReplyItem[];
+    reactionEmojis: string[];
+    can: { manage: boolean; react: boolean };
 };
+
+const EMOJI: Record<string, string> = { heart: '❤️', party: '🎉', hands: '🙌' };
 
 const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
@@ -102,9 +111,17 @@ function fmtDateTime(value?: string | null) {
         : d.toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function AnnouncementShow({ announcement, tracking, userAcknowledged, segments, can }: Props) {
+export default function AnnouncementShow({ announcement, tracking, userAcknowledged, segments, reactions, replies, reactionEmojis, can }: Props) {
     const [editOpen, setEditOpen] = useState(false);
     const [staffView, setStaffView] = useState(false);
+    const replyForm = useForm({ subject_type: 'announcement', subject_id: announcement.id, body: '' });
+
+    const react = (emoji: string) =>
+        router.post('/hr/feed/react', { subject_type: 'announcement', subject_id: announcement.id, emoji }, { preserveScroll: true });
+    const submitReply = () => {
+        if (!replyForm.data.body.trim()) return;
+        replyForm.post('/hr/feed/reply', { preserveScroll: true, onSuccess: () => replyForm.setData('body', '') });
+    };
     const pm = PRIORITY_META[announcement.priority] ?? PRIORITY_META.normal;
     const PIcon = pm.icon;
 
@@ -226,10 +243,71 @@ export default function AnnouncementShow({ announcement, tracking, userAcknowled
                             </div>
                         )}
 
-                        {/* discuss on feed */}
-                        <a href="/hr/feed" className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
-                            <MessageSquare className="h-4 w-4" /> Discuss & react on the Community feed
-                        </a>
+                        {/* reaction + reply thread — same polymorphic rows as the Community feed */}
+                        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
+                                    <MessageSquare className="h-4 w-4 text-primary" /> Discussion
+                                </div>
+                                <a href="/hr/feed" className="text-xs font-semibold text-primary hover:underline">Open in feed</a>
+                            </div>
+
+                            {/* reactions */}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {reactionEmojis.map((emoji) => {
+                                    const mine = reactions.mine?.includes(emoji);
+                                    const count = reactions.counts?.[emoji] ?? 0;
+                                    return (
+                                        <button
+                                            key={emoji}
+                                            onClick={() => can.react && react(emoji)}
+                                            disabled={!can.react}
+                                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${mine ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/50'} ${can.react ? '' : 'cursor-default opacity-70'}`}
+                                        >
+                                            <span>{EMOJI[emoji] ?? emoji}</span>
+                                            {count > 0 && <span className="tabular-nums">{count}</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* replies */}
+                            {replies.length > 0 && (
+                                <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+                                    {replies.map((r) => (
+                                        <div key={r.id} className="flex gap-2.5">
+                                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-bold text-primary">
+                                                {r.user_name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <div className="text-[12.5px]">
+                                                    <span className="font-semibold">{r.user_name}</span>
+                                                    <span className="ml-2 text-[11px] text-muted-foreground">{r.created_at}</span>
+                                                </div>
+                                                <div className="text-sm text-foreground">{r.body}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* composer */}
+                            {can.react && (
+                                <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
+                                    <input
+                                        value={replyForm.data.body}
+                                        onChange={(e) => replyForm.setData('body', e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && submitReply()}
+                                        maxLength={2000}
+                                        placeholder="Write a reply…"
+                                        className="h-9 flex-1 rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                    />
+                                    <button onClick={submitReply} disabled={replyForm.processing || !replyForm.data.body.trim()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                        <Send className="h-4 w-4" /> Reply
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* roster sidebar (managers) */}
