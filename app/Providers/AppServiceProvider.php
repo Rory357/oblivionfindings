@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -67,7 +66,6 @@ use App\Observers\FleetWorkOrderObserver;
 use App\Observers\FundingClaimObserver;
 use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
-use App\Observers\HrExpenseClaimObserver;
 use App\Observers\ProjectsToTimelineObserver;
 use App\Observers\RestraintEventObserver;
 use App\Observers\SafeguardingConcernObserver;
@@ -219,7 +217,12 @@ class AppServiceProvider extends ServiceProvider
         FleetFuelLog::observe(FleetFuelLogObserver::class);
         FleetWorkOrder::observe(FleetWorkOrderObserver::class);
         AssetMaintenanceLog::observe(AssetMaintenanceLogObserver::class);
-        HrExpenseClaim::observe(HrExpenseClaimObserver::class);
+        // HrExpenseClaim GL posting is handled solely by
+        // ExpenseService::approveClaim() → PostExpenseJournalJob (per-category DR /
+        // CR 2000 Accounts Payable). The former HrExpenseClaimObserver posted a
+        // SECOND, conflicting journal (DR 6500 / CR 2310) on the same approval,
+        // double-booking the expense — removed. See
+        // docs/compensation-hub-redesign/EXPENSE_GL_DOUBLE_POST.md.
         HrCourseEnrollment::observe(HrCourseEnrollmentObserver::class);
         Timesheet::observe(TimesheetMileageObserver::class);
         HouseLedgerEntry::observe(HouseLedgerEntryObserver::class);
