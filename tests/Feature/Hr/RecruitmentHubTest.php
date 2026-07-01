@@ -1186,6 +1186,36 @@ test('the candidate timeline records the offer approval history', function () {
     );
 });
 
+test('the approval timeline keeps a declined entry after the offer is re-approved (durable audit trail)', function () {
+    $manager = User::factory()->create(['role' => 'hr', 'name' => 'Aroha Manager', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    $ctx = makeApplicant($this->hr->id, 'offer_pending');
+    $offer = HrOffer::create([
+        'application_id' => $ctx['application']->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
+        'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
+        'approval_status' => 'draft', 'created_by' => $this->hr->id,
+    ]);
+
+    // Drive the real transitions so the append-only audit trail is written.
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.decline-approval', $offer->id), ['reason' => 'Rate too high'])->assertRedirect();
+    $this->actingAs($this->hr)->post(route('hr.offers.submit-approval', $offer->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.offers.approve', $offer->id))->assertRedirect();
+
+    $response = $this->actingAs($this->hr)->get(route('hr.candidates.show', $ctx['candidate']->id));
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->where('activityLog', fn ($log) => collect($log)
+            // The decline survives the later re-approval — impossible with state derivation.
+            ->contains(fn ($e) => str_contains($e['description'], 'sent back for changes') && str_contains($e['description'], 'Rate too high'))
+            // Final approval is attributed to the approver.
+            && collect($log)->contains(fn ($e) => $e['description'] === 'Offer approved' && ($e['actor'] ?? null) === 'Aroha Manager')
+            // Both submissions are retained (append-only, not collapsed).
+            && collect($log)->filter(fn ($e) => $e['description'] === 'Offer submitted for approval')->count() === 2)
+    );
+});
+
 test('a candidate can be tagged and the tags surface in the hub and profile', function () {
     $ctx = makeApplicant($this->hr->id, 'screening');
     $candidate = $ctx['candidate'];

@@ -314,43 +314,50 @@ class CandidateController extends Controller
                     'description' => "Offer created - {$offer->position_title}",
                     'timestamp' => optional($offer->created_at)->diffForHumans() ?? '',
                 ];
-                // Approval chain: submitted → approved / sent back for changes.
-                if ($offer->approval_requested_at) {
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => 'Offer submitted for approval',
-                        'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
-                    ];
-                }
-                if ($offer->approval_status === 'approved' && $offer->approved_at) {
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => 'Offer approved',
-                        'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
-                        'actor' => $offer->approvedBy?->name,
-                    ];
-                }
-                if ($offer->approval_status === 'declined') {
-                    $reason = $offer->approval_declined_reason;
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
-                        'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
-                    ];
-                }
-                if ($offer->sent_at) {
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => 'Offer sent to candidate',
-                        'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
-                    ];
-                }
-                if ($offer->response) {
-                    $activityLog[] = [
-                        'type' => 'offer',
-                        'description' => "Offer {$offer->response}",
-                        'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
-                    ];
+                // Approval history: prefer the append-only audit trail (durable +
+                // actor-attributed + survives a decline→resubmit loop); fall back to
+                // the current-state derivation for offers with no audit rows yet.
+                $approvalTrail = $this->offerApprovalTrail($offer);
+                if (! empty($approvalTrail)) {
+                    array_push($activityLog, ...$approvalTrail);
+                } else {
+                    if ($offer->approval_requested_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer submitted for approval',
+                            'timestamp' => optional($offer->approval_requested_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->approval_status === 'approved' && $offer->approved_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer approved',
+                            'timestamp' => optional($offer->approved_at)->diffForHumans() ?? '',
+                            'actor' => $offer->approvedBy?->name,
+                        ];
+                    }
+                    if ($offer->approval_status === 'declined') {
+                        $reason = $offer->approval_declined_reason;
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''),
+                            'timestamp' => optional($offer->updated_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->sent_at) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => 'Offer sent to candidate',
+                            'timestamp' => optional($offer->sent_at)->diffForHumans() ?? '',
+                        ];
+                    }
+                    if ($offer->response) {
+                        $activityLog[] = [
+                            'type' => 'offer',
+                            'description' => "Offer {$offer->response}",
+                            'timestamp' => optional($offer->response_at)->diffForHumans() ?? '',
+                        ];
+                    }
                 }
             }
         }
@@ -545,6 +552,9 @@ class CandidateController extends Controller
         ]);
 
         $tag = trim((string) ($validated['tag'] ?? ''));
+        if (in_array($validated['action'], ['tag', 'untag'], true) && $tag === '') {
+            return redirect()->back()->with('error', 'Enter a tag to apply or remove.');
+        }
 
         $candidates = HrCandidate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
@@ -1387,6 +1397,55 @@ class CandidateController extends Controller
         } catch (\Throwable $exception) {
             report($exception);
         }
+    }
+
+    /**
+     * Build the offer's approval history from the append-only audit trail so the
+     * timeline is durable (a decline survives a later re-approval) and shows who
+     * did what — rather than being re-derived from the offer's current state.
+     * Returns [] when the offer has no audit rows (falls back to state derivation).
+     */
+    private function offerApprovalTrail(HrOffer $offer): array
+    {
+        $logs = \App\Models\AuditLog::query()
+            ->where('auditable_type', $offer->getMorphClass())
+            ->where('auditable_id', $offer->getKey())
+            ->where('action', 'hroffer.update')
+            ->orderBy('created_at')
+            ->get(['user_id', 'meta', 'created_at']);
+
+        if ($logs->isEmpty()) {
+            return [];
+        }
+
+        $names = \App\Models\User::query()
+            ->whereIn('id', $logs->pluck('user_id')->filter()->unique()->all())
+            ->pluck('name', 'id');
+
+        $trail = [];
+        foreach ($logs as $log) {
+            $after = (array) data_get($log->meta, 'after', []);
+            $actor = $log->user_id ? ($names[$log->user_id] ?? null) : null;
+            $ts = optional($log->created_at)->diffForHumans() ?? '';
+            $status = $after['approval_status'] ?? null;
+
+            if ($status === 'pending_approval') {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer submitted for approval', 'timestamp' => $ts, 'actor' => $actor];
+            } elseif ($status === 'approved') {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer approved', 'timestamp' => $ts, 'actor' => $actor];
+            } elseif ($status === 'declined') {
+                $reason = $after['approval_declined_reason'] ?? null;
+                $trail[] = ['type' => 'offer', 'description' => 'Offer sent back for changes'.($reason ? ": {$reason}" : ''), 'timestamp' => $ts, 'actor' => $actor];
+            }
+            if (! empty($after['sent_at'])) {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer sent to candidate', 'timestamp' => $ts, 'actor' => $actor];
+            }
+            if (! empty($after['response'])) {
+                $trail[] = ['type' => 'offer', 'description' => 'Offer '.$after['response'], 'timestamp' => $ts, 'actor' => $actor];
+            }
+        }
+
+        return $trail;
     }
 
     public function respondOffer(Request $request, HrOffer $offer)
