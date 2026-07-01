@@ -350,7 +350,7 @@ export default function PerformanceHub(props: Props) {
                     { icon: <Pencil className="h-4 w-4" />, label: 'Edit', onClick: () => router.visit(`/hr/performance/reviews/${id}`) },
                     { icon: <Send className="h-4 w-4" />, label: 'Submit', onClick: () => post(`/hr/performance/reviews/${id}/submit`, {}, 'Review submitted') },
                     { icon: <Check className="h-4 w-4" />, label: 'Sign off…', tone: 'primary', onClick: () => openWiz('signoff', { reviewId: id }) },
-                    { icon: <TrendingUp className="h-4 w-4" />, label: 'Start PIP from review', onClick: () => openWiz('pip', { prefill: { employee: undefined } }) },
+                    { icon: <TrendingUp className="h-4 w-4" />, label: 'Start PIP from review', onClick: () => openWiz('pip', { reviewId: id }) },
                     { sep: true },
                     { icon: <Check className="h-4 w-4" />, label: 'Acknowledge', onClick: () => post(`/hr/performance/reviews/${id}/acknowledge`, {}, 'Review acknowledged') },
                 ];

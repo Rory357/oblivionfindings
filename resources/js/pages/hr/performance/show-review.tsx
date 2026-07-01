@@ -2,19 +2,30 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EvidenceAttachment } from '@/components/hr/performance/evidence-attachment';
-import { PageHero, PageLayout } from '@/components/page';
+import { PerformanceSatelliteHero } from '@/components/hr/performance/performance-hero';
+import {
+    PerformanceWizards,
+    type Opt,
+    type WizardState,
+    type WizardSupport,
+} from '@/components/hr/performance/performance-wizards';
+import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
-    ArrowLeft,
+    Award,
     Calendar,
     CheckCircle,
     FileText,
+    GitBranch,
     GraduationCap,
+    Sparkles,
     Star,
     Target,
+    TrendingUp,
     User,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -54,9 +65,17 @@ type ReviewGoal = {
     goal: { id: number; title: string } | null;
 };
 
+type NextSteps = {
+    action: 'pip' | 'succession';
+    employee_profile_id?: number;
+    staff: Opt[];
+    successionEmployees?: Opt[];
+};
+
 type Props = {
     review: PerformanceReview;
     reviewGoals?: ReviewGoal[];
+    nextSteps?: NextSteps | null;
     can: { manage: boolean };
 };
 
@@ -67,7 +86,9 @@ const GOAL_STATUS_STYLE: Record<string, string> = {
     missed: 'bg-status-critical-bg text-status-critical',
 };
 
-export default function ShowReview({ review, reviewGoals = [], can }: Props) {
+export default function ShowReview({ review, reviewGoals = [], nextSteps = null, can }: Props) {
+    const [wizard, setWizard] = useState<WizardState | null>(null);
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Performance & Supervision', href: '/hr/performance' },
@@ -143,16 +164,53 @@ export default function ShowReview({ review, reviewGoals = [], can }: Props) {
         );
     };
 
+    // Deliberate "Next steps" seam — the server only sends `nextSteps` for
+    // signed-off, manageable reviews where the outcome warrants action AND no
+    // equivalent process is already underway. Nothing is auto-created.
+    const wizardSupport: WizardSupport = {
+        staff: nextSteps?.staff ?? [],
+        reviewTypes: [],
+        competencyOptions: [],
+        successionEmployees: nextSteps?.successionEmployees ?? [],
+    };
+
+    const openNextStep = () => {
+        if (!nextSteps) return;
+        if (nextSteps.action === 'pip') {
+            setWizard({
+                kind: 'pip',
+                context: {
+                    reviewId: review.id,
+                    prefill: {
+                        employee: review.employee.id,
+                        reason: `Performance review outcome — overall rating ${review.overall_rating}/5`,
+                    },
+                },
+            });
+        } else {
+            setWizard({
+                kind: 'succession',
+                context: {
+                    reviewId: review.id,
+                    prefill: nextSteps.employee_profile_id
+                        ? { candidates: [nextSteps.employee_profile_id] }
+                        : {},
+                },
+            });
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Review - ${review.employee.name}`} />
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        variant="compact"
+                    <PerformanceSatelliteHero
+                        icon={Award}
                         backHref="/hr/performance/reviews"
-                        title="Performance Review"
+                        backLabel="Reviews"
+                        title="Performance review"
                         description={`${getReviewTypeLabel(review.review_type)} for ${review.employee.name}`}
                     />
                 }
@@ -174,6 +232,63 @@ export default function ShowReview({ review, reviewGoals = [], can }: Props) {
                         </Badge>
                     )}
                 </div>
+
+                {can.manage && review.status === 'signed_off' && nextSteps && (
+                    <Card
+                        className={
+                            nextSteps.action === 'pip'
+                                ? 'border-status-warning/40'
+                                : 'border-status-success/40'
+                        }
+                    >
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Sparkles className="h-4 w-4" />
+                                Next steps
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                            {nextSteps.action === 'pip' ? (
+                                <>
+                                    <p className="max-w-[64ch] text-sm text-muted-foreground">
+                                        This review was signed off with an
+                                        overall rating of{' '}
+                                        <span className="font-semibold text-foreground">
+                                            {review.overall_rating}/5
+                                        </span>{' '}
+                                        and {review.employee.name} has no open
+                                        improvement plan. You can start one
+                                        prefilled from this review — nothing is
+                                        created automatically.
+                                    </p>
+                                    <Button onClick={openNextStep}>
+                                        <TrendingUp className="mr-1.5 h-4 w-4" />
+                                        Start improvement plan
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="max-w-[64ch] text-sm text-muted-foreground">
+                                        This review was signed off with an
+                                        overall rating of{' '}
+                                        <span className="font-semibold text-foreground">
+                                            {review.overall_rating}/5
+                                        </span>{' '}
+                                        and {review.employee.name} isn&apos;t in
+                                        any active succession plan&apos;s
+                                        candidate pool. You can nominate them
+                                        via a succession plan prefilled from
+                                        this review.
+                                    </p>
+                                    <Button onClick={openNextStep}>
+                                        <GitBranch className="mr-1.5 h-4 w-4" />
+                                        Nominate for succession
+                                    </Button>
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
@@ -400,6 +515,14 @@ export default function ShowReview({ review, reviewGoals = [], can }: Props) {
                     )}
                 </div>
             </PageLayout>
+
+            {wizard ? (
+                <PerformanceWizards
+                    state={wizard}
+                    support={wizardSupport}
+                    onClose={() => setWizard(null)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

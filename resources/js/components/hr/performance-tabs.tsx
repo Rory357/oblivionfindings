@@ -1,19 +1,19 @@
 import { router } from '@inertiajs/react';
 import {
     Award,
-    ClipboardCheck,
     Gauge,
     GitBranch,
     MessageSquare,
     Sprout,
     Target,
     TrendingUp,
+    UserCheck,
 } from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
 export type PerformanceTab =
-    | 'overview'
+    | 'supervision'
     | 'reviews'
     | 'goals'
     | 'development'
@@ -22,20 +22,27 @@ export type PerformanceTab =
     | 'pips'
     | 'succession';
 
+/**
+ * Satellite tab clicks deep-link back into the Performance hub's `?tab=` views
+ * so hub ↔ satellite navigation feels continuous. Goals & Development keep
+ * their canonical standalone hub (/hr/goals) as before.
+ */
 const TAB_URLS: Record<PerformanceTab, string> = {
-    overview: '/hr/performance',
-    reviews: '/hr/performance/reviews',
+    supervision: '/hr/performance?tab=supervision',
+    reviews: '/hr/performance?tab=reviews',
     goals: '/hr/goals',
     development: '/hr/goals?tab=development',
-    competencies: '/hr/performance/competencies',
-    feedback: '/hr/feedback',
-    pips: '/hr/performance/pips',
-    succession: '/hr/succession',
+    competencies: '/hr/performance?tab=competencies',
+    feedback: '/hr/performance?tab=feedback',
+    pips: '/hr/performance?tab=pips',
+    succession: '/hr/performance?tab=succession',
 };
 
+// Mirrors the hub's TAB_ITEMS (ids, labels, icons, tones, order) so the strip
+// reads identically on the hub and its satellite pages.
 const ITEMS: HrTabItem[] = [
-    { id: 'overview', label: 'Supervision', icon: ClipboardCheck, tone: 'primary' },
     { id: 'reviews', label: 'Reviews', icon: Award, tone: 'info' },
+    { id: 'supervision', label: 'Supervision', icon: UserCheck, tone: 'primary' },
     { id: 'goals', label: 'Goals & OKRs', icon: Target, tone: 'success' },
     { id: 'development', label: 'Development', icon: Sprout, tone: 'info' },
     { id: 'competencies', label: 'Competencies & Skills', icon: Gauge, tone: 'violet' },

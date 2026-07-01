@@ -38,6 +38,11 @@ class HeadcountController extends Controller
             'forecast' => $forecast,
             'budgetVsActual' => $budgetVsActual,
             'attritionRisk' => $attritionRisk,
+            'can' => [
+                // Gates the "Create requisition" seam into the Recruitment hub
+                // (the /hr/recruitment routes sit behind hr.recruitment.view).
+                'view_recruitment' => $user->canDo('hr.recruitment.view'),
+            ],
         ]);
     }
 }

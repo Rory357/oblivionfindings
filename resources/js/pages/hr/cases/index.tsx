@@ -1,3 +1,9 @@
+import {
+    NewCaseWizard,
+    type CaseOption,
+    type CaseStaffOption,
+} from '@/components/hr/case-wizards';
+import { LifecycleTabs } from '@/components/hr/lifecycle-tabs';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +38,7 @@ import {
     Search,
     ShieldAlert,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -87,6 +94,9 @@ type Props = {
         sla_window?: string | null;
     };
     can: { manage: boolean; disciplinary?: boolean };
+    staff: CaseStaffOption[];
+    caseTypes: CaseOption[];
+    severities: CaseOption[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -103,7 +113,7 @@ const statuses = [
     'resolved',
     'closed',
 ];
-const caseTypes = [
+const caseTypeFilters = [
     'grievance',
     'disciplinary',
     'investigation',
@@ -111,7 +121,7 @@ const caseTypes = [
     'complaint',
     'other',
 ];
-const severities = ['low', 'medium', 'high', 'critical'];
+const severityFilters = ['low', 'medium', 'high', 'critical'];
 const slaWindows = ['overdue', 'due_24h', 'missing_deadline', 'escalation'];
 
 const formatDate = (value?: string | null) => {
@@ -156,7 +166,23 @@ const badgeClassBySeverity: Record<string, string> = {
     low: 'bg-muted text-foreground border-border',
 };
 
-export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
+export default function HrCasesIndex({
+    cases,
+    summary,
+    filters,
+    can,
+    staff,
+    caseTypes,
+    severities,
+}: Props) {
+    // Open the New-case wizard on mount when deep-linked via ?new (the old
+    // GET /hr/cases/create route redirects here with that param).
+    const [wizardOpen, setWizardOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
+
     const onFilter = (next: Partial<Props['filters']>) => {
         const payload = { ...filters, ...next };
 
@@ -191,17 +217,17 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         ]}
                         actions={
                             can.manage ? (
-                                <Link href="/hr/cases/create">
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Open Case
-                                    </Button>
-                                </Link>
+                                <Button size="sm" onClick={() => setWizardOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Open Case
+                                </Button>
                             ) : undefined
                         }
                     />
                 }
             >
+                <LifecycleTabs active="cases" />
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
@@ -333,7 +359,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                                     <SelectItem value={NONE}>
                                         All Case Types
                                     </SelectItem>
-                                    {caseTypes.map((caseType) => (
+                                    {caseTypeFilters.map((caseType) => (
                                         <SelectItem
                                             key={caseType}
                                             value={caseType}
@@ -364,7 +390,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                                     <SelectItem value={NONE}>
                                         All Severities
                                     </SelectItem>
-                                    {severities.map((severity) => (
+                                    {severityFilters.map((severity) => (
                                         <SelectItem
                                             key={severity}
                                             value={severity}
@@ -540,14 +566,16 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                                                     !filters.case_type &&
                                                     !filters.severity && (
                                                         <Button
-                                                            asChild
                                                             size="sm"
                                                             className="mt-2"
+                                                            onClick={() =>
+                                                                setWizardOpen(
+                                                                    true,
+                                                                )
+                                                            }
                                                         >
-                                                            <Link href="/hr/cases/create">
-                                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                                Open Case
-                                                            </Link>
+                                                            <Plus className="mr-1.5 h-4 w-4" />
+                                                            Open Case
                                                         </Button>
                                                     )}
                                             </div>
@@ -576,6 +604,15 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            {wizardOpen && can.manage ? (
+                <NewCaseWizard
+                    staff={staff}
+                    caseTypes={caseTypes}
+                    severities={severities}
+                    onClose={() => setWizardOpen(false)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

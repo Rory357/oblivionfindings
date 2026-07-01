@@ -1,21 +1,41 @@
 import { PerformanceTabs } from '@/components/hr';
+import {
+    ManageTemplatesDialog,
+    RequestFeedbackWizard,
+    reviewTypeLabel,
+    type FeedbackWizardData,
+} from '@/components/hr/feedback-wizards';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
-    CheckCircle2,
-    Clock,
+    BellRing,
     Eye,
+    FileText,
     MessageCircle,
     MessageSquare,
+    MoreHorizontal,
     Plus,
-    Send,
+    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -46,6 +66,8 @@ type Props = {
         overdue: number;
     };
     can: { manage: boolean };
+    /** Request-wizard data — null for users without hr.performance.manage. */
+    wizard?: FeedbackWizardData | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -79,24 +101,21 @@ const statusConfig: Record<
     expired: {
         bg: 'bg-muted',
         text: 'text-muted-foreground',
-        dot: 'bg-muted',
-        label: 'Expired',
+        dot: 'bg-muted-foreground',
+        label: 'Cancelled',
     },
 };
 
-const reviewTypeConfig: Record<string, { label: string; color: string }> = {
-    peer: { label: 'Peer', color: 'bg-status-info-bg text-status-info' },
-    manager: { label: 'Manager', color: 'bg-primary/10 text-primary' },
-    direct_report: {
-        label: 'Direct Report',
-        color: 'bg-status-success-bg text-status-success',
-    },
-    self: { label: 'Self', color: 'bg-status-warning-bg text-status-warning' },
+const reviewTypeConfig: Record<string, string> = {
+    peer: 'bg-status-info-bg text-status-info',
+    manager: 'bg-primary/10 text-primary',
+    direct_report: 'bg-status-success-bg text-status-success',
+    self: 'bg-status-warning-bg text-status-warning',
 };
 
 function formatDate(value?: string | null): string {
     if (!value) {
-        return '\u2014';
+        return '—';
     }
 
     const date = new Date(value);
@@ -134,13 +153,66 @@ function avatarColor(id: number) {
     return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
+function isOverdue(request: FeedbackRequest): boolean {
+    if (request.status !== 'pending' || !request.due_date) return false;
+    const due = new Date(`${request.due_date}T23:59:59`);
+    return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
+}
+
+type LifecycleAction = 'decline' | 'cancel';
+
+const LIFECYCLE_COPY: Record<
+    LifecycleAction,
+    { title: string; blurb: string; cta: string }
+> = {
+    decline: {
+        title: 'Decline this request?',
+        blurb: 'The reviewer will no longer be asked for feedback. The request is marked as declined.',
+        cta: 'Decline request',
+    },
+    cancel: {
+        title: 'Cancel this request?',
+        blurb: 'The request is withdrawn and marked as cancelled. No feedback will be collected.',
+        cta: 'Cancel request',
+    },
+};
+
 export default function FeedbackIndex({
     requests,
     pendingCount,
     stats,
     can,
+    wizard,
 }: Props) {
+    const page = usePage();
+    const authProps = page.props as {
+        auth?: {
+            user?: { id?: number };
+            can?: { hr?: { performance?: { manage?: boolean } } };
+        };
+    };
+    const authUserId = authProps.auth?.user?.id ?? null;
+    const canManage =
+        authProps.auth?.can?.hr?.performance?.manage ?? can.manage;
+
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [showRequestWizard, setShowRequestWizard] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
+    const [initialSubjectId] = useState<string | null>(() =>
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('employee')
+            : null,
+    );
+    const [showTemplates, setShowTemplates] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<{
+        request: FeedbackRequest;
+        action: LifecycleAction;
+    } | null>(null);
+    const [actionBusy, setActionBusy] = useState(false);
+    const [remindedIds, setRemindedIds] = useState<number[]>([]);
 
     const allData = requests.data;
     const totalCount = stats?.total ?? allData.length;
@@ -151,12 +223,45 @@ export default function FeedbackIndex({
     const completedCount =
         stats?.completed ??
         allData.filter((request) => request.status === 'completed').length;
+    const overdueCount =
+        stats?.overdue ?? allData.filter((request) => isOverdue(request)).length;
     const responseRate =
         totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    const filtered = statusFilter
-        ? allData.filter((request) => request.status === statusFilter)
-        : allData;
+    const filtered =
+        statusFilter === 'overdue'
+            ? allData.filter((request) => isOverdue(request))
+            : statusFilter
+              ? allData.filter((request) => request.status === statusFilter)
+              : allData;
+
+    const remind = (request: FeedbackRequest) => {
+        router.post(
+            `/hr/feedback/${request.id}/remind`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () =>
+                    setRemindedIds((ids) =>
+                        ids.includes(request.id) ? ids : [...ids, request.id],
+                    ),
+            },
+        );
+    };
+
+    const runLifecycleAction = () => {
+        if (!confirmAction) return;
+        setActionBusy(true);
+        router.post(
+            `/hr/feedback/${confirmAction.request.id}/${confirmAction.action}`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setConfirmAction(null),
+                onFinish: () => setActionBusy(false),
+            },
+        );
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -170,18 +275,30 @@ export default function FeedbackIndex({
                         description="Manage and respond to feedback requests across your team."
                         stats={[
                             { label: 'Pending', value: pendingTotal },
+                            { label: 'Overdue', value: overdueCount },
+                            { label: 'Completed', value: completedCount },
                             { label: 'Response rate', value: `${responseRate}%` },
                             { label: 'Total', value: totalCount },
-                            { label: 'Completed', value: completedCount },
                         ]}
                         actions={
-                            can.manage ? (
-                                <Button size="sm" asChild>
-                                    <Link href="/hr/feedback/request">
+                            canManage ? (
+                                <>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setShowTemplates(true)}
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Templates
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setShowRequestWizard(true)}
+                                    >
                                         <Plus className="h-4 w-4" />
-                                        Request Feedback
-                                    </Link>
-                                </Button>
+                                        Request feedback
+                                    </Button>
+                                </>
                             ) : undefined
                         }
                     />
@@ -189,86 +306,18 @@ export default function FeedbackIndex({
             >
                 <PerformanceTabs active="feedback" />
 
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    {[
-                        {
-                            label: 'Total Requests',
-                            value: totalCount,
-                            icon: Send,
-                            gradient: 'from-primary/10 to-primary/5',
-                            iconBg: 'bg-primary/10',
-                            iconColor: 'text-primary',
-                            hover: 'hover:border-primary',
-                        },
-                        {
-                            label: 'Pending',
-                            value: pendingTotal,
-                            icon: Clock,
-                            gradient:
-                                'from-status-warning/10 to-status-warning/5',
-                            iconBg: 'bg-status-warning-bg',
-                            iconColor: 'text-status-warning',
-                            hover: 'hover:border-status-warning/30',
-                        },
-                        {
-                            label: 'Completed',
-                            value: completedCount,
-                            icon: CheckCircle2,
-                            gradient:
-                                'from-status-success/10 to-status-success/5',
-                            iconBg: 'bg-status-success-bg',
-                            iconColor: 'text-status-success',
-                            hover: 'hover:border-status-success/30',
-                        },
-                        {
-                            label: 'Response Rate',
-                            value: `${responseRate}%`,
-                            icon: BarChart3,
-                            gradient: 'from-status-info/10 to-primary/5',
-                            iconBg: 'bg-status-info-bg',
-                            iconColor: 'text-status-info',
-                            hover: 'hover:border-status-info/30',
-                        },
-                    ].map((kpi) => {
-                        const Icon = kpi.icon;
-
-                        return (
-                            <Card
-                                key={kpi.label}
-                                className={`group overflow-hidden bg-gradient-to-br ${kpi.gradient} transition-all ${kpi.hover} hover:shadow-md`}
-                            >
-                                <CardContent className="pt-5">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                                                {kpi.label}
-                                            </p>
-                                            <p className="mt-1 text-3xl font-bold tracking-tight">
-                                                {kpi.value}
-                                            </p>
-                                        </div>
-
-                                        <div
-                                            className={`flex h-10 w-10 items-center justify-center rounded-xl ${kpi.iconBg} transition-transform group-hover:scale-110`}
-                                        >
-                                            <Icon
-                                                className={`h-5 w-5 ${kpi.iconColor}`}
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
-
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {[
                         { key: null, label: 'All', count: totalCount },
                         {
                             key: 'pending',
                             label: 'Pending',
                             count: pendingTotal,
+                        },
+                        {
+                            key: 'overdue',
+                            label: 'Overdue',
+                            count: overdueCount,
                         },
                         {
                             key: 'completed',
@@ -311,16 +360,14 @@ export default function FeedbackIndex({
                                     ? `No ${statusFilter} feedback requests.`
                                     : 'Start by requesting feedback for a team member.'}
                             </p>
-                            {can.manage && !statusFilter && (
+                            {canManage && !statusFilter && (
                                 <Button
-                                    className="mt-4 gap-1.5 bg-primary hover:bg-primary"
+                                    className="mt-4 gap-1.5"
                                     size="sm"
-                                    asChild
+                                    onClick={() => setShowRequestWizard(true)}
                                 >
-                                    <Link href="/hr/feedback/request">
-                                        <Plus className="h-3.5 w-3.5" />
-                                        Request Feedback
-                                    </Link>
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Request feedback
                                 </Button>
                             )}
                         </CardContent>
@@ -331,12 +378,12 @@ export default function FeedbackIndex({
                             const status =
                                 statusConfig[request.status] ||
                                 statusConfig.pending;
-                            const reviewType = reviewTypeConfig[
-                                request.review_type
-                            ] || {
-                                label: request.review_type,
-                                color: 'bg-muted text-muted-foreground',
-                            };
+                            const typeColor =
+                                reviewTypeConfig[request.review_type] ??
+                                'bg-muted text-muted-foreground';
+                            const overdue = isOverdue(request);
+                            const isReviewer =
+                                request.reviewer?.id === authUserId;
 
                             return (
                                 <Card
@@ -371,10 +418,17 @@ export default function FeedbackIndex({
                                                             {status.label}
                                                         </Badge>
                                                         <Badge
-                                                            className={`border-0 text-[9px] ${reviewType.color}`}
+                                                            className={`border-0 text-[9px] ${typeColor}`}
                                                         >
-                                                            {reviewType.label}
+                                                            {reviewTypeLabel(
+                                                                request.review_type,
+                                                            )}
                                                         </Badge>
+                                                        {overdue && (
+                                                            <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
+                                                                Overdue
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -399,24 +453,25 @@ export default function FeedbackIndex({
                                                     </p>
                                                 </div>
 
-                                                <div className="flex gap-1.5">
+                                                <div className="flex items-center gap-1.5">
                                                     {request.status ===
-                                                        'pending' && (
-                                                        <Button
-                                                            size="sm"
-                                                            className="gap-1 bg-primary text-xs hover:bg-primary"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/hr/feedback/${request.id}/respond`}
+                                                        'pending' &&
+                                                        isReviewer && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="gap-1 text-xs"
+                                                                asChild
                                                             >
-                                                                <MessageSquare className="h-3 w-3" />
-                                                                Respond
-                                                            </Link>
-                                                        </Button>
-                                                    )}
+                                                                <Link
+                                                                    href={`/hr/feedback/${request.id}/respond`}
+                                                                >
+                                                                    <MessageSquare className="h-3 w-3" />
+                                                                    Respond
+                                                                </Link>
+                                                            </Button>
+                                                        )}
 
-                                                    {can.manage &&
+                                                    {canManage &&
                                                         request.status ===
                                                             'completed' && (
                                                             <Button
@@ -433,6 +488,78 @@ export default function FeedbackIndex({
                                                                 </Link>
                                                             </Button>
                                                         )}
+
+                                                    {canManage &&
+                                                        request.status ===
+                                                            'pending' && (
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="gap-1 text-xs"
+                                                                    disabled={remindedIds.includes(
+                                                                        request.id,
+                                                                    )}
+                                                                    onClick={() =>
+                                                                        remind(
+                                                                            request,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <BellRing className="h-3 w-3" />
+                                                                    {remindedIds.includes(
+                                                                        request.id,
+                                                                    )
+                                                                        ? 'Reminded'
+                                                                        : 'Remind'}
+                                                                </Button>
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8"
+                                                                            aria-label="More actions"
+                                                                        >
+                                                                            <MoreHorizontal className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end">
+                                                                        <DropdownMenuItem
+                                                                            onClick={() =>
+                                                                                setConfirmAction(
+                                                                                    {
+                                                                                        request,
+                                                                                        action: 'decline',
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <XCircle className="h-3.5 w-3.5" />
+                                                                            Decline
+                                                                            request
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuItem
+                                                                            className="text-status-critical focus:text-status-critical"
+                                                                            onClick={() =>
+                                                                                setConfirmAction(
+                                                                                    {
+                                                                                        request,
+                                                                                        action: 'cancel',
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <XCircle className="h-3.5 w-3.5" />
+                                                                            Cancel
+                                                                            request
+                                                                        </DropdownMenuItem>
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </>
+                                                        )}
                                                 </div>
                                             </div>
                                         </div>
@@ -447,6 +574,70 @@ export default function FeedbackIndex({
                     <LaravelPagination links={requests.links} />
                 )}
             </PageLayout>
+
+            {canManage && wizard && showRequestWizard ? (
+                <RequestFeedbackWizard
+                    data={wizard}
+                    initialSubjectId={initialSubjectId}
+                    onClose={() => setShowRequestWizard(false)}
+                />
+            ) : null}
+
+            {canManage && wizard && showTemplates ? (
+                <ManageTemplatesDialog
+                    templates={wizard.templates}
+                    onClose={() => setShowTemplates(false)}
+                />
+            ) : null}
+
+            <Dialog
+                open={!!confirmAction}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+            >
+                <DialogContent className="sm:max-w-md">
+                    {confirmAction ? (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {LIFECYCLE_COPY[confirmAction.action].title}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Feedback on{' '}
+                                    <strong>
+                                        {confirmAction.request.subject?.name ??
+                                            'Unknown'}
+                                    </strong>{' '}
+                                    from{' '}
+                                    <strong>
+                                        {confirmAction.request.reviewer?.name ??
+                                            'Unknown'}
+                                    </strong>
+                                    .{' '}
+                                    {LIFECYCLE_COPY[confirmAction.action].blurb}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setConfirmAction(null)}
+                                >
+                                    Keep request
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    disabled={actionBusy}
+                                    onClick={runLifecycleAction}
+                                >
+                                    {actionBusy
+                                        ? 'Working…'
+                                        : LIFECYCLE_COPY[confirmAction.action]
+                                              .cta}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

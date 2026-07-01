@@ -1,4 +1,15 @@
-import PageShell from '@/components/page-shell';
+import {
+    Field,
+    ReviewCard,
+    ReviewRow,
+    StepHead,
+    useWizard,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/hr/wizard';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,78 +19,305 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
+    ClipboardCheck,
     Download,
     FileText,
+    Table2,
     Upload,
     UploadCloud,
     XCircle,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
+import { fireConfetti } from '@/lib/confetti';
 
 type ImportResult = { created: number; updated: number; errors: string[] };
 
-export default function ImportExportIndex() {
-    const { props } = usePage<{ flash?: { importResult?: ImportResult } }>();
-    const importResult = props.flash?.importResult ?? null;
-    const [file, setFile] = useState<File | null>(null);
-    const [preview, setPreview] = useState<string[][]>([]);
-    const [importing, setImporting] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+type Props = {
+    stats: {
+        exportable: number;
+        profiles: number;
+    };
+};
 
-    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const selected = e.target.files?.[0] ?? null;
-        setFile(selected);
-        if (selected) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const text = ev.target?.result as string;
-                const lines = text.split('\n').filter((l) => l.trim());
-                const rows = lines.slice(0, 6).map((line) => {
-                    const result: string[] = [];
-                    let current = '';
-                    let inQuotes = false;
-                    for (const ch of line) {
-                        if (ch === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (ch === ',' && !inQuotes) {
-                            result.push(current.trim());
-                            current = '';
-                        } else {
-                            current += ch;
-                        }
-                    }
-                    result.push(current.trim());
-                    return result;
-                });
-                setPreview(rows);
-            };
-            reader.readAsText(selected);
+const MAX_CSV_BYTES = 5 * 1024 * 1024; // matches the 5MB server rule
+
+/** Minimal CSV row split honouring double quotes (preview only). */
+function splitCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (const ch of line) {
+        if (ch === '"') {
+            inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
         } else {
-            setPreview([]);
+            current += ch;
         }
     }
+    result.push(current.trim());
+    return result;
+}
 
-    function handleImport() {
+/* ================================================================== */
+/*  Import wizard                                                     */
+/* ================================================================== */
+
+const IMPORT_STEPS: readonly WizardStep[] = [
+    { key: 'file', label: 'CSV file', blurb: 'Choose the upload', icon: Upload },
+    { key: 'confirm', label: 'Preview & confirm', blurb: 'Check, then run', icon: ClipboardCheck },
+];
+
+function ImportWizard({ onClose }: { onClose: () => void }) {
+    const wizard = useWizard(IMPORT_STEPS.length);
+    const [result, setResult] = useState<ImportResult | null>(null);
+    const [preview, setPreview] = useState<string[][]>([]);
+    const [rowCount, setRowCount] = useState(0);
+
+    const form = useForm({ file: null as File | null });
+
+    const stageFile = (files: File[]) => {
+        const file = files[0];
         if (!file) return;
-        setImporting(true);
-        const formData = new FormData();
-        formData.append('file', file);
-        router.post('/hr/import-export/import', formData, {
+        const ok =
+            file.type === 'text/csv' ||
+            file.type === 'text/plain' ||
+            /\.(csv|txt)$/i.test(file.name);
+        if (!ok) {
+            toast.error('Please choose a CSV file.');
+            return;
+        }
+        if (file.size > MAX_CSV_BYTES) {
+            toast.error('The CSV must be 5MB or smaller.');
+            return;
+        }
+        form.setData('file', file);
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const text = (ev.target?.result as string) ?? '';
+            const lines = text.split('\n').filter((l) => l.trim());
+            setRowCount(Math.max(lines.length - 1, 0));
+            setPreview(lines.slice(0, 6).map(splitCsvLine));
+        };
+        reader.readAsText(file);
+    };
+
+    const clearFile = () => {
+        form.setData('file', null);
+        setPreview([]);
+        setRowCount(0);
+    };
+
+    const submit = () => {
+        form.post('/hr/import-export/import', {
             forceFormData: true,
-            onFinish: () => {
-                setImporting(false);
-                setFile(null);
-                setPreview([]);
-                if (fileInputRef.current) fileInputRef.current.value = '';
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const flash = page.props.flash as
+                    | { importResult?: ImportResult; error?: string }
+                    | undefined;
+                if (flash?.error) {
+                    toast.error(flash.error);
+                    return;
+                }
+                const res = flash?.importResult ?? {
+                    created: 0,
+                    updated: 0,
+                    errors: [],
+                };
+                setResult(res);
+                if (res.errors.length === 0) fireConfetti();
             },
         });
-    }
+    };
+
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title="Import employees"
+            description="Create or update employee records from a CSV file."
+            railIcon={UploadCloud}
+            railTitle="Import employees"
+            railSub="Bulk CSV import"
+            steps={IMPORT_STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                result ? (
+                    <WizardSuccessPane
+                        title={
+                            result.errors.length > 0
+                                ? 'Import finished with errors'
+                                : 'Import complete'
+                        }
+                        blurb={
+                            <>
+                                {result.created} employee
+                                {result.created === 1 ? '' : 's'} created and{' '}
+                                {result.updated} updated.
+                                {result.errors.length > 0 ? (
+                                    <>
+                                        {' '}
+                                        {result.errors.length} row
+                                        {result.errors.length === 1 ? '' : 's'}{' '}
+                                        failed — the details are listed on the
+                                        page behind this dialog.
+                                    </>
+                                ) : null}
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={
+                wizard.isFirst ? null : (
+                    <Button variant="outline" onClick={wizard.back}>
+                        Back
+                    </Button>
+                )
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    {wizard.isLast ? (
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !form.data.file}
+                        >
+                            {form.processing
+                                ? form.progress
+                                    ? `Uploading… ${form.progress.percentage ?? 0}%`
+                                    : 'Importing…'
+                                : `Import ${rowCount > 0 ? `${rowCount} row${rowCount === 1 ? '' : 's'}` : 'CSV'}`}
+                        </Button>
+                    ) : (
+                        <Button onClick={wizard.next} disabled={!form.data.file}>
+                            Continue
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {wizard.index === 0 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={Upload}
+                        title="Choose the CSV"
+                        blurb="Rows are matched by email — existing people are updated, new ones created."
+                    />
+                    <Field label="CSV file" required error={form.errors.file}>
+                        {form.data.file ? (
+                            <StagedFileCard file={form.data.file} onRemove={clearFile} />
+                        ) : (
+                            <FileDropzone
+                                onFiles={stageFile}
+                                accept=".csv,.txt,text/csv"
+                                multiple={false}
+                                title="Drag & drop the CSV here"
+                                hint="CSV up to 5MB — name and email columns are required"
+                            />
+                        )}
+                    </Field>
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4">
+                        <FileText className="mt-0.5 h-5 w-5 flex-none text-primary" />
+                        <div className="text-[12.5px] text-muted-foreground">
+                            Not sure about the columns? Download the{' '}
+                            <a
+                                href="/hr/import-export/template"
+                                className="font-semibold text-primary hover:underline"
+                            >
+                                blank template
+                            </a>{' '}
+                            — it has every supported header pre-filled.
+                        </div>
+                    </div>
+                </WizardStepPane>
+            )}
+
+            {wizard.index === 1 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Preview & confirm"
+                        blurb="Check the first rows look right, then run the import."
+                    />
+                    {preview.length > 0 ? (
+                        <div className="overflow-x-auto rounded-xl border border-border">
+                            <table className="w-full text-xs">
+                                <thead className="bg-muted/50">
+                                    <tr>
+                                        {preview[0].map((h, i) => (
+                                            <th
+                                                key={i}
+                                                className="px-3 py-2 text-left font-medium"
+                                            >
+                                                {h}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {preview.slice(1, 6).map((row, ri) => (
+                                        <tr key={ri} className="border-t border-border">
+                                            {row.map((c, ci) => (
+                                                <td
+                                                    key={ci}
+                                                    className="px-3 py-1.5 text-muted-foreground"
+                                                >
+                                                    {c || '-'}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <div className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
+                                Showing first {Math.min(preview.length - 1, 5)} of{' '}
+                                {rowCount} data row{rowCount === 1 ? '' : 's'}
+                            </div>
+                        </div>
+                    ) : null}
+                    <div className="mt-4">
+                        <ReviewCard icon={Table2} title="Import" onEdit={() => wizard.goTo(0)} span>
+                            <ReviewRow label="File" value={form.data.file?.name} />
+                            <ReviewRow
+                                label="Data rows"
+                                value={String(rowCount)}
+                            />
+                            <ReviewRow
+                                label="Behaviour"
+                                value="Match by email — update existing, create new"
+                            />
+                        </ReviewCard>
+                    </div>
+                </WizardStepPane>
+            )}
+        </WizardShell>
+    );
+}
+
+/* ================================================================== */
+/*  Page                                                              */
+/* ================================================================== */
+
+export default function ImportExportIndex({ stats }: Props) {
+    const { props } = usePage<{ flash?: { importResult?: ImportResult } }>();
+    const importResult = props.flash?.importResult ?? null;
+    const [importing, setImporting] = useState(false);
 
     function handleExport() {
         const form = document.createElement('form');
@@ -106,17 +344,38 @@ export default function ImportExportIndex() {
             ]}
         >
             <Head title="Employee Import / Export" />
-            <PageHero category="hr"
-                icon={UploadCloud}
-                title="Employee Import / Export"
-                description="Bulk import or export employee records via CSV."
-                actions={
-                    <Button onClick={handleExport} size="sm">
-                        <Download className="mr-2 h-4 w-4" /> Export CSV
-                    </Button>
+            <PageLayout
+                hero={
+                    <PageHero category="hr"
+                        icon={UploadCloud}
+                        title="Employee Import / Export"
+                        description="Bulk import or export employee records via CSV."
+                        stats={[
+                            {
+                                label: 'Active employees',
+                                value: stats.exportable,
+                                tone: 'success',
+                            },
+                            { label: 'Profiles on record', value: stats.profiles },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    onClick={handleExport}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Download className="mr-1.5 h-4 w-4" /> Export CSV
+                                </Button>
+                                <Button size="sm" onClick={() => setImporting(true)}>
+                                    <Upload className="mr-1.5 h-4 w-4" /> Import CSV
+                                </Button>
+                            </div>
+                        }
+                    />
                 }
-            />
-            <PageShell>
+            >
                 <div className="grid gap-6 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -125,7 +384,8 @@ export default function ImportExportIndex() {
                                 Employees
                             </CardTitle>
                             <CardDescription>
-                                Download a CSV of all active employee records.
+                                Download a CSV of all {stats.exportable} active
+                                employee records.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
@@ -149,65 +409,17 @@ export default function ImportExportIndex() {
                             </CardTitle>
                             <CardDescription>
                                 Upload a CSV to create or update employee
-                                records.
+                                records — rows are matched by email.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".csv,.txt"
-                                onChange={handleFileChange}
-                                className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground hover:file:bg-primary/90"
-                            />
-                            {preview.length > 0 && (
-                                <div className="overflow-x-auto rounded-lg border">
-                                    <table className="w-full text-xs">
-                                        <thead className="bg-muted/50">
-                                            <tr>
-                                                {preview[0].map((h, i) => (
-                                                    <th
-                                                        key={i}
-                                                        className="px-3 py-2 text-left font-medium"
-                                                    >
-                                                        {h}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {preview
-                                                .slice(1, 6)
-                                                .map((row, ri) => (
-                                                    <tr
-                                                        key={ri}
-                                                        className="border-t"
-                                                    >
-                                                        {row.map((c, ci) => (
-                                                            <td
-                                                                key={ci}
-                                                                className="px-3 py-1.5 text-muted-foreground"
-                                                            >
-                                                                {c || '-'}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                    <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                        Showing first{' '}
-                                        {Math.min(preview.length - 1, 5)} rows
-                                    </div>
-                                </div>
-                            )}
-                            <Button
-                                onClick={handleImport}
-                                disabled={!file || importing}
-                            >
-                                <Upload className="mr-2 h-4 w-4" />{' '}
-                                {importing ? 'Importing...' : 'Import CSV'}
+                            <Button onClick={() => setImporting(true)}>
+                                <Upload className="mr-2 h-4 w-4" /> Start import
                             </Button>
+                            <div className="text-sm text-muted-foreground">
+                                A guided upload with a preview of your file
+                                before anything is written.
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -258,7 +470,11 @@ export default function ImportExportIndex() {
                         </CardContent>
                     </Card>
                 )}
-            </PageShell>
+            </PageLayout>
+
+            {importing ? (
+                <ImportWizard onClose={() => setImporting(false)} />
+            ) : null}
         </AppLayout>
     );
 }

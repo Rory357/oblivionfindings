@@ -121,6 +121,31 @@ test('hr can create and complete offboarding workflow with dependency and sign-o
     expect($checklist->completed_at)->not->toBeNull();
     expect($this->profile->is_active)->toBeFalse();
     expect(optional($this->profile->end_date)->toDateString())->toBe($lastWorkingDay);
+
+    // Completing offboarding revokes the leaver's login (approval withdrawn).
+    expect($this->staff->fresh()->approved_at)->toBeNull();
+    // The acting HR user is untouched.
+    expect($this->hr->fresh()->approved_at)->not->toBeNull();
+});
+
+test('revoked leaver session is ended on their next request', function () {
+    $this->staff->forceFill(['approved_at' => null])->save();
+
+    $this->actingAs($this->staff)
+        ->get('/dashboard')
+        ->assertRedirect(route('login'));
+});
+
+test('reactivating an employee restores a revoked login', function () {
+    $this->staff->forceFill(['approved_at' => null])->save();
+    $this->profile->update(['is_active' => false]);
+
+    $this->actingAs($this->hr)
+        ->patch("/hr/people/{$this->profile->id}/active", ['is_active' => true])
+        ->assertSessionHas('success');
+
+    expect($this->staff->fresh()->approved_at)->not->toBeNull();
+    expect($this->profile->fresh()->is_active)->toBeTrue();
 });
 
 test('offboarding dashboard exposes overdue summary and supports status filter', function () {

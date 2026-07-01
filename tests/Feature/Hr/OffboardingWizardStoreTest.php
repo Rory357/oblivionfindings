@@ -34,6 +34,12 @@ beforeEach(function () {
     ]);
 });
 
+test('the offboarding create GET redirects to the index with the wizard param', function () {
+    $this->actingAs($this->hr)
+        ->get('/hr/offboarding/create')
+        ->assertRedirect(route('hr.offboarding.index', ['new' => 1]));
+});
+
 test('the offboarding wizard store creates a checklist with the standard tasks', function () {
     $profile = makeOffProfile();
 

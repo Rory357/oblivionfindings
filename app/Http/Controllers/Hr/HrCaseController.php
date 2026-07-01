@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
+use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,6 +14,42 @@ use Inertia\Inertia;
 class HrCaseController extends Controller
 {
     use ResolvesHrTenant;
+
+    /**
+     * Case type options shared by the index New-case wizard.
+     */
+    private const CASE_TYPE_OPTIONS = [
+        ['value' => 'grievance', 'label' => 'Grievance'],
+        ['value' => 'disciplinary', 'label' => 'Disciplinary'],
+        ['value' => 'investigation', 'label' => 'Investigation'],
+        ['value' => 'welfare', 'label' => 'Welfare'],
+        ['value' => 'complaint', 'label' => 'Complaint'],
+        ['value' => 'other', 'label' => 'Other'],
+    ];
+
+    /**
+     * Severity options shared by the index New-case wizard.
+     */
+    private const SEVERITY_OPTIONS = [
+        ['value' => 'low', 'label' => 'Low'],
+        ['value' => 'medium', 'label' => 'Medium'],
+        ['value' => 'high', 'label' => 'High'],
+        ['value' => 'critical', 'label' => 'Critical'],
+    ];
+
+    /**
+     * Timeline event type options shared by the show-page Add-event wizard.
+     */
+    private const EVENT_TYPE_OPTIONS = [
+        ['value' => 'note', 'label' => 'Note'],
+        ['value' => 'meeting', 'label' => 'Meeting'],
+        ['value' => 'phone_call', 'label' => 'Phone Call'],
+        ['value' => 'letter', 'label' => 'Letter'],
+        ['value' => 'email', 'label' => 'Email'],
+        ['value' => 'document', 'label' => 'Document'],
+        ['value' => 'investigation_update', 'label' => 'Investigation Update'],
+        ['value' => 'other', 'label' => 'Other'],
+    ];
 
     /**
      * List all HR cases.
@@ -135,6 +172,8 @@ class HrCaseController extends Controller
                 ->count(),
         ];
 
+        $canManage = $user->canDo('hr.cases.manage');
+
         return Inertia::render('hr/cases/index', [
             'cases' => $cases,
             'summary' => $summary,
@@ -146,48 +185,36 @@ class HrCaseController extends Controller
                 'sla_window' => $slaWindow !== '' ? $slaWindow : null,
             ],
             'can' => [
-                'manage' => $user->canDo('hr.cases.manage'),
+                'manage' => $canManage,
                 'disciplinary' => $user->canDo('hr.disciplinary.manage'),
             ],
+            // New-case wizard data (managers only — the CTA is hidden otherwise).
+            'staff' => $canManage
+                ? User::staff()
+                    ->whereIn('id', $this->hrStaffUserIdsForTenant($tenantId))
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email'])
+                : [],
+            'caseTypes' => self::CASE_TYPE_OPTIONS,
+            'severities' => self::SEVERITY_OPTIONS,
         ]);
     }
 
     /**
-     * Show form to create a new HR case.
+     * The full-page create form was replaced by the New-case wizard on the
+     * index; keep the GET route working by deep-linking into it.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::staff()
-            ->whereIn('id', $staffIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/cases/create', [
-            'staff' => $staff,
-            'caseTypes' => [
-                ['value' => 'grievance', 'label' => 'Grievance'],
-                ['value' => 'disciplinary', 'label' => 'Disciplinary'],
-                ['value' => 'investigation', 'label' => 'Investigation'],
-                ['value' => 'welfare', 'label' => 'Welfare'],
-                ['value' => 'complaint', 'label' => 'Complaint'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-            'severities' => [
-                ['value' => 'low', 'label' => 'Low'],
-                ['value' => 'medium', 'label' => 'Medium'],
-                ['value' => 'high', 'label' => 'High'],
-                ['value' => 'critical', 'label' => 'Critical'],
-            ],
-        ]);
+        return redirect()->route('hr.cases.index', ['new' => 1]);
     }
 
     /**
-     * Show form to add an event to a case.
+     * The full-page event form was replaced by the Add-event wizard on the
+     * case show page; keep the GET route working by deep-linking into it.
      */
     public function createEvent(Request $request, HrCase $case)
     {
@@ -196,19 +223,7 @@ class HrCaseController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
-        return Inertia::render('hr/cases/create-event', [
-            'hrCase' => $case->load('subject:id,name'),
-            'eventTypes' => [
-                ['value' => 'note', 'label' => 'Note'],
-                ['value' => 'meeting', 'label' => 'Meeting'],
-                ['value' => 'phone_call', 'label' => 'Phone Call'],
-                ['value' => 'letter', 'label' => 'Letter'],
-                ['value' => 'email', 'label' => 'Email'],
-                ['value' => 'document', 'label' => 'Document'],
-                ['value' => 'investigation_update', 'label' => 'Investigation Update'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-        ]);
+        return redirect()->route('hr.cases.show', ['case' => $case->id, 'new' => 'event']);
     }
 
     /**
@@ -253,13 +268,67 @@ class HrCaseController extends Controller
             ->sortBy('occurred_at')
             ->values();
 
+        // Serialise disciplinary actions form-ready (input-formatted dates,
+        // string ids, normalised checklist) so the Edit-disciplinary wizard on
+        // this page can hydrate directly from the row.
+        $case->setRelation(
+            'disciplinaryActions',
+            $case->disciplinaryActions->map(fn (HrDisciplinaryAction $action) => [
+                'id' => $action->id,
+                'employee_user_id' => (string) $action->employee_user_id,
+                'stage' => $action->stage,
+                'action_type' => $action->action_type,
+                'allegation_summary' => $action->allegation_summary,
+                'investigation_notes' => $action->investigation_notes,
+                'investigator_user_id' => $action->investigator_user_id ? (string) $action->investigator_user_id : '',
+                'notice_issued_at' => optional($action->notice_issued_at)->format('Y-m-d\TH:i'),
+                'notice_document_path' => $action->notice_document_path,
+                'meeting_scheduled_at' => optional($action->meeting_scheduled_at)->format('Y-m-d\TH:i'),
+                'meeting_location' => $action->meeting_location,
+                'support_person_advised' => (bool) $action->support_person_advised,
+                'meeting_held_at' => optional($action->meeting_held_at)->format('Y-m-d\TH:i'),
+                'meeting_notes' => $action->meeting_notes,
+                'meeting_attendees' => $action->meeting_attendees ?? [],
+                'employee_response' => $action->employee_response,
+                'response_deadline' => optional($action->response_deadline)->toDateString(),
+                'outcome' => $action->outcome,
+                'outcome_rationale' => $action->outcome_rationale,
+                'outcome_document_path' => $action->outcome_document_path,
+                'good_faith_checklist' => DisciplinaryController::normalizeGoodFaithChecklist((array) ($action->good_faith_checklist ?? [])),
+                'appeal_received' => (bool) $action->appeal_received,
+                'appeal_notes' => $action->appeal_notes,
+                'appeal_outcome' => $action->appeal_outcome,
+                'employee' => $action->employee ? ['id' => $action->employee->id, 'name' => $action->employee->name] : null,
+                'investigator' => $action->investigator ? ['id' => $action->investigator->id, 'name' => $action->investigator->name] : null,
+                'created_at' => optional($action->created_at)->toIso8601String(),
+            ]),
+        );
+
+        $canRunWizards = $canManageCases || $canManageDisciplinary;
+
         return Inertia::render('hr/cases/show', [
             'case' => $case,
             'timeline' => $timeline,
             'can' => [
-                'manage' => $user->canDo('hr.cases.manage'),
-                'disciplinary' => $user->canDo('hr.disciplinary.manage'),
+                'manage' => $canManageCases,
+                'disciplinary' => $canManageDisciplinary,
             ],
+            // Wizard data (Add event / Add disciplinary / Edit disciplinary).
+            'staff' => $canRunWizards
+                ? User::staff()
+                    ->whereIn('id', $this->hrStaffUserIdsForTenant($tenantId))
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email'])
+                : [],
+            'eventTypes' => self::EVENT_TYPE_OPTIONS,
+            'actionTypes' => DisciplinaryController::ACTION_TYPE_OPTIONS,
+            'stageOptions' => collect(DisciplinaryController::STAGES)
+                ->map(fn (string $stage) => [
+                    'value' => $stage,
+                    'label' => str_replace('_', ' ', $stage),
+                ])
+                ->values(),
+            'goodFaithRequiredChecks' => DisciplinaryController::GOOD_FAITH_CHECK_OPTIONS,
         ]);
     }
 

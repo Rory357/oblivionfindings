@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { LifecycleTabs } from '@/components/hr/lifecycle-tabs';
 import {
     OffboardingWizardDialog,
     type DepartureReason,
@@ -109,7 +110,11 @@ export default function OffboardingIndex({
     filters,
     can,
 }: Props) {
-    const [wizardOpen, setWizardOpen] = useState(false);
+    const [wizardOpen, setWizardOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
 
     function applyFilter(key: string, value: string | null) {
         router.get(
@@ -145,6 +150,7 @@ export default function OffboardingIndex({
                         }
                     />
                 }
+                tabs={<LifecycleTabs active="offboarding" />}
             >
                 <div className="grid gap-3 md:grid-cols-5">
                     <Card>

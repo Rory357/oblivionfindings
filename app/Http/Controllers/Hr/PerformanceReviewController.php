@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StorePerformanceReviewRequest;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
+use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -150,6 +153,8 @@ class PerformanceReviewController extends Controller
 
         $review->load(['employee:id,name', 'reviewer:id,name', 'reviewGoals.goal:id,title']);
 
+        $canManage = $user->canDo('hr.performance.manage');
+
         return Inertia::render('hr/performance/show-review', [
             'review' => $review,
             // Structured review goals (falls back to the legacy JSON blob for
@@ -169,10 +174,83 @@ class PerformanceReviewController extends Controller
                     'rating' => null,
                     'goal' => null,
                 ])->all(),
+            'nextSteps' => $this->nextStepsFor($review, $canManage, $tenantId),
             'can' => [
-                'manage' => $user->canDo('hr.performance.manage'),
+                'manage' => $canManage,
             ],
         ]);
+    }
+
+    /**
+     * Deliberate, permission-gated "Next steps" affordance for signed-off
+     * reviews. Never auto-creates anything — it only surfaces a prefillable
+     * CTA into the existing PIP / succession flows when the review outcome
+     * warrants it and no equivalent process is already underway.
+     *
+     * @return array{action: string, employee_profile_id?: int, staff: array<int, array{value: int, label: string}>, successionEmployees?: array<int, array{value: int, label: string}>}|null
+     */
+    private function nextStepsFor(HrPerformanceReview $review, bool $canManage, int $tenantId): ?array
+    {
+        if (! $canManage || $review->status !== 'signed_off' || $review->overall_rating === null) {
+            return null;
+        }
+
+        $staffOptions = fn () => $this->reviewStaff($tenantId)
+            ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
+            ->values()
+            ->all();
+
+        // Low outcome → structured improvement plan (unless one is already open).
+        if ($review->overall_rating <= 2) {
+            $hasActivePip = HrPerformanceImprovementPlan::where('employee_user_id', $review->employee_user_id)
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->exists();
+
+            if ($hasActivePip) {
+                return null;
+            }
+
+            return [
+                'action' => 'pip',
+                'staff' => $staffOptions(),
+            ];
+        }
+
+        // Strong outcome → succession nomination (unless already a candidate).
+        if ($review->overall_rating >= 4) {
+            $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+                ->where('user_id', $review->employee_user_id)
+                ->where('is_active', true)
+                ->first(['id']);
+
+            if (! $profile) {
+                return null;
+            }
+
+            $isCandidate = HrSuccessionCandidate::where('employee_profile_id', $profile->id)
+                ->whereHas('successionPlan', fn ($q) => $q->where('is_active', true))
+                ->exists();
+
+            if ($isCandidate) {
+                return null;
+            }
+
+            return [
+                'action' => 'succession',
+                'employee_profile_id' => $profile->id,
+                'staff' => $staffOptions(),
+                'successionEmployees' => HrEmployeeProfile::where('tenant_id', $tenantId)
+                    ->where('is_active', true)
+                    ->with('user:id,name')
+                    ->orderBy('user_id')
+                    ->limit(500)
+                    ->get(['id', 'user_id'])
+                    ->map(fn ($p) => ['value' => $p->id, 'label' => $p->user?->name ?? 'Unknown'])
+                    ->all(),
+            ];
+        }
+
+        return null;
     }
 
     /**

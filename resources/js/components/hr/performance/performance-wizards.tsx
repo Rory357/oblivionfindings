@@ -449,7 +449,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
             ],
-            build: (d) => {
+            build: (d, ctx) => {
                 const ms = lines(d.milestones);
                 const review = String(d.review);
                 return {
@@ -465,6 +465,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                         end_date: review,
                         review_date: review,
                         milestones: ms.map((m) => ({ title: m, due_date: review })),
+                        source_review_id: ctx?.reviewId ?? null,
                         stay: true,
                     },
                 };
@@ -517,7 +518,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
             ],
-            build: (d) => ({
+            build: (d, ctx) => ({
                 url: '/hr/succession',
                 method: 'post',
                 data: {
@@ -528,6 +529,7 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                         employee_profile_id: Number(id),
                         readiness: d.readiness || 'developing',
                     })),
+                    source_review_id: ctx?.reviewId ?? null,
                     stay: true,
                 },
             }),

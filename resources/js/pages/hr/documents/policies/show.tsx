@@ -1,7 +1,16 @@
+import { NewVersionWizard } from '@/components/hr/policy-wizards';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
@@ -17,10 +26,13 @@ import {
     Download,
     Edit,
     Eye,
+    FilePlus2,
     FileText,
     History,
     ShieldCheck,
+    Trash2,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -115,14 +127,46 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
         { title: policy.title, href: `/hr/documents/policies/${policy.id}` },
     ];
 
-    const handleAttest = () => {
-        if (
-            confirm(
-                'By clicking confirm, you attest that you have read and understood this policy.',
-            )
-        ) {
-            router.post(`/hr/documents/policies/${policy.id}/attest`);
-        }
+    const [attesting, setAttesting] = useState(false);
+    const [attestBusy, setAttestBusy] = useState(false);
+    const [versionWizard, setVersionWizard] = useState(false);
+    const [deletingVersion, setDeletingVersion] = useState<PolicyVersion | null>(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
+
+    const nextVersion =
+        policy.versions.reduce(
+            (max, v) => Math.max(max, Number(v.version_number) || 0),
+            0,
+        ) + 1;
+
+    const confirmAttest = () => {
+        setAttestBusy(true);
+        router.post(
+            `/hr/documents/policies/${policy.id}/attest`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setAttestBusy(false);
+                    setAttesting(false);
+                },
+            },
+        );
+    };
+
+    const confirmDeleteVersion = () => {
+        if (!deletingVersion) return;
+        setDeleteBusy(true);
+        router.delete(
+            `/hr/documents/policies/${policy.id}/versions/${deletingVersion.id}`,
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setDeleteBusy(false);
+                    setDeletingVersion(null);
+                },
+            },
+        );
     };
 
     return (
@@ -204,20 +248,30 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                     </>
                                 )}
                                 {can.manage && (
-                                    <Link
-                                        href={`/hr/documents/policies/${policy.id}/edit`}
-                                    >
-                                        <Button size="sm" variant="outline">
-                                            <Edit className="mr-1.5 h-4 w-4" />
-                                            Edit Policy
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setVersionWizard(true)}
+                                        >
+                                            <FilePlus2 className="mr-1.5 h-4 w-4" />
+                                            New Version
                                         </Button>
-                                    </Link>
+                                        <Link
+                                            href={`/hr/documents/policies/${policy.id}/edit`}
+                                        >
+                                            <Button size="sm" variant="outline">
+                                                <Edit className="mr-1.5 h-4 w-4" />
+                                                Edit Policy
+                                            </Button>
+                                        </Link>
+                                    </>
                                 )}
                                 {can.attest &&
                                     policy.requires_attestation && (
                                         <Button
                                             size="sm"
-                                            onClick={handleAttest}
+                                            onClick={() => setAttesting(true)}
                                         >
                                             <ShieldCheck className="mr-1.5 h-4 w-4" />
                                             I Attest
@@ -318,6 +372,9 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                     <TableHead>Effective From</TableHead>
                                     <TableHead>Changes</TableHead>
                                     <TableHead>Created</TableHead>
+                                    {can.manage && (
+                                        <TableHead className="w-16"></TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -342,12 +399,32 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                         <TableCell>
                                             {formatDate(version.created_at)}
                                         </TableCell>
+                                        {can.manage && (
+                                            <TableCell className="text-right">
+                                                {policy.current_version?.id !==
+                                                    version.id && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-status-critical"
+                                                        aria-label={`Delete version ${version.version_number}`}
+                                                        onClick={() =>
+                                                            setDeletingVersion(
+                                                                version,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))}
                                 {!policy.versions.length && (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={4}
+                                            colSpan={can.manage ? 5 : 4}
                                             className="py-6 text-center text-sm text-muted-foreground"
                                         >
                                             No version history available.
@@ -361,11 +438,17 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
 
                 {policy.attestations.length > 0 && (
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <ShieldCheck className="h-5 w-5 text-status-warning" />
                                 Recent Attestations
                             </CardTitle>
+                            <Link
+                                href={`/hr/documents/policies/attestations?policy_id=${policy.id}`}
+                                className="text-xs text-primary hover:underline"
+                            >
+                                View all attestations
+                            </Link>
                         </CardHeader>
                         <CardContent className="p-0">
                             <Table>
@@ -402,6 +485,85 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                     </Card>
                 )}
             </PageLayout>
+
+            {versionWizard ? (
+                <NewVersionWizard
+                    policyId={policy.id}
+                    policyTitle={policy.title}
+                    nextVersion={nextVersion}
+                    onClose={() => setVersionWizard(false)}
+                />
+            ) : null}
+
+            <Dialog
+                open={attesting}
+                onOpenChange={(open) => {
+                    if (!open) setAttesting(false);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Attest to this policy</DialogTitle>
+                        <DialogDescription>
+                            By confirming, you attest that you have read and
+                            understood “{policy.title}”
+                            {policy.current_version
+                                ? ` (v${policy.current_version.version_number})`
+                                : ''}
+                            . Your sign-off is recorded with a timestamp for the
+                            audit trail.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setAttesting(false)}
+                            disabled={attestBusy}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={confirmAttest} disabled={attestBusy}>
+                            <ShieldCheck className="mr-1.5 h-4 w-4" />
+                            {attestBusy ? 'Recording…' : 'I attest'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={deletingVersion !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeletingVersion(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Delete version</DialogTitle>
+                        <DialogDescription>
+                            Deleting v{deletingVersion?.version_number} removes
+                            this version and its stored PDF permanently. The
+                            current version cannot be deleted.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setDeletingVersion(null)}
+                            disabled={deleteBusy}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDeleteVersion}
+                            disabled={deleteBusy}
+                        >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            {deleteBusy ? 'Deleting…' : 'Delete version'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

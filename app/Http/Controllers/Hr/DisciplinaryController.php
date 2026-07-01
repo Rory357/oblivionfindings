@@ -8,19 +8,18 @@ use App\Http\Requests\Hr\StoreDisciplinaryActionRequest;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class DisciplinaryController extends Controller
 {
     use ResolvesHrTenant;
 
     /**
-     * Disciplinary process stages in order.
+     * Disciplinary process stages in order. Public so the case show page
+     * (which hosts the disciplinary wizards) can expose the same contract.
      */
-    private const STAGES = [
+    public const STAGES = [
         'allegation_raised',
         'investigation',
         'notice_issued',
@@ -36,7 +35,7 @@ class DisciplinaryController extends Controller
     /**
      * Good faith checks that must be true before recording/communicating an outcome.
      */
-    private const REQUIRED_GOOD_FAITH_CHECKS = [
+    public const REQUIRED_GOOD_FAITH_CHECKS = [
         'allegation_communicated',
         'opportunity_to_respond',
         'response_genuinely_considered',
@@ -44,7 +43,30 @@ class DisciplinaryController extends Controller
     ];
 
     /**
-     * Show form to create a new disciplinary action.
+     * Disciplinary action type options shared with the case show page wizards.
+     */
+    public const ACTION_TYPE_OPTIONS = [
+        ['value' => 'verbal_warning', 'label' => 'Verbal Warning'],
+        ['value' => 'written_warning', 'label' => 'Written Warning'],
+        ['value' => 'final_warning', 'label' => 'Final Warning'],
+        ['value' => 'suspension', 'label' => 'Suspension'],
+        ['value' => 'dismissal', 'label' => 'Dismissal'],
+        ['value' => 'other', 'label' => 'Other'],
+    ];
+
+    /**
+     * Labels for the required good-faith checks, shared with the case show page.
+     */
+    public const GOOD_FAITH_CHECK_OPTIONS = [
+        ['key' => 'allegation_communicated', 'label' => 'Allegation clearly communicated'],
+        ['key' => 'opportunity_to_respond', 'label' => 'Genuine opportunity to respond provided'],
+        ['key' => 'response_genuinely_considered', 'label' => 'Employee response genuinely considered'],
+        ['key' => 'support_person_offered', 'label' => 'Support person was offered'],
+    ];
+
+    /**
+     * The full-page create form was replaced by the Add-disciplinary wizard on
+     * the case show page; keep the GET route working by deep-linking into it.
      */
     public function create(Request $request, HrCase $case)
     {
@@ -52,29 +74,13 @@ class DisciplinaryController extends Controller
         abort_unless($user && $user->canDo('hr.disciplinary.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $case->tenant_id);
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::staff()
-            ->when($tenantStaffIds !== [], fn ($query) => $query->whereIn('id', $tenantStaffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/cases/create-disciplinary', [
-            'hrCase' => $case->load('subject:id,name'),
-            'staff' => $staff,
-            'actionTypes' => [
-                ['value' => 'verbal_warning', 'label' => 'Verbal Warning'],
-                ['value' => 'written_warning', 'label' => 'Written Warning'],
-                ['value' => 'final_warning', 'label' => 'Final Warning'],
-                ['value' => 'suspension', 'label' => 'Suspension'],
-                ['value' => 'dismissal', 'label' => 'Dismissal'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-        ]);
+        return redirect()->route('hr.cases.show', ['case' => $case->id, 'new' => 'disciplinary']);
     }
 
     /**
-     * Show form to edit an existing disciplinary action.
+     * The full-page edit form was replaced by the Edit-disciplinary wizard on
+     * the parent case show page; keep the GET route working by deep-linking.
      */
     public function edit(Request $request, HrDisciplinaryAction $action)
     {
@@ -83,71 +89,12 @@ class DisciplinaryController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $action->tenant_id);
 
-        $hrCase = $action->hrCase()->with('subject:id,name')->firstOrFail();
+        $hrCase = $action->hrCase()->firstOrFail();
         $this->assertHrTenantAccess($tenantId, $hrCase->tenant_id);
 
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $staff = User::staff()
-            ->when($tenantStaffIds !== [], fn ($query) => $query->whereIn('id', $tenantStaffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/cases/edit-disciplinary', [
-            'hrCase' => [
-                'id' => $hrCase->id,
-                'case_number' => $hrCase->case_number,
-                'subject' => $hrCase->subject ? [
-                    'id' => $hrCase->subject->id,
-                    'name' => $hrCase->subject->name,
-                ] : null,
-            ],
-            'action' => [
-                'id' => $action->id,
-                'employee_user_id' => (string) $action->employee_user_id,
-                'stage' => $action->stage,
-                'action_type' => $action->action_type,
-                'allegation_summary' => $action->allegation_summary,
-                'investigation_notes' => $action->investigation_notes,
-                'investigator_user_id' => $action->investigator_user_id ? (string) $action->investigator_user_id : '',
-                'notice_issued_at' => optional($action->notice_issued_at)->format('Y-m-d\TH:i'),
-                'notice_document_path' => $action->notice_document_path,
-                'meeting_scheduled_at' => optional($action->meeting_scheduled_at)->format('Y-m-d\TH:i'),
-                'meeting_location' => $action->meeting_location,
-                'support_person_advised' => (bool) $action->support_person_advised,
-                'meeting_held_at' => optional($action->meeting_held_at)->format('Y-m-d\TH:i'),
-                'meeting_notes' => $action->meeting_notes,
-                'meeting_attendees' => $action->meeting_attendees ?? [],
-                'employee_response' => $action->employee_response,
-                'response_deadline' => optional($action->response_deadline)->toDateString(),
-                'outcome' => $action->outcome,
-                'outcome_rationale' => $action->outcome_rationale,
-                'outcome_document_path' => $action->outcome_document_path,
-                'good_faith_checklist' => $this->normalizeGoodFaithChecklist((array) ($action->good_faith_checklist ?? [])),
-                'appeal_received' => (bool) $action->appeal_received,
-                'appeal_notes' => $action->appeal_notes,
-                'appeal_outcome' => $action->appeal_outcome,
-            ],
-            'staff' => $staff,
-            'actionTypes' => [
-                ['value' => 'verbal_warning', 'label' => 'Verbal Warning'],
-                ['value' => 'written_warning', 'label' => 'Written Warning'],
-                ['value' => 'final_warning', 'label' => 'Final Warning'],
-                ['value' => 'suspension', 'label' => 'Suspension'],
-                ['value' => 'dismissal', 'label' => 'Dismissal'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-            'stageOptions' => collect(self::STAGES)
-                ->map(fn (string $stage) => [
-                    'value' => $stage,
-                    'label' => str_replace('_', ' ', $stage),
-                ])
-                ->values(),
-            'goodFaithRequiredChecks' => [
-                ['key' => 'allegation_communicated', 'label' => 'Allegation clearly communicated'],
-                ['key' => 'opportunity_to_respond', 'label' => 'Genuine opportunity to respond provided'],
-                ['key' => 'response_genuinely_considered', 'label' => 'Employee response genuinely considered'],
-                ['key' => 'support_person_offered', 'label' => 'Support person was offered'],
-            ],
+        return redirect()->route('hr.cases.show', [
+            'case' => $hrCase->id,
+            'edit-disciplinary' => $action->id,
         ]);
     }
 
@@ -374,10 +321,13 @@ class DisciplinaryController extends Controller
     }
 
     /**
+     * Normalise a stored checklist to booleans keyed by the required checks.
+     * Public static so the case show page (hosting the edit wizard) reuses it.
+     *
      * @param array<string, mixed> $checklist
      * @return array<string, bool>
      */
-    protected function normalizeGoodFaithChecklist(array $checklist): array
+    public static function normalizeGoodFaithChecklist(array $checklist): array
     {
         $normalized = [];
         foreach (self::REQUIRED_GOOD_FAITH_CHECKS as $key) {

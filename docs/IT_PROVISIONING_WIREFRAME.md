@@ -1,9 +1,18 @@
 # IT & Provisioning — wireframe build-out spec
 
-`/it` (top-level nav: **IT & Provisioning**) currently renders a **design-preview
-wireframe** (`resources/js/pages/it/index.tsx`) with static mock data. It exists
-so the shape can be agreed before any backend is built. This note lists exactly
-what must be built to make it real.
+> **Status: BUILT (2026-07-02).** The wireframe has been replaced by the real
+> feature: `it_provisioning_requests` + `it_tickets` tables,
+> `App\Http\Controllers\It\ItProvisioningController`, the
+> `OnboardingService::createItProvisioningRequests()` bridge, `it.view` /
+> `it.manage` permissions (RbacSeeder + grant migration), and a live
+> `resources/js/pages/it/index.tsx` (filters, context menus, Log-ticket /
+> Fulfil / Assign wizards). Tests: `tests/Feature/It/ItProvisioningTest.php`.
+> The spec below is kept for the record; §5 (external integrations on fulfil)
+> remains the only deferred item.
+
+`/it` (top-level nav: **IT & Provisioning**) previously rendered a
+design-preview wireframe with static mock data, agreed before the backend was
+built. This note lists exactly what had to be built to make it real.
 
 ## Why it exists
 Onboarding checklists produce IT-category tasks like *"Create Microsoft 365

@@ -553,10 +553,9 @@ function buildIconNavItems({
         }
     }
 
-    // IT & Provisioning — design preview surface for the account/access/equipment
-    // requests that onboarding IT tasks should feed. Gated to onboarding managers
-    // until the backend ships (see docs/IT_PROVISIONING_WIREFRAME.md).
-    if (can?.hr?.onboarding?.manage) {
+    // IT & Provisioning — the account/access/equipment request queue fed by
+    // onboarding IT tasks, plus the helpdesk ticket queue.
+    if (can?.it?.view) {
         items.push({
             id: 'it-provisioning',
             icon: Server,

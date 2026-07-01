@@ -1,19 +1,14 @@
 import { PayrollTabs } from '@/components/hr';
+import {
+    CreateRunWizard,
+    ExportProfileWizard,
+    type ExportFieldOption,
+    type PayrollExportProfile,
+} from '@/components/hr/payroll-wizards';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
@@ -22,12 +17,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Banknote, Download, Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 
 interface PayrollRun {
     id: number;
@@ -48,24 +42,6 @@ interface PayrollRun {
         provider_key: string | null;
     } | null;
     validation_errors: string[];
-}
-
-interface PayrollExportProfile {
-    id: number;
-    name: string;
-    provider_key: string | null;
-    description: string | null;
-    delimiter: string;
-    enclosure: string;
-    line_ending: string;
-    include_headers: boolean;
-    is_default: boolean;
-    mappings: Array<{ header: string; source: string; value?: unknown }>;
-}
-
-interface ExportFieldOption {
-    value: string;
-    label: string;
 }
 
 interface Props {
@@ -111,16 +87,9 @@ function formatCurrency(amount: number): string {
     }).format(amount);
 }
 
-function toDateInputValue(date: Date): string {
-    const offsetDate = new Date(
-        date.getTime() - date.getTimezoneOffset() * 60000,
-    );
-    return offsetDate.toISOString().slice(0, 10);
-}
-
 function formatDate(value: string | null): string {
     if (!value) {
-        return '\u2014';
+        return '—';
     }
 
     const date = new Date(`${value}T00:00:00`);
@@ -135,55 +104,24 @@ function formatDate(value: string | null): string {
     }).format(date);
 }
 
+type ProfileWizardState = { profile: PayrollExportProfile | null } | null;
+
 export default function PayrollIndex({
     runs,
     profiles,
     exportFieldOptions,
     can,
 }: Props) {
-    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-    const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-    const [editingProfileId, setEditingProfileId] = useState<number | null>(
-        null,
-    );
+    const [runWizardOpen, setRunWizardOpen] = useState(false);
+    const [profileWizard, setProfileWizard] =
+        useState<ProfileWizardState>(null);
     const [selectedProfileByRun, setSelectedProfileByRun] = useState<
         Record<number, string>
     >({});
-    const [profileSubmitting, setProfileSubmitting] = useState(false);
-    const [profileJsonError, setProfileJsonError] = useState<string | null>(
-        null,
-    );
     const page = usePage<{ errors?: Record<string, string | string[]> }>();
-    const { data, setData, post, processing, errors, clearErrors, reset } =
-        useForm({
-            period_start: '',
-            period_end: '',
-            notes: '',
-        });
-    const {
-        data: profileData,
-        setData: setProfileData,
-        errors: profileErrors,
-        clearErrors: clearProfileErrors,
-        reset: resetProfileForm,
-    } = useForm({
-        name: '',
-        provider_key: '',
-        description: '',
-        delimiter: ',',
-        enclosure: '"',
-        line_ending: '\\n',
-        include_headers: true,
-        is_default: false,
-        mappings_json: '[]',
-    });
 
     const lockError = page.props?.errors?.lock;
-    const periodError = page.props?.errors?.period;
     const exportError = page.props?.errors?.export;
-    const profileMappingsError = (
-        profileErrors as Record<string, string | undefined>
-    ).mappings;
     const defaultProfile =
         profiles.find((profile) => profile.is_default) ?? null;
 
@@ -198,138 +136,12 @@ export default function PayrollIndex({
         );
     }
 
-    function openCreateRunDialog() {
-        const periodStart = new Date();
-        const periodEnd = new Date(periodStart);
-        periodEnd.setDate(periodEnd.getDate() + 13);
-
-        clearErrors();
-        setData({
-            period_start: toDateInputValue(periodStart),
-            period_end: toDateInputValue(periodEnd),
-            notes: '',
-        });
-        setIsCreateDialogOpen(true);
-    }
-
-    function openCreateProfileDialog() {
-        clearProfileErrors();
-        setProfileJsonError(null);
-        setEditingProfileId(null);
-        resetProfileForm();
-        const defaultMappings = [
-            { header: 'Employee ID', source: 'employee_number' },
-            { header: 'Employee Name', source: 'name' },
-            { header: 'Regular Hours', source: 'regular_hours' },
-            { header: 'Overtime Hours', source: 'overtime_hours' },
-            { header: 'Gross Pay', source: 'gross_pay' },
-        ];
-        setProfileData({
-            name: '',
-            provider_key: '',
-            description: '',
-            delimiter: ',',
-            enclosure: '"',
-            line_ending: '\\n',
-            include_headers: true,
-            is_default: profiles.length === 0,
-            mappings_json: JSON.stringify(defaultMappings, null, 2),
-        });
-        setIsProfileDialogOpen(true);
-    }
-
-    function openEditProfileDialog(profile: PayrollExportProfile) {
-        clearProfileErrors();
-        setProfileJsonError(null);
-        setEditingProfileId(profile.id);
-        setProfileData({
-            name: profile.name,
-            provider_key: profile.provider_key ?? '',
-            description: profile.description ?? '',
-            delimiter: profile.delimiter || ',',
-            enclosure: profile.enclosure || '"',
-            line_ending:
-                profile.line_ending === '\r\n'
-                    ? '\\r\\n'
-                    : profile.line_ending === '\r'
-                      ? '\\r'
-                      : '\\n',
-            include_headers: profile.include_headers,
-            is_default: profile.is_default,
-            mappings_json: JSON.stringify(profile.mappings ?? [], null, 2),
-        });
-        setIsProfileDialogOpen(true);
-    }
-
     function handleSetDefaultProfile(profileId: number) {
         router.post(
             `/hr/payroll/export-profiles/${profileId}/set-default`,
             {},
             { preserveScroll: true },
         );
-    }
-
-    function handleProfileSubmit(event: FormEvent) {
-        event.preventDefault();
-        setProfileJsonError(null);
-
-        let parsedMappings: unknown;
-        try {
-            parsedMappings = JSON.parse(profileData.mappings_json || '[]');
-        } catch {
-            setProfileJsonError('Mappings JSON is invalid.');
-            return;
-        }
-
-        const payload = {
-            name: profileData.name,
-            provider_key: profileData.provider_key || null,
-            description: profileData.description || null,
-            delimiter: profileData.delimiter || ',',
-            enclosure: profileData.enclosure || '"',
-            line_ending: profileData.line_ending || '\\n',
-            include_headers: profileData.include_headers,
-            is_default: profileData.is_default,
-            mappings: Array.isArray(parsedMappings) ? parsedMappings : [],
-        };
-
-        setProfileSubmitting(true);
-
-        if (editingProfileId) {
-            router.put(
-                `/hr/payroll/export-profiles/${editingProfileId}`,
-                payload,
-                {
-                    preserveScroll: true,
-                    onFinish: () => setProfileSubmitting(false),
-                    onSuccess: () => {
-                        setIsProfileDialogOpen(false);
-                        setEditingProfileId(null);
-                    },
-                },
-            );
-            return;
-        }
-
-        router.post('/hr/payroll/export-profiles', payload, {
-            preserveScroll: true,
-            onFinish: () => setProfileSubmitting(false),
-            onSuccess: () => {
-                setIsProfileDialogOpen(false);
-            },
-        });
-    }
-
-    function handleCreateRunSubmit(event: FormEvent) {
-        event.preventDefault();
-
-        post('/hr/payroll/runs', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsCreateDialogOpen(false);
-                reset();
-            },
-        });
     }
 
     return (
@@ -349,7 +161,7 @@ export default function PayrollIndex({
                         ]}
                         actions={
                             can.manage ? (
-                                <Button onClick={openCreateRunDialog}>
+                                <Button onClick={() => setRunWizardOpen(true)}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Create Run
                                 </Button>
@@ -359,10 +171,6 @@ export default function PayrollIndex({
                 }
             >
                 <PayrollTabs active="runs" />
-                <div className="text-xs text-muted-foreground">
-                    Tip: use the Create Run button to enter period dates and
-                    generate draft payroll items.
-                </div>
 
                 {lockError ? (
                     <Card className="border-status-critical/40 bg-status-critical-bg">
@@ -383,311 +191,19 @@ export default function PayrollIndex({
                     </Card>
                 ) : null}
 
-                <Dialog
-                    open={isCreateDialogOpen}
-                    onOpenChange={setIsCreateDialogOpen}
-                >
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Create Payroll Run</DialogTitle>
-                            <DialogDescription>
-                                Enter the payroll period dates to generate a
-                                draft run.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form
-                            onSubmit={handleCreateRunSubmit}
-                            className="space-y-4"
-                        >
-                            <div className="space-y-2">
-                                <Label htmlFor="period_start">
-                                    Period start
-                                </Label>
-                                <Input
-                                    id="period_start"
-                                    type="date"
-                                    value={data.period_start}
-                                    onChange={(event) =>
-                                        setData(
-                                            'period_start',
-                                            event.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                {(errors.period_start ||
-                                    (typeof periodError === 'string'
-                                        ? periodError
-                                        : null)) && (
-                                    <p className="text-xs text-status-critical">
-                                        {errors.period_start ||
-                                            (typeof periodError === 'string'
-                                                ? periodError
-                                                : null)}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="period_end">Period end</Label>
-                                <Input
-                                    id="period_end"
-                                    type="date"
-                                    value={data.period_end}
-                                    min={data.period_start || undefined}
-                                    onChange={(event) =>
-                                        setData(
-                                            'period_end',
-                                            event.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                {errors.period_end && (
-                                    <p className="text-xs text-status-critical">
-                                        {errors.period_end}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">Notes (optional)</Label>
-                                <Input
-                                    id="notes"
-                                    value={data.notes}
-                                    onChange={(event) =>
-                                        setData('notes', event.target.value)
-                                    }
-                                    placeholder="Optional payroll notes"
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setIsCreateDialogOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={processing}>
-                                    {processing ? 'Creating...' : 'Create Run'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                {runWizardOpen && (
+                    <CreateRunWizard onClose={() => setRunWizardOpen(false)} />
+                )}
 
-                <Dialog
-                    open={isProfileDialogOpen}
-                    onOpenChange={setIsProfileDialogOpen}
-                >
-                    <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>
-                                {editingProfileId
-                                    ? 'Edit Export Profile'
-                                    : 'Create Export Profile'}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Configure payroll export columns and separators
-                                for your payroll provider.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form
-                            onSubmit={handleProfileSubmit}
-                            className="space-y-4"
-                        >
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="profile_name">
-                                        Profile name
-                                    </Label>
-                                    <Input
-                                        id="profile_name"
-                                        value={profileData.name}
-                                        onChange={(event) =>
-                                            setProfileData(
-                                                'name',
-                                                event.target.value,
-                                            )
-                                        }
-                                        required
-                                    />
-                                    {profileErrors.name && (
-                                        <p className="text-xs text-status-critical">
-                                            {profileErrors.name}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="provider_key">
-                                        Provider key (optional)
-                                    </Label>
-                                    <Input
-                                        id="provider_key"
-                                        value={profileData.provider_key}
-                                        onChange={(event) =>
-                                            setProfileData(
-                                                'provider_key',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="myob, xero, custom"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="delimiter">Delimiter</Label>
-                                    <Input
-                                        id="delimiter"
-                                        value={profileData.delimiter}
-                                        onChange={(event) =>
-                                            setProfileData(
-                                                'delimiter',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="enclosure">
-                                        Text enclosure
-                                    </Label>
-                                    <Input
-                                        id="enclosure"
-                                        value={profileData.enclosure}
-                                        onChange={(event) =>
-                                            setProfileData(
-                                                'enclosure',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="line_ending">
-                                        Line ending
-                                    </Label>
-                                    <Select
-                                        value={profileData.line_ending}
-                                        onValueChange={(value) =>
-                                            setProfileData('line_ending', value)
-                                        }
-                                    >
-                                        <SelectTrigger id="line_ending">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="\\n">
-                                                LF (\n)
-                                            </SelectItem>
-                                            <SelectItem value="\\r\\n">
-                                                CRLF (\r\n)
-                                            </SelectItem>
-                                            <SelectItem value="\\r">
-                                                CR (\r)
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">
-                                        Description
-                                    </Label>
-                                    <Input
-                                        id="description"
-                                        value={profileData.description}
-                                        onChange={(event) =>
-                                            setProfileData(
-                                                'description',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-6 rounded-md border p-3">
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={profileData.include_headers}
-                                        onCheckedChange={(checked) =>
-                                            setProfileData(
-                                                'include_headers',
-                                                Boolean(checked),
-                                            )
-                                        }
-                                    />
-                                    <span>Include headers</span>
-                                </label>
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox
-                                        checked={profileData.is_default}
-                                        onCheckedChange={(checked) =>
-                                            setProfileData(
-                                                'is_default',
-                                                Boolean(checked),
-                                            )
-                                        }
-                                    />
-                                    <span>Set as default profile</span>
-                                </label>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="mappings_json">
-                                    Mappings JSON
-                                </Label>
-                                <Textarea
-                                    id="mappings_json"
-                                    rows={10}
-                                    value={profileData.mappings_json}
-                                    onChange={(event) =>
-                                        setProfileData(
-                                            'mappings_json',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Use field sources:{' '}
-                                    {exportFieldOptions
-                                        .map((field) => field.value)
-                                        .join(', ')}
-                                    , plus <code>static</code>.
-                                </p>
-                                {(profileErrors.mappings_json ||
-                                    profileMappingsError) && (
-                                    <p className="text-xs text-status-critical">
-                                        {profileErrors.mappings_json ||
-                                            profileMappingsError}
-                                    </p>
-                                )}
-                                {profileJsonError && (
-                                    <p className="text-xs text-status-critical">
-                                        {profileJsonError}
-                                    </p>
-                                )}
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() =>
-                                        setIsProfileDialogOpen(false)
-                                    }
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={profileSubmitting}
-                                >
-                                    {profileSubmitting
-                                        ? 'Saving...'
-                                        : editingProfileId
-                                          ? 'Update Profile'
-                                          : 'Create Profile'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                {profileWizard !== null && (
+                    <ExportProfileWizard
+                        key={profileWizard.profile?.id ?? 'new'}
+                        profile={profileWizard.profile}
+                        fieldOptions={exportFieldOptions}
+                        isFirstProfile={profiles.length === 0}
+                        onClose={() => setProfileWizard(null)}
+                    />
+                )}
 
                 <Card>
                     <CardContent className="py-4">
@@ -698,7 +214,9 @@ export default function PayrollIndex({
                             {can.manage && (
                                 <Button
                                     variant="outline"
-                                    onClick={openCreateProfileDialog}
+                                    onClick={() =>
+                                        setProfileWizard({ profile: null })
+                                    }
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     New Export Profile
@@ -749,9 +267,9 @@ export default function PayrollIndex({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() =>
-                                                        openEditProfileDialog(
+                                                        setProfileWizard({
                                                             profile,
-                                                        )
+                                                        })
                                                     }
                                                 >
                                                     Edit
@@ -905,6 +423,21 @@ export default function PayrollIndex({
                                                             Paid
                                                         </span>
                                                     )}
+                                                    {can.export_data &&
+                                                        run.net_paid_at && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                asChild
+                                                            >
+                                                                <a
+                                                                    href={`/hr/payroll/runs/${run.id}/net-pay-file`}
+                                                                >
+                                                                    <Download className="mr-1 h-3 w-3" />
+                                                                    Bank file
+                                                                </a>
+                                                            </Button>
+                                                        )}
                                                     {can.export_data &&
                                                         run.status ===
                                                             'locked' && (

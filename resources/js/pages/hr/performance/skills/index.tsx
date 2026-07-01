@@ -1,5 +1,9 @@
 import { PerformanceTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PerformanceSatelliteHero,
+    SatelliteHeroAction,
+} from '@/components/hr/performance/performance-hero';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +27,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, Grid3X3, Plus, Star } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
@@ -105,45 +109,35 @@ export default function SkillsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PerformanceSatelliteHero
                         icon={Star}
                         title="Skills"
-                        description="Manage organisational skills and competencies"
+                        description="Manage organisational skills and competencies."
                         stats={[
                             { label: 'Skills', value: skills.data.length },
                             { label: 'Categories', value: categories.length },
-                            { label: 'Gaps', value: skillGaps.length },
+                            { label: 'Gaps', value: skillGaps.length, amber: skillGaps.length > 0 },
                         ]}
                         actions={
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/hr/performance/competencies">
-                                        Competencies
-                                    </Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href="/hr/performance/skills/matrix">
-                                        <Grid3X3 className="mr-1.5 h-4 w-4" />
-                                        Skills Matrix
-                                    </Link>
-                                </Button>
+                            <>
+                                <SatelliteHeroAction
+                                    label="Competencies"
+                                    href="/hr/performance/competencies"
+                                />
+                                <SatelliteHeroAction
+                                    icon={Grid3X3}
+                                    label="Skills matrix"
+                                    href="/hr/performance/skills/matrix"
+                                />
                                 {can.create && (
-                                    <Button size="sm" onClick={() => setOpen(true)}>
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New Skill
-                                    </Button>
+                                    <SatelliteHeroAction
+                                        icon={Plus}
+                                        label="New skill"
+                                        primary
+                                        onClick={() => setOpen(true)}
+                                    />
                                 )}
-                            </div>
+                            </>
                         }
                     />
                 }

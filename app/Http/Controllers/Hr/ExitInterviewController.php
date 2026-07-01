@@ -4,16 +4,36 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
+use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Services\ExitInterviewService;
+use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class ExitInterviewController extends Controller
 {
     use ResolvesHrTenant;
+
+    /**
+     * Departure-reason taxonomy, shared with the offboarding wizard.
+     */
+    private const DEPARTURE_REASONS = [
+        ['value' => 'career_growth', 'label' => 'Career Growth'],
+        ['value' => 'compensation', 'label' => 'Compensation'],
+        ['value' => 'work_life_balance', 'label' => 'Work-Life Balance'],
+        ['value' => 'management', 'label' => 'Management Issues'],
+        ['value' => 'culture', 'label' => 'Company Culture'],
+        ['value' => 'relocation', 'label' => 'Relocation'],
+        ['value' => 'retirement', 'label' => 'Retirement'],
+        ['value' => 'personal', 'label' => 'Personal Reasons'],
+        ['value' => 'redundancy', 'label' => 'Redundancy'],
+        ['value' => 'contract_end', 'label' => 'Contract End'],
+        ['value' => 'other', 'label' => 'Other'],
+    ];
 
     public function __construct(
         protected ExitInterviewService $exitInterviewService,
@@ -38,58 +58,47 @@ class ExitInterviewController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $canManage = $this->canManage($user);
+
+        $statsBase = HrExitInterview::forTenant($tenantId);
+        $avgSatisfaction = (clone $statsBase)->whereNotNull('overall_satisfaction')->avg('overall_satisfaction');
+        $recommendTotal = (clone $statsBase)->whereNotNull('would_recommend')->count();
+        $recommendYes = (clone $statsBase)->where('would_recommend', true)->count();
+
         return Inertia::render('hr/exit-interviews/index', [
             'interviews' => $interviews,
+            'stats' => [
+                'total' => (clone $statsBase)->count(),
+                'avg_satisfaction' => $avgSatisfaction !== null ? round((float) $avgSatisfaction, 1) : null,
+                'recommend_pct' => $recommendTotal > 0 ? (int) round($recommendYes / $recommendTotal * 100) : null,
+                'last_90_days' => (clone $statsBase)->where('interview_date', '>=', now()->subDays(90)->toDateString())->count(),
+            ],
+            'employees' => $canManage
+                ? HrEmployeeProfile::forTenant($tenantId)
+                    ->with('user:id,name')
+                    ->get(['id', 'user_id', 'position_title'])
+                : [],
+            'interviewers' => $canManage ? $this->interviewerOptions($tenantId, $user) : [],
+            'departureReasons' => self::DEPARTURE_REASONS,
             'filters' => [
                 'reason' => $request->query('reason'),
             ],
             'can' => [
-                'manage' => $user->canDo('hr.exit-interviews.manage'),
+                'manage' => $canManage,
             ],
         ]);
     }
 
     /**
-     * Show form to create an exit interview.
+     * The record form is now a wizard modal on the index page — keep the old
+     * GET route working by bouncing to the index with the wizard open.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $employees = HrEmployeeProfile::forTenant($tenantId)
-            ->with('user:id,name')
-            ->get(['id', 'user_id', 'position_title']);
-
-        $interviewerIds = HrEmployeeProfile::forTenant($tenantId)
-            ->pluck('user_id')
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        $interviewers = User::whereIn('id', $interviewerIds)
-            ->get(['id', 'name']);
-
-        return Inertia::render('hr/exit-interviews/create', [
-            'employees' => $employees,
-            'interviewers' => $interviewers,
-            'departureReasons' => [
-                ['value' => 'career_growth', 'label' => 'Career Growth'],
-                ['value' => 'compensation', 'label' => 'Compensation'],
-                ['value' => 'work_life_balance', 'label' => 'Work-Life Balance'],
-                ['value' => 'management', 'label' => 'Management Issues'],
-                ['value' => 'culture', 'label' => 'Company Culture'],
-                ['value' => 'relocation', 'label' => 'Relocation'],
-                ['value' => 'retirement', 'label' => 'Retirement'],
-                ['value' => 'personal', 'label' => 'Personal Reasons'],
-                ['value' => 'redundancy', 'label' => 'Redundancy'],
-                ['value' => 'contract_end', 'label' => 'Contract End'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-        ]);
+        return redirect()->route('hr.exit-interviews.index', ['new' => 1]);
     }
 
     /**
@@ -121,6 +130,15 @@ class ExitInterviewController extends Controller
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        // Cross-loop seam: recording the interview ticks off the matching
+        // pending "Exit interview" task on the employee's open offboarding
+        // checklist, so the leaver workflow stays in sync automatically.
+        $this->completeOffboardingExitInterviewTask(
+            $tenantId,
+            (int) $data['employee_profile_id'],
+            (int) $user->id,
+        );
 
         // When recorded from an offboarding checklist, stay on that page.
         if ($request->boolean('from_offboarding')) {
@@ -177,6 +195,57 @@ class ExitInterviewController extends Controller
                 'to' => $toDate,
             ],
         ]);
+    }
+
+    /**
+     * Auto-complete the pending "Exit interview" task on the employee's open
+     * offboarding checklist (if any). Best-effort: tasks blocked by dependency
+     * or sign-off rules are left for manual completion.
+     */
+    private function completeOffboardingExitInterviewTask(?int $tenantId, int $employeeProfileId, int $completedBy): void
+    {
+        $task = HrOffboardingTask::query()
+            ->where('status', '!=', 'completed')
+            ->where('category', 'hr')
+            ->where('title', 'like', '%exit interview%')
+            ->whereHas('checklist', fn ($query) => $query
+                ->where('tenant_id', $tenantId)
+                ->where('employee_profile_id', $employeeProfileId)
+                ->whereIn('status', ['pending', 'in_progress']))
+            ->orderBy('sort_order')
+            ->first();
+
+        if (! $task) {
+            return;
+        }
+
+        try {
+            app(OnboardingService::class)->completeOffboardingTask($task, $completedBy, [
+                'notes' => trim(($task->notes ? $task->notes."\n" : '').'Auto-completed: exit interview recorded.'),
+            ]);
+        } catch (\LogicException) {
+            // Dependencies or sign-off requirements block auto-completion —
+            // leave the task for the checklist owner to complete manually.
+        }
+    }
+
+    /**
+     * Users who can be recorded as interviewers for the wizard.
+     */
+    private function interviewerOptions(?int $tenantId, User $user): Collection
+    {
+        $ids = HrEmployeeProfile::forTenant($tenantId)
+            ->pluck('user_id')
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        return User::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     private function canView($user): bool

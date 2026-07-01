@@ -1,16 +1,17 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero, PageLayout } from '@/components/page';
+import { PerformanceSatelliteHero } from '@/components/hr/performance/performance-hero';
+import { PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Calendar,
     CheckCircle,
     Clock,
     FileText,
     User,
+    UserCheck,
 } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -82,10 +83,11 @@ export default function ShowSupervision({ note, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
-                        variant="compact"
-                        backHref="/hr/performance"
-                        title="Supervision Note"
+                    <PerformanceSatelliteHero
+                        icon={UserCheck}
+                        backHref="/hr/performance?tab=supervision"
+                        backLabel="Supervision"
+                        title="Supervision note"
                         description={`${getSessionTypeLabel(note.session_type)} with ${note.employee.name}`}
                     />
                 }

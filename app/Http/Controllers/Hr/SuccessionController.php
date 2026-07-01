@@ -42,6 +42,7 @@ class SuccessionController extends Controller
             'current_holder_name' => $plan->currentHolder?->name,
             'current_holder' => $plan->currentHolder?->only('id', 'name'),
             'position' => $plan->position?->only('id', 'title'),
+            'notes' => $plan->notes,
             'candidates_count' => $plan->candidates_count,
             'is_active' => $plan->is_active,
             'created_at' => $plan->created_at?->toDateTimeString(),
@@ -58,37 +59,44 @@ class SuccessionController extends Controller
 
         $departments = HrSuccessionPlan::distinct()->whereNotNull('department')->pluck('department');
 
+        $canManage = $this->canManage($user);
+
         return Inertia::render('hr/succession/index', [
             'plans' => $plans,
             'readinessSummary' => $readinessSummary,
             'departments' => $departments,
             'filters' => $request->only(['risk_level', 'department', 'active_only']),
+            'stats' => [
+                'total' => HrSuccessionPlan::active()->count(),
+                'high_risk' => HrSuccessionPlan::active()->whereIn('risk_level', ['high', 'critical'])->count(),
+                'vacant' => HrSuccessionPlan::active()->whereNull('current_holder_user_id')->count(),
+                'ready_now' => HrSuccessionCandidate::where('readiness', 'ready_now')
+                    ->whereIn('succession_plan_id', HrSuccessionPlan::active()->select('id'))
+                    ->count(),
+            ],
+            // Wizard option lists — only fetched for users who can open the wizard.
+            'positions' => $canManage
+                ? HrPosition::active()->orderBy('title')->get(['id', 'title', 'department'])
+                : [],
+            'holders' => $canManage
+                ? User::orderBy('name')->get(['id', 'name', 'email'])
+                : [],
             'can' => [
-                'manage' => $this->canManage($user),
+                'manage' => $canManage,
             ],
         ]);
     }
 
     /**
-     * Form to create succession plan + add candidates.
+     * The full-page create form was folded into a WizardShell modal on the
+     * index — keep the GET route alive for bookmarks and route() helpers.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
 
-        $positions = HrPosition::active()->orderBy('title')->get(['id', 'title', 'department']);
-        $staff = User::orderBy('name')->get(['id', 'name', 'email']);
-        $employees = HrEmployeeProfile::where('is_active', true)
-            ->with('user:id,name,email')
-            ->orderBy('user_id')
-            ->get(['id', 'user_id', 'position_title', 'department']);
-
-        return Inertia::render('hr/succession/create', [
-            'positions' => $positions,
-            'staff' => $staff,
-            'employees' => $employees,
-        ]);
+        return redirect()->route('hr.succession.index', ['new' => 1]);
     }
 
     /**
@@ -112,12 +120,21 @@ class SuccessionController extends Controller
             'candidates.*.strengths' => ['nullable', 'string', 'max:2000'],
             'candidates.*.development_needs' => ['nullable', 'string', 'max:2000'],
             'candidates.*.overall_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'source_review_id' => ['nullable', 'integer', 'exists:hr_performance_reviews,id'],
             'stay' => ['nullable', 'boolean'],
         ]);
 
         $stay = (bool) ($data['stay'] ?? false);
 
-        DB::transaction(function () use ($user, $data) {
+        // Provenance note when the nomination was deliberately started from a
+        // signed-off performance review (no schema change — notes text).
+        $notes = $data['notes'] ?? null;
+        if (! empty($data['source_review_id'])) {
+            $provenance = "Created from performance review #{$data['source_review_id']}.";
+            $notes = $notes ? "{$notes}\n\n{$provenance}" : $provenance;
+        }
+
+        DB::transaction(function () use ($user, $data, $notes) {
             $plan = HrSuccessionPlan::create([
                 'tenant_id' => null,
                 'position_id' => $data['position_id'] ?? null,
@@ -125,7 +142,7 @@ class SuccessionController extends Controller
                 'department' => $data['department'] ?? null,
                 'risk_level' => $data['risk_level'],
                 'current_holder_user_id' => $data['current_holder_user_id'] ?? null,
-                'notes' => $data['notes'] ?? null,
+                'notes' => $notes,
                 'is_active' => true,
                 'created_by' => $user->id,
             ]);
@@ -171,6 +188,8 @@ class SuccessionController extends Controller
             ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title', 'department']);
 
+        $canManage = $this->canManage($user);
+
         return Inertia::render('hr/succession/show', [
             'plan' => [
                 'id' => $plan->id,
@@ -202,8 +221,15 @@ class SuccessionController extends Controller
                 ]),
             ],
             'employees' => $employees,
+            // Edit-plan wizard option lists.
+            'positions' => $canManage
+                ? HrPosition::active()->orderBy('title')->get(['id', 'title', 'department'])
+                : [],
+            'holders' => $canManage
+                ? User::orderBy('name')->get(['id', 'name', 'email'])
+                : [],
             'can' => [
-                'manage' => $this->canManage($user),
+                'manage' => $canManage,
             ],
         ]);
     }

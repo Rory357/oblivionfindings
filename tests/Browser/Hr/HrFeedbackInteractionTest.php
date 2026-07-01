@@ -4,44 +4,28 @@ use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Models\User;
 use Laravel\Dusk\Browser;
 
-function chooseFeedbackSelectOption(Browser $browser, int $index, string $optionText): void
+/** Click the first visible element (button/tile/row) containing the text. */
+function clickFeedbackElementWithText(Browser $browser, string $text): void
 {
-    $encodedIndex = json_encode($index, JSON_THROW_ON_ERROR);
-    $openComboboxScript = str_replace('__INDEX__', $encodedIndex, <<<'JS'
-        const triggerIndex = __INDEX__;
-        const triggers = Array.from(document.querySelectorAll('[role="combobox"]'));
-        const trigger = triggers[triggerIndex] ?? null;
+    $escaped = json_encode($text, JSON_THROW_ON_ERROR);
+    $script = str_replace('__TEXT__', $escaped, <<<'JS'
+        const wanted = __TEXT__;
+        const candidates = Array.from(document.querySelectorAll('button'))
+            .filter((element) => element.textContent?.includes(wanted));
 
-        if (!trigger) {
-            throw new Error('Combobox trigger not found at index ' + triggerIndex + '.');
+        if (candidates.length === 0) {
+            throw new Error('Clickable element not found: ' + wanted);
         }
 
-        trigger.click();
+        candidates[0].scrollIntoView({ block: 'center' });
+        candidates[0].click();
     JS);
 
-    $browser->script($openComboboxScript);
-
-    $browser->pause(250);
-
-    $escapedOption = json_encode($optionText, JSON_THROW_ON_ERROR);
-    $selectOptionScript = str_replace('__OPTION_TEXT__', $escapedOption, <<<'JS'
-        const optionText = __OPTION_TEXT__;
-        const option = Array.from(document.querySelectorAll('[role="option"]'))
-            .find((element) => element.textContent?.trim().includes(optionText));
-
-        if (!option) {
-            throw new Error('Option not found: ' + optionText);
-        }
-
-        option.click();
-    JS);
-
-    $browser->script($selectOptionScript);
-
+    $browser->script($script);
     $browser->pause(250);
 }
 
-test('hr feedback request form submits through the live browser flow', function () {
+test('hr feedback request wizard submits through the live browser flow', function () {
     $admin = User::where('email', 'admin@test.com')->firstOrFail();
     $subject = User::where('email', 'staff@test.com')->firstOrFail();
     $reviewer = User::where('email', 'manager@test.com')->firstOrFail();
@@ -49,32 +33,29 @@ test('hr feedback request form submits through the live browser flow', function 
     $initialCount = HrFeedbackRequest::count();
 
     $this->browse(function (Browser $browser) use ($admin, $subject, $reviewer, $initialCount) {
+        // The old full-page form redirects to the index with the wizard open.
         $browser->loginAs($admin)
             ->visit('/hr/feedback/request')
-            ->waitForText('Request 360-Degree Feedback', 10);
+            ->waitForText('Who is the feedback about?', 10);
 
-        chooseFeedbackSelectOption($browser, 0, $subject->name);
-        chooseFeedbackSelectOption($browser, 1, 'Manager Review');
+        // Step 1 — subject employee.
+        clickFeedbackElementWithText($browser, $subject->name);
+        $browser->press('Continue')->pause(300);
 
-        $escapedReviewer = json_encode($reviewer->name, JSON_THROW_ON_ERROR);
-        $selectReviewerScript = str_replace('__REVIEWER_NAME__', $escapedReviewer, <<<'JS'
-            const reviewerName = __REVIEWER_NAME__;
-            const label = Array.from(document.querySelectorAll('label'))
-                .find((element) => element.textContent?.includes(reviewerName));
+        // Step 2 — review type.
+        clickFeedbackElementWithText($browser, 'Manager review');
+        $browser->press('Continue')->pause(300);
 
-            if (!label) {
-                throw new Error('Reviewer label not found: ' + reviewerName);
-            }
+        // Step 3 — reviewer multi-select.
+        clickFeedbackElementWithText($browser, $reviewer->name);
+        $browser->press('Continue')->pause(300);
 
-            label.scrollIntoView({ block: 'center' });
-            label.click();
-        JS);
+        // Step 4 — questions/template (defaults are fine).
+        $browser->press('Continue')->pause(300);
 
-        $browser->script($selectReviewerScript);
-
-        $browser->press('Send Requests')
-            ->waitForLocation('/hr/feedback', 10)
-            ->waitForText('360-degree feedback requests sent.', 10);
+        // Step 5 — review & send.
+        $browser->press('Send requests')
+            ->waitForText('Feedback requests sent', 10);
 
         expect(HrFeedbackRequest::count())->toBeGreaterThan($initialCount);
     });

@@ -531,6 +531,13 @@ class EmployeeProfileController extends Controller
 
         $profile->update(['is_active' => $data['is_active']]);
 
+        // Re-hiring a leaver whose login was revoked on offboarding completion
+        // must restore their access, or the "reactivated" employee can never
+        // sign in again (approval is what gates login).
+        if ($data['is_active'] && $profile->user && is_null($profile->user->approved_at)) {
+            $profile->user->forceFill(['approved_at' => now()])->save();
+        }
+
         return back()->with(
             'success',
             $data['is_active']

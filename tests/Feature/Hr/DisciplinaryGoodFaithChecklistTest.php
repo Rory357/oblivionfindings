@@ -180,7 +180,7 @@ test('disciplinary stage cannot advance to outcome without required good faith c
     expect((string) ($stageEvent?->description ?? ''))->toContain('outcome decided');
 });
 
-test('disciplinary edit page exposes checklist and stage contract for ui', function () {
+test('disciplinary edit GET redirects to the case show page which exposes the wizard contract', function () {
     $action = HrDisciplinaryAction::query()->create([
         'tenant_id' => 1,
         'case_id' => $this->case->id,
@@ -195,13 +195,35 @@ test('disciplinary edit page exposes checklist and stage contract for ui', funct
         'created_by' => $this->hr->id,
     ]);
 
-    $response = $this->actingAs($this->hr)->get("/hr/cases/disciplinary/{$action->id}/edit");
+    // The full-page edit form was replaced by the Edit-disciplinary wizard on
+    // the parent case show page; the old GET deep-links into it.
+    $this->actingAs($this->hr)
+        ->get("/hr/cases/disciplinary/{$action->id}/edit")
+        ->assertRedirect("/hr/cases/{$this->case->id}?edit-disciplinary={$action->id}");
+
+    $response = $this->actingAs($this->hr)->get("/hr/cases/{$this->case->id}?edit-disciplinary={$action->id}");
     $response->assertOk();
 
-    expect($response->inertiaProps('hrCase.case_number'))->toBe('HR-90001');
-    expect($response->inertiaProps('action.id'))->toBe($action->id);
-    expect($response->inertiaProps('action.stage'))->toBe('response_period');
-    expect($response->inertiaProps('action.good_faith_checklist.allegation_communicated'))->toBeTrue();
+    expect($response->inertiaProps('case.case_number'))->toBe('HR-90001');
+    expect($response->inertiaProps('case.disciplinary_actions.0.id'))->toBe($action->id);
+    expect($response->inertiaProps('case.disciplinary_actions.0.stage'))->toBe('response_period');
+    expect($response->inertiaProps('case.disciplinary_actions.0.good_faith_checklist.allegation_communicated'))->toBeTrue();
+    expect($response->inertiaProps('case.disciplinary_actions.0.good_faith_checklist.opportunity_to_respond'))->toBeFalse();
     expect($response->inertiaProps('goodFaithRequiredChecks'))->toHaveCount(4);
     expect(collect($response->inertiaProps('stageOptions'))->pluck('value')->all())->toContain('outcome_decided');
+    expect(collect($response->inertiaProps('actionTypes'))->pluck('value')->all())->toContain('written_warning');
+});
+
+test('case and disciplinary create GETs redirect into their wizard hosts', function () {
+    $this->actingAs($this->hr)
+        ->get('/hr/cases/create')
+        ->assertRedirect('/hr/cases?new=1');
+
+    $this->actingAs($this->hr)
+        ->get("/hr/cases/{$this->case->id}/events/create")
+        ->assertRedirect("/hr/cases/{$this->case->id}?new=event");
+
+    $this->actingAs($this->hr)
+        ->get("/hr/cases/{$this->case->id}/disciplinary/create")
+        ->assertRedirect("/hr/cases/{$this->case->id}?new=disciplinary");
 });

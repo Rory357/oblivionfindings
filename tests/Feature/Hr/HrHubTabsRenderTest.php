@@ -75,7 +75,8 @@ test('every page in the tab-shell hubs still renders for a permitted user', func
     '/hr/performance',
     '/hr/performance/reviews',
     '/hr/goals',
-    '/hr/goals/development',
+    // /hr/goals/development deliberately 302s into the hub tab — assert the tab URL.
+    '/hr/goals?tab=development',
     '/hr/performance/competencies',
     '/hr/feedback',
     '/hr/performance/pips',

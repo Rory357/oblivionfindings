@@ -1,11 +1,12 @@
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ReportsTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { AlertTriangle, Briefcase, Users } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { AlertTriangle, Briefcase, FilePlus2, Users } from 'lucide-react';
 import {
     Bar,
     BarChart,
@@ -26,7 +27,7 @@ type Props = {
         fte_total: number;
     };
     budgetVsActual: {
-        positions: Array<{
+        by_position: Array<{
             id: number;
             title: string;
             department: string;
@@ -49,6 +50,7 @@ type Props = {
         milestone: string;
         risk_level: string;
     }>;
+    can?: { view_recruitment?: boolean };
 };
 
 const breadcrumbs = [
@@ -61,11 +63,13 @@ export default function HeadcountIndex({
     budgetVsActual,
     forecast,
     attritionRisk,
+    can,
 }: Props) {
     const deptData = current.by_department.map((d) => ({
         name: d.department,
         count: d.count,
     }));
+    const canRecruit = !!can?.view_recruitment;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -78,9 +82,27 @@ export default function HeadcountIndex({
                     stats={[
                         { label: 'Headcount', value: current.total },
                         { label: 'Total FTE', value: current.fte_total },
-                        { label: 'Vacancies', value: budgetVsActual.total_vacant },
-                        { label: 'Attrition risk', value: attritionRisk.length },
+                        {
+                            label: 'Vacancies',
+                            value: budgetVsActual.total_vacant,
+                            tone: budgetVsActual.total_vacant > 0 ? 'warning' : 'neutral',
+                        },
+                        {
+                            label: 'Attrition risk',
+                            value: attritionRisk.length,
+                            tone: attritionRisk.length > 0 ? 'critical' : 'neutral',
+                        },
                     ]}
+                    actions={
+                        canRecruit ? (
+                            <Button asChild variant="secondary">
+                                <Link href="/hr/recruitment?tab=requisitions">
+                                    <Briefcase className="mr-2 h-4 w-4" />
+                                    Open recruitment
+                                </Link>
+                            </Button>
+                        ) : undefined
+                    }
                 />
                 <ReportsTabs active="headcount" />
                 <div className="grid gap-4 md:grid-cols-4">
@@ -159,7 +181,7 @@ export default function HeadcountIndex({
                                     <Tooltip />
                                     <Bar
                                         dataKey="count"
-                                        fill="#6366f1"
+                                        fill="var(--primary)"
                                         radius={[4, 4, 0, 0]}
                                     />
                                 </BarChart>
@@ -180,13 +202,13 @@ export default function HeadcountIndex({
                                     <Line
                                         type="monotone"
                                         dataKey="projected"
-                                        stroke="#6366f1"
+                                        stroke="var(--primary)"
                                         strokeWidth={2}
                                     />
                                     <Line
                                         type="monotone"
                                         dataKey="current"
-                                        stroke="#94a3b8"
+                                        stroke="var(--muted-foreground)"
                                         strokeDasharray="5 5"
                                     />
                                 </LineChart>
@@ -221,10 +243,17 @@ export default function HeadcountIndex({
                                         <th className="px-4 py-3 text-center">
                                             Fill Rate
                                         </th>
+                                        {canRecruit && (
+                                            <th className="px-4 py-3 text-right">
+                                                <span className="sr-only">
+                                                    Actions
+                                                </span>
+                                            </th>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {budgetVsActual.positions.map((p) => (
+                                    {budgetVsActual.by_position.map((p) => (
                                         <tr key={p.id} className="border-b">
                                             <td className="px-4 py-3 font-medium">
                                                 {p.title}
@@ -253,6 +282,25 @@ export default function HeadcountIndex({
                                             <td className="px-4 py-3 text-center">
                                                 {p.fill_rate}%
                                             </td>
+                                            {canRecruit && (
+                                                <td className="px-4 py-3 text-right">
+                                                    {p.vacant > 0 && (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                        >
+                                                            {/* Requisition creation lives in the Recruitment
+                                                                hub wizard; it doesn't read prefill params, so
+                                                                this deep-links to the Requisitions tab. */}
+                                                            <Link href="/hr/recruitment?tab=requisitions">
+                                                                <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                Create requisition
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>

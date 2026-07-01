@@ -1,4 +1,11 @@
-import PageShell from '@/components/page-shell';
+import {
+    ExitInterviewWizard,
+    type DepartureReasonOption,
+    type ExitInterviewEmployeeOption,
+    type ExitInterviewerOption,
+} from '@/components/hr/exit-interview-wizards';
+import { LifecycleTabs } from '@/components/hr/lifecycle-tabs';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +26,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BarChart3, LogOut, Plus, Star } from 'lucide-react';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -41,7 +48,19 @@ interface ExitInterview {
 }
 
 interface Props {
-    interviews: { data: ExitInterview[]; links: any[] };
+    interviews: {
+        data: ExitInterview[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+    };
+    stats: {
+        total: number;
+        avg_satisfaction: number | null;
+        recommend_pct: number | null;
+        last_90_days: number;
+    };
+    employees: ExitInterviewEmployeeOption[];
+    interviewers: ExitInterviewerOption[];
+    departureReasons: DepartureReasonOption[];
     filters: { reason: string | null };
     can: { manage: boolean };
 }
@@ -94,10 +113,19 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
 
 export default function ExitInterviewsIndex({
     interviews,
+    stats,
+    employees,
+    interviewers,
+    departureReasons,
     filters,
     can,
 }: Props) {
     const NONE = '__none__';
+    const [wizardOpen, setWizardOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -111,38 +139,54 @@ export default function ExitInterviewsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Exit Interviews" />
 
-            <PageHero category="hr"
-                icon={LogOut}
-                title="Exit Interviews"
-                description="Track departure feedback and identify retention insights."
-                stats={[
-                    { label: 'Total', value: interviews.data.length },
-                    {
-                        label: 'Would recommend',
-                        value: interviews.data.filter((i) => i.would_recommend === true).length,
-                    },
-                ]}
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/exit-interviews/trends">
-                            <Button size="sm" variant="outline">
-                                <BarChart3 className="mr-1.5 h-4 w-4" />
-                                Trends
-                            </Button>
-                        </Link>
-                        {can.manage && (
-                            <Link href="/hr/exit-interviews/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Interview
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        category="hr"
+                        icon={LogOut}
+                        title="Exit Interviews"
+                        description="Track departure feedback and identify retention insights."
+                        stats={[
+                            { label: 'Total recorded', value: stats.total },
+                            { label: 'Last 90 days', value: stats.last_90_days },
+                            {
+                                label: 'Avg satisfaction',
+                                value:
+                                    stats.avg_satisfaction !== null
+                                        ? `${stats.avg_satisfaction}/5`
+                                        : '—',
+                            },
+                            {
+                                label: 'Would recommend',
+                                value:
+                                    stats.recommend_pct !== null
+                                        ? `${stats.recommend_pct}%`
+                                        : '—',
+                            },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href="/hr/exit-interviews/trends">
+                                    <Button size="sm" variant="outline">
+                                        <BarChart3 className="mr-1.5 h-4 w-4" />
+                                        Trends
+                                    </Button>
+                                </Link>
+                                {can.manage && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setWizardOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Interview
+                                    </Button>
+                                )}
+                            </div>
+                        }
+                    />
                 }
-            />
-
-            <PageShell>
+                tabs={<LifecycleTabs active="exit-interviews" />}
+            >
                 {/* Filters */}
                 <Card className="mb-4">
                     <CardHeader>
@@ -270,7 +314,16 @@ export default function ExitInterviewsIndex({
                     links={interviews?.links ?? []}
                     className="mt-4"
                 />
-            </PageShell>
+
+                {can.manage && wizardOpen && (
+                    <ExitInterviewWizard
+                        employees={employees}
+                        interviewers={interviewers}
+                        departureReasons={departureReasons}
+                        onClose={() => setWizardOpen(false)}
+                    />
+                )}
+            </PageLayout>
         </AppLayout>
     );
 }

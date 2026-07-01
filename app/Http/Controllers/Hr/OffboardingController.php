@@ -200,36 +200,16 @@ class OffboardingController extends Controller
         ]);
     }
 
+    /**
+     * The start-offboarding form is a wizard modal on the index page — keep
+     * the old GET route working by bouncing to the index with the wizard open.
+     */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $existingProfileIds = HrOffboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->pluck('employee_profile_id');
-
-        $employees = HrEmployeeProfile::query()
-            ->with('user:id,name,email')
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->whereNotIn('id', $existingProfileIds)
-            ->get()
-            ->map(fn ($profile) => [
-                'id' => $profile->id,
-                'name' => $profile->user?->name ?? 'Unknown',
-                'email' => $profile->user?->email,
-                'position_title' => $profile->position_title,
-                'end_date' => optional($profile->end_date)->toDateString(),
-            ]);
-
-        return Inertia::render('hr/offboarding/create', [
-            'employees' => $employees,
-            'defaultEndDate' => now()->addWeeks(2)->toDateString(),
-        ]);
+        return redirect()->route('hr.offboarding.index', ['new' => 1]);
     }
 
     public function store(Request $request)

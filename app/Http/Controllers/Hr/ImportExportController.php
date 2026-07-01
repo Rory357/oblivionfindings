@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\EmployeeImportExportService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -25,7 +26,15 @@ class ImportExportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
 
-        return Inertia::render('hr/import-export/index');
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        return Inertia::render('hr/import-export/index', [
+            'stats' => [
+                // Mirrors the exporter: a plain export ships active profiles only.
+                'exportable' => HrEmployeeProfile::where('tenant_id', $tenantId)->where('is_active', true)->count(),
+                'profiles' => HrEmployeeProfile::where('tenant_id', $tenantId)->count(),
+            ],
+        ]);
     }
 
     /**

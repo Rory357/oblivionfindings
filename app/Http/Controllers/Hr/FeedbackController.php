@@ -75,16 +75,40 @@ class FeedbackController extends Controller
             'overdue' => $overdueCount,
         ];
 
+        // Request-wizard data (modal on the index) — managers only.
+        $wizard = null;
+        if ($canManage) {
+            $wizard = [
+                'employees' => User::select('id', 'name')->orderBy('name')->get(),
+                'reviewTypes' => FeedbackService::REVIEW_TYPES,
+                'templates' => HrFeedbackTemplate::forTenant($tenantId)
+                    ->active()
+                    ->orderByDesc('is_default')
+                    ->orderBy('name')
+                    ->get()
+                    ->map(fn ($t) => [
+                        'id' => $t->id,
+                        'name' => $t->name,
+                        'description' => $t->description,
+                        'questions' => $t->questions,
+                        'is_default' => $t->is_default,
+                    ])
+                    ->values(),
+                'defaultQuestions' => FeedbackService::FEEDBACK_QUESTIONS,
+            ];
+        }
+
         return Inertia::render('hr/feedback/index', [
             'requests' => $allRequests,
             'pendingCount' => $pendingCount,
             'stats' => $stats,
             'can' => ['manage' => $canManage],
+            'wizard' => $wizard,
         ]);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Request — form to initiate 360 feedback                            */
+    /*  Request — legacy full-page form, now the index wizard              */
     /* ------------------------------------------------------------------ */
 
     public function request(Request $request)
@@ -92,29 +116,14 @@ class FeedbackController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $employees = User::select('id', 'name')->orderBy('name')->get();
-
-        $templates = HrFeedbackTemplate::forTenant($tenantId)
-            ->active()
-            ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($t) => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'description' => $t->description,
-                'questions' => $t->questions,
-                'is_default' => $t->is_default,
-            ]);
-
-        return Inertia::render('hr/feedback/request', [
-            'employees' => $employees,
-            'reviewTypes' => FeedbackService::REVIEW_TYPES,
-            'templates' => $templates,
-            'defaultQuestions' => FeedbackService::FEEDBACK_QUESTIONS,
-        ]);
+        // The full-page request form was replaced by the Request-feedback
+        // wizard modal on the index; old links land there with it open. Deep
+        // links carrying ?employee= (employee profile page) preselect the
+        // subject inside the wizard.
+        return redirect()->route('hr.feedback.index', array_filter([
+            'new' => 1,
+            'employee' => $request->query('employee'),
+        ]));
     }
 
     /* ------------------------------------------------------------------ */

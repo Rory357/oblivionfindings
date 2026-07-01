@@ -1,24 +1,25 @@
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { useForm } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { CheckCircle2, LayoutTemplate, ListChecks, Plus, Settings2, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import {
+    Field,
+    FieldErr,
+    ReviewCard,
+    ReviewRow,
+    Segmented,
+    SelectInput,
+    StepHead,
+    useWizard,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/hr/wizard';
 
 import { prettyLabel } from './shared';
 
@@ -54,6 +55,12 @@ export interface TemplateRow {
 
 const CATEGORIES = ['general', 'compliance', 'it', 'payroll', 'induction'];
 
+const STEPS: readonly WizardStep[] = [
+    { key: 'basics', label: 'Basics', blurb: 'Role, site type & status', icon: Settings2 },
+    { key: 'tasks', label: 'Tasks', blurb: 'Build the task set', icon: ListChecks },
+    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+];
+
 const blankTask = (sortOrder = 1): TemplateTask => ({
     category: 'general',
     title: '',
@@ -80,6 +87,9 @@ export function TemplateDialog({
     siteTypeOptions: string[];
     courseOptions?: CourseOption[];
 }) {
+    const wizard = useWizard(STEPS.length);
+    const [done, setDone] = useState(false);
+
     const form = useForm<{
         template_id: string;
         role: string;
@@ -124,6 +134,8 @@ export function TemplateDialog({
             });
         }
         form.clearErrors();
+        setDone(false);
+        wizard.reset();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, template?.id]);
 
@@ -143,6 +155,9 @@ export function TemplateDialog({
                 .filter((_, idx) => idx !== i)
                 .map((t, idx) => ({ ...t, sort_order: idx + 1 })),
         );
+
+    const validTasks = form.data.tasks.filter((t) => t.title.trim() !== '');
+    const canSubmit = validTasks.length > 0;
 
     const submit = () => {
         form.transform((data) => ({
@@ -164,64 +179,111 @@ export function TemplateDialog({
         }));
         form.put('/hr/onboarding/templates', {
             preserveScroll: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => setDone(true),
         });
     };
 
     return (
-        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-[720px]">
-                <DialogHeader className="border-b border-border px-6 py-4">
-                    <DialogTitle>{template ? 'Edit template' : 'New template'}</DialogTitle>
-                    <DialogDescription>
-                        Define a reusable onboarding task set, auto-matched to a role when you start an onboarding.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-5">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <div className="space-y-1.5">
-                            <Label>Role</Label>
-                            <Select value={form.data.role} onValueChange={(v) => form.setData('role', v)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {roleOptions.map((r) => (
-                                        <SelectItem key={r} value={r}>
-                                            {prettyLabel(r)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.role && <p className="text-xs text-status-critical">{form.errors.role}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Site type</Label>
-                            <Select value={form.data.site_type} onValueChange={(v) => form.setData('site_type', v)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {siteTypeOptions.map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                            {prettyLabel(s)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-end">
-                            <label className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={form.data.is_active}
-                                    onCheckedChange={(c) => form.setData('is_active', Boolean(c))}
-                                />
-                                Template active
-                            </label>
-                        </div>
+        <WizardShell
+            open={open}
+            onClose={onClose}
+            title={template ? 'Edit template' : 'New template'}
+            description="Define a reusable onboarding task set, auto-matched to a role when you start an onboarding."
+            railIcon={LayoutTemplate}
+            railTitle={template ? 'Edit template' : 'New template'}
+            railSub="Onboarding templates"
+            steps={STEPS}
+            stepIndex={wizard.index}
+            onStepClick={wizard.goTo}
+            pct={wizard.progress}
+            success={
+                done ? (
+                    <WizardSuccessPane
+                        title={template ? 'Template updated' : 'Template created'}
+                        blurb={
+                            <>
+                                The {prettyLabel(form.data.role)} template with {validTasks.length}{' '}
+                                {validTasks.length === 1 ? 'task' : 'tasks'} is saved and will
+                                auto-match when you start an onboarding.
+                            </>
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            footerStart={
+                wizard.isFirst ? null : (
+                    <Button variant="outline" onClick={wizard.back}>
+                        Back
+                    </Button>
+                )
+            }
+            footerEnd={
+                <>
+                    <Button variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    {wizard.isLast ? (
+                        <Button onClick={submit} disabled={form.processing || !canSubmit}>
+                            {form.processing
+                                ? 'Saving…'
+                                : template
+                                  ? 'Update template'
+                                  : 'Create template'}
+                        </Button>
+                    ) : (
+                        <Button onClick={wizard.next} disabled={wizard.index === 1 && !canSubmit}>
+                            Continue
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {wizard.index === 0 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={Settings2}
+                        title="Template basics"
+                        blurb="Which role this task set is for, and where it applies."
+                    />
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                        <Field label="Role" required error={form.errors.role}>
+                            <SelectInput
+                                value={form.data.role}
+                                onChange={(v) => form.setData('role', v)}
+                                placeholder="Select role"
+                                options={roleOptions.map((r) => ({ value: r, label: prettyLabel(r) }))}
+                            />
+                        </Field>
+                        <Field label="Site type" error={form.errors.site_type}>
+                            <SelectInput
+                                value={form.data.site_type}
+                                onChange={(v) => form.setData('site_type', v)}
+                                placeholder="All"
+                                options={siteTypeOptions.map((s) => ({ value: s, label: prettyLabel(s) }))}
+                            />
+                        </Field>
+                        <Field label="Status" hint="inactive templates are never auto-matched">
+                            <Segmented
+                                value={form.data.is_active ? 'active' : 'inactive'}
+                                onChange={(v) => form.setData('is_active', v === 'active')}
+                                options={[
+                                    { value: 'active', label: 'Active' },
+                                    { value: 'inactive', label: 'Inactive' },
+                                ]}
+                            />
+                        </Field>
                     </div>
+                </WizardStepPane>
+            )}
 
+            {wizard.index === 1 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={ListChecks}
+                        title="Build the task set"
+                        blurb="Every onboarding started from this template gets these tasks."
+                    />
                     <div className="space-y-2.5">
                         <div className="flex items-center justify-between">
                             <Label>Tasks</Label>
@@ -235,18 +297,15 @@ export function TemplateDialog({
                                 <div className="grid gap-2.5 sm:grid-cols-4">
                                     <div className="space-y-1">
                                         <Label className="text-xs">Category</Label>
-                                        <Select value={task.category || 'general'} onValueChange={(v) => setTask(i, { category: v })}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {CATEGORIES.map((c) => (
-                                                    <SelectItem key={c} value={c}>
-                                                        {prettyLabel(c)}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <SelectInput
+                                            value={task.category || 'general'}
+                                            onChange={(v) => setTask(i, { category: v })}
+                                            placeholder="Category"
+                                            options={CATEGORIES.map((c) => ({
+                                                value: c,
+                                                label: prettyLabel(c),
+                                            }))}
+                                        />
                                     </div>
                                     <div className="space-y-1 sm:col-span-2">
                                         <Label className="text-xs">Title</Label>
@@ -292,22 +351,18 @@ export function TemplateDialog({
                                                 (optional — defaults to mandatory courses)
                                             </span>
                                         </Label>
-                                        <Select
+                                        <SelectInput
                                             value={task.course_code || NO_COURSE}
-                                            onValueChange={(v) => setTask(i, { course_code: v === NO_COURSE ? '' : v })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Mandatory courses" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={NO_COURSE}>Mandatory courses (default)</SelectItem>
-                                                {courseOptions.map((c) => (
-                                                    <SelectItem key={c.code} value={c.code}>
-                                                        {c.title} ({c.code})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            onChange={(v) => setTask(i, { course_code: v === NO_COURSE ? '' : v })}
+                                            placeholder="Mandatory courses"
+                                            options={[
+                                                { value: NO_COURSE, label: 'Mandatory courses (default)' },
+                                                ...courseOptions.map((c) => ({
+                                                    value: c.code,
+                                                    label: `${c.title} (${c.code})`,
+                                                })),
+                                            ]}
+                                        />
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between">
@@ -335,20 +390,51 @@ export function TemplateDialog({
                                 </div>
                             </div>
                         ))}
-                        {form.errors.tasks && <p className="text-xs text-status-critical">{form.errors.tasks}</p>}
+                        <FieldErr>{form.errors.tasks}</FieldErr>
                     </div>
-                </div>
+                </WizardStepPane>
+            )}
 
-                <div className="flex items-center justify-end gap-2.5 border-t border-border bg-muted/30 px-6 py-3.5">
-                    <Button variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button onClick={submit} disabled={form.processing}>
-                        {form.processing ? 'Saving…' : template ? 'Update template' : 'Create template'}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
+            {wizard.index === 2 && (
+                <WizardStepPane>
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review the template"
+                        blurb="Check the details, then confirm below."
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <ReviewCard icon={Settings2} title="Basics" onEdit={() => wizard.goTo(0)}>
+                            <ReviewRow label="Role" value={prettyLabel(form.data.role)} />
+                            <ReviewRow label="Site type" value={prettyLabel(form.data.site_type)} />
+                            <ReviewRow label="Status" value={form.data.is_active ? 'Active' : 'Inactive'} />
+                        </ReviewCard>
+                        <ReviewCard icon={ListChecks} title="Tasks" onEdit={() => wizard.goTo(1)}>
+                            <ReviewRow
+                                label="Task count"
+                                value={`${validTasks.length} ${validTasks.length === 1 ? 'task' : 'tasks'}`}
+                            />
+                            <ReviewRow
+                                label="Sign-off required"
+                                value={`${validTasks.filter((t) => t.sign_off_required).length} of ${validTasks.length}`}
+                            />
+                        </ReviewCard>
+                        <ReviewCard icon={ListChecks} title="Task list" onEdit={() => wizard.goTo(1)} span>
+                            {validTasks.length > 0 ? (
+                                validTasks.map((t, i) => (
+                                    <ReviewRow
+                                        key={i}
+                                        label={`${i + 1}. ${t.title.trim()}`}
+                                        value={prettyLabel(t.category || 'general')}
+                                    />
+                                ))
+                            ) : (
+                                <ReviewRow label="No tasks yet" />
+                            )}
+                        </ReviewCard>
+                    </div>
+                </WizardStepPane>
+            )}
+        </WizardShell>
     );
 }
 

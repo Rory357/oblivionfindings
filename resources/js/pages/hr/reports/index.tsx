@@ -1,38 +1,34 @@
-import { PageHero, PageLayout } from '@/components/page';
 import { ReportsTabs } from '@/components/hr';
+import {
+    ScheduleReportWizard,
+    WEEKDAY_LABELS,
+    type AvailableReport,
+    type RecipientUser,
+    type ReportSubscription,
+} from '@/components/hr/report-wizards';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     BarChart3,
+    Bookmark,
     CalendarDays,
+    CalendarClock,
     Clock3,
     Download,
     GraduationCap,
     ShieldCheck,
     TrendingDown,
     Users,
+    Wrench,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-
-interface AvailableReport {
-    key: string;
-    title: string;
-    description: string;
-    category: string;
-}
+import { useState } from 'react';
 
 interface RecentExport {
     id: number;
@@ -43,33 +39,6 @@ interface RecentExport {
     generated_at: string | null;
     generated_by: string | null;
     subscription_id: number | null;
-}
-
-interface ReportSubscription {
-    id: number;
-    report_type: string;
-    cadence: 'daily' | 'weekly' | 'monthly';
-    day_of_week: number | null;
-    day_of_month: number | null;
-    run_at: string;
-    timezone: string;
-    is_active: boolean;
-    next_run_at: string | null;
-    last_run_at: string | null;
-    last_status: string | null;
-    last_error: string | null;
-    recipient_user_ids: number[];
-    recipient_names: string[];
-    filters: {
-        date_from: string | null;
-        date_to: string | null;
-    };
-}
-
-interface RecipientUser {
-    id: number;
-    name: string;
-    email: string;
 }
 
 interface Props {
@@ -107,15 +76,7 @@ const categoryColors: Record<string, string> = {
     training: 'border-primary/30 text-primary bg-primary/10',
 };
 
-const weekdayLabels = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-];
+type ScheduleWizardState = { subscription: ReportSubscription | null } | null;
 
 export default function ReportsIndex({
     availableReports,
@@ -127,44 +88,12 @@ export default function ReportsIndex({
 }: Props) {
     const [dateFrom, setDateFrom] = useState(defaultFilters.date_from || '');
     const [dateTo, setDateTo] = useState(defaultFilters.date_to || '');
-    const [editingSubscriptionId, setEditingSubscriptionId] = useState<
-        number | null
-    >(null);
+    const [scheduleWizard, setScheduleWizard] =
+        useState<ScheduleWizardState>(null);
 
-    const buildDefaultSubscription = () => ({
-        report_type: availableReports[0]?.key ?? 'headcount',
-        cadence: 'weekly' as 'daily' | 'weekly' | 'monthly',
-        day_of_week: '1',
-        day_of_month: '1',
-        run_at: '08:00',
-        timezone: 'Pacific/Auckland',
-        recipient_user_id: recipientOptions[0]
-            ? String(recipientOptions[0].id)
-            : '',
-        date_from: defaultFilters.date_from || '',
-        date_to: defaultFilters.date_to || '',
-    });
-
-    const [newSubscription, setNewSubscription] = useState(
-        buildDefaultSubscription,
-    );
-
-    const cadenceHint = useMemo(() => {
-        if (newSubscription.cadence === 'daily') {
-            return 'Runs every day at the selected time.';
-        }
-
-        if (newSubscription.cadence === 'weekly') {
-            const dayIndex = Number(newSubscription.day_of_week);
-            return `Runs each ${weekdayLabels[dayIndex] ?? 'Monday'} at the selected time.`;
-        }
-
-        return `Runs each month on day ${newSubscription.day_of_month} at the selected time.`;
-    }, [
-        newSubscription.cadence,
-        newSubscription.day_of_week,
-        newSubscription.day_of_month,
-    ]);
+    const activeSubscriptions = subscriptions.filter(
+        (subscription) => subscription.is_active,
+    ).length;
 
     function buildFilterParams(reportType: string): string {
         const params = new URLSearchParams({ report_type: reportType });
@@ -186,76 +115,12 @@ export default function ReportsIndex({
         });
     }
 
-    function submitSubscription(e: React.FormEvent) {
-        e.preventDefault();
-
-        const payload = {
-            report_type: newSubscription.report_type,
-            cadence: newSubscription.cadence,
-            day_of_week:
-                newSubscription.cadence === 'weekly'
-                    ? Number(newSubscription.day_of_week)
-                    : null,
-            day_of_month:
-                newSubscription.cadence === 'monthly'
-                    ? Number(newSubscription.day_of_month)
-                    : null,
-            run_at: newSubscription.run_at,
-            timezone: newSubscription.timezone || 'Pacific/Auckland',
-            recipient_user_ids: newSubscription.recipient_user_id
-                ? [Number(newSubscription.recipient_user_id)]
-                : [],
-            date_from: newSubscription.date_from || null,
-            date_to: newSubscription.date_to || null,
-            is_active: true,
-        };
-
-        const onSuccess = () => {
-            setEditingSubscriptionId(null);
-            setNewSubscription(buildDefaultSubscription());
-        };
-
-        if (editingSubscriptionId) {
-            router.put(
-                `/hr/reports/subscriptions/${editingSubscriptionId}`,
-                payload,
-                {
-                    preserveScroll: true,
-                    onSuccess,
-                },
-            );
-            return;
-        }
-
-        router.post('/hr/reports/subscriptions', payload, {
-            preserveScroll: true,
-            onSuccess,
-        });
-    }
-
     function toggleSubscription(id: number) {
         router.post(
             `/hr/reports/subscriptions/${id}/toggle-active`,
             {},
             { preserveScroll: true },
         );
-    }
-
-    function startEditSubscription(subscription: ReportSubscription) {
-        setEditingSubscriptionId(subscription.id);
-        setNewSubscription({
-            report_type: subscription.report_type,
-            cadence: subscription.cadence,
-            day_of_week: String(subscription.day_of_week ?? 1),
-            day_of_month: String(subscription.day_of_month ?? 1),
-            run_at: (subscription.run_at || '08:00').slice(0, 5),
-            timezone: subscription.timezone || 'Pacific/Auckland',
-            recipient_user_id: subscription.recipient_user_ids[0]
-                ? String(subscription.recipient_user_ids[0])
-                : '',
-            date_from: subscription.filters.date_from || '',
-            date_to: subscription.filters.date_to || '',
-        });
     }
 
     function subscriptionScheduleLabel(
@@ -267,7 +132,7 @@ export default function ReportsIndex({
         if (subscription.cadence === 'weekly') {
             const label =
                 subscription.day_of_week !== null
-                    ? weekdayLabels[subscription.day_of_week]
+                    ? WEEKDAY_LABELS[subscription.day_of_week]
                     : 'Weekly';
             return `${label} at ${subscription.run_at}`;
         }
@@ -287,8 +152,40 @@ export default function ReportsIndex({
                         stats={[
                             { label: 'Available', value: availableReports.length },
                             { label: 'Recent exports', value: recentExports.length },
-                            { label: 'Subscriptions', value: subscriptions.length },
+                            {
+                                label: 'Active schedules',
+                                value: activeSubscriptions,
+                                tone: activeSubscriptions > 0 ? 'success' : undefined,
+                            },
                         ]}
+                        actions={
+                            <>
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/reports/saved">
+                                        <Bookmark className="mr-2 h-4 w-4" />
+                                        Saved reports
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/reports/builder">
+                                        <Wrench className="mr-2 h-4 w-4" />
+                                        Report builder
+                                    </Link>
+                                </Button>
+                                {can.export_data && (
+                                    <Button
+                                        onClick={() =>
+                                            setScheduleWizard({
+                                                subscription: null,
+                                            })
+                                        }
+                                    >
+                                        <CalendarClock className="mr-2 h-4 w-4" />
+                                        Schedule report
+                                    </Button>
+                                )}
+                            </>
+                        }
                     />
                 }
             >
@@ -447,16 +344,16 @@ export default function ReportsIndex({
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {report.period_start ||
-                                                    '\u2014'}{' '}
+                                                    '—'}{' '}
                                                 to{' '}
-                                                {report.period_end || '\u2014'}
+                                                {report.period_end || '—'}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {report.row_count}
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {report.generated_at ||
-                                                    '\u2014'}
+                                                    '—'}
                                                 {report.generated_by
                                                     ? ` by ${report.generated_by}`
                                                     : ''}
@@ -511,313 +408,22 @@ export default function ReportsIndex({
                 </div>
 
                 {can.export_data && (
-                    <>
-                        <div>
-                            <h2 className="mb-4 text-lg font-semibold">
+                    <div>
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">
                                 Scheduled Reports
                             </h2>
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base">
-                                            {editingSubscriptionId
-                                                ? 'Edit Schedule'
-                                                : 'Create Schedule'}
-                                        </CardTitle>
-                                        {editingSubscriptionId && (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setEditingSubscriptionId(
-                                                        null,
-                                                    );
-                                                    setNewSubscription(
-                                                        buildDefaultSubscription(),
-                                                    );
-                                                }}
-                                            >
-                                                Cancel Edit
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <form
-                                        className="grid gap-4 md:grid-cols-4"
-                                        onSubmit={submitSubscription}
-                                    >
-                                        <div className="space-y-2">
-                                            <Label>Report</Label>
-                                            <Select
-                                                value={
-                                                    newSubscription.report_type
-                                                }
-                                                onValueChange={(value) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            report_type: value,
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {availableReports.map(
-                                                        (report) => (
-                                                            <SelectItem
-                                                                key={report.key}
-                                                                value={
-                                                                    report.key
-                                                                }
-                                                            >
-                                                                {report.title}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Cadence</Label>
-                                            <Select
-                                                value={newSubscription.cadence}
-                                                onValueChange={(value) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            cadence: value as
-                                                                | 'daily'
-                                                                | 'weekly'
-                                                                | 'monthly',
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="daily">
-                                                        Daily
-                                                    </SelectItem>
-                                                    <SelectItem value="weekly">
-                                                        Weekly
-                                                    </SelectItem>
-                                                    <SelectItem value="monthly">
-                                                        Monthly
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        {newSubscription.cadence ===
-                                            'weekly' && (
-                                            <div className="space-y-2">
-                                                <Label>Weekday</Label>
-                                                <Select
-                                                    value={
-                                                        newSubscription.day_of_week
-                                                    }
-                                                    onValueChange={(value) =>
-                                                        setNewSubscription(
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                day_of_week:
-                                                                    value,
-                                                            }),
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {weekdayLabels.map(
-                                                            (day, index) => (
-                                                                <SelectItem
-                                                                    key={day}
-                                                                    value={String(
-                                                                        index,
-                                                                    )}
-                                                                >
-                                                                    {day}
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
-
-                                        {newSubscription.cadence ===
-                                            'monthly' && (
-                                            <div className="space-y-2">
-                                                <Label>Day Of Month</Label>
-                                                <Input
-                                                    type="number"
-                                                    min={1}
-                                                    max={28}
-                                                    value={
-                                                        newSubscription.day_of_month
-                                                    }
-                                                    onChange={(event) =>
-                                                        setNewSubscription(
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                day_of_month:
-                                                                    event.target
-                                                                        .value,
-                                                            }),
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-2">
-                                            <Label>Run At</Label>
-                                            <Input
-                                                type="time"
-                                                value={newSubscription.run_at}
-                                                onChange={(event) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            run_at: event.target
-                                                                .value,
-                                                        }),
-                                                    )
-                                                }
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Timezone</Label>
-                                            <Input
-                                                value={newSubscription.timezone}
-                                                onChange={(event) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            timezone:
-                                                                event.target
-                                                                    .value,
-                                                        }),
-                                                    )
-                                                }
-                                                placeholder="Pacific/Auckland"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Recipient</Label>
-                                            <Select
-                                                value={
-                                                    newSubscription.recipient_user_id ||
-                                                    '__none__'
-                                                }
-                                                onValueChange={(value) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            recipient_user_id:
-                                                                value ===
-                                                                '__none__'
-                                                                    ? ''
-                                                                    : value,
-                                                        }),
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Current user" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="__none__">
-                                                        Current user
-                                                    </SelectItem>
-                                                    {recipientOptions.map(
-                                                        (recipient) => (
-                                                            <SelectItem
-                                                                key={
-                                                                    recipient.id
-                                                                }
-                                                                value={String(
-                                                                    recipient.id,
-                                                                )}
-                                                            >
-                                                                {recipient.name}{' '}
-                                                                (
-                                                                {
-                                                                    recipient.email
-                                                                }
-                                                                )
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Default Date From</Label>
-                                            <Input
-                                                type="date"
-                                                value={
-                                                    newSubscription.date_from
-                                                }
-                                                onChange={(event) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            date_from:
-                                                                event.target
-                                                                    .value,
-                                                        }),
-                                                    )
-                                                }
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Default Date To</Label>
-                                            <Input
-                                                type="date"
-                                                value={newSubscription.date_to}
-                                                onChange={(event) =>
-                                                    setNewSubscription(
-                                                        (prev) => ({
-                                                            ...prev,
-                                                            date_to:
-                                                                event.target
-                                                                    .value,
-                                                        }),
-                                                    )
-                                                }
-                                            />
-                                        </div>
-
-                                        <div className="flex items-end">
-                                            <Button type="submit">
-                                                {editingSubscriptionId
-                                                    ? 'Update Schedule'
-                                                    : 'Create Schedule'}
-                                            </Button>
-                                        </div>
-                                    </form>
-                                    <p className="mt-3 text-xs text-muted-foreground">
-                                        {cadenceHint}
-                                    </p>
-                                </CardContent>
-                            </Card>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setScheduleWizard({ subscription: null })
+                                }
+                            >
+                                <CalendarClock className="mr-2 h-4 w-4" />
+                                Schedule report
+                            </Button>
                         </div>
-
                         <Card>
                             <CardContent className="p-0">
                                 <table className="w-full text-sm">
@@ -872,7 +478,7 @@ export default function ReportsIndex({
                                                         ? subscription.recipient_names.join(
                                                               ', ',
                                                           )
-                                                        : '\u2014'}
+                                                        : '—'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Badge
@@ -899,7 +505,7 @@ export default function ReportsIndex({
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {subscription.next_run_at ||
-                                                        '\u2014'}
+                                                        '—'}
                                                     {subscription.last_run_at
                                                         ? ` (last: ${subscription.last_run_at})`
                                                         : ''}
@@ -910,8 +516,10 @@ export default function ReportsIndex({
                                                             variant="outline"
                                                             size="sm"
                                                             onClick={() =>
-                                                                startEditSubscription(
-                                                                    subscription,
+                                                                setScheduleWizard(
+                                                                    {
+                                                                        subscription,
+                                                                    },
                                                                 )
                                                             }
                                                         >
@@ -949,7 +557,18 @@ export default function ReportsIndex({
                                 </table>
                             </CardContent>
                         </Card>
-                    </>
+                    </div>
+                )}
+
+                {scheduleWizard !== null && (
+                    <ScheduleReportWizard
+                        key={scheduleWizard.subscription?.id ?? 'new'}
+                        subscription={scheduleWizard.subscription}
+                        reports={availableReports}
+                        recipients={recipientOptions}
+                        defaultFilters={defaultFilters}
+                        onClose={() => setScheduleWizard(null)}
+                    />
                 )}
             </PageLayout>
         </AppLayout>

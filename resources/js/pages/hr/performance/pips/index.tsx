@@ -1,7 +1,10 @@
 import { PerformanceTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    PerformanceSatelliteHero,
+    SatelliteHeroAction,
+} from '@/components/hr/performance/performance-hero';
+import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Select,
@@ -115,31 +118,29 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PerformanceSatelliteHero
                         icon={ShieldAlert}
-                        title="Performance Improvement Plans"
+                        title="Performance improvement plans"
                         description="Manage and track employee improvement plans."
-                        stats={stats ? [
-                            { label: 'Active', value: stats.active },
-                            { label: 'Completed', value: stats.completed },
-                            { label: 'Cancelled', value: stats.cancelled },
-                            { label: 'Total', value: stats.total },
-                        ] : undefined}
+                        stats={
+                            stats
+                                ? [
+                                      { label: 'Active', value: stats.active, amber: stats.active > 0 },
+                                      { label: 'Completed', value: stats.completed },
+                                      { label: 'Cancelled', value: stats.cancelled },
+                                      { label: 'Total', value: stats.total },
+                                  ]
+                                : []
+                        }
                         actions={
-                            <div className="flex items-center gap-2">
-                                <Link href="/hr/performance">
-                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                        Dashboard
-                                    </Button>
-                                </Link>
-                                {can.manage && (
-                                    <Button size="sm" asChild>
-                                        <Link href="/hr/performance/pips/create">
-                                            <Plus className="mr-1.5 h-4 w-4" /> New PIP
-                                        </Link>
-                                    </Button>
-                                )}
-                            </div>
+                            can.manage ? (
+                                <SatelliteHeroAction
+                                    icon={Plus}
+                                    label="New PIP"
+                                    primary
+                                    href="/hr/performance/pips/create"
+                                />
+                            ) : undefined
                         }
                     />
                 }

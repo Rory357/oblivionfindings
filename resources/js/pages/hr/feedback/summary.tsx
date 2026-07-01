@@ -289,8 +289,8 @@ export default function FeedbackSummary({
                                                         q.min_rating !==
                                                             q.max_rating && (
                                                             <span className="text-[10px] text-muted-foreground">
-                                                                {q.min_rating}{' '}
-                                                                \u2013{' '}
+                                                                {q.min_rating}
+                                                                {' \u2013 '}
                                                                 {q.max_rating}
                                                             </span>
                                                         )}

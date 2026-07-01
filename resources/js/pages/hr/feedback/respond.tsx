@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Calendar, CheckCircle2, MessageSquare, Send, Star } from 'lucide-react';
 
 type User = { id: number; name: string };
@@ -85,7 +85,7 @@ function StarRating({
                         className="group/star h-8 w-8"
                     >
                         <Star
-                            className={`size-7 transition-all ${star <= value ? 'scale-110 fill-amberx text-status-warning' : 'text-muted-foreground/20 group-hover/star:scale-110 hover:text-status-warning'}`}
+                            className={`size-7 transition-all ${star <= value ? 'scale-110 fill-status-warning text-status-warning' : 'text-muted-foreground/20 group-hover/star:scale-110 hover:text-status-warning'}`}
                         />
                     </Button>
                 ))}
@@ -249,7 +249,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                                             }
                                             placeholder="Share your observations... (optional)"
                                             rows={2}
-                                            className="bg-primary-foreground/80 text-sm"
+                                            className="bg-card text-sm"
                                         />
                                     </div>
                                 </CardContent>
@@ -275,20 +275,18 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                             )}
                         </div>
                         <div className="flex gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => history.back()}
-                            >
-                                Cancel
+                            <Button type="button" variant="outline" asChild>
+                                <Link href="/hr/feedback">Cancel</Link>
                             </Button>
                             <Button
                                 type="submit"
-                                className="gap-1.5 bg-primary hover:bg-primary"
+                                className="gap-1.5"
                                 disabled={form.processing}
                             >
                                 <Send className="h-3.5 w-3.5" />
-                                Submit Feedback
+                                {form.processing
+                                    ? 'Submitting…'
+                                    : 'Submit Feedback'}
                             </Button>
                         </div>
                     </div>

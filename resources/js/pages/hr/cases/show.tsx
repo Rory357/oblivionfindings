@@ -1,3 +1,12 @@
+import {
+    CaseEventWizard,
+    DisciplinaryCreateWizard,
+    DisciplinaryEditWizard,
+    type CaseOption,
+    type CaseStaffOption,
+    type DisciplinaryActionForm,
+    type GoodFaithCheckOption,
+} from '@/components/hr/case-wizards';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Briefcase,
@@ -51,15 +60,7 @@ type TimelineRow = {
     visibility?: 'internal' | 'restricted' | 'full';
 };
 
-type DisciplinaryActionRow = {
-    id: number;
-    stage: string;
-    action_type: string;
-    allegation_summary: string;
-    investigation_notes: string | null;
-    response_deadline: string | null;
-    outcome: string | null;
-    good_faith_checklist: Record<string, boolean> | null;
+type DisciplinaryActionRow = DisciplinaryActionForm & {
     employee?: UserRef;
     investigator?: UserRef;
     created_at: string;
@@ -89,7 +90,32 @@ type Props = {
     case: HrCasePayload;
     timeline: TimelineRow[];
     can: { manage: boolean; disciplinary: boolean };
+    staff: CaseStaffOption[];
+    eventTypes: CaseOption[];
+    actionTypes: CaseOption[];
+    stageOptions: CaseOption[];
+    goodFaithRequiredChecks: GoodFaithCheckOption[];
 };
+
+type CaseModalState =
+    | { type: 'event' }
+    | { type: 'disciplinary' }
+    | { type: 'edit-disciplinary'; actionId: number }
+    | null;
+
+/** Initial modal from the URL — old GET form routes redirect here with these params. */
+function initialModal(): CaseModalState {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const editId = Number(params.get('edit-disciplinary'));
+    if (Number.isInteger(editId) && editId > 0) {
+        return { type: 'edit-disciplinary', actionId: editId };
+    }
+    const wanted = params.get('new');
+    if (wanted === 'event') return { type: 'event' };
+    if (wanted === 'disciplinary') return { type: 'disciplinary' };
+    return null;
+}
 
 const requiredGoodFaithChecks = [
     'allegation_communicated',
@@ -198,7 +224,16 @@ const normalizeVisibility = (
     return 'internal';
 };
 
-export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
+export default function HrCaseShow({
+    case: hrCase,
+    timeline,
+    can,
+    staff,
+    eventTypes,
+    actionTypes,
+    stageOptions,
+    goodFaithRequiredChecks,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Cases', href: '/hr/cases' },
@@ -228,6 +263,13 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                 timelineVisibilityFilter,
         );
     }, [timeline, timelineVisibilityFilter]);
+
+    const [modal, setModal] = useState<CaseModalState>(initialModal);
+
+    const editingAction =
+        modal?.type === 'edit-disciplinary'
+            ? (disciplinaryActions.find((a) => a.id === modal.actionId) ?? null)
+            : null;
 
     const [closeCaseDialogOpen, setCloseCaseDialogOpen] = useState(false);
     const [closeCaseOutcome, setCloseCaseOutcome] = useState('');
@@ -310,14 +352,16 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         actions={
                             can.manage && !isClosed ? (
                                 <>
-                                    <Link
-                                        href={`/hr/cases/${hrCase.id}/events/create`}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setModal({ type: 'event' })
+                                        }
                                     >
-                                        <Button size="sm" variant="outline">
-                                            <Calendar className="mr-1.5 h-4 w-4" />
-                                            Add Event
-                                        </Button>
-                                    </Link>
+                                        <Calendar className="mr-1.5 h-4 w-4" />
+                                        Add Event
+                                    </Button>
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -566,14 +610,16 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                     Disciplinary Actions
                                 </CardTitle>
                                 {can.disciplinary && !isClosed ? (
-                                    <Link
-                                        href={`/hr/cases/${hrCase.id}/disciplinary/create`}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setModal({ type: 'disciplinary' })
+                                        }
                                     >
-                                        <Button size="sm" variant="outline">
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Action
-                                        </Button>
-                                    </Link>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Action
+                                    </Button>
                                 ) : null}
                             </div>
                         </CardHeader>
@@ -637,16 +683,19 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                             </div>
                                             {can.disciplinary ? (
                                                 <div className="flex items-center gap-2">
-                                                    <Link
-                                                        href={`/hr/cases/disciplinary/${action.id}/edit`}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setModal({
+                                                                type: 'edit-disciplinary',
+                                                                actionId:
+                                                                    action.id,
+                                                            })
+                                                        }
                                                     >
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                        >
-                                                            Edit
-                                                        </Button>
-                                                    </Link>
+                                                        Edit
+                                                    </Button>
                                                     {canAdvance ? (
                                                         <Button
                                                             size="sm"
@@ -686,6 +735,41 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     </Card>
                 ) : null}
             </PageLayout>
+
+            {modal?.type === 'event' && can.manage ? (
+                <CaseEventWizard
+                    caseId={hrCase.id}
+                    caseNumber={hrCase.case_number}
+                    subjectName={hrCase.subject?.name ?? null}
+                    eventTypes={eventTypes}
+                    onClose={() => setModal(null)}
+                />
+            ) : null}
+
+            {modal?.type === 'disciplinary' && can.disciplinary ? (
+                <DisciplinaryCreateWizard
+                    caseId={hrCase.id}
+                    caseNumber={hrCase.case_number}
+                    subjectId={hrCase.subject?.id ?? null}
+                    subjectName={hrCase.subject?.name ?? null}
+                    staff={staff}
+                    actionTypes={actionTypes}
+                    onClose={() => setModal(null)}
+                />
+            ) : null}
+
+            {editingAction && can.disciplinary ? (
+                <DisciplinaryEditWizard
+                    key={editingAction.id}
+                    action={editingAction}
+                    caseNumber={hrCase.case_number}
+                    staff={staff}
+                    actionTypes={actionTypes}
+                    stageOptions={stageOptions}
+                    goodFaithRequiredChecks={goodFaithRequiredChecks}
+                    onClose={() => setModal(null)}
+                />
+            ) : null}
 
             <Dialog
                 open={closeCaseDialogOpen}

@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        // Guarded: the committed test schema dump already contains these
+        // columns, so this migration must be a no-op when it re-runs on top
+        // of the dump (test bootstrap runs pending migrations after loading
+        // it; an unguarded duplicate-column failure silently aborts every
+        // later migration).
+        if (Schema::hasColumn('hr_expense_items', 'source_type')) {
+            return;
+        }
+
         Schema::table('hr_expense_items', function (Blueprint $table) {
             $table->string('source_type')->nullable()->after('notes');
             $table->unsignedBigInteger('source_id')->nullable()->after('source_type');
@@ -22,6 +31,10 @@ return new class extends Migration {
 
     public function down(): void
     {
+        if (! Schema::hasColumn('hr_expense_items', 'source_type')) {
+            return;
+        }
+
         Schema::table('hr_expense_items', function (Blueprint $table) {
             $table->dropIndex(['source_type', 'source_id']);
             $table->dropColumn(['source_type', 'source_id']);

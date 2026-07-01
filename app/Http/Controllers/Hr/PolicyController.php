@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPolicy;
+use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrPolicyVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,6 +16,18 @@ use Illuminate\Support\Facades\Storage;
 class PolicyController extends Controller
 {
     use ResolvesHrTenant;
+
+    /** Seed categories offered by the policy wizard alongside tenant-created ones. */
+    private const DEFAULT_CATEGORIES = [
+        ['value' => 'employment', 'label' => 'Employment'],
+        ['value' => 'health_and_safety', 'label' => 'Health & Safety'],
+        ['value' => 'safeguarding', 'label' => 'Safeguarding'],
+        ['value' => 'data_protection', 'label' => 'Data Protection'],
+        ['value' => 'conduct', 'label' => 'Conduct'],
+        ['value' => 'leave', 'label' => 'Leave'],
+        ['value' => 'training', 'label' => 'Training'],
+        ['value' => 'general', 'label' => 'General'],
+    ];
 
     /**
      * List the policy library.
@@ -41,9 +54,29 @@ class PolicyController extends Controller
             ->values()
             ->toArray();
 
+        // Hero stats — computed over the whole register, not the current page.
+        $stats = [
+            'total' => HrPolicy::forTenant($tenantId)->count(),
+            'active' => HrPolicy::forTenant($tenantId)->active()->count(),
+            'need_attestation' => HrPolicy::forTenant($tenantId)->active()->where('requires_attestation', true)->count(),
+            'attestations' => HrPolicyAttestation::where('tenant_id', $tenantId)->count(),
+        ];
+
+        // Wizard edit-mode prefill: ?edit={id} may point at a policy outside the
+        // current page of results, so ship the requested record explicitly.
+        $editPolicy = null;
+        if ($request->query('edit') && $user->canDo('hr.policies.manage')) {
+            $editPolicy = HrPolicy::forTenant($tenantId)
+                ->select(['id', 'title', 'category', 'is_active', 'requires_attestation', 'attestation_frequency_months'])
+                ->find($request->query('edit'));
+        }
+
         return Inertia::render('hr/documents/policies/index', [
             'policies' => $policies,
             'categories' => $categories,
+            'defaultCategories' => self::DEFAULT_CATEGORIES,
+            'stats' => $stats,
+            'editPolicy' => $editPolicy,
             'filters' => [
                 'category' => $request->query('category'),
                 'active_only' => $request->boolean('active_only', true),
@@ -55,38 +88,20 @@ class PolicyController extends Controller
     }
 
     /**
-     * Show form to create a new policy.
+     * Legacy full-page create form — the flow now lives in the PolicyWizard
+     * modal on the index, so send the old GET route there with ?new=1.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        // Get existing categories for suggestions
-        $existingCategories = HrPolicy::forTenant($tenantId)
-            ->selectRaw('DISTINCT category')
-            ->pluck('category')
-            ->filter()
-            ->values();
-
-        return Inertia::render('hr/documents/policies/create', [
-            'existingCategories' => $existingCategories,
-            'defaultCategories' => [
-                ['value' => 'employment', 'label' => 'Employment'],
-                ['value' => 'health_and_safety', 'label' => 'Health & Safety'],
-                ['value' => 'safeguarding', 'label' => 'Safeguarding'],
-                ['value' => 'data_protection', 'label' => 'Data Protection'],
-                ['value' => 'conduct', 'label' => 'Conduct'],
-                ['value' => 'leave', 'label' => 'Leave'],
-                ['value' => 'training', 'label' => 'Training'],
-                ['value' => 'general', 'label' => 'General'],
-            ],
-        ]);
+        return redirect()->route('hr.policies.index', ['new' => 1]);
     }
 
     /**
-     * Show form to edit a policy.
+     * Legacy full-page edit form — the flow now lives in the PolicyWizard
+     * modal on the index, so send the old GET route there with ?edit={id}.
      */
     public function edit(Request $request, HrPolicy $policy)
     {
@@ -95,28 +110,7 @@ class PolicyController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
-        $policy->load(['versions' => fn ($q) => $q->orderByDesc('version_number')]);
-
-        $existingCategories = HrPolicy::forTenant($tenantId)
-            ->selectRaw('DISTINCT category')
-            ->pluck('category')
-            ->filter()
-            ->values();
-
-        return Inertia::render('hr/documents/policies/edit', [
-            'policy' => $policy,
-            'existingCategories' => $existingCategories,
-            'defaultCategories' => [
-                ['value' => 'employment', 'label' => 'Employment'],
-                ['value' => 'health_and_safety', 'label' => 'Health & Safety'],
-                ['value' => 'safeguarding', 'label' => 'Safeguarding'],
-                ['value' => 'data_protection', 'label' => 'Data Protection'],
-                ['value' => 'conduct', 'label' => 'Conduct'],
-                ['value' => 'leave', 'label' => 'Leave'],
-                ['value' => 'training', 'label' => 'Training'],
-                ['value' => 'general', 'label' => 'General'],
-            ],
-        ]);
+        return redirect()->route('hr.policies.index', ['edit' => $policy->id]);
     }
 
     /**

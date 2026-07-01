@@ -107,18 +107,26 @@ class PipController extends Controller
             'milestones.*.title' => ['required', 'string', 'max:255'],
             'milestones.*.description' => ['nullable', 'string', 'max:2000'],
             'milestones.*.due_date' => ['required', 'date'],
+            'source_review_id' => ['nullable', 'integer', 'exists:hr_performance_reviews,id'],
             'stay' => ['nullable', 'boolean'],
         ]);
 
         $stay = (bool) ($data['stay'] ?? false);
 
-        DB::transaction(function () use ($user, $data) {
+        // Provenance note when the PIP was deliberately started from a
+        // signed-off performance review (no schema change — reason text).
+        $reason = $data['reason'];
+        if (! empty($data['source_review_id'])) {
+            $reason .= "\n\nCreated from performance review #{$data['source_review_id']}.";
+        }
+
+        DB::transaction(function () use ($user, $data, $reason) {
             $pip = HrPerformanceImprovementPlan::create([
                 'tenant_id' => $user->tenant_id,
                 'employee_user_id' => $data['employee_user_id'],
                 'manager_user_id' => $user->id,
                 'title' => $data['title'],
-                'reason' => $data['reason'],
+                'reason' => $reason,
                 'expectations' => $data['expectations'],
                 'support_offered' => $data['support_offered'] ?? null,
                 'consequences' => $data['consequences'] ?? null,

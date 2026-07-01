@@ -3,15 +3,29 @@ import {
     type ExistingSuccessionCandidate,
     type SuccessionEmployeeOption,
 } from '@/components/hr/performance/succession-candidate-dialog';
+import {
+    SuccessionPlanWizard,
+    type SuccessionHolderOption,
+    type SuccessionPositionOption,
+} from '@/components/hr/succession-wizards';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { Pencil, Plus, Star, Users } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Pencil, Plus, Sparkles, Star, Trash2, Users, X } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 type Candidate = {
     id: number;
@@ -27,12 +41,16 @@ type Plan = {
     department: string | null;
     risk_level: string;
     current_holder_name: string | null;
+    current_holder: { id: number; name: string } | null;
+    position: { id: number; title: string } | null;
     notes: string | null;
     candidates: Candidate[];
 };
 type Props = {
     plan: Plan;
     employees: SuccessionEmployeeOption[];
+    positions?: SuccessionPositionOption[];
+    holders?: SuccessionHolderOption[];
     can: { manage?: boolean };
 };
 
@@ -55,11 +73,20 @@ const readinessColors: Record<string, string> = {
     developing: 'border-border/30 text-muted-foreground',
 };
 
-export default function SuccessionShow({ plan, employees, can }: Props) {
+export default function SuccessionShow({
+    plan,
+    employees,
+    positions = [],
+    holders = [],
+    can,
+}: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ExistingSuccessionCandidate | null>(
         null,
     );
+    const [planWizardOpen, setPlanWizardOpen] = useState(false);
+    const [deletingPlan, setDeletingPlan] = useState(false);
+    const [removing, setRemoving] = useState<Candidate | null>(null);
 
     const openAdd = () => {
         setEditing(null);
@@ -77,13 +104,66 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
         setDialogOpen(true);
     };
 
+    const nominate = (c: Candidate) => {
+        router.post(
+            `/hr/succession/candidates/${c.id}/nominate`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () =>
+                    toast.success(
+                        `${c.employee?.name ?? 'Candidate'} nominated to the ready-now talent pool.`,
+                    ),
+            },
+        );
+    };
+
+    const confirmRemove = () => {
+        if (!removing) return;
+        router.delete(`/hr/succession/candidates/${removing.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Candidate removed from plan.');
+                setRemoving(null);
+            },
+        });
+    };
+
+    const confirmDeletePlan = () => {
+        router.delete(`/hr/succession/${plan.id}`, {
+            onSuccess: () => toast.success('Succession plan deleted.'),
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Succession: ${plan.role_title}`} />
             <PageShell>
                 <PageHero category="hr" variant="compact"
+                    backHref="/hr/succession"
+                    backLabel="Succession planning"
                     title={plan.role_title}
                     description={plan.department || 'Succession Plan'}
+                    actions={
+                        can.manage ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setPlanWizardOpen(true)}
+                                >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit plan
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setDeletingPlan(true)}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4 text-status-critical" />
+                                    Delete
+                                </Button>
+                            </>
+                        ) : undefined
+                    }
                 />
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
@@ -125,7 +205,7 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                 {plan.notes && (
                     <Card>
                         <CardContent className="pt-4">
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm whitespace-pre-line text-muted-foreground">
                                 {plan.notes}
                             </p>
                         </CardContent>
@@ -172,17 +252,30 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                                                         ] || c.readiness}
                                                     </Badge>
                                                     {can.manage && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7"
-                                                            onClick={() =>
-                                                                openEdit(c)
-                                                            }
-                                                            aria-label="Edit candidate"
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
+                                                        <>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7"
+                                                                onClick={() =>
+                                                                    openEdit(c)
+                                                                }
+                                                                aria-label="Edit candidate"
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7"
+                                                                onClick={() =>
+                                                                    setRemoving(c)
+                                                                }
+                                                                aria-label="Remove candidate"
+                                                            >
+                                                                <X className="h-3.5 w-3.5 text-status-critical" />
+                                                            </Button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -192,7 +285,7 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                                                         (s) => (
                                                             <Star
                                                                 key={s}
-                                                                className={`h-4 w-4 ${s <= c.overall_rating! ? 'fill-amberx text-status-warning' : 'text-muted-foreground'}`}
+                                                                className={`h-4 w-4 ${s <= c.overall_rating! ? 'fill-status-warning text-status-warning' : 'text-muted-foreground'}`}
                                                             />
                                                         ),
                                                     )}
@@ -218,6 +311,20 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                                                     </p>
                                                 </div>
                                             )}
+                                            {can.manage &&
+                                                c.readiness !== 'ready_now' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-1"
+                                                        onClick={() =>
+                                                            nominate(c)
+                                                        }
+                                                    >
+                                                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                                                        Nominate as ready now
+                                                    </Button>
+                                                )}
                                         </CardContent>
                                     </Card>
                                 ))}
@@ -239,6 +346,80 @@ export default function SuccessionShow({ plan, employees, can }: Props) {
                         candidate={editing}
                     />
                 )}
+
+                {can.manage && planWizardOpen && (
+                    <SuccessionPlanWizard
+                        onClose={() => setPlanWizardOpen(false)}
+                        positions={positions}
+                        holders={holders}
+                        plan={{
+                            id: plan.id,
+                            role_title: plan.role_title,
+                            department: plan.department,
+                            risk_level: plan.risk_level,
+                            current_holder: plan.current_holder,
+                            position: plan.position,
+                            notes: plan.notes,
+                        }}
+                    />
+                )}
+
+                <Dialog
+                    open={!!removing}
+                    onOpenChange={(o) => {
+                        if (!o) setRemoving(null);
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Remove candidate?</DialogTitle>
+                            <DialogDescription>
+                                {removing?.employee?.name ?? 'This candidate'} and
+                                their readiness assessment will be removed from
+                                this plan.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setRemoving(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={confirmRemove}>
+                                Remove
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={deletingPlan} onOpenChange={setDeletingPlan}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Delete succession plan?</DialogTitle>
+                            <DialogDescription>
+                                “{plan.role_title}” and its{' '}
+                                {plan.candidates.length} candidate assessment
+                                {plan.candidates.length === 1 ? '' : 's'} will be
+                                removed. This can’t be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setDeletingPlan(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={confirmDeletePlan}
+                            >
+                                Delete plan
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );

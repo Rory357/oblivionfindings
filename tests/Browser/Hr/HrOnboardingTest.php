@@ -34,13 +34,15 @@ test('hr offboarding index loads', function () {
     });
 });
 
-test('hr offboarding create page loads', function () {
+test('hr offboarding create redirects to the index wizard', function () {
+    // Start-offboarding is now a wizard modal — the legacy create GET bounces
+    // to the index with ?new=1, which opens the wizard on mount.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/hr/offboarding/create')
             ->waitForText('Offboarding', 10)
-            ->assertPathIs('/hr/offboarding/create');
+            ->assertPathIs('/hr/offboarding');
     });
 });
 

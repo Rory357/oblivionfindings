@@ -413,6 +413,10 @@ class RbacSeeder extends Seeder
             ['key' => 'hr.onboarding.view', 'description' => 'View onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.onboarding.manage', 'description' => 'Manage onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
 
+            // IT & Provisioning (/it — onboarding-driven requests + helpdesk tickets)
+            ['key' => 'it.view', 'description' => 'View the IT & Provisioning queues', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.manage', 'description' => 'Work IT provisioning requests and helpdesk tickets', 'group' => 'it', 'module' => 'Operations'],
+
             // Settings
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology', 'group' => 'settings', 'module' => 'System'],
             ['key' => 'settings.branding.manage', 'description' => 'Manage organisation branding', 'group' => 'settings', 'module' => 'System'],
@@ -621,6 +625,7 @@ class RbacSeeder extends Seeder
             'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view', 'hr.payroll.export',
             'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
+            'it.view', 'it.manage',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
         ]);
@@ -760,6 +765,7 @@ class RbacSeeder extends Seeder
             'hr.payroll.export', 'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
             'timesheets.viewAny', 'timesheets.manageAny',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
+            'it.view', 'it.manage',
         ]);
 
         // Auditor

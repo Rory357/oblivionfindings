@@ -4,7 +4,9 @@
  * the right rail shows the compliance panel. Colours stay token-based (primary /
  * status-* / --hr-amber injected as a CSS var) so tenant white-label theming
  * still propagates. */
+import { Link } from '@inertiajs/react';
 import {
+    ArrowLeft,
     Award,
     CalendarDays,
     Check,
@@ -18,7 +20,7 @@ import {
     UserCheck,
     type LucideIcon,
 } from 'lucide-react';
-import { type CSSProperties } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -245,6 +247,124 @@ function HeroStat({
             >
                 {value}
             </span>
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Satellite hero — slimmed variant of the hub command band for the   */
+/*  Performance deep-dive pages (competencies, PIPs, skills, detail    */
+/*  pages). Same gradient/token chrome + a back-to-hub breadcrumb so   */
+/*  hub ↔ satellite feels continuous.                                  */
+/* ------------------------------------------------------------------ */
+
+export type SatelliteStat = { label: string; value: string | number; amber?: boolean };
+
+export function PerformanceSatelliteHero({
+    icon: Icon,
+    title,
+    description,
+    backHref = '/hr/performance',
+    backLabel = 'Performance & development',
+    stats = [],
+    actions,
+}: {
+    icon: LucideIcon;
+    title: string;
+    description?: string;
+    backHref?: string;
+    backLabel?: string;
+    stats?: SatelliteStat[];
+    actions?: ReactNode;
+}) {
+    return (
+        <div
+            style={HERO_STYLE}
+            className="relative overflow-hidden rounded-[24px] text-primary-foreground"
+        >
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
+                <div className="absolute -top-24 right-[18%] h-56 w-56 rounded-full bg-primary-foreground/[0.05]" />
+                <div className="absolute -bottom-[80px] right-[4%] h-44 w-44 rounded-full bg-primary-foreground/[0.04]" />
+            </div>
+
+            <div className="relative flex flex-wrap items-center gap-x-6 gap-y-4 p-[24px_28px]">
+                <div className="min-w-0 flex-1 basis-[420px]">
+                    <Link
+                        href={backHref}
+                        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        {backLabel}
+                    </Link>
+                    <div className="mt-2.5 flex items-center gap-3.5">
+                        <span className="grid h-[46px] w-[46px] flex-none place-items-center rounded-[14px] border border-primary-foreground/20 bg-primary-foreground/15">
+                            <Icon className="h-[22px] w-[22px]" />
+                        </span>
+                        <div className="min-w-0">
+                            <h1 className="text-[22px] font-bold leading-[1.1] tracking-tight">{title}</h1>
+                            {description ? (
+                                <p className="mt-1 text-[13px] font-medium text-primary-foreground/75">{description}</p>
+                            ) : null}
+                        </div>
+                    </div>
+                    {stats.length > 0 ? (
+                        <div className="-ml-3 mt-3 flex flex-wrap gap-0.5">
+                            {stats.map((s) => (
+                                <div key={s.label} className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-1.5 text-left">
+                                    <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+                                        {s.label}
+                                    </span>
+                                    <span className={cn('text-[19px] font-bold tabular-nums', s.amber && 'text-[color:var(--hr-amber)]')}>
+                                        {s.value}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+
+                {actions ? <div className="flex flex-none flex-wrap items-center gap-2">{actions}</div> : null}
+            </div>
+        </div>
+    );
+}
+
+/** Ghost action button styled for the gradient band (satellite heroes). */
+export function SatelliteHeroAction({
+    icon: Icon,
+    label,
+    onClick,
+    href,
+    primary,
+}: {
+    icon?: LucideIcon;
+    label: string;
+    onClick?: () => void;
+    href?: string;
+    primary?: boolean;
+}) {
+    const className = cn(
+        'inline-flex h-[34px] items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] transition-colors',
+        primary
+            ? 'bg-primary-foreground font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]'
+            : 'border border-primary-foreground/[0.28] bg-primary-foreground/[0.12] font-semibold text-primary-foreground hover:bg-primary-foreground/20',
+    );
+    const inner = (
+        <>
+            {Icon ? <Icon className="h-[15px] w-[15px]" /> : null}
+            {label}
+        </>
+    );
+    if (href) {
+        return (
+            <Link href={href} className={className}>
+                {inner}
+            </Link>
+        );
+    }
+    return (
+        <button type="button" onClick={onClick} className={className}>
+            {inner}
         </button>
     );
 }

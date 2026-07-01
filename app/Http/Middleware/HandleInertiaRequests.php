@@ -762,6 +762,11 @@ class HandleInertiaRequests extends Middleware
                 ],
             ],
 
+            'it' => [
+                'view' => $user->canDo('it.view'),
+                'manage' => $user->canDo('it.manage'),
+            ],
+
             'governance' => [
                 'view' => $user->canDo('governance.view'),
                 'meetings' => [

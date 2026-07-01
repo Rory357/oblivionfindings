@@ -3,6 +3,7 @@
 use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\RosterController;
 use App\Http\Controllers\TodayDashboardController;
@@ -138,13 +139,20 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
-// IT & Provisioning — DESIGN PREVIEW (wireframe only, no backend yet).
-// Renders static mock data so the shape can be reviewed before the
-// it_provisioning_requests / it_tickets subsystem is built. See
-// docs/IT_PROVISIONING_WIREFRAME.md for the build-out spec.
-Route::get('/it', fn () => Inertia::render('it/index'))
-    ->middleware(['auth', 'permission:hr.onboarding.manage'])
-    ->name('it.index');
+// IT & Provisioning — onboarding-driven provisioning queue + helpdesk
+// tickets. Built from docs/IT_PROVISIONING_WIREFRAME.md.
+Route::middleware(['auth', 'permission:it.view'])->group(function () {
+    Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+
+    Route::middleware('permission:it.manage')->group(function () {
+        Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
+        Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
+        Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
+        Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
+        Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
+        Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
+    });
+});
 
 Route::get('/my-roster/data', [RosterController::class, 'data'])
     ->middleware(['auth'])

@@ -1,8 +1,29 @@
 import { DocumentsTabs } from '@/components/hr';
+import {
+    buildCategoryOptions,
+    PolicyWizard,
+    type CategoryOption,
+    type EditablePolicy,
+} from '@/components/hr/policy-wizards';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -22,17 +43,22 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { BookOpen, CheckCircle, FileText, Plus, ShieldCheck } from 'lucide-react';
+import {
+    BookOpen,
+    CheckCircle,
+    FileText,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    ShieldCheck,
+    Trash2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
-type Policy = {
-    id: number;
-    title: string;
+type Policy = EditablePolicy & {
     slug: string;
-    category: string;
-    is_active: boolean;
-    requires_attestation: boolean;
     current_version: {
         id: number;
         version_number: string;
@@ -43,9 +69,17 @@ type Policy = {
 type Props = {
     policies: {
         data: Policy[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
     };
     categories: string[];
+    defaultCategories: CategoryOption[];
+    stats: {
+        total: number;
+        active: number;
+        need_attestation: number;
+        attestations: number;
+    };
+    editPolicy: EditablePolicy | null;
     filters: {
         category: string | null;
         active_only: boolean | string | null;
@@ -87,13 +121,38 @@ const getCategoryColor = (category: string) => {
     return colors[category] || 'bg-muted text-foreground border-border';
 };
 
+type WizardState =
+    | { mode: 'create' }
+    | { mode: 'edit'; policy: EditablePolicy }
+    | null;
+
 export default function PoliciesIndex({
     policies,
     categories,
+    defaultCategories,
+    stats,
+    editPolicy,
     filters,
     can,
 }: Props) {
     const NONE = '__none__';
+
+    // Open the right wizard mode on mount when arriving via the legacy GET
+    // create/edit routes (they redirect here with ?new=1 / ?edit={id}).
+    const [wizard, setWizard] = useState<WizardState>(() => {
+        if (typeof window === 'undefined' || !can.manage) return null;
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('new')) return { mode: 'create' };
+        if (params.has('edit') && editPolicy) return { mode: 'edit', policy: editPolicy };
+        return null;
+    });
+    const [deleting, setDeleting] = useState<Policy | null>(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
+
+    const categoryOptions = useMemo(
+        () => buildCategoryOptions(categories, defaultCategories),
+        [categories, defaultCategories],
+    );
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -101,6 +160,18 @@ export default function PoliciesIndex({
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true },
         );
+    };
+
+    const confirmDelete = () => {
+        if (!deleting) return;
+        setDeleteBusy(true);
+        router.delete(`/hr/documents/policies/${deleting.id}`, {
+            preserveScroll: true,
+            onFinish: () => {
+                setDeleteBusy(false);
+                setDeleting(null);
+            },
+        });
     };
 
     return (
@@ -114,12 +185,14 @@ export default function PoliciesIndex({
                         title="Policy Library"
                         description="Organisation policies, procedures, and staff attestations."
                         stats={[
-                            { label: 'Total', value: policies.data.length },
-                            { label: 'Active', value: policies.data.filter((p) => p.is_active).length },
+                            { label: 'Policies', value: stats.total },
+                            { label: 'Active', value: stats.active, tone: 'success' },
                             {
                                 label: 'Need attestation',
-                                value: policies.data.filter((p) => p.requires_attestation).length,
+                                value: stats.need_attestation,
+                                tone: 'warning',
                             },
+                            { label: 'Attestations recorded', value: stats.attestations },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
@@ -130,12 +203,13 @@ export default function PoliciesIndex({
                                     </Button>
                                 </Link>
                                 {can.manage && (
-                                    <Link href="/hr/documents/policies/create">
-                                        <Button size="sm">
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Create Policy
-                                        </Button>
-                                    </Link>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setWizard({ mode: 'create' })}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New policy
+                                    </Button>
                                 )}
                             </div>
                         }
@@ -231,7 +305,7 @@ export default function PoliciesIndex({
                                     <TableHead>Current Version</TableHead>
                                     <TableHead>Effective From</TableHead>
                                     <TableHead>Attestation</TableHead>
-                                    <TableHead className="w-20"></TableHead>
+                                    <TableHead className="w-24"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -240,9 +314,12 @@ export default function PoliciesIndex({
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <FileText className="h-4 w-4 text-muted-foreground" />
-                                                <span className="font-medium">
+                                                <Link
+                                                    href={`/hr/documents/policies/${policy.id}`}
+                                                    className="font-medium hover:underline"
+                                                >
                                                     {policy.title}
-                                                </span>
+                                                </Link>
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -311,12 +388,51 @@ export default function PoliciesIndex({
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Link
-                                                href={`/hr/documents/policies/${policy.id}`}
-                                                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-                                            >
-                                                View
-                                            </Link>
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <Link
+                                                    href={`/hr/documents/policies/${policy.id}`}
+                                                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                                                >
+                                                    View
+                                                </Link>
+                                                {can.manage && (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7"
+                                                                aria-label={`Actions for ${policy.title}`}
+                                                            >
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem
+                                                                onSelect={() =>
+                                                                    setWizard({
+                                                                        mode: 'edit',
+                                                                        policy,
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Pencil className="mr-2 h-4 w-4" />
+                                                                Edit policy
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                className="text-status-critical focus:text-status-critical"
+                                                                onSelect={() =>
+                                                                    setDeleting(policy)
+                                                                }
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Delete policy
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -339,6 +455,49 @@ export default function PoliciesIndex({
                     <LaravelPagination links={policies.links} />
                 ) : null}
             </PageLayout>
+
+            {wizard ? (
+                <PolicyWizard
+                    policy={wizard.mode === 'edit' ? wizard.policy : null}
+                    categoryOptions={categoryOptions}
+                    onClose={() => setWizard(null)}
+                />
+            ) : null}
+
+            <Dialog
+                open={deleting !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeleting(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Delete policy</DialogTitle>
+                        <DialogDescription>
+                            Deleting “{deleting?.title}” permanently removes the
+                            policy, every published version and its stored PDFs.
+                            This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setDeleting(null)}
+                            disabled={deleteBusy}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={deleteBusy}
+                        >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            {deleteBusy ? 'Deleting…' : 'Delete policy'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

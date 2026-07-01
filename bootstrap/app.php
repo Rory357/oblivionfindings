@@ -3,6 +3,7 @@
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnforceTwoFactorPolicy;
+use App\Http\Middleware\EnsureAccountStillApproved;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\HandleAppearance;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleAppearance::class,
             EnforceSessionTimeout::class,
+            EnsureAccountStillApproved::class,
             EnforceTwoFactorPolicy::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

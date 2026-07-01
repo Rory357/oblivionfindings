@@ -15,6 +15,7 @@ use App\Domain\Hr\Notifications\OnboardingChecklistAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
+use App\Models\ItProvisioningRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -117,6 +118,11 @@ class OnboardingService
                     $taskByIndex[$index]->update(['dependency_task_ids' => $dependencyIds]);
                 }
             }
+
+            // Cross-loop: raise IT provisioning requests (/it queue) for the
+            // checklist's account/access IT tasks. Equipment tasks keep their
+            // asset-issue path (provisionAssetForTask).
+            $this->createItProvisioningRequests($checklist, array_values($taskByIndex), $createdBy);
 
             // Cross-loop: auto-enrol the new hire in training for any induction
             // tasks (explicit course_code, else the tenant's mandatory courses).
@@ -500,6 +506,61 @@ class OnboardingService
                 Log::warning('Onboarding induction enrolment failed', [
                     'course_id' => $course->id,
                     'profile_id' => $profile->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Raise a pending it_provisioning_request for every non-equipment IT task
+     * on a freshly generated checklist, so the /it queue picks them up.
+     * Equipment tasks are skipped — they are fulfilled via
+     * provisionAssetForTask. Idempotent (one request per task) and best-effort
+     * so a provisioning hiccup never rolls back checklist creation.
+     *
+     * @param  array<int, HrOnboardingTask>  $tasks
+     */
+    protected function createItProvisioningRequests(HrOnboardingChecklist $checklist, array $tasks, int $createdBy): void
+    {
+        // House rule: new-table writes are guarded so code deployed ahead of
+        // the migration step degrades gracefully.
+        if (! Schema::hasTable('it_provisioning_requests')) {
+            return;
+        }
+
+        foreach ($tasks as $task) {
+            if (($task->category ?: '') !== 'it') {
+                continue;
+            }
+
+            $type = ItProvisioningRequest::inferTypeFromTitle($task->title);
+            if ($type === 'equipment') {
+                continue;
+            }
+
+            try {
+                $exists = ItProvisioningRequest::query()
+                    ->where('onboarding_task_id', $task->id)
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
+
+                ItProvisioningRequest::create([
+                    'tenant_id' => $checklist->tenant_id,
+                    'employee_profile_id' => $checklist->employee_profile_id,
+                    'onboarding_task_id' => $task->id,
+                    'type' => $type,
+                    'item' => $task->title,
+                    'assigned_to_user_id' => null,
+                    'status' => 'pending',
+                    'created_by' => $createdBy,
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to raise IT provisioning request from onboarding task', [
+                    'task_id' => $task->id,
+                    'checklist_id' => $checklist->id,
                     'error' => $exception->getMessage(),
                 ]);
             }
@@ -928,9 +989,48 @@ class OnboardingService
                     'end_date' => $profile->end_date ?? ($checklist->due_date ?? now()->toDateString()),
                 ]);
             }
+
+            if ($profile) {
+                $this->revokeSystemAccess($profile);
+            }
         } elseif ($checklist->status !== 'in_progress') {
             $checklist->update(['status' => 'in_progress']);
         }
+    }
+
+    /**
+     * Revoke the leaver's system login once their offboarding checklist is
+     * fully complete. Withdrawing approval blocks future logins (Fortify +
+     * OAuth both check `approved_at`) and EnsureAccountStillApproved ends any
+     * live session on their next request. Never revokes the acting user's own
+     * account mid-session.
+     */
+    protected function revokeSystemAccess(HrEmployeeProfile $profile): void
+    {
+        $user = $profile->user;
+
+        if (! $user || is_null($user->approved_at)) {
+            return;
+        }
+
+        if (auth()->id() === $user->id) {
+            Log::warning('Skipped login revocation on offboarding completion: actor is the leaver.', [
+                'user_id' => $user->id,
+                'employee_profile_id' => $profile->id,
+            ]);
+
+            return;
+        }
+
+        $user->forceFill([
+            'approved_at' => null,
+            'remember_token' => null,
+        ])->save();
+
+        Log::info('Login access revoked on offboarding completion.', [
+            'user_id' => $user->id,
+            'employee_profile_id' => $profile->id,
+        ]);
     }
 
     protected function resolveTemplate(?int $tenantId, ?string $positionRole, string $siteType): ?HrOnboardingTemplate
