@@ -934,17 +934,25 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.assets.view')->prefix('assets')->name('assets.')->group(function () {
         Route::get('/', [AssetController::class, 'index'])->name('index');
+        Route::get('/export', [AssetController::class, 'export'])->name('export');
+        Route::get('/qr/{token}', [AssetController::class, 'qrRedirect'])->name('qr.redirect');
+        Route::get('/documents/{document}/download', [AssetController::class, 'downloadDocument'])->name('documents.download');
 
         Route::middleware('permission:hr.assets.manage')->group(function () {
-            Route::get('/create', [AssetController::class, 'create'])->name('create');
+            Route::get('/fleet-search', [AssetController::class, 'fleetSearch'])->name('fleet-search');
             Route::post('/', [AssetController::class, 'store'])->name('store');
+            Route::post('/bulk', [AssetController::class, 'bulk'])->name('bulk');
+            Route::put('/{asset}', [AssetController::class, 'update'])->name('update');
             Route::post('/{asset}/assign', [AssetController::class, 'assign'])->name('assign');
             Route::post('/assignments/{assignment}/return', [AssetController::class, 'returnAsset'])->name('assignments.return');
-            Route::post('/{asset}/maintenance', [AssetController::class, 'sendToMaintenance'])->name('maintenance');
-            Route::post('/{asset}/return-from-maintenance', [AssetController::class, 'returnFromMaintenance'])->name('return-from-maintenance');
+            Route::post('/{asset}/maintenance', [AssetController::class, 'logMaintenance'])->name('maintenance');
+            Route::post('/{asset}/return-to-service', [AssetController::class, 'returnToService'])->name('return-to-service');
             Route::post('/{asset}/retire', [AssetController::class, 'retire'])->name('retire');
+            Route::post('/{asset}/documents', [AssetController::class, 'storeDocument'])->name('documents.store');
+            Route::delete('/documents/{document}', [AssetController::class, 'destroyDocument'])->name('documents.destroy');
         });
 
+        Route::get('/{asset}/qr.svg', [AssetController::class, 'qrSvg'])->name('qr.svg');
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
     });
 

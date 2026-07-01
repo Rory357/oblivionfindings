@@ -12,6 +12,7 @@ use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
 use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
 use App\Domain\Hr\Notifications\GoalCompletedNotification;
+use App\Domain\Hr\Notifications\HrAssetAlertNotification;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
 use App\Domain\Hr\Notifications\LeaveDeclinedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
@@ -261,6 +262,84 @@ class HrNotificationService
     {
         return $this->getUsersWithPermission(['hr.leave.approve'], $request->tenant_id)
             ->reject(fn (User $u) => $u->id === $request->user_id);
+    }
+
+    /**
+     * Deliver HR asset attention alerts (warranty / overdue / repair / leaver) to
+     * every user who can manage assets in the alert's tenant. Suppresses repeats
+     * per the alert's dedupe scope: 'once' = never re-send the same key, 'daily' =
+     * at most one per day (so ongoing states keep nudging until resolved).
+     *
+     * @param  array<int,array<string,mixed>>  $alerts
+     * @return int Number of notifications sent.
+     */
+    public function sendAssetAlerts(array $alerts): int
+    {
+        // Resolve asset managers via a candidate query + canDo() filter. We avoid
+        // getUsersWithPermission() here: its wherePivot() inside a whereHas closure
+        // emits an invalid `pivot` column reference on this branch. canDo() applies
+        // the role + allow/deny-override precedence correctly.
+        $recipients = $this->assetManagers();
+        if ($recipients->isEmpty()) {
+            return 0;
+        }
+
+        $sent = 0;
+
+        foreach ($alerts as $alert) {
+            foreach ($recipients as $recipient) {
+                $query = $recipient->notifications()
+                    ->where('type', HrAssetAlertNotification::class)
+                    ->where('data->dedupe_key', $alert['dedupe_key']);
+
+                if (($alert['scope'] ?? 'daily') === 'daily') {
+                    $query->whereDate('created_at', now()->toDateString());
+                }
+
+                if ($query->exists()) {
+                    continue;
+                }
+
+                try {
+                    $recipient->notify(new HrAssetAlertNotification([
+                        'kind' => $alert['kind'],
+                        'title' => $alert['title'],
+                        'message' => $alert['message'],
+                        'asset_id' => $alert['asset_id'] ?? null,
+                        'action_url' => $alert['action_url'],
+                        'dedupe_key' => $alert['dedupe_key'],
+                    ]));
+                    $sent++;
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to send HR asset alert notification', [
+                        'dedupe_key' => $alert['dedupe_key'],
+                        'recipient_id' => $recipient->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $sent;
+    }
+
+    /**
+     * Users who may manage HR assets, resolved correctly via canDo() (role grant +
+     * allow/deny override precedence). The candidate query narrows to users who
+     * either hold a role granting the permission or carry an explicit override.
+     */
+    protected function assetManagers(): Collection
+    {
+        $key = 'hr.assets.manage';
+
+        return User::query()
+            ->where(function ($query) use ($key) {
+                $query->whereHas('roles.permissions', fn ($p) => $p->where('key', $key))
+                    ->orWhereHas('permissionOverrides', fn ($p) => $p->where('permissions.key', $key));
+            })
+            ->get()
+            ->filter(fn (User $user) => $user->canDo($key))
+            ->values();
     }
 
     /**

@@ -23,6 +23,7 @@ use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
+use App\Domain\Hr\Jobs\SendAssetRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
@@ -289,6 +290,13 @@ app(Schedule::class)
     ->job(new SendExpiryRemindersJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
+
+// HR asset reminders (warranty expiring, returns overdue, repairs overdue,
+// leaver-held): daily at 07:30
+app(Schedule::class)
+    ->job(new SendAssetRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:30');
 
 // Onboarding email automation: dispatch templates due today (start_date − offset): daily 08:00
 app(Schedule::class)
