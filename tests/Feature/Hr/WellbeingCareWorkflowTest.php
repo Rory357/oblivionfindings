@@ -114,15 +114,32 @@ test('action plan reopen and cancel append timeline notes', function () {
     expect(HrEngagementActionPlanNote::query()->where('plan_id', $plan->id)->count())->toBeGreaterThanOrEqual(2);
 });
 
-test('private check-ins are hidden from staff, shared ones can be acknowledged by the subject only', function () {
-    // Private check-in — never shown to staff
-    $this->actingAs($this->manager)->post('/hr/wellbeing/checkins', [
-        'staff_user_id' => $this->staff->id,
+test('the employee view hides private check-ins and shows shared ones to the subject', function () {
+    // Check-ins about the manager (who can load /hr/wellbeing). Private one is hidden.
+    HrWellbeingCheckin::query()->create([
+        'tenant_id' => 1,
+        'staff_user_id' => $this->manager->id,
+        'manager_user_id' => $this->manager->id,
         'type' => 'welfare',
         'notes' => 'Private note',
         'is_private' => true,
-    ])->assertRedirect();
+    ]);
+    $shared = HrWellbeingCheckin::query()->create([
+        'tenant_id' => 1,
+        'staff_user_id' => $this->manager->id,
+        'manager_user_id' => $this->manager->id,
+        'type' => 'welfare',
+        'notes' => 'Shared note',
+        'is_private' => false,
+    ]);
 
+    $props = $this->actingAs($this->manager)->get('/hr/wellbeing')->inertiaProps();
+    $myCheckinIds = collect($props['my']['checkins'])->pluck('id')->all();
+    expect($myCheckinIds)->toContain($shared->id);
+    expect($myCheckinIds)->toHaveCount(1); // private one excluded
+});
+
+test('only the subject can acknowledge a shared check-in, never a private one', function () {
     $shared = HrWellbeingCheckin::query()->create([
         'tenant_id' => 1,
         'staff_user_id' => $this->staff->id,
@@ -131,17 +148,23 @@ test('private check-ins are hidden from staff, shared ones can be acknowledged b
         'notes' => 'Shared note',
         'is_private' => false,
     ]);
+    $private = HrWellbeingCheckin::query()->create([
+        'tenant_id' => 1,
+        'staff_user_id' => $this->staff->id,
+        'manager_user_id' => $this->manager->id,
+        'type' => 'welfare',
+        'notes' => 'Private note',
+        'is_private' => true,
+    ]);
 
-    $props = $this->actingAs($this->staff)->get('/hr/wellbeing')->inertiaProps();
-    $myCheckinIds = collect($props['my']['checkins'])->pluck('id')->all();
-    expect($myCheckinIds)->toContain($shared->id);
-    expect($myCheckinIds)->toHaveCount(1); // private one excluded
-
-    // Subject acknowledges
+    // Subject (a plain support worker, no dashboard permission) can acknowledge the shared one.
     $this->actingAs($this->staff)->post("/hr/wellbeing/checkins/{$shared->id}/acknowledge")->assertRedirect();
     expect($shared->fresh()->acknowledged_at)->not->toBeNull();
 
-    // A different user may not acknowledge
+    // Private check-ins can never be acknowledged by the subject.
+    $this->actingAs($this->staff)->post("/hr/wellbeing/checkins/{$private->id}/acknowledge")->assertForbidden();
+
+    // A different user may not acknowledge.
     $other = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $this->actingAs($other)->post("/hr/wellbeing/checkins/{$shared->id}/acknowledge")->assertForbidden();
 });
