@@ -3,11 +3,14 @@
 namespace App\Domain\Hr\Jobs;
 
 use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\DocumentExpiryNotification;
+use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\VisaExpiryNotification;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -93,6 +96,58 @@ class SendExpiryRemindersJob implements ShouldQueue
 
         $this->sendVisaExpiryReminders($reminderDays);
         $this->sendDocumentExpiryReminders((int) max($reminderDays));
+        $this->sendSignatureDueReminders();
+    }
+
+    /**
+     * Signature-due sweep: nudge each pending signer once their request enters
+     * the reminder window (default 2 days before due), then stamp
+     * `reminder_sent_at` so we don't re-send. Requests with no due date, or
+     * already reminded, are skipped.
+     */
+    private function sendSignatureDueReminders(): void
+    {
+        $leadDays = (int) config('hr.signature_reminder_lead_days', 2);
+        $cutoff = now()->addDays($leadDays)->toDateString();
+        $sentCount = 0;
+
+        $query = HrDocumentSignature::query()
+            ->with('document:id,title')
+            ->where('status', 'pending')
+            ->whereNull('reminder_sent_at')
+            ->whereNotNull('due_at')
+            ->whereDate('due_at', '<=', $cutoff);
+
+        if ($this->tenantId !== null) {
+            $query->where('tenant_id', $this->tenantId);
+        }
+
+        $query->chunkById(200, function ($signatures) use (&$sentCount) {
+            foreach ($signatures as $signature) {
+                $signer = User::find($signature->signer_user_id);
+                if ($signer) {
+                    try {
+                        $signer->notify(new SignatureReminderNotification([
+                            'signature_id' => $signature->id,
+                            'document_title' => $signature->document?->title ?? 'a document',
+                            'due_at' => optional($signature->due_at)->toDateString(),
+                        ]));
+                        $sentCount++;
+                    } catch (\Throwable $exception) {
+                        Log::warning('Failed to send signature reminder', [
+                            'signature_id' => $signature->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+                $signature->update(['reminder_sent_at' => now()]);
+            }
+        });
+
+        Log::info('SendExpiryRemindersJob: Signature-due reminder check completed.', [
+            'tenant_id' => $this->tenantId,
+            'sent' => $sentCount,
+        ]);
     }
 
     /**

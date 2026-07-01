@@ -490,6 +490,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/documents/export', [HrDocumentController::class, 'export'])->name('documents.export');
         Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])->name('documents.download');
         Route::get('/documents/{document}/signed', [HrDocumentController::class, 'downloadSigned'])->name('documents.signed');
+        Route::get('/documents/{document}/audit', [HrDocumentController::class, 'audit'])->name('documents.audit');
 
         Route::middleware('permission:hr.documents.manage')->group(function () {
             Route::get('/documents/upload', [HrDocumentController::class, 'createUpload'])->name('documents.upload');

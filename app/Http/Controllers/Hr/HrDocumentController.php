@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Services\HrDocumentMergeService;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -489,6 +490,77 @@ class HrDocumentController extends Controller
         $filename = $document->original_name ?: basename($document->storage_path);
 
         return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
+    }
+
+    /**
+     * Real audit history for a document — merges the model's AuditableChanges
+     * log (create/update) with its signature lifecycle events, newest first.
+     */
+    public function audit(Request $request, HrDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.documents.view'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+
+        if ($document->is_restricted) {
+            abort_unless($user->canDo('hr.documents.manage'), 403);
+        }
+
+        $entries = collect();
+
+        AuditLog::query()
+            ->where('auditable_type', $document->getMorphClass())
+            ->where('auditable_id', $document->id)
+            ->with('user:id,name')
+            ->orderBy('created_at')
+            ->get()
+            ->each(function (AuditLog $log) use ($entries) {
+                $verb = str_contains($log->action, '.create') ? 'Uploaded'
+                    : (str_contains($log->action, '.delete') ? 'Deleted' : 'Updated');
+                $fields = is_array($log->meta['fields'] ?? null) ? $log->meta['fields'] : [];
+                $entries->push([
+                    'icon' => $verb === 'Uploaded' ? 'upload' : ($verb === 'Deleted' ? 'trash' : 'pencil'),
+                    'label' => $verb === 'Updated' && $fields
+                        ? 'Updated ' . implode(', ', array_slice($fields, 0, 3))
+                        : $verb,
+                    'who' => $log->user?->name ?? 'System',
+                    'at' => optional($log->created_at)->toDateTimeString(),
+                ]);
+            });
+
+        $document->loadMissing('signatures.signer:id,name');
+        foreach ($document->signatures->sortBy('requested_at') as $sig) {
+            $entries->push([
+                'icon' => 'send',
+                'label' => 'Sent for signature',
+                'who' => $sig->signer?->name ?? 'Signer',
+                'at' => optional($sig->requested_at)->toDateTimeString(),
+            ]);
+            if ($sig->status === 'signed') {
+                $entries->push([
+                    'icon' => 'check',
+                    'label' => 'Signed' . ($sig->ip_address ? " (IP {$sig->ip_address})" : ''),
+                    'who' => $sig->signer?->name ?? 'Signer',
+                    'at' => optional($sig->signed_at)->toDateTimeString(),
+                ]);
+            } elseif ($sig->status === 'declined') {
+                $entries->push([
+                    'icon' => 'alert',
+                    'label' => 'Declined' . ($sig->declined_reason ? " — {$sig->declined_reason}" : ''),
+                    'who' => $sig->signer?->name ?? 'Signer',
+                    'at' => optional($sig->updated_at)->toDateTimeString(),
+                ]);
+            }
+        }
+
+        $sorted = $entries
+            ->sortBy(fn (array $e) => $e['at'] ?? '')
+            ->values()
+            ->all();
+
+        return response()->json(['entries' => $sorted]);
     }
 
     /**
