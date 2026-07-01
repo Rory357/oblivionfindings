@@ -59,13 +59,28 @@ export function DriverChip({ status }: { status?: string | null }) {
 /** Overall compliance status pill from a per-staff status breakdown. */
 export function complianceStatusBadge(row: {
     compliance_percent: number;
+    compliant_count: number;
+    expiring_soon_count: number;
     expired_count: number;
     not_started_count: number;
 }): { label: string; variant: Variant } {
+    // A person whose role carries no tracked requirements is not "expiring" —
+    // surface that honestly rather than defaulting to a warning badge.
+    if (trackedCount(row) === 0) return { label: 'No requirements', variant: 'neutral' };
     if (row.compliance_percent === 100) return { label: 'Compliant', variant: 'success' };
     if (row.expired_count > 0) return { label: 'Has expired', variant: 'critical' };
     if (row.not_started_count > 0) return { label: 'Incomplete', variant: 'neutral' };
     return { label: 'Expiring', variant: 'warning' };
+}
+
+/** Total requirements actually tracked for a staff row (0 = none assigned). */
+export function trackedCount(row: {
+    compliant_count: number;
+    expiring_soon_count: number;
+    expired_count: number;
+    not_started_count: number;
+}): number {
+    return row.compliant_count + row.expiring_soon_count + row.expired_count + row.not_started_count;
 }
 
 export function initials(name: string): string {

@@ -61,6 +61,7 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
 
     const total = summary.compliant + summary.expiring_soon + summary.expired + summary.not_started;
     const pct = total > 0 ? Math.round((summary.compliant / total) * 100) : 0;
+    const pctLabel = total > 0 ? `${pct}%` : '—';
 
     const record = (preset: Record<string, unknown> = {}) => setWz({ type: 'record', preset: { person: String(staff.id), ...preset } });
     const waive = (preset: Record<string, unknown> = {}) => setWz({ type: 'waive', preset: { person: String(staff.id), ...preset } });
@@ -85,7 +86,7 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
                     </div>
                     <div className="flex items-center gap-5">
                         <div className="text-center">
-                            <div className="text-3xl font-bold tabular-nums">{pct}%</div>
+                            <div className="text-3xl font-bold tabular-nums">{pctLabel}</div>
                             <div className="text-[10px] font-bold uppercase tracking-wide text-primary-foreground/60">Compliant</div>
                         </div>
                         {can.manage && (

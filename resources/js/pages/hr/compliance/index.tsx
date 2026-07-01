@@ -35,6 +35,7 @@ import {
     ComplianceContextMenu,
     ComplianceRing,
     DriverChip,
+    trackedCount,
     VettingChip,
     useContextMenu,
     type CtxItem,
@@ -297,7 +298,11 @@ export default function ComplianceOverview({ staffStatuses, summary, requirement
                                                 </div>
                                             </td>
                                             <td className="px-3 py-2.5">
-                                                <ComplianceRing pct={r.compliance_percent} />
+                                                {trackedCount(r) === 0 ? (
+                                                    <span className="text-muted-foreground">—</span>
+                                                ) : (
+                                                    <ComplianceRing pct={r.compliance_percent} />
+                                                )}
                                             </td>
                                             <td className="px-3 py-2.5">
                                                 <StatusBadge variant={sb.variant}>{sb.label}</StatusBadge>
