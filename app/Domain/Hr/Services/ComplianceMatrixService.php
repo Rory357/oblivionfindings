@@ -277,11 +277,26 @@ class ComplianceMatrixService
 
         switch ($requirement->check_type) {
             case 'training_course':
-                $record = $user->staffTrainingRecords()
-                    ->where('training_course_id', $requirement->reference_id)
-                    ->where('status', 'completed')
-                    ->orderByDesc('completed_at')
-                    ->first();
+                // Canonical link is HrCourse (via the requirement back-link); fall
+                // back to the legacy training_course_id so records completed before
+                // unification (or backfilled) still satisfy the requirement.
+                $hrCourseId = $requirement->hrCourse?->id;
+                $legacyRef = $requirement->reference_id;
+                $record = null;
+                if ($hrCourseId || $legacyRef) {
+                    $record = $user->staffTrainingRecords()
+                        ->where('status', 'completed')
+                        ->where(function ($q) use ($hrCourseId, $legacyRef) {
+                            if ($hrCourseId) {
+                                $q->orWhere('hr_course_id', $hrCourseId);
+                            }
+                            if ($legacyRef) {
+                                $q->orWhere('training_course_id', $legacyRef);
+                            }
+                        })
+                        ->orderByDesc('completed_at')
+                        ->first();
+                }
 
                 if ($record) {
                     $result['evidence_type'] = 'training_record';

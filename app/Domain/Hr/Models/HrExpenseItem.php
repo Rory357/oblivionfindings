@@ -20,6 +20,8 @@ class HrExpenseItem extends Model
         'receipt_path',
         'tax_amount',
         'notes',
+        'source_type',
+        'source_id',
     ];
 
     protected $casts = [

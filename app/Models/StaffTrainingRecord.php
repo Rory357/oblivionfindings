@@ -15,6 +15,7 @@ class StaffTrainingRecord extends Model
     protected $fillable = [
         'user_id',
         'training_course_id',
+        'hr_course_id',
         'status',
         'enrolled_at',
         'enrolled_by_user_id',
@@ -59,11 +60,19 @@ class StaffTrainingRecord extends Model
     }
 
     /**
-     * Training course.
+     * Legacy training course (kept for backward-compatible reads).
      */
     public function trainingCourse(): BelongsTo
     {
         return $this->belongsTo(TrainingCourse::class);
+    }
+
+    /**
+     * Canonical catalog course (source of truth after unification).
+     */
+    public function hrCourse(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Hr\Models\HrCourse::class, 'hr_course_id');
     }
 
     /**

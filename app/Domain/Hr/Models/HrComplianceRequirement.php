@@ -5,6 +5,7 @@ namespace App\Domain\Hr\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrComplianceRequirement extends Model
@@ -51,6 +52,16 @@ class HrComplianceRequirement extends Model
     public function staffStatuses(): HasMany
     {
         return $this->hasMany(HrStaffComplianceStatus::class, 'requirement_id');
+    }
+
+    /**
+     * The canonical catalog course this requirement is satisfied by, if any.
+     * HrCourse.compliance_requirement_id is the source-of-truth back-link used by
+     * the training-completion → compliance bridge and the eligibility readers.
+     */
+    public function hrCourse(): HasOne
+    {
+        return $this->hasOne(HrCourse::class, 'compliance_requirement_id');
     }
 
     /* ------------------------------------------------------------------ */

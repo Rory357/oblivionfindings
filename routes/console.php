@@ -79,6 +79,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// Escalate offers stuck awaiting sign-off (≥2 days) to the hiring manager: 08:20 NZ
+app(Schedule::class)
+    ->command('recruitment:send-offer-approval-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:20');
+
 // PPE compliance reminders: worker unacknowledged/fit-test digests + H&S lead
 // overdue-inspection/expiring/condemned digests — every day 08:15 NZ.
 app(Schedule::class)

@@ -114,3 +114,13 @@ test('a user without hr.benefits.manage cannot update an enrollment', function (
         'status' => 'active',
     ]);
 });
+
+test('the benefits index exposes plan employer rates + a salary map for the cost preview', function () {
+    $this->profile->update(['annual_salary' => 65000]);
+
+    $this->actingAs($this->hr)->get('/hr/compensation/benefits')->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('hr/compensation/benefits/index')
+            ->where("annualSalaryByProfileId.{$this->profile->id}", 65000.0)
+            ->where('plans.0.employer_contribution_rate', fn ($v) => $v !== null));
+});

@@ -31,6 +31,7 @@ interface BenefitPlan {
     id: number;
     name: string;
     type: string;
+    employer_contribution_rate?: string | number | null;
 }
 
 interface Enrollment {
@@ -75,6 +76,7 @@ interface Props {
     summary: Summary;
     filters: { status: string | null; plan_id: string | null };
     stats: CompensationHeroStats;
+    annualSalaryByProfileId?: Record<number, number | string | null>;
     can: { manage: boolean };
 }
 
@@ -117,6 +119,7 @@ export default function BenefitsIndex({
     summary,
     filters,
     stats,
+    annualSalaryByProfileId,
     can,
 }: Props) {
     const [open, setOpen] = useState(false);
@@ -382,6 +385,7 @@ export default function BenefitsIndex({
                 onClose={() => setOpen(false)}
                 plans={plans}
                 employees={employees}
+                annualSalaryByProfileId={annualSalaryByProfileId}
             />
 
             {/* Guided enroll wizard (edit existing enrollment) */}
@@ -390,6 +394,7 @@ export default function BenefitsIndex({
                 onClose={() => setEditing(null)}
                 plans={plans}
                 employees={employees}
+                annualSalaryByProfileId={annualSalaryByProfileId}
                 edit={editing}
             />
         </AppLayout>

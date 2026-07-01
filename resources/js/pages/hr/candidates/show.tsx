@@ -73,6 +73,7 @@ import {
     Trash2,
     Upload,
     UserCheck,
+    X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -198,6 +199,7 @@ interface Candidate {
     personal_phone: string | null;
     source: string;
     source_detail: string | null;
+    tags: string[];
     notes: string | null;
     created_at: string;
     applications: Application[];
@@ -300,6 +302,28 @@ export default function CandidateShow({
 
     const currentStatus = candidate.applications[0]?.stage ?? 'new';
 
+    // Candidate tags (segmentation labels — e.g. "rehire", "weekend-available").
+    const [tagInput, setTagInput] = useState('');
+    function saveTags(next: string[]) {
+        const cleaned = Array.from(
+            new Set(next.map((t) => t.trim()).filter(Boolean)),
+        );
+        router.post(
+            `/hr/recruitment/candidates/${candidate.id}/tags`,
+            { tags: cleaned },
+            { preserveScroll: true },
+        );
+    }
+    function addTag() {
+        const t = tagInput.trim();
+        setTagInput('');
+        if (!t || candidate.tags.includes(t)) return;
+        saveTags([...candidate.tags, t]);
+    }
+    function removeTag(tag: string) {
+        saveTags(candidate.tags.filter((t) => t !== tag));
+    }
+
     // Document upload form
     const documentForm = useForm<{
         file: File | null;
@@ -395,6 +419,22 @@ export default function CandidateShow({
         router.post(
             `/hr/recruitment/offers/${offerId}/convert`,
             {},
+            { preserveScroll: true },
+        );
+    }
+    function submitOfferApproval(offerId: number) {
+        router.post(
+            `/hr/recruitment/offers/${offerId}/submit-approval`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+    function declineOfferApproval(offerId: number) {
+        const reason = window.prompt('Decline this offer for changes. Reason (optional):');
+        if (reason === null) return; // cancelled — don't decline
+        router.post(
+            `/hr/recruitment/offers/${offerId}/decline-approval`,
+            { reason },
             { preserveScroll: true },
         );
     }
@@ -1023,6 +1063,7 @@ export default function CandidateShow({
                     ];
                     if (candidate.source_detail)
                         heroBadges.push({ label: candidate.source_detail });
+                    candidate.tags.forEach((t) => heroBadges.push({ label: t }));
 
                     const heroMeta: PageHeroMetaItem[] = [];
                     if (candidate.preferred_name)
@@ -1090,6 +1131,55 @@ export default function CandidateShow({
                         />
                     );
                 })()}
+
+                {/* Tags - segmentation labels (manager-editable) */}
+                <Card>
+                    <CardContent className="flex flex-wrap items-center gap-2 py-3">
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                            Tags
+                        </span>
+                        {candidate.tags.length === 0 ? (
+                            <span className="text-[13px] text-muted-foreground">None yet</span>
+                        ) : (
+                            candidate.tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="gap-1">
+                                    {tag}
+                                    {can.manage ? (
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove ${tag}`}
+                                            onClick={() => removeTag(tag)}
+                                            className="ml-0.5 rounded-full text-muted-foreground hover:text-foreground"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    ) : null}
+                                </Badge>
+                            ))
+                        )}
+                        {can.manage ? (
+                            <div className="ml-auto flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={tagInput}
+                                    onChange={(e) => setTagInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            addTag();
+                                        }
+                                    }}
+                                    placeholder="Add a tag…"
+                                    maxLength={100}
+                                    className="h-8 w-40 rounded-md border border-border bg-background px-2.5 text-[13px] outline-none focus:border-primary"
+                                />
+                                <Button size="sm" variant="outline" onClick={addTag} disabled={!tagInput.trim()}>
+                                    Add
+                                </Button>
+                            </div>
+                        ) : null}
+                    </CardContent>
+                </Card>
 
                 {/* Tab bar - Full width, no sidebar */}
                 <Tabs defaultValue="applications" className="space-y-4">
@@ -1721,10 +1811,10 @@ export default function CandidateShow({
                                                         }
                                                         className="capitalize"
                                                     >
-                                                        {
-                                                            app.offer
-                                                                .approval_status
-                                                        }
+                                                        {app.offer.approval_status.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
                                                     {app.offer.sent_at && (
                                                         <Badge variant="outline">
@@ -1782,21 +1872,59 @@ export default function CandidateShow({
                                                     <div className="mt-3 flex flex-wrap gap-2">
                                                         {app.offer
                                                             .approval_status !==
-                                                            'approved' && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    approveOffer(
-                                                                        app
-                                                                            .offer!
-                                                                            .id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                        )}
+                                                            'approved' &&
+                                                            !app.offer
+                                                                .sent_at && (
+                                                                <>
+                                                                    {app.offer
+                                                                        .approval_status !==
+                                                                        'pending_approval' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                submitOfferApproval(
+                                                                                    app
+                                                                                        .offer!
+                                                                                        .id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Submit for approval
+                                                                        </Button>
+                                                                    )}
+                                                                    {app.offer
+                                                                        .approval_status ===
+                                                                        'pending_approval' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() =>
+                                                                                declineOfferApproval(
+                                                                                    app
+                                                                                        .offer!
+                                                                                        .id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Decline
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() =>
+                                                                            approveOffer(
+                                                                                app
+                                                                                    .offer!
+                                                                                    .id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                </>
+                                                            )}
                                                         {app.offer
                                                             .approval_status ===
                                                             'approved' &&

@@ -818,12 +818,13 @@ class HrDemoSeeder extends Seeder
     private function seedTraining(int $tenantId, Collection $profiles): void
     {
         $courses = [
-            ['code' => 'HR-DEMO-FIRST-AID', 'title' => 'First Aid Refresher', 'category' => 'safety', 'method' => 'in_person', 'mandatory' => true],
-            ['code' => 'HR-DEMO-MEDS', 'title' => 'Medication Administration', 'category' => 'clinical', 'method' => 'blended', 'mandatory' => true],
-            ['code' => 'HR-DEMO-PBS', 'title' => 'Positive Behaviour Support', 'category' => 'practice', 'method' => 'online', 'mandatory' => false],
-            ['code' => 'HR-DEMO-PRIVACY', 'title' => 'Privacy and Records', 'category' => 'compliance', 'method' => 'self_paced', 'mandatory' => true],
+            ['code' => 'HR-DEMO-FIRST-AID', 'title' => 'First Aid Refresher', 'category' => 'safety', 'method' => 'in_person', 'mandatory' => true, 'cost' => 95, 'validity' => 24, 'cpd' => 6],
+            ['code' => 'HR-DEMO-MEDS', 'title' => 'Medication Administration', 'category' => 'clinical', 'method' => 'blended', 'mandatory' => true, 'cost' => 0, 'validity' => 12, 'cpd' => 4],
+            ['code' => 'HR-DEMO-PBS', 'title' => 'Positive Behaviour Support', 'category' => 'practice', 'method' => 'online', 'mandatory' => false, 'cost' => 0, 'validity' => 0, 'cpd' => 4],
+            ['code' => 'HR-DEMO-PRIVACY', 'title' => 'Privacy and Records', 'category' => 'compliance', 'method' => 'self_paced', 'mandatory' => true, 'cost' => 0, 'validity' => 24, 'cpd' => 2],
         ];
 
+        $createdCourses = [];
         foreach ($courses as $index => $courseData) {
             $course = HrCourse::updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $courseData['code']],
@@ -834,12 +835,18 @@ class HrDemoSeeder extends Seeder
                     'delivery_method' => $courseData['method'],
                     'duration_hours' => $index + 2,
                     'provider' => 'Oblivion Findings Demo',
-                    'cost' => $index === 0 ? 95 : 0,
+                    'cost' => $courseData['cost'],
                     'is_mandatory' => $courseData['mandatory'],
+                    'requires_renewal' => $courseData['validity'] > 0,
+                    'validity_period_months' => $courseData['validity'] ?: null,
+                    'renewal_reminder_months' => $courseData['validity'] > 0 ? 2 : null,
+                    'cpd_points' => $courseData['cpd'],
+                    'org_pays_provider' => $courseData['cost'] > 0,
                     'max_participants' => 20,
                     'is_active' => true,
                 ],
             );
+            $createdCourses[] = $course;
 
             $profile = $profiles[$index % $profiles->count()];
             HrCourseEnrollment::updateOrCreate(
@@ -855,6 +862,38 @@ class HrDemoSeeder extends Seeder
                     'score' => $index % 2 === 0 ? 92 - $index : null,
                     'certificate_path' => $index % 2 === 0 ? "hr/demo/certificates/{$courseData['code']}.pdf" : null,
                     'notes' => 'Seeded enrollment for training compliance demo.',
+                ],
+            );
+        }
+
+        // Upcoming sessions for the in-person / blended courses.
+        foreach (array_slice($createdCourses, 0, 2) as $offset => $course) {
+            \App\Domain\Hr\Models\HrCourseSession::updateOrCreate(
+                ['tenant_id' => $tenantId, 'course_id' => $course->id, 'session_date' => Carbon::now()->addDays(7 + $offset * 7)->toDateString()],
+                [
+                    'start_time' => '09:00',
+                    'end_time' => '17:00',
+                    'location' => 'Training room A',
+                    'max_participants' => 20,
+                    'status' => 'scheduled',
+                ],
+            );
+        }
+
+        // Assignments: spread across statuses incl. overdue so the dashboard +
+        // Assignments tab read true.
+        foreach ($profiles as $i => $profile) {
+            $course = $createdCourses[$i % count($createdCourses)];
+            $overdue = $i % 3 === 0;
+            \App\Domain\Hr\Models\HrCourseAssignment::updateOrCreate(
+                ['tenant_id' => $tenantId, 'user_id' => $profile->user_id, 'hr_course_id' => $course->id],
+                [
+                    'source' => ['manual', 'role_rule', 'hs_requirement'][$i % 3],
+                    'assigned_by' => $profiles->first()->user_id,
+                    'assigned_at' => Carbon::now()->subDays(20),
+                    'due_at' => $overdue ? Carbon::now()->subDays(5) : Carbon::now()->addDays(20),
+                    'status' => $i % 4 === 1 ? 'completed' : 'assigned',
+                    'score' => $i % 4 === 1 ? 90 : null,
                 ],
             );
         }

@@ -137,6 +137,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/recruitment/candidates/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
         Route::put('/recruitment/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/candidates/{candidate}/tags', [CandidateController::class, 'updateTags'])->name('candidates.tags.update')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/applications/{application}/advance', [CandidateController::class, 'advanceApplication'])->name('applications.advance')
             ->middleware('permission:hr.recruitment.manage');
 
@@ -190,6 +192,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/submit-approval', [CandidateController::class, 'submitOfferApproval'])->name('offers.submit-approval')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/decline-approval', [CandidateController::class, 'declineOfferApproval'])->name('offers.decline-approval')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
             ->middleware('permission:hr.recruitment.manage');
@@ -276,7 +282,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
-        Route::get('/training', [TrainingDashboardController::class, 'index'])->name('training.index');
+        // Legacy standalone dashboard is consolidated into the Training hub.
+        // Both URLs render the hub (it defaults to the Dashboard tab).
+        Route::get('/training', [TrainingController::class, 'catalog'])->name('training.index');
     });
 
     /*
@@ -482,12 +490,19 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.documents.view')->group(function () {
         Route::get('/documents', [HrDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/export', [HrDocumentController::class, 'export'])->name('documents.export');
         Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])->name('documents.download');
+        Route::get('/documents/{document}/signed', [HrDocumentController::class, 'downloadSigned'])->name('documents.signed');
 
         Route::middleware('permission:hr.documents.manage')->group(function () {
             Route::get('/documents/upload', [HrDocumentController::class, 'createUpload'])->name('documents.upload');
             Route::post('/documents', [HrDocumentController::class, 'store'])->name('documents.store');
             Route::post('/documents/generate', [HrDocumentController::class, 'generate'])->name('documents.generate');
+            Route::post('/documents/preview', [HrDocumentController::class, 'preview'])->name('documents.preview');
+            Route::get('/documents/bulk-download', [HrDocumentController::class, 'bulkDownload'])->name('documents.bulk-download');
+            Route::post('/documents/bulk-delete', [HrDocumentController::class, 'bulkDestroy'])->name('documents.bulk-delete');
+            Route::post('/documents/move', [HrDocumentController::class, 'move'])->name('documents.move');
+            Route::put('/documents/{document}', [HrDocumentController::class, 'update'])->name('documents.update');
             Route::delete('/documents/{document}', [HrDocumentController::class, 'destroy'])->name('documents.destroy');
             Route::get('/documents/templates', [HrDocumentController::class, 'templates'])->name('documents.templates');
             Route::get('/documents/templates/create', [HrDocumentController::class, 'createTemplate'])->name('documents.templates.create');
@@ -526,15 +541,43 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/surveys/{survey}', [WellbeingController::class, 'showSurvey'])->name('surveys.show');
         Route::post('/surveys/{survey}/responses', [WellbeingController::class, 'submitResponse'])->name('surveys.responses.store');
 
+        // Staff (My HR) actions on their own records.
+        Route::post('/checkins/{checkin}/acknowledge', [WellbeingController::class, 'acknowledgeCheckin'])->name('checkins.acknowledge');
+
         Route::middleware('permission:hr.performance.manage')->group(function () {
+            // Surveys
             Route::post('/surveys', [WellbeingController::class, 'storeSurvey'])->name('surveys.store');
             Route::put('/surveys/{survey}', [WellbeingController::class, 'updateSurvey'])->name('surveys.update');
             Route::post('/surveys/{survey}/publish', [WellbeingController::class, 'publishSurvey'])->name('surveys.publish');
             Route::post('/surveys/{survey}/close', [WellbeingController::class, 'closeSurvey'])->name('surveys.close');
+            Route::post('/surveys/{survey}/duplicate', [WellbeingController::class, 'duplicateSurvey'])->name('surveys.duplicate');
+            Route::post('/surveys/{survey}/nudge', [WellbeingController::class, 'nudgeSurvey'])->name('surveys.nudge');
+            Route::post('/surveys/{survey}/archive', [WellbeingController::class, 'archiveSurvey'])->name('surveys.archive');
+            Route::delete('/surveys/{survey}', [WellbeingController::class, 'destroySurvey'])->name('surveys.destroy');
+            Route::get('/surveys/{survey}/export', [WellbeingController::class, 'exportSurvey'])->name('surveys.export');
             Route::post('/surveys/{survey}/action-plans', [WellbeingController::class, 'storeActionPlan'])->name('action-plans.store');
+
+            // Standalone / flag-linked action plans + lifecycle + notes
+            Route::post('/action-plans', [WellbeingController::class, 'storeStandaloneActionPlan'])->name('action-plans.store-standalone');
+            Route::post('/action-plans/{plan}/reopen', [WellbeingController::class, 'reopenActionPlan'])->name('action-plans.reopen');
+            Route::post('/action-plans/{plan}/cancel', [WellbeingController::class, 'cancelActionPlan'])->name('action-plans.cancel');
+
+            // Flag triage
+            Route::post('/signals/{user}/acknowledge', [WellbeingController::class, 'acknowledgeFlag'])->name('signals.acknowledge');
+            Route::post('/signals/{user}/snooze', [WellbeingController::class, 'snoozeFlag'])->name('signals.snooze');
+            Route::post('/signals/{user}/dismiss', [WellbeingController::class, 'dismissFlag'])->name('signals.dismiss');
+            Route::post('/signals/{user}/undo', [WellbeingController::class, 'undoFlag'])->name('signals.undo');
+
+            // Check-ins
+            Route::post('/checkins', [WellbeingController::class, 'storeCheckin'])->name('checkins.store');
+            Route::patch('/checkins/{checkin}', [WellbeingController::class, 'updateCheckin'])->name('checkins.update');
+
+            // EAP referrals
+            Route::post('/eap-referrals', [WellbeingController::class, 'storeEapReferral'])->name('eap.store');
         });
 
         Route::put('/action-plans/{plan}', [WellbeingController::class, 'updateActionPlan'])->name('action-plans.update');
+        Route::post('/action-plans/{plan}/notes', [WellbeingController::class, 'storeActionPlanNote'])->name('action-plans.notes.store');
     });
 
     /*
@@ -992,9 +1035,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
         Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
         Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
-        Route::post('/request', [ESignatureController::class, 'request'])
-            ->middleware('permission:hr.signatures.manage|hr.documents.manage')
-            ->name('request');
+        Route::middleware('permission:hr.signatures.manage|hr.documents.manage')->group(function () {
+            Route::post('/request', [ESignatureController::class, 'request'])->name('request');
+            Route::post('/{signature}/nudge', [ESignatureController::class, 'nudge'])->name('nudge');
+            Route::post('/{signature}/resend', [ESignatureController::class, 'resend'])->name('resend');
+            Route::post('/document/{document}/cancel', [ESignatureController::class, 'cancel'])->name('cancel');
+        });
     });
 
     /*
@@ -1136,15 +1182,30 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
         Route::get('/training/catalog', [TrainingController::class, 'catalog'])->name('training.catalog');
         Route::get('/training/courses/{course}', [TrainingController::class, 'showCourse'])->name('training.courses.show');
+        Route::get('/training/courses/{course}/detail', [TrainingController::class, 'courseDetail'])->name('training.courses.detail');
+        Route::get('/training/export', [TrainingController::class, 'export'])->name('training.export');
         Route::get('/training/enrollments/{enrollment}/certificate', [TrainingController::class, 'downloadCertificate'])->name('training.certificate');
+        // Claims reuse the expense backend; gated on the expense-create path inside the controller.
+        Route::post('/training/claims', [TrainingController::class, 'claimFee'])->name('training.claims.store');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses')->group(function () {
         Route::post('/training/courses', [TrainingController::class, 'storeCourse'])->name('training.courses.store');
+        Route::put('/training/courses/{course}', [TrainingController::class, 'updateCourse'])->name('training.courses.update');
+        Route::patch('/training/courses/{course}/toggle', [TrainingController::class, 'toggleCourse'])->name('training.courses.toggle');
+        Route::post('/training/courses/bulk-archive', [TrainingController::class, 'bulkArchiveCourses'])->name('training.courses.bulk-archive');
+        Route::post('/training/courses/{course}/sessions', [TrainingController::class, 'storeSession'])->name('training.sessions.store');
+        Route::put('/training/sessions/{session}', [TrainingController::class, 'updateSession'])->name('training.sessions.update');
+        Route::delete('/training/sessions/{session}', [TrainingController::class, 'cancelSession'])->name('training.sessions.cancel');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses|training.enrol')->group(function () {
         Route::post('/training/enroll', [TrainingController::class, 'enroll'])->name('training.enroll');
+        Route::post('/training/assignments', [TrainingController::class, 'storeAssignments'])->name('training.assignments.store');
+        Route::get('/training/assignments/preview', [TrainingController::class, 'previewAssignments'])->name('training.assignments.preview');
+        Route::post('/training/assignments/{assignment}/remind', [TrainingController::class, 'remindAssignment'])->name('training.assignments.remind');
     });
     Route::middleware('permission:hr.training.manage|training.manageCourses|training.record')->group(function () {
         Route::put('/training/enrollments/{enrollment}/complete', [TrainingController::class, 'completeEnrollment'])->name('training.enrollments.complete');
+        Route::post('/training/record', [TrainingController::class, 'recordCompletion'])->name('training.record');
+        Route::patch('/training/assignments/{assignment}/waive', [TrainingController::class, 'waiveAssignment'])->name('training.assignments.waive');
     });
 });

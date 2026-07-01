@@ -14,6 +14,62 @@ use Illuminate\Support\Facades\DB;
 class EngagementService
 {
     /**
+     * Seeded survey templates that prefill the builder's Questions step.
+     */
+    public const TEMPLATES = [
+        [
+            'key' => 'enps',
+            'name' => 'eNPS',
+            'survey_type' => 'enps',
+            'description' => 'A two-question employee Net Promoter check.',
+            'questions' => [
+                ['question_type' => 'enps', 'question_text' => 'How likely are you to recommend us as a place to work?', 'is_required' => true],
+                ['question_type' => 'text', 'question_text' => 'What is the main reason for your score?', 'is_required' => false],
+            ],
+        ],
+        [
+            'key' => 'monthly_pulse',
+            'name' => 'Monthly pulse',
+            'survey_type' => 'pulse',
+            'description' => 'A quick monthly mood and workload check.',
+            'questions' => [
+                ['question_type' => 'scale', 'question_text' => 'How are you feeling about work this month?', 'is_required' => true],
+                ['question_type' => 'scale', 'question_text' => 'Do you feel you have enough rest between shifts?', 'is_required' => true],
+                ['question_type' => 'text', 'question_text' => 'What is one thing that would make next month better?', 'is_required' => false],
+            ],
+        ],
+        [
+            'key' => 'wellbeing_pulse',
+            'name' => 'Wellbeing pulse',
+            'survey_type' => 'engagement',
+            'description' => 'A deeper wellbeing and support check.',
+            'questions' => [
+                ['question_type' => 'scale', 'question_text' => 'How manageable has your workload felt lately?', 'is_required' => true],
+                ['question_type' => 'scale', 'question_text' => 'How supported do you feel by your team and manager?', 'is_required' => true],
+                ['question_type' => 'boolean', 'question_text' => 'Do you know where to go if you need wellbeing support?', 'is_required' => true],
+                ['question_type' => 'text', 'question_text' => 'Is there anything you would like us to know?', 'is_required' => false],
+            ],
+        ],
+    ];
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function templates(): array
+    {
+        return collect(self::TEMPLATES)->map(fn (array $template, int $index) => [
+            ...$template,
+            'questions' => collect($template['questions'])
+                ->map(fn (array $question, int $i) => [
+                    ...$question,
+                    'options' => $question['options'] ?? [],
+                    'sort_order' => $i + 1,
+                ])
+                ->all(),
+        ])->all();
+    }
+
+    /**
      * @throws \InvalidArgumentException
      */
     public function createSurvey(User $actor, array $data): HrEngagementSurvey
@@ -26,6 +82,8 @@ class EngagementService
                 'survey_type' => $data['survey_type'] ?? 'pulse',
                 'status' => 'draft',
                 'is_anonymous' => (bool) ($data['is_anonymous'] ?? true),
+                'audience_type' => $data['audience_type'] ?? 'all',
+                'audience_site_ids' => ($data['audience_type'] ?? 'all') === 'site' ? array_values($data['audience_site_ids'] ?? []) : null,
                 'starts_at' => $data['starts_at'] ?? null,
                 'ends_at' => $data['ends_at'] ?? null,
                 'created_by' => $actor->id,
@@ -68,6 +126,10 @@ class EngagementService
                 'is_anonymous' => array_key_exists('is_anonymous', $data)
                     ? (bool) $data['is_anonymous']
                     : $survey->is_anonymous,
+                'audience_type' => $data['audience_type'] ?? $survey->audience_type ?? 'all',
+                'audience_site_ids' => array_key_exists('audience_type', $data)
+                    ? (($data['audience_type'] === 'site') ? array_values($data['audience_site_ids'] ?? []) : null)
+                    : $survey->audience_site_ids,
                 'starts_at' => $data['starts_at'] ?? $survey->starts_at,
                 'ends_at' => $data['ends_at'] ?? $survey->ends_at,
                 'updated_by' => $actor->id,
@@ -110,14 +172,7 @@ class EngagementService
             'updated_by' => $actor->id,
         ]);
 
-        $recipients = HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($survey->tenant_id !== null, fn ($query) => $query->where('tenant_id', $survey->tenant_id))
-            ->with('user:id,email,name')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->values();
+        $recipients = $this->recipientsFor($survey);
 
         if ($recipients->isNotEmpty()) {
             $notification = new EngagementSurveyInvitationNotification($survey->fresh());
@@ -125,6 +180,150 @@ class EngagementService
         }
 
         return $survey->fresh();
+    }
+
+    /**
+     * Resolve the active recipients for a survey based on its audience scope.
+     * Null / 'all' audience = every active staff member in the tenant (legacy).
+     *
+     * @return Collection<int, User>
+     */
+    public function recipientsFor(HrEngagementSurvey $survey): Collection
+    {
+        $siteIds = ($survey->audience_type === 'site')
+            ? collect($survey->audience_site_ids ?? [])->map(fn ($id) => (int) $id)->filter()->values()
+            : collect();
+
+        return HrEmployeeProfile::query()
+            ->where('is_active', true)
+            ->when($survey->tenant_id !== null, fn ($query) => $query->where('tenant_id', $survey->tenant_id))
+            ->when($siteIds->isNotEmpty(), function ($query) use ($siteIds) {
+                $query->where(function ($inner) use ($siteIds) {
+                    $inner->whereIn('primary_site_id', $siteIds->all());
+                    foreach ($siteIds as $siteId) {
+                        $inner->orWhereJsonContains('secondary_site_ids', $siteId);
+                    }
+                });
+            })
+            ->with('user:id,email,name')
+            ->get()
+            ->pluck('user')
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
+    public function recipientCount(HrEngagementSurvey $survey): int
+    {
+        return $this->recipientsFor($survey)->count();
+    }
+
+    /**
+     * Duplicate a survey (and its questions) as a fresh draft.
+     */
+    public function duplicateSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
+    {
+        return DB::transaction(function () use ($survey, $actor) {
+            $survey->loadMissing('questions');
+
+            $copy = HrEngagementSurvey::create([
+                'tenant_id' => $survey->tenant_id,
+                'title' => $this->copyTitle($survey->title),
+                'description' => $survey->description,
+                'survey_type' => $survey->survey_type,
+                'status' => 'draft',
+                'is_anonymous' => $survey->is_anonymous,
+                'audience_type' => $survey->audience_type ?? 'all',
+                'audience_site_ids' => $survey->audience_site_ids,
+                'starts_at' => null,
+                'ends_at' => null,
+                'created_by' => $actor->id,
+                'updated_by' => $actor->id,
+            ]);
+
+            $survey->questions->each(fn ($question) => $copy->questions()->create([
+                'question_type' => $question->question_type,
+                'question_text' => $question->question_text,
+                'options' => $question->options,
+                'is_required' => $question->is_required,
+                'sort_order' => $question->sort_order,
+            ]));
+
+            return $copy->load('questions');
+        });
+    }
+
+    protected function copyTitle(string $title): string
+    {
+        return mb_substr(trim($title) . ' (copy)', 0, 255);
+    }
+
+    /**
+     * Re-dispatch the survey invitation to recipients who have not yet responded.
+     * Anonymity-safe: we target by recipient list and check each recipient's
+     * deterministic respondent hash, never "who answered".
+     */
+    public function nudgeNonResponders(HrEngagementSurvey $survey, User $actor): int
+    {
+        if ($survey->status !== 'published') {
+            throw new \InvalidArgumentException('Only published surveys can be nudged.');
+        }
+
+        $recipients = $this->recipientsFor($survey);
+        if ($recipients->isEmpty()) {
+            return 0;
+        }
+
+        $key = (string) config('app.key');
+        $respondedHashes = $survey->responses()->pluck('respondent_hash')->filter()->all();
+        $respondedUserIds = $survey->is_anonymous
+            ? collect()
+            : $survey->responses()->pluck('user_id')->filter()->values();
+
+        $pending = $recipients->filter(function (User $recipient) use ($survey, $key, $respondedHashes, $respondedUserIds) {
+            if ($survey->is_anonymous) {
+                $hash = hash_hmac('sha256', $survey->id . ':' . $recipient->id, $key);
+
+                return ! in_array($hash, $respondedHashes, true);
+            }
+
+            return ! $respondedUserIds->contains($recipient->id);
+        })->values();
+
+        if ($pending->isEmpty()) {
+            return 0;
+        }
+
+        $notification = new EngagementSurveyInvitationNotification($survey->fresh());
+        $pending->each(fn (User $recipient) => $recipient->notify($notification));
+
+        return $pending->count();
+    }
+
+    /**
+     * Archive a closed survey for list hygiene.
+     */
+    public function archiveSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
+    {
+        if (! in_array($survey->status, ['closed', 'archived'], true)) {
+            throw new \InvalidArgumentException('Only closed surveys can be archived.');
+        }
+
+        $survey->update(['status' => 'archived', 'updated_by' => $actor->id]);
+
+        return $survey->fresh();
+    }
+
+    /**
+     * Delete a draft survey (and its questions via cascade).
+     */
+    public function deleteSurvey(HrEngagementSurvey $survey): void
+    {
+        if ($survey->status !== 'draft') {
+            throw new \InvalidArgumentException('Only draft surveys can be deleted.');
+        }
+
+        $survey->delete();
     }
 
     public function closeSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
