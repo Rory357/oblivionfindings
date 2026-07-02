@@ -5,7 +5,7 @@ namespace App\Services\Tasks;
 use App\Models\User;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Carbon;
 
 /**
  * The company-wide work-item feed: unions open incidents, corrective
@@ -159,12 +159,24 @@ class TaskAggregator
     public function stats(array $items, User $user): array
     {
         $open = array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE);
+        $mine = array_filter($open, fn (TaskItem $i) => ($i->assignee['id'] ?? null) === $user->id);
+        $weekAhead = now()->addDays(7);
 
         return [
             'open' => count($open),
+            'bucketOpen' => count(array_filter($open, fn (TaskItem $i) => $i->bucket === TaskItem::BUCKET_OPEN)),
+            'inProgress' => count(array_filter($open, fn (TaskItem $i) => $i->bucket === TaskItem::BUCKET_IN_PROGRESS)),
+            'unassigned' => count(array_filter($open, fn (TaskItem $i) => $i->assignee === null)),
+            'dueWeek' => count(array_filter(
+                $open,
+                fn (TaskItem $i) => $i->dueAt !== null
+                    && ! $i->isOverdue()
+                    && Carbon::parse($i->dueAt)->lte($weekAhead),
+            )),
             'overdue' => count(array_filter($open, fn (TaskItem $i) => $i->isOverdue())),
             'critical' => count(array_filter($open, fn (TaskItem $i) => in_array($i->severity, ['critical', 'high'], true))),
-            'mine' => count(array_filter($open, fn (TaskItem $i) => ($i->assignee['id'] ?? null) === $user->id)),
+            'mine' => count($mine),
+            'myOverdue' => count(array_filter($mine, fn (TaskItem $i) => $i->isOverdue())),
         ];
     }
 
@@ -209,12 +221,26 @@ class TaskAggregator
             return false;
         }
 
-        if (($filters['assigned'] ?? null) === 'me' && ($item->assignee['id'] ?? null) !== $user->id) {
+        $assigned = $filters['assigned'] ?? null;
+        if ($assigned === 'me' && ($item->assignee['id'] ?? null) !== $user->id) {
+            return false;
+        }
+        if ($assigned === 'unassigned' && $item->assignee !== null) {
             return false;
         }
 
         if (! empty($filters['overdue']) && ! $item->isOverdue()) {
             return false;
+        }
+
+        // due=week: open items due inside the next 7 days (not yet overdue).
+        if (($filters['due'] ?? null) === 'week') {
+            if ($item->bucket === TaskItem::BUCKET_DONE
+                || $item->dueAt === null
+                || $item->isOverdue()
+                || Carbon::parse($item->dueAt)->gt(now()->addDays(7))) {
+                return false;
+            }
         }
 
         $q = trim((string) ($filters['q'] ?? ''));

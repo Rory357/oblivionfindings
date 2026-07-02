@@ -18,15 +18,15 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import {
+    HeroCluster,
+    HeroClusterTile,
     HeroMedallion,
     HeroSegmented,
     HeroShell,
     HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, ChevronDown, ListChecks, Search } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Download, ListChecks, Search, Siren } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -63,15 +63,28 @@ interface Filters {
     sources: string[] | null;
     severity: string[] | null;
     bucket: string[] | null;
-    assigned: 'me' | null;
+    assigned: 'me' | 'unassigned' | null;
     overdue: boolean;
+    due: 'week' | null;
     q: string | null;
     include_done: boolean;
 }
 
+interface Stats {
+    open: number;
+    bucketOpen: number;
+    inProgress: number;
+    unassigned: number;
+    dueWeek: number;
+    overdue: number;
+    critical: number;
+    mine: number;
+    myOverdue: number;
+}
+
 interface Props {
     items: TaskItem[];
-    stats: { open: number; overdue: number; critical: number; mine: number };
+    stats: Stats;
     sources: Array<{ key: string; label: string }>;
     filters: Filters;
 }
@@ -136,8 +149,9 @@ function buildParams(f: Filters): Record<string, string> {
     if (f.sources?.length) params.sources = f.sources.join(',');
     if (f.severity?.length) params.severity = f.severity.join(',');
     if (f.bucket?.length) params.bucket = f.bucket.join(',');
-    if (f.assigned === 'me') params.assigned = 'me';
+    if (f.assigned) params.assigned = f.assigned;
     if (f.overdue) params.overdue = '1';
+    if (f.due) params.due = f.due;
     if (f.q) params.q = f.q;
     if (f.include_done) params.done = '1';
     return params;
@@ -197,9 +211,12 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         filters.bucket?.length ||
         filters.assigned ||
         filters.overdue ||
+        filters.due ||
         filters.q ||
         filters.include_done
     );
+
+    const exportHref = `/tasks?${new URLSearchParams({ ...buildParams(filters), format: 'csv' }).toString()}`;
     const clearFilters = () => {
         lastSentQ.current = '';
         // The bare visit IS the cleared state — reflect it locally so a
@@ -210,6 +227,7 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
             bucket: null,
             assigned: null,
             overdue: false,
+            due: null,
             q: null,
             include_done: false,
         };
@@ -248,29 +266,91 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                         </div>
                     }
                 >
-                    <div className="flex items-start gap-4">
-                        <HeroMedallion icon={ListChecks} />
-                        <div className="min-w-0 flex-1">
-                            <HeroStatusPill>Work queue · live across every module</HeroStatusPill>
-                            <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">All Tasks</h1>
-                            <p className="mt-1 max-w-2xl text-sm text-primary-foreground/80">
-                                One queue across every module — incidents, corrective actions, alerts,
-                                concerns and follow-ups you're permitted to see, each deep-linking back
-                                to the record that owns it.
-                            </p>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex items-start gap-4">
+                            <HeroMedallion icon={ListChecks} />
+                            <div className="min-w-0 flex-1">
+                                <HeroStatusPill>Work queue · live across every module</HeroStatusPill>
+                                <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">All Tasks</h1>
+                                <p className="mt-1 max-w-2xl text-sm text-primary-foreground/80">
+                                    One queue across every module — incidents, corrective actions, alerts,
+                                    concerns and follow-ups you're permitted to see, each deep-linking back
+                                    to the record that owns it.
+                                </p>
+                            </div>
                         </div>
+                        {/* On-dark hero affordance (hero-footer idiom, tokens only). */}
+                        <a
+                            href={exportHref}
+                            className="inline-flex h-9 shrink-0 items-center gap-2 self-start rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                        >
+                            <Download className="h-4 w-4" />
+                            Export CSV
+                        </a>
                     </div>
 
-                    <HeroSummaryStrip label="At a glance">
-                        <HeroSummaryMetric tone="neutral">{stats.open} open</HeroSummaryMetric>
-                        <HeroSummaryMetric tone={stats.overdue > 0 ? 'critical' : 'success'}>
-                            {stats.overdue} overdue
-                        </HeroSummaryMetric>
-                        <HeroSummaryMetric tone={stats.critical > 0 ? 'warning' : 'success'}>
-                            {stats.critical} high priority
-                        </HeroSummaryMetric>
-                        <HeroSummaryMetric tone="neutral">{stats.mine} assigned to me</HeroSummaryMetric>
-                    </HeroSummaryStrip>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        <HeroCluster title="The queue" icon={ListChecks}>
+                            <HeroClusterTile
+                                href="/tasks?bucket=open"
+                                label="Open"
+                                value={String(stats.bucketOpen)}
+                                caption="ready to start"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/tasks?bucket=in_progress"
+                                label="In progress"
+                                value={String(stats.inProgress)}
+                                caption="being worked"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/tasks?assigned=unassigned"
+                                label="Unassigned"
+                                value={String(stats.unassigned)}
+                                caption="need an owner"
+                                tone={stats.unassigned > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/tasks?due=week"
+                                label="Due this week"
+                                value={String(stats.dueWeek)}
+                                caption="next 7 days"
+                                tone="neutral"
+                            />
+                        </HeroCluster>
+                        <HeroCluster title="Needs attention" icon={Siren}>
+                            <HeroClusterTile
+                                href="/tasks?overdue=1"
+                                label="Overdue"
+                                value={String(stats.overdue)}
+                                caption="past their due date"
+                                tone={stats.overdue > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/tasks?severity=critical,high"
+                                label="High priority"
+                                value={String(stats.critical)}
+                                caption="critical + high"
+                                tone={stats.critical > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/tasks?assigned=me"
+                                label="Assigned to me"
+                                value={String(stats.mine)}
+                                caption="my open items"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/tasks?assigned=me&overdue=1"
+                                label="My overdue"
+                                value={String(stats.myOverdue)}
+                                caption="chase these first"
+                                tone={stats.myOverdue > 0 ? 'critical' : 'success'}
+                            />
+                        </HeroCluster>
+                    </div>
                 </HeroShell>
 
                 {/* ── Filter bar ── */}

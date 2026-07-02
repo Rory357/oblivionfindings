@@ -91,6 +91,50 @@ it('gates every provider on the module permission', function () {
         ->and($sources)->not->toContain('alert');
 });
 
+it('filters to unassigned items', function () {
+    $user = makeTasksUser(['incidents.viewAny']);
+    $unassigned = ClientIncident::factory()->create(['status' => 'submitted', 'investigation_assigned_to' => null]);
+    ClientIncident::factory()->create(['status' => 'submitted', 'investigation_assigned_to' => $user->id]);
+
+    $this->actingAs($user)
+        ->get('/tasks?assigned=unassigned')
+        ->assertInertia(fn ($page) => $page
+            ->where('items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$unassigned->id]));
+});
+
+it('filters to items due within the week', function () {
+    $user = makeTasksUser(['incidents.viewAny']);
+    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $dueSoon = $incident->followups()->create([
+        'assigned_to_user_id' => $user->id,
+        'due_at' => now()->addDays(3),
+        'notes' => 'Call whānau with outcome',
+    ]);
+    $incident->followups()->create([
+        'assigned_to_user_id' => $user->id,
+        'due_at' => now()->addDays(30),
+        'notes' => 'Quarterly review',
+    ]);
+
+    $this->actingAs($user)
+        ->get('/tasks?due=week')
+        ->assertInertia(fn ($page) => $page
+            ->where('items', fn ($items) => collect($items)->pluck('id')->all() === ['followup-'.$dueSoon->id]));
+});
+
+it('streams the filtered queue as csv', function () {
+    $user = makeTasksUser(['incidents.viewAny']);
+    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+
+    $response = $this->actingAs($user)->get('/tasks?format=csv');
+
+    $response->assertOk();
+    expect((string) $response->headers->get('Content-Type'))->toContain('text/csv');
+    expect($response->streamedContent())
+        ->toContain('Ticket')
+        ->toContain((string) $incident->fresh()->reference_number);
+});
+
 it('sorts overdue items first', function () {
     $user = makeTasksUser(['incidents.viewAny']);
     ClientIncident::factory()->create(['status' => 'submitted', 'severity' => 'high']);

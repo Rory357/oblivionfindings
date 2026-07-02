@@ -7,6 +7,7 @@ use App\Services\Tasks\TaskItem;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Company-wide "All Tasks" dashboard: every open incident, corrective
@@ -16,7 +17,7 @@ use Inertia\Response;
  */
 class AllTasksController extends Controller
 {
-    public function index(Request $request, TaskAggregator $aggregator): Response
+    public function index(Request $request, TaskAggregator $aggregator): Response|StreamedResponse
     {
         $user = $request->user();
 
@@ -24,24 +25,66 @@ class AllTasksController extends Controller
             'sources' => $this->csv($request->query('sources')),
             'severity' => $this->csv($request->query('severity')),
             'bucket' => $this->csv($request->query('bucket')),
-            'assigned' => $request->query('assigned') === 'me' ? 'me' : null,
+            'assigned' => in_array($request->query('assigned'), ['me', 'unassigned'], true)
+                ? $request->query('assigned')
+                : null,
             'overdue' => $request->boolean('overdue'),
+            'due' => $request->query('due') === 'week' ? 'week' : null,
             'q' => ($q = trim((string) $request->query('q', ''))) === '' ? null : $q,
             'include_done' => $request->boolean('done'),
         ];
 
         // One provider pass; stats stay stable while filters slice the list.
         $items = $aggregator->itemsFor($user, ['include_done' => $filters['include_done']]);
+        $filtered = $aggregator->filterItems($items, $user, $filters);
+
+        if ($request->query('format') === 'csv') {
+            return $this->exportCsv($filtered);
+        }
 
         return Inertia::render('tasks/index', [
-            'items' => array_map(
-                fn (TaskItem $item) => $item->toArray(),
-                $aggregator->filterItems($items, $user, $filters),
-            ),
+            'items' => array_map(fn (TaskItem $item) => $item->toArray(), $filtered),
             'stats' => $aggregator->stats($items, $user),
             'sources' => $aggregator->sourcesFor($user),
             'filters' => $filters,
         ]);
+    }
+
+    /**
+     * Stream the current (filtered) queue as a spreadsheet-safe CSV.
+     *
+     * @param  TaskItem[]  $items
+     */
+    private function exportCsv(array $items): StreamedResponse
+    {
+        return response()->streamDownload(function () use ($items): void {
+            $out = fopen('php://output', 'w');
+
+            $this->putCsv($out, [
+                'Ticket', 'Title', 'Type', 'Module', 'Severity', 'Status',
+                'Assignee', 'Client', 'Site', 'Due', 'Overdue', 'Created', 'Link',
+            ]);
+
+            foreach ($items as $item) {
+                $this->putCsv($out, [
+                    $item->ref,
+                    $item->title,
+                    $item->type,
+                    $item->sourceLabel,
+                    $item->severity,
+                    $item->status,
+                    $item->assignee['name'] ?? '',
+                    $item->client['name'] ?? '',
+                    $item->site['name'] ?? '',
+                    $item->dueAt,
+                    $item->isOverdue() ? 'yes' : 'no',
+                    $item->createdAt,
+                    $item->link,
+                ]);
+            }
+
+            fclose($out);
+        }, 'all-tasks-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     /**
