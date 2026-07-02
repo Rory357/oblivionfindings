@@ -67,9 +67,16 @@ class RefusalFollowUpController extends Controller
      */
     public function complete(Request $request, MedicationRefusalFollowup $followup)
     {
+        // Completion must record what was actually done/decided — a bare
+        // timestamp left auditors unable to verify the resolution action.
+        $validated = $request->validate([
+            'outcome' => ['required', 'string', 'max:2000'],
+        ]);
+
         $followup->update([
             'follow_up_completed_at' => now(),
             'follow_up_completed_by' => Auth::id(),
+            'follow_up_outcome' => $validated['outcome'],
         ]);
 
         app(MedicationIncidentIntegrationService::class)->resolveRefusalEscalation(
