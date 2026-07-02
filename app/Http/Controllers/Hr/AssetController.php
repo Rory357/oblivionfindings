@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AssetService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\FleetIncident;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Endroid\QrCode\Builder\Builder;
@@ -18,6 +19,7 @@ use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -182,12 +184,37 @@ class AssetController extends Controller
             'documents' => fn ($q) => $q->with('uploadedBy:id,name')->orderByDesc('created_at'),
         ]);
 
+        // Fleet incident read routes are gated fleet.viewAny|assets.viewAny;
+        // the fleet asset detail page itself is assets.viewAny|assets.viewAssigned.
+        $canViewFleet = (bool) ($user->canDo('assets.viewAny') || $user->canDo('assets.viewAssigned'));
+        $canViewFleetIncidents = (bool) ($user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny'));
+
+        $fleetIncidents = ($asset->isFleetLinked() && $canViewFleetIncidents && Schema::hasTable('fleet_incidents'))
+            ? $asset->fleetIncidents()
+                ->latest('occurred_at')
+                ->limit(5)
+                ->get(['id', 'reference_number', 'incident_type', 'description', 'severity', 'status', 'occurred_at'])
+                ->map(fn (FleetIncident $i) => [
+                    'id' => $i->id,
+                    'reference' => $i->reference(),
+                    'title' => ucfirst(str_replace('_', ' ', (string) $i->incident_type)),
+                    'summary' => Str::limit((string) $i->description, 90),
+                    'severity' => $i->severity,
+                    'status' => $i->status,
+                    'occurred_at' => $i->occurred_at?->toDateString(),
+                ])
+                ->values()
+            : collect();
+
         return Inertia::render('hr/assets/show', [
             'asset' => $this->mapAssetDetail($asset),
             'staff' => $this->staffOptions($asset->tenant_id),
             'categories' => $this->categoryOptions(),
+            'fleetIncidents' => $fleetIncidents,
             'can' => [
                 'manage' => $user->canDo('hr.assets.manage'),
+                'view_fleet' => $canViewFleet,
+                'view_fleet_incidents' => $canViewFleetIncidents,
             ],
         ]);
     }

@@ -45,6 +45,20 @@ class DashboardController extends Controller
         $onlineVehicles = $vehicles->filter(fn ($v) => $v->fleetState?->status === 'online')->count();
         $offlineVehicles = $totalVehicles - $onlineVehicles;
 
+        // Vehicles currently under maintenance (either status convention) — from the
+        // already-loaded collection, no extra query.
+        $vehiclesInMaintenance = $vehicles->whereIn('status', ['maintenance', 'out_of_service'])->count();
+
+        // Compliance horizon for the hero — WOF / rego due within 30 days.
+        $wofDue30 = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->wofExpiring(30)
+            ->count();
+        $regoDue30 = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->registrationExpiring(30)
+            ->count();
+
         // Vehicle status breakdown from fleet state snapshots
         $vehicleStatusBreakdown = Schema::hasTable('fleet_vehicle_state_snapshots')
             ? FleetVehicleStateSnapshot::query()
@@ -389,6 +403,9 @@ class DashboardController extends Controller
                     : 0,
                 'upcoming_maintenance_count' => $upcomingMaintenanceCount,
                 'trips_today' => $tripsToday,
+                'vehicles_in_maintenance' => $vehiclesInMaintenance,
+                'wof_due_30' => $wofDue30,
+                'rego_due_30' => $regoDue30,
                 'tracked_residents' => $trackedResidents,
                 'active_outings' => $activeOutings,
             ],

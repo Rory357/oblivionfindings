@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
+use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -78,10 +79,16 @@ class LiveMapController extends Controller
                 ] : null,
             ])->values();
 
+        // Open alerts for the hero band — single COUNT query.
+        $openAlerts = ControlRoomAlert::query()
+            ->whereNotIn('status', ['closed', 'resolved'])
+            ->count();
+
         return Inertia::render('fleet-assets/map', [
             'vehicle_markers' => $vehicleMarkers,
             'house_markers' => $houses,
             'geofences' => $geofences,
+            'open_alerts' => $openAlerts,
         ]);
     }
 }

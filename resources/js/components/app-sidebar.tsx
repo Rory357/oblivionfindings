@@ -1405,6 +1405,13 @@ function buildFleetAssetsSubPanelGroups({
             icon: Package,
         });
     }
+    if (can?.hr?.assets?.view) {
+        assets.items.push({
+            title: 'HR Asset Register',
+            href: '/hr/assets',
+            icon: Briefcase,
+        });
+    }
     if (can?.assets?.alertsView) {
         assets.items.push({
             title: 'Alerts',

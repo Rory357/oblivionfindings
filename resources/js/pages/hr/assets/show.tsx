@@ -5,6 +5,7 @@
  * every lifecycle action is a reviewed wizard modal. */
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowLeft,
     Boxes,
     CheckCircle2,
@@ -114,11 +115,22 @@ interface AssetDetail {
     documents: DocumentRow[];
 }
 
+interface FleetIncidentRow {
+    id: number;
+    reference: string;
+    title: string;
+    summary: string | null;
+    severity: string;
+    status: string;
+    occurred_at: string | null;
+}
+
 interface Props {
     asset: AssetDetail;
     staff: StaffOption[];
     categories: CategoryOption[];
-    can: { manage: boolean };
+    fleetIncidents: FleetIncidentRow[];
+    can: { manage: boolean; view_fleet: boolean; view_fleet_incidents: boolean };
 }
 
 type DetailTab = 'details' | 'history' | 'maintenance' | 'documents' | 'activity';
@@ -139,7 +151,7 @@ const DOC_CATEGORIES = [
     { value: 'photo', label: 'Photo' },
 ];
 
-export default function AssetShow({ asset, staff, categories, can }: Props) {
+export default function AssetShow({ asset, staff, categories, fleetIncidents, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Asset Management', href: '/hr/assets' },
@@ -204,13 +216,19 @@ export default function AssetShow({ asset, staff, categories, can }: Props) {
                                 {asset.tag}{asset.serial ? ` · ${asset.serial}` : ''} · {categoryLabel(asset.category)}
                             </div>
                             {asset.fleet && asset.fleet_asset ? (
-                                <a
-                                    href={`/fleet-assets/assets/${asset.fleet_asset.id}`}
-                                    className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-primary-foreground/25 bg-primary-foreground/[0.12] px-2.5 py-1 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/20"
-                                >
-                                    <Truck className="h-3.5 w-3.5" /> Linked to Fleet register
-                                    <ExternalLink className="h-3 w-3" />
-                                </a>
+                                can.view_fleet ? (
+                                    <a
+                                        href={`/fleet-assets/assets/${asset.fleet_asset.id}`}
+                                        className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-primary-foreground/25 bg-primary-foreground/[0.12] px-2.5 py-1 text-[12px] font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    >
+                                        <Truck className="h-3.5 w-3.5" /> Linked to Fleet register
+                                        <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                ) : (
+                                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-primary-foreground/25 bg-primary-foreground/[0.12] px-2.5 py-1 text-[12px] font-semibold text-primary-foreground">
+                                        <Truck className="h-3.5 w-3.5" /> Linked to Fleet register
+                                    </span>
+                                )
                             ) : null}
                         </div>
 
@@ -254,7 +272,14 @@ export default function AssetShow({ asset, staff, categories, can }: Props) {
                     ))}
                 </div>
 
-                {tab === 'details' && <DetailsTab asset={asset} />}
+                {tab === 'details' && (
+                    <>
+                        <DetailsTab asset={asset} />
+                        {asset.fleet && can.view_fleet_incidents && fleetIncidents.length > 0 ? (
+                            <FleetIncidentsPanel incidents={fleetIncidents} />
+                        ) : null}
+                    </>
+                )}
                 {tab === 'history' && <HistoryTab assignments={asset.assignments} />}
                 {tab === 'maintenance' && <MaintenanceLogsTab logs={asset.maintenance_logs} />}
                 {tab === 'documents' && <DocumentsTab asset={asset} canManage={can.manage} />}
@@ -341,6 +366,50 @@ function DetailsTab({ asset }: { asset: AssetDetail }) {
                 )}
             </Panel>
         </div>
+    );
+}
+
+const INCIDENT_SEV_CLS: Record<string, string> = {
+    minor: 'bg-status-success-bg text-status-success',
+    moderate: 'bg-status-warning-bg text-status-warning',
+    major: 'bg-status-critical-bg text-status-critical',
+    critical: 'bg-status-critical-bg text-status-critical',
+};
+
+/** Recent Fleet incidents against the linked canonical asset (read-through). */
+function FleetIncidentsPanel({ incidents }: { incidents: FleetIncidentRow[] }) {
+    return (
+        <Panel className="mt-4">
+            <div className="mb-3 text-[15px] font-bold">Fleet incidents</div>
+            <div className="flex flex-col">
+                {incidents.map((i, idx) => (
+                    <a
+                        key={i.id}
+                        href={`/fleet-assets/incidents/${i.id}`}
+                        className={cn('flex items-center gap-3 py-2.5 transition-colors hover:bg-accent/50', idx ? 'border-t border-border' : '')}
+                    >
+                        <span className={cn('grid h-9 w-9 flex-none place-items-center rounded-[9px]', INCIDENT_SEV_CLS[i.severity] ?? 'bg-muted text-muted-foreground')}>
+                            <AlertTriangle className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-[12px] font-semibold text-muted-foreground">{i.reference}</span>
+                                <span className="text-[13px] font-bold">{i.title}</span>
+                                <span className={cn('rounded-full px-2 py-px text-[11px] font-bold capitalize', INCIDENT_SEV_CLS[i.severity] ?? 'bg-muted text-muted-foreground')}>
+                                    {i.severity}
+                                </span>
+                                <span className="rounded-full bg-muted px-2 py-px text-[11px] font-bold capitalize text-muted-foreground">{i.status}</span>
+                            </div>
+                            <div className="mt-0.5 text-[12px] text-muted-foreground">
+                                {fdate(i.occurred_at)}
+                                {i.summary ? ` · ${i.summary}` : ''}
+                            </div>
+                        </div>
+                        <ExternalLink className="h-3.5 w-3.5 flex-none text-muted-foreground" />
+                    </a>
+                ))}
+            </div>
+        </Panel>
     );
 }
 

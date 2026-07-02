@@ -124,7 +124,24 @@ class AssetController extends Controller
 
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
+        // Hero stats — whole-register counts (independent of filters/pagination).
+        $heroTotal = Asset::query()->count();
+        $heroActive = Asset::query()->where('status', 'active')->count();
+        $heroMaintenance = Asset::query()->whereIn('status', ['maintenance', 'out_of_service'])->count();
+        $heroInspectionsDue = Schema::hasColumn('assets', 'inspection_due_at')
+            ? Asset::query()
+                ->whereNotNull('inspection_due_at')
+                ->where('inspection_due_at', '<=', now()->addDays(30))
+                ->count()
+            : 0;
+
         return Inertia::render('fleet-assets/assets/index', [
+            'hero' => [
+                'total' => $heroTotal,
+                'active' => $heroActive,
+                'maintenance' => $heroMaintenance,
+                'inspections_due' => $heroInspectionsDue,
+            ],
             'assets' => [
                 'data' => $assets->getCollection()->map(fn ($a) => [
                     'id' => $a->id,
@@ -267,6 +284,12 @@ class AssetController extends Controller
 
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
         $currentAssignment = $asset->assignments->first(fn ($assignment) => $assignment->released_at === null);
+
+        // Federation: the HR-register wrapper (if any) so the fleet page can
+        // point back at /hr/assets/{id} — link only for hr.assets.view holders.
+        $hrAsset = $this->hasTable('hr_assets')
+            ? $asset->hrAsset()->with('currentAssignment.employeeProfile.user:id,name')->first()
+            : null;
 
         $safeAsset = [
             'id' => $asset->id,
@@ -415,6 +438,13 @@ class AssetController extends Controller
         return Inertia::render('fleet-assets/assets/show', [
             'asset' => $safeAsset,
             'timeline' => $timeline,
+            'hr_asset' => $hrAsset ? [
+                'id' => $hrAsset->id,
+                'asset_tag' => $hrAsset->asset_tag,
+                'status' => $hrAsset->status,
+                'current_holder_name' => $hrAsset->currentAssignment?->employeeProfile?->user?->name,
+            ] : null,
+            'can_view_hr_assets' => (bool) $request->user()?->canDo('hr.assets.view'),
         ]);
     }
 

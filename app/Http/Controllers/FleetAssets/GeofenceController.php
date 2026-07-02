@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Site;
+use App\Rules\GeofenceShape;
 use App\Services\AuditLogger;
 use App\Services\Fleet\GeofenceStateCleanupService;
 use Illuminate\Http\Request;
@@ -95,7 +96,7 @@ class GeofenceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:circle,polygon'],
             'scope' => ['required', 'string', 'in:vehicle,resident'],
-            'shape' => ['required', 'array'],
+            'shape' => ['required', 'array', new GeofenceShape],
             'breach_type' => ['required', 'string', 'in:enter,exit,both'],
             'alert_config' => ['nullable', 'array'],
             'time_rules' => ['nullable', 'array'],
@@ -155,7 +156,7 @@ class GeofenceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:circle,polygon'],
             'scope' => ['required', 'string', 'in:vehicle,resident'],
-            'shape' => ['required', 'array'],
+            'shape' => ['required', 'array', new GeofenceShape],
             'breach_type' => ['required', 'string', 'in:enter,exit,both'],
             'alert_config' => ['nullable', 'array'],
             'time_rules' => ['nullable', 'array'],

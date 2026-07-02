@@ -107,7 +107,13 @@ class FleetGeofenceService
         }
     }
 
-    protected function isInside(AssetGeofence $geofence, float $lat, float $lon): bool
+    /**
+     * Canonical point-in-geofence containment check. Invalid or incomplete
+     * shapes (missing circle centre/radius, polygons with fewer than 3
+     * points) are treated as OUTSIDE so a misconfigured geofence never
+     * silently swallows a breach.
+     */
+    public function isInside(AssetGeofence $geofence, float $lat, float $lon): bool
     {
         $shape = $geofence->shape ?? [];
         if ($geofence->type === 'polygon') {

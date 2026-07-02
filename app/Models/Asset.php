@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Hr\Models\HrAsset;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -270,6 +271,15 @@ class Asset extends Model
     public function fleetIncidents(): HasMany
     {
         return $this->hasMany(FleetIncident::class);
+    }
+
+    /**
+     * The HR-register wrapper row that federates to this canonical Fleet
+     * asset (inverse of HrAsset::fleetAsset()).
+     */
+    public function hrAsset(): HasOne
+    {
+        return $this->hasOne(HrAsset::class, 'fleet_asset_id');
     }
 
     public function fleetHandovers(): HasMany

@@ -37,9 +37,11 @@ import {
     Cpu,
     Download,
     Edit,
+    ExternalLink,
     FileText,
     Info,
     MapPin,
+    Package,
     Radio,
     Shield,
     Upload,
@@ -179,6 +181,14 @@ type Props = {
         [key: string]: any;
     };
     timeline: TimelineEvent[];
+    /** HR-register wrapper federating to this canonical Fleet asset, if any. */
+    hr_asset: {
+        id: number;
+        asset_tag: string | null;
+        status: string | null;
+        current_holder_name: string | null;
+    } | null;
+    can_view_hr_assets: boolean;
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -216,6 +226,8 @@ function isExpired(dateStr: string | null): boolean {
 export default function AssetShow({
     asset,
     timeline,
+    hr_asset,
+    can_view_hr_assets,
 }: Props) {
     const [activeTab, setActiveTab] = useState('overview');
     const linkedDevices: LinkedDevice[] = asset?.trackers ?? [];
@@ -350,6 +362,25 @@ export default function AssetShow({
                                     <Badge variant={asset.risk_level === 'high' ? 'destructive' : 'secondary'} className="text-xs">
                                         Risk: {asset.risk_level}
                                     </Badge>
+                                )}
+                                {hr_asset && (
+                                    can_view_hr_assets ? (
+                                        <Link
+                                            href={`/hr/assets/${hr_asset.id}`}
+                                            className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-white/50 px-2.5 py-1 text-xs font-semibold hover:bg-white/70 dark:bg-black/20 dark:hover:bg-black/30"
+                                        >
+                                            <Package className="h-3.5 w-3.5" />
+                                            Also tracked in HR Assets
+                                            {hr_asset.current_holder_name ? ` · with ${hr_asset.current_holder_name}` : ''}
+                                            <ExternalLink className="h-3 w-3" />
+                                        </Link>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-white/50 px-2.5 py-1 text-xs font-semibold dark:bg-black/20">
+                                            <Package className="h-3.5 w-3.5" />
+                                            Also tracked in HR Assets
+                                            {hr_asset.current_holder_name ? ` · with ${hr_asset.current_holder_name}` : ''}
+                                        </span>
+                                    )
                                 )}
                             </div>
                             {/* Key metrics row */}

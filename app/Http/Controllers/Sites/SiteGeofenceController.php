@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\Site;
+use App\Rules\GeofenceShape;
 use App\Services\AuditLogger;
 use App\Services\Fleet\GeofenceStateCleanupService;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class SiteGeofenceController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', 'in:circle,polygon'],
-            'shape' => ['required', 'array'],
+            'shape' => ['required', 'array', new GeofenceShape],
             'breach_type' => ['required', 'string', 'in:enter,exit,both'],
             'is_active' => ['boolean'],
             'asset_ids' => ['array'],

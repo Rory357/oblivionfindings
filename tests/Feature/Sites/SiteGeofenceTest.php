@@ -6,7 +6,6 @@ use App\Models\FleetGeofenceState;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\AssetGeofenceEvaluator;
 use App\Services\Fleet\FleetGeofenceService;
 use App\Services\Sites\SiteReadinessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -206,10 +205,65 @@ test('assigned site geofence is evaluated for assigned fleet assets', function (
         'geofence_id' => $geofence->id,
     ]);
 
-    $breaches = app(AssetGeofenceEvaluator::class)->evaluate($assignedAsset, -36.9, 174.9);
+    // Moving outside the boundary flips the assigned asset's state to a breach.
+    app(FleetGeofenceService::class)->evaluate($assignedAsset, -36.9, 174.9, now());
 
-    expect($breaches)->toHaveCount(1)
-        ->and($breaches[0]->id)->toBe($geofence->id);
+    $this->assertDatabaseHas('fleet_geofence_states', [
+        'asset_id' => $assignedAsset->id,
+        'geofence_id' => $geofence->id,
+        'status' => 'outside',
+    ]);
+    $this->assertDatabaseMissing('fleet_geofence_states', [
+        'asset_id' => $unassignedAsset->id,
+        'geofence_id' => $geofence->id,
+    ]);
+});
+
+test('geofence containment treats invalid or incomplete shapes as outside', function () {
+    $service = app(FleetGeofenceService::class);
+
+    $circle = new AssetGeofence([
+        'type' => 'circle',
+        'shape' => siteGeofenceCircleShape(),
+    ]);
+
+    expect($service->isInside($circle, -36.8485, 174.7633))->toBeTrue()
+        ->and($service->isInside($circle, -36.9, 174.9))->toBeFalse();
+
+    // A circle missing its centre/radius can never contain a point.
+    $invalidCircle = new AssetGeofence([
+        'type' => 'circle',
+        'shape' => ['radius_m' => 250],
+    ]);
+
+    expect($service->isInside($invalidCircle, -36.8485, 174.7633))->toBeFalse();
+
+    $polygon = new AssetGeofence([
+        'type' => 'polygon',
+        'shape' => [
+            'coordinates' => [
+                ['lat' => -36.84, 'lng' => 174.75],
+                ['lat' => -36.84, 'lng' => 174.78],
+                ['lat' => -36.86, 'lng' => 174.765],
+            ],
+        ],
+    ]);
+
+    expect($service->isInside($polygon, -36.847, 174.765))->toBeTrue()
+        ->and($service->isInside($polygon, -36.9, 174.9))->toBeFalse();
+
+    // Fewer than 3 points is not a polygon — treated as outside.
+    $degeneratePolygon = new AssetGeofence([
+        'type' => 'polygon',
+        'shape' => [
+            'coordinates' => [
+                ['lat' => -36.84, 'lng' => 174.75],
+                ['lat' => -36.86, 'lng' => 174.765],
+            ],
+        ],
+    ]);
+
+    expect($service->isInside($degeneratePolygon, -36.85, 174.76))->toBeFalse();
 });
 
 test('site geofence routes require geofence management permission', function () {

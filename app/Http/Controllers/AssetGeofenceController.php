@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetGeofence;
+use App\Rules\GeofenceShape;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class AssetGeofenceController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'type' => ['required', 'in:circle,polygon'],
-            'shape' => ['required', 'array'],
+            'shape' => ['required', 'array', new GeofenceShape],
             'breach_type' => ['required', 'in:soft,hard'],
             'time_rules' => ['nullable', 'array'],
             'is_active' => ['boolean'],

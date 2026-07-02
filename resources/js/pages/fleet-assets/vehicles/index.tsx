@@ -1,9 +1,15 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import { SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    FleetComplianceBadges,
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,15 +24,14 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Battery,
+    Bookmark,
     Car,
+    ClipboardCheck,
     Download,
     Gauge,
-    Loader2,
-    Plus,
     RefreshCw,
     Search,
     WifiOff,
-    Wrench,
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -58,12 +63,27 @@ function toArray<T>(input: PaginatedOrArray<T> | null | undefined): T[] {
 type Props = {
     vehicles: PaginatedOrArray<Vehicle>;
     sites?: Array<{ id: number; name: string }>;
+    hero: {
+        total: number;
+        available: number;
+        in_use: number;
+        maintenance: number;
+    };
+    compliance: {
+        wof_due: number;
+        wof_expired: number;
+        rego_due: number;
+        cof_due: number;
+        insurance_expiring: number | null;
+        open_alerts: number;
+        critical_alerts: number;
+    };
     can: {
         manage: boolean;
     };
 };
 
-export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Props) {
+export default function VehiclesIndex({ vehicles: rawVehicles, sites, hero, compliance, can }: Props) {
     const vehicles = toArray(rawVehicles);
     const paginationLinks = !Array.isArray(rawVehicles) ? rawVehicles?.links ?? [] : [];
     const paginationMeta = !Array.isArray(rawVehicles) ? rawVehicles?.meta ?? {} : {};
@@ -143,15 +163,6 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
         });
     }, [selectedIds, bulkSiteId]);
 
-    // KPI stats
-    const totalCount = vehicles.length;
-    const onlineCount = vehicles.filter((v) => v.state?.status === 'online').length;
-    const offlineCount = vehicles.filter((v) => !v.state || v.state.status !== 'online').length;
-    const inMaintenanceCount = vehicles.filter((v) => v.status === 'maintenance').length;
-
-    // Fake sparkline data for KPI cards (derived from vehicle count for demo)
-    const trendData = [3, 5, 4, 7, 6, 8, totalCount > 0 ? totalCount : 5];
-
     return (
         <AppLayout
             breadcrumbs={[
@@ -161,36 +172,79 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
         >
             <Head title="Vehicles" />
             <PageShell>
-                <PageHero
-                    title={
-                        <div className="flex items-center gap-2">
-                            <span>Vehicles</span>
-                            {isRefreshing && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
+                <HeroShell
+                    footer={
+                        <FleetComplianceBadges
+                            wofDue={compliance.wof_due}
+                            wofExpired={compliance.wof_expired}
+                            regoDue={compliance.rego_due}
+                            cofDue={compliance.cof_due}
+                            insuranceExpiring={compliance.insurance_expiring}
+                            openAlerts={compliance.open_alerts}
+                            criticalAlerts={compliance.critical_alerts}
+                            hrefs={{
+                                wof: '/fleet-assets/compliance',
+                                rego: '/fleet-assets/compliance',
+                                cof: '/fleet-assets/compliance',
+                                insurance: '/fleet-assets/compliance',
+                                alerts: '/fleet-assets/alerts',
+                            }}
+                        />
+                    }
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Car} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>
+                                Vehicle fleet · live sync
+                                {isRefreshing && <RefreshCw className="h-3 w-3 animate-spin" />}
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Vehicles</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Live vehicle tracking and management.
+                            </p>
                         </div>
-                    }
-                    description="Live vehicle tracking and management."
-                    actions={
-                        <Button variant="outline" size="sm" asChild>
-                            <a href="/fleet-assets/vehicles?export=csv">
-                                <Download className="mr-2 h-4 w-4" />
-                                Export CSV
-                            </a>
-                        </Button>
-                    }
-                />
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-2xl lg:ml-auto">
+                            <HeroClusterTile label="Total" value={fmt(hero.total)} caption="in the fleet" tone="neutral" />
+                            <HeroClusterTile
+                                label="Available"
+                                value={fmt(hero.available)}
+                                caption="ready to book"
+                                tone={hero.available > 0 ? 'success' : 'warning'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings"
+                                label="In use"
+                                value={fmt(hero.in_use)}
+                                caption="checked out"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders"
+                                label="Maintenance"
+                                value={fmt(hero.maintenance)}
+                                caption="in the workshop"
+                                tone={hero.maintenance > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href="/fleet-assets/bookings/create" icon={Bookmark} emphasis>
+                            Book vehicle
+                        </FleetHeroAction>
+                        <FleetHeroAction href="/fleet-assets/daily-check" icon={ClipboardCheck}>
+                            Daily check
+                        </FleetHeroAction>
+                        <FleetHeroAction href="/fleet-assets/vehicles?export=csv" icon={Download} external>
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {vehicles.length === 0 && !searchTerm && statusFilter === 'all' ? (
                     <FleetEmptyState icon={Car} title="No vehicles tracked yet" description="Add vehicles to start fleet tracking. Vehicles with GPS trackers will appear on the map in real time." actionLabel="Add Vehicle" actionHref="/fleet-assets/assets/create" />
                 ) : (
                     <>
-                        {/* KPI Cards Row */}
-                        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                            <FleetStatCard label="Total" value={totalCount} icon={Car} trend={trendData} />
-                            <FleetStatCard label="Online" value={onlineCount} icon={Gauge} color="blue" />
-                            <FleetStatCard label="Offline" value={offlineCount} icon={WifiOff} color="amber" trend={[2, 3, 1, 4, 2, 3, offlineCount > 0 ? offlineCount : 2]} />
-                            <FleetStatCard label="Maintenance" value={inMaintenanceCount} icon={Wrench} color="cyan" subtitle="vehicles in service" />
-                        </div>
-
                         {/* Map + Vehicle List side by side */}
                         <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
                             {/* Map */}
