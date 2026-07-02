@@ -16,6 +16,12 @@ class MedicationAdministrationCorrectionController extends Controller
         abort_unless($request->user()?->canDo('medications.administer.correct'), 403);
         abort_unless($correction->is_correction && $correction->correction_status === 'pending', 404);
 
+        // Two-person rule: the person who raised the correction cannot approve
+        // their own — approval must be an independent check.
+        if ((int) $correction->administered_by === (int) $request->user()->id) {
+            return back()->with('error', 'A correction must be approved by someone other than the person who raised it.');
+        }
+
         $correction->update([
             'correction_status' => 'approved',
             'correction_approved_by' => $request->user()->id,

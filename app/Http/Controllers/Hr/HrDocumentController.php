@@ -742,9 +742,9 @@ class HrDocumentController extends Controller
 
         return response()->streamDownload(function () use ($documents) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Title', 'Category', 'Folder', 'Employee', 'Signature', 'Expiry', 'Restricted', 'Version', 'Uploaded by', 'Created']);
+            $this->putCsv($out, ['Title', 'Category', 'Folder', 'Employee', 'Signature', 'Expiry', 'Restricted', 'Version', 'Uploaded by', 'Created']);
             foreach ($documents as $document) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $document->title,
                     $document->category,
                     $document->folder ?: $this->folderForCategory($document->category),

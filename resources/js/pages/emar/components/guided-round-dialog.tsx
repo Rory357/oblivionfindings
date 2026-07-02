@@ -68,6 +68,7 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
     const [reason, setReason] = useState('');
     const [witnessedBy, setWitnessedBy] = useState('');
     const [witnessCredential, setWitnessCredential] = useState('');
+    const [quantityGiven, setQuantityGiven] = useState('');
     const [bloodGlucose, setBloodGlucose] = useState('');
     const [pulse, setPulse] = useState('');
     const [saving, setSaving] = useState(false);
@@ -83,6 +84,7 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
         setReason('');
         setWitnessedBy('');
         setWitnessCredential('');
+        setQuantityGiven('');
         setBloodGlucose('');
         setPulse('');
     };
@@ -116,6 +118,7 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
         if (!pending || !item) return false;
         if (pending === 'given') {
             if (item.requires_witness && !witnessedBy) return false;
+            if (item.is_controlled && !quantityGiven) return false;
             if (item.requires_blood_glucose && !bloodGlucose) return false;
             if (item.requires_pulse && !pulse) return false;
             return true;
@@ -138,6 +141,7 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
                 reason_code: pending === 'given' ? null : reasonCode || null,
                 witnessed_by: pending === 'given' && witnessedBy ? Number(witnessedBy) : null,
                 witness_credential: witnessCredential || null,
+                quantity_administered: pending === 'given' && quantityGiven ? Number(quantityGiven) : null,
                 blood_glucose_level: pending === 'given' && bloodGlucose ? Number(bloodGlucose) : null,
                 pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
                 client_request_uuid: crypto.randomUUID(),
@@ -261,6 +265,8 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
                         setWitnessedBy={setWitnessedBy}
                         witnessCredential={witnessCredential}
                         setWitnessCredential={setWitnessCredential}
+                        quantityGiven={quantityGiven}
+                        setQuantityGiven={setQuantityGiven}
                         bloodGlucose={bloodGlucose}
                         setBloodGlucose={setBloodGlucose}
                         pulse={pulse}
@@ -349,6 +355,8 @@ type DosePaneProps = {
     setWitnessedBy: (v: string) => void;
     witnessCredential: string;
     setWitnessCredential: (v: string) => void;
+    quantityGiven: string;
+    setQuantityGiven: (v: string) => void;
     bloodGlucose: string;
     setBloodGlucose: (v: string) => void;
     pulse: string;
@@ -407,7 +415,7 @@ function ConfirmPanel(props: DosePaneProps) {
     const {
         item, pending, reasonCode, setReasonCode, reason, setReason, reasonObj, notGivenReasons,
         witnesses, witnessedBy, setWitnessedBy, witnessCredential, setWitnessCredential,
-        bloodGlucose, setBloodGlucose, pulse, setPulse,
+        quantityGiven, setQuantityGiven, bloodGlucose, setBloodGlucose, pulse, setPulse,
     } = props;
 
     const title = pending === 'given' ? 'Confirm administration' : pending === 'refused' ? 'Record refusal' : 'Record withheld dose';
@@ -430,6 +438,18 @@ function ConfirmPanel(props: DosePaneProps) {
                         <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a note" />
                     </Field>
                 </>
+            ) : null}
+            {pending === 'given' && item.is_controlled ? (
+                <Field label="Units given" required hint="Removed from CD stock — the register entry uses this quantity.">
+                    <Input
+                        type="number"
+                        min={0.25}
+                        step={0.25}
+                        value={quantityGiven}
+                        onChange={(e) => setQuantityGiven(e.target.value)}
+                        placeholder="e.g. 1"
+                    />
+                </Field>
             ) : null}
             {pending === 'given' && item.requires_witness ? (
                 <>

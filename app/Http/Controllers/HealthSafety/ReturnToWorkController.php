@@ -533,10 +533,10 @@ class ReturnToWorkController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reference', 'Worker', 'Site', 'Injury date', 'Type', 'Body part', 'Severity', 'Status', 'Lost days', 'ACC lodged', 'ACC number', 'WorkSafe notifiable']);
+            $this->putCsv($out, ['Reference', 'Worker', 'Site', 'Injury date', 'Type', 'Body part', 'Severity', 'Status', 'Lost days', 'ACC lodged', 'ACC number', 'WorkSafe notifiable']);
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $i) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $this->reference($i->id),
                         $i->user?->name,
                         $i->site?->name,

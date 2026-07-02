@@ -59,9 +59,9 @@ class SiteHazardController extends Controller
             ->get();
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['Reference', 'Site', 'Site type', 'Hazard', 'Severity', 'Likelihood', 'Risk', 'Status', 'Assigned to', 'Due', 'Logged']);
+        $this->putCsv($handle, ['Reference', 'Site', 'Site type', 'Hazard', 'Severity', 'Likelihood', 'Risk', 'Status', 'Assigned to', 'Due', 'Logged']);
         foreach ($rows as $h) {
-            fputcsv($handle, [
+            $this->putCsv($handle, [
                 $h->reference_number,
                 $h->site?->name,
                 $h->site?->type,

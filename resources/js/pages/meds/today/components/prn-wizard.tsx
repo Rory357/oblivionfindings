@@ -132,6 +132,7 @@ export function PrnWizard({
     const form = useForm({
         client_medication_id: initialMedId,
         dose_given: '',
+        quantity_administered: '',
         time: nowHm(),
         witnessed_by: '',
         witness_credential: '',
@@ -161,6 +162,9 @@ export function PrnWizard({
         if (index === 2) {
             if (!form.data.dose_given.trim())
                 e.dose_given = 'Enter the dose given';
+            if (med?.is_controlled && form.data.quantity_administered === '')
+                e.quantity_administered =
+                    'Record how many units were given';
             if (!form.data.time) e.time = 'Enter the time';
             if (med?.requires_witness && !form.data.witnessed_by)
                 e.witnessed_by =
@@ -197,6 +201,10 @@ export function PrnWizard({
             client_medication_id: med.id,
             reason: reasonText,
             dose_given: form.data.dose_given,
+            quantity_administered:
+                form.data.quantity_administered === ''
+                    ? null
+                    : Number(form.data.quantity_administered),
             administered_at: `${date}T${form.data.time}:00`,
             witnessed_by: form.data.witnessed_by
                 ? parseInt(form.data.witnessed_by, 10)
@@ -529,6 +537,29 @@ export function PrnWizard({
                                 />
                             </Field>
                         </div>
+                        {med.is_controlled ? (
+                            <Field
+                                label="Units given"
+                                required
+                                hint="removed from CD stock"
+                                error={err('quantity_administered')}
+                            >
+                                <Input
+                                    type="number"
+                                    min={0.25}
+                                    step="0.25"
+                                    placeholder="e.g. 1"
+                                    value={form.data.quantity_administered}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'quantity_administered',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="max-w-[220px]"
+                                />
+                            </Field>
+                        ) : null}
                         {med.requires_witness ? (
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field

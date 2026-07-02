@@ -283,9 +283,9 @@ class MileageController extends Controller
 
         return response()->streamDownload(function () use ($all) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Staff', 'Date', 'Start Location', 'End Location', 'Distance (km)', 'Purpose', 'Client', 'Rate/km', 'Total Amount', 'Status', 'Approved By', 'Approved At', 'Notes']);
+            $this->putCsv($handle, ['ID', 'Staff', 'Date', 'Start Location', 'End Location', 'Distance (km)', 'Purpose', 'Client', 'Rate/km', 'Total Amount', 'Status', 'Approved By', 'Approved At', 'Notes']);
             foreach ($all as $t) {
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $t->id,
                     $t->user?->name ?? '',
                     $t->date?->format('Y-m-d') ?? '',

@@ -86,6 +86,9 @@ class HandoverController extends Controller
             'can' => [
                 'create' => $this->canCreateHandovers($auth),
                 'manage' => $canViewAny || (bool) $auth->canDo('shifts.manageAny'),
+                // Gates the read-only "Medications this shift" lens in the detail
+                // dialog — the snapshot endpoint sits behind medications.view.
+                'view_medications' => (bool) $auth->canDo('medications.view'),
             ],
             'currentUser' => ['id' => $auth->id, 'name' => $auth->name],
         ]);

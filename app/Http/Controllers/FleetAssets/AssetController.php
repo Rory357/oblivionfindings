@@ -72,9 +72,9 @@ class AssetController extends Controller
             $allAssets = (clone $query)->orderBy('name')->limit(5000)->get();
             return response()->streamDownload(function () use ($allAssets) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
+                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
                 foreach ($allAssets as $a) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $a->name, $a->asset_tag, $a->category, $a->status,
                         $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
                     ]);

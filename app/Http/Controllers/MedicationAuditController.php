@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MedicationAuditController extends Controller
 {
+    use SanitizesCsvOutput;
+
     private function baseQuery()
     {
         return AuditLog::query()
@@ -85,9 +88,9 @@ class MedicationAuditController extends Controller
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Time', 'Action', 'Type', 'ID', 'Client', 'User', 'Meta']);
+            $this->putCsv($out, ['Time', 'Action', 'Type', 'ID', 'Client', 'User', 'Meta']);
             $q->limit(5000)->get()->each(function ($l) use ($out) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     optional($l->created_at)->toDateTimeString(),
                     $l->action,
                     class_basename($l->auditable_type),

@@ -11,6 +11,7 @@ use App\Services\Eligibility\Rules\AvailabilityRule;
 use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
 use App\Services\Eligibility\Rules\HsTrainingRule;
+use App\Services\Eligibility\Rules\MedicationCompetencyRule;
 use App\Services\Eligibility\Rules\SiteAssignmentRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -28,6 +29,7 @@ class ShiftStaffEligibilityService
         protected SiteAssignmentRule $siteAssignmentRule,
         protected DriverLicenceExpiryRule $driverLicenceRule,
         protected HsTrainingRule $hsTrainingRule,
+        protected MedicationCompetencyRule $medicationCompetencyRule,
     ) {}
 
     /**
@@ -66,6 +68,7 @@ class ShiftStaffEligibilityService
         $checks[] = $this->siteAssignmentRule->evaluate($shift, $user);
         $checks[] = $this->driverLicenceRule->evaluate($shift, $user);
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
+        $checks[] = $this->medicationCompetencyRule->evaluate($shift, $user);
 
         return EligibilityResult::fromChecks($checks);
     }

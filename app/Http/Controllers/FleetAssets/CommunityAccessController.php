@@ -180,9 +180,9 @@ class CommunityAccessController extends Controller
         if ($request->input('export') === 'csv') {
             return response()->streamDownload(function () use ($byResident) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Resident', 'House', 'Outings', 'Transport Trips', 'Total Hours', 'Last Outing']);
+                $this->putCsv($handle, ['Resident', 'House', 'Outings', 'Transport Trips', 'Total Hours', 'Last Outing']);
                 foreach ($byResident as $r) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $r['name'],
                         $r['house'],
                         $r['outings'],

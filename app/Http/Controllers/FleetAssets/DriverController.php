@@ -25,10 +25,10 @@ class DriverController extends Controller
             $allDrivers = (clone $query)->orderBy('name')->limit(5000)->get();
             return response()->streamDownload(function () use ($allDrivers) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Name', 'Email', 'Licence Class', 'Licence Expires', 'Status', 'Can Drive Clients']);
+                $this->putCsv($handle, ['Name', 'Email', 'Licence Class', 'Licence Expires', 'Status', 'Can Drive Clients']);
                 foreach ($allDrivers as $u) {
                     $e = $u->hrDriverEligibility;
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $u->name, $u->email,
                         $e?->licence_class ?? '', optional($e?->licence_expires_at)->format('Y-m-d') ?? '',
                         $e?->status ?? '', $e?->can_drive_clients ? 'Yes' : 'No',

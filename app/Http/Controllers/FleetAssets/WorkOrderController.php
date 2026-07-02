@@ -22,9 +22,9 @@ class WorkOrderController extends Controller
             $all = (clone $query)->latest()->limit(5000)->get();
             return response()->streamDownload(function () use ($all) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Title', 'Asset', 'Priority', 'Status', 'Assigned To', 'Due Date', 'Created']);
+                $this->putCsv($handle, ['Title', 'Asset', 'Priority', 'Status', 'Assigned To', 'Due Date', 'Created']);
                 foreach ($all as $wo) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $wo->title, $wo->asset?->name ?? '', $wo->priority, $wo->status,
                         $wo->assignedTo?->name ?? '', optional($wo->due_at)->format('Y-m-d') ?? '',
                         optional($wo->created_at)->format('Y-m-d') ?? '',

@@ -886,7 +886,7 @@ class GoalController extends Controller
 
         return response()->streamDownload(function () use ($goals) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Type', 'Objective', 'Owner', 'Cycle', 'Status', 'Confidence',
                 'Priority', 'Progress %', 'Start', 'Due',
                 'Key result', 'KR type', 'Baseline', 'Current', 'Target', 'Unit', 'Weight', 'KR progress %',
@@ -907,12 +907,12 @@ class GoalController extends Controller
                 ];
 
                 if ($g->keyResults->isEmpty()) {
-                    fputcsv($out, [...$base, '', '', '', '', '', '', '', '']);
+                    $this->putCsv($out, [...$base, '', '', '', '', '', '', '', '']);
                     continue;
                 }
 
                 foreach ($g->keyResults as $kr) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         ...$base,
                         $kr->title,
                         $kr->kr_type,

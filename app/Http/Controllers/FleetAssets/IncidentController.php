@@ -1070,9 +1070,9 @@ class IncidentController extends Controller
 
         return response()->streamDownload(function () use ($all) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Ref', 'Date', 'Vehicle/Asset', 'Type', 'Severity', 'Location', 'Reported By', 'Driver', 'Status', 'Injury', 'Off-road', 'Police due', 'TCR ref', 'Insurance ref', 'Description']);
+            $this->putCsv($handle, ['Ref', 'Date', 'Vehicle/Asset', 'Type', 'Severity', 'Location', 'Reported By', 'Driver', 'Status', 'Injury', 'Off-road', 'Police due', 'TCR ref', 'Insurance ref', 'Description']);
             foreach ($all as $i) {
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $i->reference(),
                     optional($i->occurred_at)->format('Y-m-d H:i') ?? '',
                     $i->asset?->name ?? '',

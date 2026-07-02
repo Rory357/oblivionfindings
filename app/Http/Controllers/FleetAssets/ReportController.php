@@ -486,10 +486,10 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($trips) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Trip ID', 'Vehicle', 'Driver', 'Started At', 'Ended At', 'Distance (km)', 'Duration (min)', 'Status']);
+            $this->putCsv($handle, ['Trip ID', 'Vehicle', 'Driver', 'Started At', 'Ended At', 'Distance (km)', 'Duration (min)', 'Status']);
             foreach ($trips as $trip) {
                 $durationMin = $trip->duration_s ? round($trip->duration_s / 60, 0) : '';
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $trip->id,
                     $trip->asset?->name ?? '',
                     $trip->driverSession?->user?->name ?? '',
@@ -516,9 +516,9 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($logs) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Log ID', 'Vehicle', 'User', 'Date', 'Fuel Type', 'Litres', 'Cost Per Litre', 'Total Cost', 'Odometer (km)']);
+            $this->putCsv($handle, ['Log ID', 'Vehicle', 'User', 'Date', 'Fuel Type', 'Litres', 'Cost Per Litre', 'Total Cost', 'Odometer (km)']);
             foreach ($logs as $log) {
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $log->id,
                     $log->asset?->name ?? '',
                     $log->user?->name ?? '',
@@ -546,9 +546,9 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($workOrders) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['WO ID', 'Vehicle', 'Title', 'Priority', 'Status', 'Reported By', 'Assigned To', 'Due At', 'Estimated Cost', 'Actual Cost']);
+            $this->putCsv($handle, ['WO ID', 'Vehicle', 'Title', 'Priority', 'Status', 'Reported By', 'Assigned To', 'Due At', 'Estimated Cost', 'Actual Cost']);
             foreach ($workOrders as $wo) {
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $wo->id,
                     $wo->asset?->name ?? '',
                     $wo->title ?? '',
@@ -572,9 +572,9 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($vehicles) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Vehicle', 'Asset Tag', 'Registration Number', 'WOF Expires', 'Registration Expires', 'COF Expires']);
+            $this->putCsv($handle, ['Vehicle', 'Asset Tag', 'Registration Number', 'WOF Expires', 'Registration Expires', 'COF Expires']);
             foreach ($vehicles as $v) {
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $v->name ?? '',
                     $v->asset_tag ?? '',
                     $v->registration_number ?? '',

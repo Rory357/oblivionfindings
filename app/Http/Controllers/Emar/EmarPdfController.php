@@ -8,6 +8,7 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationRound;
+use App\Services\UserSiteAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -30,6 +31,7 @@ class EmarPdfController extends Controller
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
         $client = Client::findOrFail($request->input('client_id'));
+        $this->authorize('viewMedications', $client);
 
         $scheduledMedications = ClientMedication::where('client_id', $client->id)
             ->where('active', true)
@@ -89,6 +91,7 @@ class EmarPdfController extends Controller
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
 
         $client = Client::findOrFail($request->input('client_id'));
+        $this->authorize('viewMedications', $client);
 
         $entries = ClientControlledDrugEntry::where('client_id', $client->id)
             ->whereBetween('recorded_at', [
@@ -122,7 +125,16 @@ class EmarPdfController extends Controller
 
         $date = $request->input('date', Carbon::today()->toDateString());
 
+        // Scope to the sites this user may see (empty = unrestricted org-wide
+        // reporter or no site profile), so a site-restricted exporter cannot
+        // pull every site's round sheet by date.
+        $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
+            $request->user(),
+            ['reports.viewAny'],
+        );
+
         $rounds = MedicationRound::where('round_date', $date)
+            ->when($siteIds !== [], fn ($q) => $q->whereIn('site_id', $siteIds))
             ->with(['assignedTo', 'administrations.medication', 'administrations.client'])
             ->orderBy('scheduled_time')
             ->get();

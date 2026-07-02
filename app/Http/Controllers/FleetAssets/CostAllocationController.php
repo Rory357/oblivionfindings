@@ -198,14 +198,14 @@ class CostAllocationController extends Controller
             return response()->streamDownload(function () use ($tab, $bySite, $byResident) {
                 $handle = fopen('php://output', 'w');
                 if ($tab === 'resident') {
-                    fputcsv($handle, ['Resident', 'House', 'Trips', 'Distance (km)', 'Estimated Cost']);
+                    $this->putCsv($handle, ['Resident', 'House', 'Trips', 'Distance (km)', 'Estimated Cost']);
                     foreach ($byResident as $r) {
-                        fputcsv($handle, [$r['name'], $r['house'], $r['trips'], $r['distance_km'], $r['estimated_cost']]);
+                        $this->putCsv($handle, [$r['name'], $r['house'], $r['trips'], $r['distance_km'], $r['estimated_cost']]);
                     }
                 } else {
-                    fputcsv($handle, ['House', 'Vehicles', 'Fuel Cost', 'Maintenance Cost', 'Total', 'Cost/Vehicle']);
+                    $this->putCsv($handle, ['House', 'Vehicles', 'Fuel Cost', 'Maintenance Cost', 'Total', 'Cost/Vehicle']);
                     foreach ($bySite as $s) {
-                        fputcsv($handle, [$s['name'], $s['vehicles'], $s['fuel_cost'], $s['maintenance_cost'], $s['total'], $s['cost_per_vehicle']]);
+                        $this->putCsv($handle, [$s['name'], $s['vehicles'], $s['fuel_cost'], $s['maintenance_cost'], $s['total'], $s['cost_per_vehicle']]);
                     }
                 }
                 fclose($handle);

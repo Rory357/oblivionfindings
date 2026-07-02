@@ -124,9 +124,9 @@ class OnboardingController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Employee', 'Role', 'Site', 'Template', 'Status', 'Tasks done', 'Tasks total', 'Owner', 'Due date']);
+            $this->putCsv($out, ['Employee', 'Role', 'Site', 'Template', 'Status', 'Tasks done', 'Tasks total', 'Owner', 'Due date']);
             foreach ($rows as $c) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $c->employeeProfile?->user?->name ?? 'Unknown',
                     $c->employeeProfile?->position_title ?? $c->employeeProfile?->position_role,
                     $c->employeeProfile?->primarySite?->name,

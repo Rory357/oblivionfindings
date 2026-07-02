@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
@@ -10,6 +11,8 @@ use Illuminate\Http\Request;
 
 class MedicationsReportController extends Controller
 {
+    use SanitizesCsvOutput;
+
     public function index(Request $request)
     {
         // Access is permission-gated at the route level (reports.viewAny)
@@ -205,7 +208,7 @@ class MedicationsReportController extends Controller
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Administered At',
                 'Scheduled For',
                 'Client',
@@ -222,7 +225,7 @@ class MedicationsReportController extends Controller
                 foreach ($rows as $a) {
                     $clientName = trim(($a->client?->first_name ?? '') . ' ' . ($a->client?->last_name ?? ''));
                     $contextName = $a->serviceContext?->name ?? '';
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         optional($a->scheduled_for)->toDateTimeString(),
                         $clientName,
@@ -284,7 +287,7 @@ class MedicationsReportController extends Controller
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Reported At',
                 'Status',
                 'Client',
@@ -305,7 +308,7 @@ class MedicationsReportController extends Controller
             $q->orderBy('reported_at')->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $d) {
                     $clientName = trim(($d->client?->first_name ?? '') . ' ' . ($d->client?->last_name ?? ''));
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         optional($d->reported_at)->toDateTimeString(),
                         $d->status,
                         $clientName,

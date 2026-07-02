@@ -80,8 +80,13 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
             ];
         }
 
-        // Expiring within warning window.
-        if ($licenceExpiry->diffInDays($shiftStart, false) <= self::EXPIRY_WARNING_DAYS) {
+        // Expiring within warning window. Compute whole days from the shift to
+        // the (not-yet-passed) expiry off the day boundaries so the sign is
+        // unambiguous — `$expiry->diffInDays($shiftStart, false)` is negative
+        // for any future expiry and would warn on every valid licence.
+        $daysUntilExpiry = $shiftStart->copy()->startOfDay()->diffInDays($licenceExpiry->copy()->startOfDay());
+
+        if ($daysUntilExpiry <= self::EXPIRY_WARNING_DAYS) {
             return [
                 'rule' => 'driver_licence',
                 'passed' => false,

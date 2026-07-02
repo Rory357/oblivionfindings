@@ -33,6 +33,7 @@ class CalendarSources
             ['key' => 'ppe',        'label' => 'PPE & equipment',   'short' => 'PPE',        'group' => 'auto',   'icon' => 'HardHat',       'origin' => 'PPE register'],
             ['key' => 'respite',    'label' => 'Respite booking',   'short' => 'Respite',    'group' => 'auto',   'icon' => 'BedDouble',     'origin' => 'Respite'],
             ['key' => 'participation', 'label' => 'Worker participation', 'short' => 'Participation', 'group' => 'auto', 'icon' => 'Users',     'origin' => 'Worker participation'],
+            ['key' => 'medication', 'label' => 'Medication',        'short' => 'Medication', 'group' => 'auto',   'icon' => 'Pill',          'origin' => 'eMAR'],
             ['key' => 'external',   'label' => 'External busy',     'short' => 'External',   'group' => 'external', 'icon' => 'Lock',        'origin' => 'External calendar'],
         ];
     }

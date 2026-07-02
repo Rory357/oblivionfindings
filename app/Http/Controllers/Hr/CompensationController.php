@@ -145,14 +145,14 @@ class CompensationController extends Controller
         return response()->streamDownload(function () use ($bands) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads currency/macrons correctly
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Position role', 'Band', 'Currency',
                 'Min salary', 'Mid salary', 'Max salary',
                 'Min hourly', 'Max hourly',
                 'Effective from', 'Effective to',
             ]);
             foreach ($bands as $band) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $band->position_role,
                     $band->band_name,
                     $band->currency,

@@ -45,17 +45,17 @@ class CombinedReportController extends Controller
 
         return response()->streamDownload(function () use ($payload) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Metric', 'Value']);
+            $this->putCsv($out, ['Metric', 'Value']);
             foreach ($payload['metrics'] as $metric) {
-                fputcsv($out, [$metric['label'], $metric['value']]);
+                $this->putCsv($out, [$metric['label'], $metric['value']]);
             }
 
             foreach ($payload['sections'] as $section) {
-                fputcsv($out, []);
-                fputcsv($out, [$section['title']]);
-                fputcsv($out, $section['columns']);
+                $this->putCsv($out, []);
+                $this->putCsv($out, [$section['title']]);
+                $this->putCsv($out, $section['columns']);
                 foreach ($section['rows'] as $row) {
-                    fputcsv($out, $row['cells']);
+                    $this->putCsv($out, $row['cells']);
                 }
             }
             fclose($out);

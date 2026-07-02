@@ -245,12 +245,12 @@ class ResidentTransportController extends Controller
             $all = (clone $query)->latest('departed_at')->limit(5000)->get();
             return response()->streamDownload(function () use ($all) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['ID', 'Vehicle', 'Driver', 'Resident', 'Type', 'Pickup', 'Dropoff', 'Departed', 'Arrived', 'Duration (min)', 'Passengers', 'Supervisor', 'Status', 'Notes']);
+                $this->putCsv($handle, ['ID', 'Vehicle', 'Driver', 'Resident', 'Type', 'Pickup', 'Dropoff', 'Departed', 'Arrived', 'Duration (min)', 'Passengers', 'Supervisor', 'Status', 'Notes']);
                 foreach ($all as $t) {
                     $duration = ($t->departed_at && $t->arrived_at)
                         ? round($t->departed_at->diffInMinutes($t->arrived_at), 1)
                         : '';
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $t->id,
                         $t->asset?->name ?? '',
                         $t->driver?->name ?? '',
@@ -1024,9 +1024,9 @@ class ResidentTransportController extends Controller
             $all = (clone $query)->latest('packed_at')->limit(5000)->get();
             return response()->streamDownload(function () use ($all) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
+                $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
                 foreach ($all as $log) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $log->id,
                         trim(($log->client?->first_name ?? '') . ' ' . ($log->client?->last_name ?? '')),
                         $log->medication_name,

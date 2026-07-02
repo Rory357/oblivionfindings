@@ -179,7 +179,10 @@ class MedicationControllerTest extends TestCase
 
     public function test_canonical_medications_daily_view_accessible_by_support_worker(): void
     {
+        // /emar/daily 301s to the merged /emar home (see MedicationsController);
+        // the canonical daily view is reachable by following that redirect.
         $this->actingAs($this->supportWorker)
+            ->followingRedirects()
             ->get(EmarUrl::daily())
             ->assertOk();
     }
@@ -197,11 +200,15 @@ class MedicationControllerTest extends TestCase
 
     public function test_support_worker_only_sees_assigned_clients_in_medications_index(): void
     {
-        // Create an unassigned client
+        // The client picker now lives on the MAR chart page; both residents get
+        // an active medication so the assigned-only scoping (not the has-meds
+        // filter) is what excludes the unassigned client.
+        $this->createMedication();
         $unassignedClient = Client::factory()->create();
+        $this->createMedication(['client_id' => $unassignedClient->id]);
 
         $this->actingAs($this->supportWorker)
-            ->get(EmarUrl::daily())
+            ->get(EmarUrl::mar())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
@@ -212,10 +219,12 @@ class MedicationControllerTest extends TestCase
 
     public function test_admin_sees_all_clients_in_medications_index(): void
     {
+        $this->createMedication();
         $otherClient = Client::factory()->create();
+        $this->createMedication(['client_id' => $otherClient->id]);
 
         $this->actingAs($this->admin)
-            ->get(EmarUrl::daily())
+            ->get(EmarUrl::mar())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
@@ -1604,7 +1613,13 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('client_break_glass_accesses', ['id' => $access->id]);
+        // Revocation soft-deletes: the activation is retained for the
+        // break-glass audit trail (never hard-erased) with the revoker stamped.
+        $this->assertSoftDeleted('client_break_glass_accesses', ['id' => $access->id]);
+        $this->assertSame(
+            $this->providerManager->id,
+            ClientBreakGlassAccess::withTrashed()->find($access->id)->revoked_by,
+        );
     }
 
     public function test_break_glass_destroy_by_admin(): void
@@ -1623,7 +1638,8 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('client_break_glass_accesses', ['id' => $access->id]);
+        // Soft-deleted for the audit trail, not hard-erased.
+        $this->assertSoftDeleted('client_break_glass_accesses', ['id' => $access->id]);
     }
 
     public function test_break_glass_destroy_by_non_owner_non_manager_forbidden(): void

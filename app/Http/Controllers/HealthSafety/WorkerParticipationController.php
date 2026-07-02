@@ -708,31 +708,31 @@ class WorkerParticipationController extends Controller
         return response()->streamDownload(function () use ($reps, $meetings, $consultations) {
             $out = fopen('php://output', 'w');
 
-            fputcsv($out, ['H&S Representatives']);
-            fputcsv($out, ['Name', 'Site', 'Work group', 'Election method', 'Elected', 'Term expires', 'Training days', 'Status']);
+            $this->putCsv($out, ['H&S Representatives']);
+            $this->putCsv($out, ['Name', 'Site', 'Work group', 'Election method', 'Elected', 'Term expires', 'Training days', 'Status']);
             foreach ($reps as $r) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $r->user?->name, $r->site?->name, $r->work_group, $r->election_method,
                     optional($r->elected_at)->toDateString(), optional($r->term_expires_at)->toDateString(),
                     $r->training_days_completed, $r->status,
                 ]);
             }
 
-            fputcsv($out, []);
-            fputcsv($out, ['Committee Meetings']);
-            fputcsv($out, ['Committee', 'Scheduled', 'Status', 'Minutes filed', 'Actions due']);
+            $this->putCsv($out, []);
+            $this->putCsv($out, ['Committee Meetings']);
+            $this->putCsv($out, ['Committee', 'Scheduled', 'Status', 'Minutes filed', 'Actions due']);
             foreach ($meetings as $m) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $m->committee?->name, optional($m->scheduled_at)->format('Y-m-d H:i'), $m->status,
                     $m->minutes_document_path ? 'Yes' : 'No', $m->actions_due_count,
                 ]);
             }
 
-            fputcsv($out, []);
-            fputcsv($out, ['Worker Consultations']);
-            fputcsv($out, ['Title', 'Type', 'Site', 'Date', 'Status', 'Supporting doc', 'Outcome doc']);
+            $this->putCsv($out, []);
+            $this->putCsv($out, ['Worker Consultations']);
+            $this->putCsv($out, ['Title', 'Type', 'Site', 'Date', 'Status', 'Supporting doc', 'Outcome doc']);
             foreach ($consultations as $c) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $c->title, $c->consultation_type, $c->site?->name, optional($c->consultation_date)->toDateString(),
                     $c->status, $c->document_path ? 'Yes' : 'No', $c->outcome_document_path ? 'Yes' : 'No',
                 ]);

@@ -234,9 +234,9 @@ class PpeController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Type', 'Category', 'Standard', 'Site', 'Location', 'Brand', 'Model', 'Serial', 'Quantity', 'Condition', 'Status', 'Expiry', 'Next inspection']);
+            $this->putCsv($out, ['Type', 'Category', 'Standard', 'Site', 'Location', 'Brand', 'Model', 'Serial', 'Quantity', 'Condition', 'Status', 'Expiry', 'Next inspection']);
             foreach ($rows as $i) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $i->ppeType?->name,
                     $i->ppeType?->category,
                     $i->ppeType?->standards_reference,

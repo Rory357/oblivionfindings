@@ -325,9 +325,9 @@ class HealthSafetyDashboardController extends Controller
 
         return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, $data['headers']);
+            $this->putCsv($out, $data['headers']);
             foreach ($data['rows'] as $row) {
-                fputcsv($out, $row);
+                $this->putCsv($out, $row);
             }
             fclose($out);
         }, $filename, [

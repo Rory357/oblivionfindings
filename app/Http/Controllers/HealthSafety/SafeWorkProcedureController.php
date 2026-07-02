@@ -117,9 +117,9 @@ class SafeWorkProcedureController extends Controller
 
         return response()->streamDownload(function () use ($procedures) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reference', 'Title', 'Category', 'Status', 'Version', 'Owner', 'Approved by', 'Next review', 'Sites', 'Roles']);
+            $this->putCsv($out, ['Reference', 'Title', 'Category', 'Status', 'Version', 'Owner', 'Approved by', 'Next review', 'Sites', 'Roles']);
             foreach ($procedures as $p) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $p->reference_number,
                     $p->title,
                     $this->categoryLabel((string) $p->category),

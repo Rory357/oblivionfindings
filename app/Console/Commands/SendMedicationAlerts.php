@@ -13,6 +13,7 @@ use App\Notifications\MedicationOverdueNotification;
 use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -168,7 +169,7 @@ class SendMedicationAlerts extends Command
                 $query->whereNull('last_reorder_alert_at')
                     ->orWhere('last_reorder_alert_at', '<', now()->subHours(24));
             })
-            ->with('medication.client')
+            ->with('medication.client:id,first_name,last_name,site_id')
             ->get();
 
         if ($lowStocks->isEmpty()) {
@@ -176,18 +177,42 @@ class SendMedicationAlerts extends Command
             return;
         }
 
-        // Find users with medications.view permission
-        $users = User::whereHas('roles', function ($q) {
-            $q->whereHas('permissions', fn ($p) => $p->where('key', 'medications.view'));
-        })->get();
+        // Candidate recipients: users who hold medications.view via a role OR a
+        // per-user override, with canDo() making the authoritative call so
+        // deny-overrides are honoured (the previous role-only query missed
+        // per-user grants and ignored overrides).
+        $siteAccess = app(UserSiteAccessService::class);
+        $recipients = User::query()
+            ->where(function ($q) {
+                $q->whereHas('roles.permissions', fn ($p) => $p->where('key', 'medications.view'))
+                    ->orWhereHas('permissionOverrides', fn ($p) => $p->where('permissions.key', 'medications.view'));
+            })
+            ->get()
+            ->filter(fn (User $user) => $user->canDo('medications.view'))
+            ->map(fn (User $user) => [
+                'user' => $user,
+                // Empty = unrestricted (manager/no site profile); otherwise the
+                // set of sites this user may see.
+                'sites' => $siteAccess->accessibleSiteIds($user, ['medications.reports.export', 'reports.viewAny']),
+            ])
+            ->values();
 
         $count = 0;
         foreach ($lowStocks as $stock) {
             $medicationName = $stock->medication?->name ?? 'Unknown medication';
-            $clientName = $stock->medication?->client?->name ?? 'Unknown client';
+            $client = $stock->medication?->client;
+            $clientName = $client ? trim($client->first_name.' '.$client->last_name) : 'Unknown client';
+            $stockSiteId = $client?->site_id;
 
-            foreach ($users as $user) {
-                $user->notify(new MedicationStockLowNotification(
+            foreach ($recipients as $entry) {
+                // Site-scope: a site-restricted recipient only hears about stock
+                // for a client at one of their sites; org-wide recipients (empty
+                // set) hear everything.
+                if ($entry['sites'] !== [] && $stockSiteId !== null && ! in_array((int) $stockSiteId, $entry['sites'], true)) {
+                    continue;
+                }
+
+                $entry['user']->notify(new MedicationStockLowNotification(
                     medication: $medicationName,
                     clientName: $clientName,
                     count: (int) $stock->on_hand,

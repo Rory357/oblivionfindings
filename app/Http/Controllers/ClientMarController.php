@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\EnhancedMarService;
@@ -13,6 +14,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientMarController extends Controller
 {
+    use SanitizesCsvOutput;
+
     public function show(Request $request, Client $client)
     {
         $user = $request->user();
@@ -44,11 +47,11 @@ class ClientMarController extends Controller
 
         return response()->streamDownload(function () use ($payload) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Scheduled', 'Medication', 'Dosage', 'Route', 'Form', 'Status', 'Administered at', 'Reason', 'Notes']);
+            $this->putCsv($out, ['Scheduled', 'Medication', 'Dosage', 'Route', 'Form', 'Status', 'Administered at', 'Reason', 'Notes']);
             // Export scheduled medications
             foreach ($payload['scheduled'] as $row) {
                 $admin = $row['administration'];
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $row['scheduled_for'] ? Carbon::parse($row['scheduled_for'])->format('Y-m-d H:i') : '',
                     $row['medication']['name'] ?? '',
                     $row['medication']['dosage'] ?? '',
@@ -62,7 +65,7 @@ class ClientMarController extends Controller
             }
             // Export PRN medications (as separate rows)
             foreach ($payload['prn'] as $prn) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     'PRN',
                     $prn['medication']['name'] ?? '',
                     $prn['medication']['dosage'] ?? '',

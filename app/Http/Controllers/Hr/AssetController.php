@@ -534,12 +534,12 @@ class AssetController extends Controller
 
         return response()->streamDownload(function () use ($assets) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Tag', 'Name', 'Category', 'Status', 'Make', 'Model', 'Serial',
                 'Purchase cost (NZD)', 'Supplier', 'Warranty expiry', 'Assignee', 'Fleet-linked',
             ]);
             foreach ($assets as $a) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $a->asset_tag,
                     $a->name,
                     $a->category,

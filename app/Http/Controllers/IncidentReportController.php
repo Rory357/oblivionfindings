@@ -54,7 +54,7 @@ class IncidentReportController extends Controller
 
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Incident ID',
                 'Client',
                 'Shift ID',
@@ -74,7 +74,7 @@ class IncidentReportController extends Controller
 
             $q->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $i) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $i->id,
                         ($i->client?->first_name . ' ' . $i->client?->last_name),
                         $i->shift_id,

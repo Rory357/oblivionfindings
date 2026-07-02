@@ -22,7 +22,6 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class ClientMedicalController extends Controller
 {
@@ -407,6 +406,7 @@ class ClientMedicalController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
             'shift_id' => ['nullable', 'integer'],
@@ -516,18 +516,8 @@ class ClientMedicalController extends Controller
             );
 
             if (! ($result['success'] ?? false)) {
-                if (
-                    $medication->is_prn
-                    && ($result['safety_check']['blocked'] ?? false)
-                    && $medication->fresh()->isPrnBlocked()
-                ) {
-                    $limitIncidentKey = 'emar:prn-over-limit:'.$client->id.':'.$medication->id.':'.now()->format('YmdHi');
-                    if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
-                        app(MedicationIncidentIntegrationService::class)
-                            ->handlePrnOverLimit($client, $medication->fresh(), $user->id);
-                    }
-                }
-
+                // PRN over-limit incidents are raised inside EnhancedMarService
+                // (shared across all recording surfaces), so no handling here.
                 if ($request->expectsJson()) {
                     return response()->json(
                         $this->withMedicationSync(
@@ -581,16 +571,9 @@ class ClientMedicalController extends Controller
                 'created_by' => $user->id,
             ]);
 
-            if ($data['status'] === 'missed') {
-                app(MedicationIncidentIntegrationService::class)->handleMissedDose($a, $user->id);
-            } elseif ($data['status'] === 'refused' && ($medication->high_risk || $medication->controlled_drug)) {
-                app(MedicationIncidentIntegrationService::class)->handleRefusedDose($a);
-            }
-
-            if (($a->late_minutes ?? null) && $a->late_minutes > 120) {
-                app(MedicationIncidentIntegrationService::class)->handleLateDose($a, $a->late_minutes);
-            }
-
+            // Missed/refused/late incident creation now lives in
+            // EnhancedMarService::recordAdministration so every recording
+            // surface raises the same incidents.
             app(MedicationAlertService::class)->generateClientAlerts($client);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication administration', $a, $client, [

@@ -291,6 +291,7 @@ export default function Handovers({ handovers = [], weekStart, weekEnd, catalogu
                 onSubmit={submitHandover}
                 onAcknowledge={acknowledgeHandover}
                 medicationSnapshotUrl="/emar/handovers/shift-medications"
+                emarLens
             />
 
             {wizardOpen && (

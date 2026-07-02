@@ -863,14 +863,14 @@ class TimeTrackingController extends Controller
 
         return response()->streamDownload(function () use ($query, $tz) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, [
+            $this->putCsv($out, [
                 'Staff', 'Date', 'Clock in', 'Clock out', 'Break (min)', 'Hours',
                 'Pay type', 'Sleepover', 'On-call', 'Public holiday',
                 'Break compliant', 'Mileage (km)', 'Site', 'Status',
             ]);
             $query->chunk(500, function ($rows) use ($out, $tz) {
                 foreach ($rows as $e) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $e->user?->name ?? 'Unknown',
                         $e->entry_date->toDateString(),
                         $e->clock_in?->copy()->setTimezone($tz)->format('Y-m-d H:i'),

@@ -48,12 +48,12 @@ class AuditLogSettingsController extends Controller
         return response()->streamDownload(function () use ($logs): void {
             $handle = fopen('php://output', 'wb');
 
-            fputcsv($handle, ['Timestamp', 'User', 'Description', 'Action', 'Module', 'Subject', 'IP Address']);
+            $this->putCsv($handle, ['Timestamp', 'User', 'Description', 'Action', 'Module', 'Subject', 'IP Address']);
 
             foreach ($logs as $log) {
                 $event = $this->mapEvent($log);
 
-                fputcsv($handle, [
+                $this->putCsv($handle, [
                     $event['created_at'],
                     $event['causer']['name'] ?? 'System',
                     $event['description'],

@@ -977,19 +977,19 @@ class WellbeingController extends Controller
         return response()->streamDownload(function () use ($survey, $summary, $isAnonymous) {
             $out = fopen('php://output', 'w');
 
-            fputcsv($out, ['Survey', $survey->title]);
-            fputcsv($out, ['Type', $survey->survey_type]);
-            fputcsv($out, ['Anonymous', $isAnonymous ? 'Yes' : 'No']);
-            fputcsv($out, ['Responses', $summary['response_count']]);
+            $this->putCsv($out, ['Survey', $survey->title]);
+            $this->putCsv($out, ['Type', $survey->survey_type]);
+            $this->putCsv($out, ['Anonymous', $isAnonymous ? 'Yes' : 'No']);
+            $this->putCsv($out, ['Responses', $summary['response_count']]);
             if ($summary['enps'] !== null) {
-                fputcsv($out, ['eNPS', $summary['enps']]);
+                $this->putCsv($out, ['eNPS', $summary['enps']]);
             }
-            fputcsv($out, []);
+            $this->putCsv($out, []);
 
             // Per-question averages (anonymity-safe aggregate).
-            fputcsv($out, ['Question', 'Type', 'Responses', 'Average']);
+            $this->putCsv($out, ['Question', 'Type', 'Responses', 'Average']);
             foreach ($summary['question_stats'] as $stat) {
-                fputcsv($out, [$stat['question_text'], $stat['question_type'], $stat['responses'], $stat['average'] ?? '—']);
+                $this->putCsv($out, [$stat['question_text'], $stat['question_type'], $stat['responses'], $stat['average'] ?? '—']);
             }
 
             fclose($out);

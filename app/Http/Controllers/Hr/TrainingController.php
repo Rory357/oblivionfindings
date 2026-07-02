@@ -603,9 +603,9 @@ class TrainingController extends Controller
 
         return response()->streamDownload(function () use ($headers, $rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, $headers);
+            $this->putCsv($out, $headers);
             foreach ($rows as $row) {
-                fputcsv($out, $row);
+                $this->putCsv($out, $row);
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);

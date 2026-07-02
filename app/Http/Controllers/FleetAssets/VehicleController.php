@@ -61,9 +61,9 @@ class VehicleController extends Controller
             $allVehicles = (clone $query)->orderBy('name')->limit(5000)->get();
             return response()->streamDownload(function () use ($allVehicles, $hasFleetFields) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
+                $this->putCsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
                 foreach ($allVehicles as $v) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $v->name,
                         $v->asset_tag,
                         $v->status,

@@ -53,7 +53,7 @@ class RecruitmentExportController extends Controller
     /** @param resource $out */
     private function streamPipeline($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Name', 'Email', 'Stage', 'Requisition', 'Source', 'Days in stage', 'Created']);
+        $this->putCsv($out, ['Name', 'Email', 'Stage', 'Requisition', 'Source', 'Days in stage', 'Created']);
 
         HrCandidate::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
@@ -63,7 +63,7 @@ class RecruitmentExportController extends Controller
             ->chunk(500, function ($candidates) use ($out) {
                 foreach ($candidates as $c) {
                     $days = $c->current_stage_entered_at ? (int) $c->current_stage_entered_at->diffInDays(now()) : 0;
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $c->full_name,
                         $c->personal_email,
                         $c->status,
@@ -79,7 +79,7 @@ class RecruitmentExportController extends Controller
     /** @param resource $out */
     private function streamRequisitions($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Title', 'Site', 'Status', 'Openings', 'Applicants', 'Hiring manager', 'Employment type']);
+        $this->putCsv($out, ['Title', 'Site', 'Status', 'Openings', 'Applicants', 'Hiring manager', 'Employment type']);
 
         HrJobRequisition::query()
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
@@ -88,7 +88,7 @@ class RecruitmentExportController extends Controller
             ->orderByDesc('created_at')
             ->chunk(500, function ($reqs) use ($out) {
                 foreach ($reqs as $r) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $r->title,
                         $r->site?->name ?? '',
                         $r->status,
@@ -104,7 +104,7 @@ class RecruitmentExportController extends Controller
     /** @param resource $out */
     private function streamOffers($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Candidate', 'Role', 'Approval', 'Response', 'Hourly rate', 'Annual salary', 'Sent at', 'Created']);
+        $this->putCsv($out, ['Candidate', 'Role', 'Approval', 'Response', 'Hourly rate', 'Annual salary', 'Sent at', 'Created']);
 
         HrOffer::query()
             ->with(['application.candidate:id,first_name,last_name,tenant_id'])
@@ -112,7 +112,7 @@ class RecruitmentExportController extends Controller
             ->orderByDesc('created_at')
             ->chunk(500, function ($offers) use ($out) {
                 foreach ($offers as $o) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $o->application?->candidate?->full_name ?? '',
                         $o->position_title,
                         $o->approval_status,
@@ -129,16 +129,16 @@ class RecruitmentExportController extends Controller
     /** @param resource $out */
     private function streamAnalytics($out, ?int $tenantId, RecruitmentAnalyticsService $analytics): void
     {
-        fputcsv($out, ['Section', 'Label', 'Count', 'Detail']);
+        $this->putCsv($out, ['Section', 'Label', 'Count', 'Detail']);
 
         foreach ($analytics->getPipelineConversion($tenantId) as $row) {
-            fputcsv($out, ['Conversion funnel', $row['stage'], $row['count'], ($row['percentage'] ?? 0).'%']);
+            $this->putCsv($out, ['Conversion funnel', $row['stage'], $row['count'], ($row['percentage'] ?? 0).'%']);
         }
         foreach ($analytics->getSourceEffectiveness($tenantId) as $row) {
-            fputcsv($out, ['Source', $row['source'] ?: 'Unknown', $row['total'], $row['hired'].' hired · '.$row['conversion_rate'].'%']);
+            $this->putCsv($out, ['Source', $row['source'] ?: 'Unknown', $row['total'], $row['hired'].' hired · '.$row['conversion_rate'].'%']);
         }
         foreach ($analytics->getOpenPositionsSummary($tenantId) as $row) {
-            fputcsv($out, ['Open position', $row['position_title'], $row['applications'], $row['days_open'].' days open']);
+            $this->putCsv($out, ['Open position', $row['position_title'], $row['applications'], $row['days_open'].' days open']);
         }
     }
 }

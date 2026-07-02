@@ -122,10 +122,10 @@ class ShiftReportController extends Controller
         return response()->streamDownload(function () use ($payload) {
             $handle = fopen('php://output', 'w');
 
-            fputcsv($handle, $payload['headers']);
+            $this->putCsv($handle, $payload['headers']);
 
             foreach ($payload['rows'] as $row) {
-                fputcsv($handle, $row);
+                $this->putCsv($handle, $row);
             }
 
             fclose($handle);

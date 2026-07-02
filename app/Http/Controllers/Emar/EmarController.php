@@ -580,6 +580,42 @@ class EmarController extends Controller
     }
 
     /**
+     * Client ids this user may view medications for, or null when unrestricted
+     * (org-wide medication-ops / manager access). Mirrors the tiers of
+     * ClientPolicy::viewMedications so assigned-only staff don't see other
+     * residents in eMAR pickers/registers (the per-client 403 already existed;
+     * this closes the list-level disclosure).
+     *
+     * @return array<int, int>|null
+     */
+    private function medicationViewableClientIds(?User $user): ?array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $hasMedicationOpsAccess = $user->canDo('medications.view') && (
+            $user->canDo('medications.stock.update')
+            || $user->canDo('medications.audit.view')
+            || $user->canDo('medications.reports.export')
+            || $user->canDo('reports.viewAny')
+        );
+
+        $isOrgWideViewer = $user->canDo('clients.viewAny')
+            && ($user->hasRole('admin', 'manager', 'coordinator') || ! $user->hasRole('support_worker'));
+
+        if ($hasMedicationOpsAccess || $isOrgWideViewer) {
+            return null;
+        }
+
+        return Client::query()
+            ->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $contents
      * @return array<int, array<string, mixed>>
      */
@@ -732,6 +768,22 @@ class EmarController extends Controller
             ->first();
     }
 
+    /**
+     * A controlled-drug register witness must be authorised to witness — same
+     * bar as administration (EnhancedMarService::validateWitness). Recording a
+     * witness who cannot legally countersign is not a real second check.
+     */
+    private function assertControlledWitnessAuthorised(int $witnessId): void
+    {
+        $witness = User::query()->find($witnessId);
+
+        if (! $witness || ! $witness->canDo('medications.controlled.witness')) {
+            throw ValidationException::withMessages([
+                'witnessed_by' => 'The selected witness is not authorised to witness controlled drug records.',
+            ]);
+        }
+    }
+
     // ─── Dashboard ─────────────────────────────────────────
     public function dashboard(Request $request, MedicationOverviewService $overview)
     {
@@ -762,7 +814,9 @@ class EmarController extends Controller
         $scheduleDate = $scheduleService->dateFromInput($request->input('date'));
         $date = $scheduleDate->toDateString();
         [$dayStartUtc, $dayEndUtc] = $scheduleService->utcDayWindow($scheduleDate);
+        $viewableClientIds = $this->medicationViewableClientIds($request->user());
         $clients = Client::query()
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('id', $viewableClientIds))
             ->withCount(['medications as active_medications_count' => fn ($q) => $q->active()])
             ->having('active_medications_count', '>', 0)
             ->orderBy('last_name')
@@ -1124,6 +1178,7 @@ class EmarController extends Controller
     public function prn(Request $request)
     {
         $user = $request->user();
+        $viewableClientIds = $this->medicationViewableClientIds($user);
         $siteFilter = $request->integer('site_id') ?: null;
         $clientFilter = $request->integer('client_id') ?: null;
         $search = trim((string) $request->string('q')) ?: null;
@@ -1161,6 +1216,7 @@ class EmarController extends Controller
         // (capped working view; the History tab is the paginated full archive).
         $administrations = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
@@ -1175,6 +1231,7 @@ class EmarController extends Controller
         // (PrnFollowUp shape for the reused PrnEffectDialog).
         $pendingReviews = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->where('status', 'given')
@@ -1201,6 +1258,7 @@ class EmarController extends Controller
         // All PRN clients for the active site drive the Client filter dropdown;
         // the data lists (near-limit meds, record wizard) honour the client filter.
         $siteClientIds = ClientMedication::active()->prn()
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->distinct()->pluck('client_id')->all();
         $dataClientIds = $clientFilter
@@ -1396,6 +1454,8 @@ class EmarController extends Controller
         $siteFilter = $request->integer('site_id') ?: null;
         $clientFilter = $request->integer('client_id') ?: null;
         $search = trim((string) $request->string('q')) ?: null;
+        $viewableClientIds = $this->medicationViewableClientIds($request->user());
+        $byViewable = fn ($q) => $q->whereIn('client_id', $viewableClientIds);
         $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
         $byClient = fn ($q) => $q->where('client_id', $clientFilter);
 
@@ -1418,6 +1478,7 @@ class EmarController extends Controller
         $controlledMedications = ClientMedication::query()
             ->active()
             ->controlled()
+            ->when($viewableClientIds !== null, $byViewable)
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->with([
@@ -1442,6 +1503,7 @@ class EmarController extends Controller
             ->pluck('last_at', 'client_medication_id');
 
         $recentEntries = ClientControlledDrugEntry::query()
+            ->when($viewableClientIds !== null, $byViewable)
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->whereBetween('recorded_at', [$dayStart, $dayEnd])
@@ -1452,6 +1514,7 @@ class EmarController extends Controller
 
         $discrepancies = ClientControlledDrugDiscrepancy::query()
             ->whereIn('status', ['open', 'under_review'])
+            ->when($viewableClientIds !== null, $byViewable)
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->with([
@@ -1468,6 +1531,7 @@ class EmarController extends Controller
 
         $destructions = MedicationDestruction::query()
             ->controlled()
+            ->when($viewableClientIds !== null, $byViewable)
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->whereBetween('destroyed_at', [$dayStart, $dayEnd])
@@ -1477,6 +1541,7 @@ class EmarController extends Controller
             ->get();
 
         $lossReports = ControlledDrugLossReport::query()
+            ->when($viewableClientIds !== null, $byViewable)
             ->when($siteFilter, $bySite)
             ->when($clientFilter, $byClient)
             ->with([
@@ -2892,9 +2957,42 @@ class EmarController extends Controller
             unset($validated['prescriber_type']);
         }
 
-        MedicationPrescriberOrder::create($validated);
+        $order = MedicationPrescriberOrder::create($validated);
+
+        // A written cease order takes effect immediately; verbal/telephone
+        // cease orders apply once countersigned (see countersignPrescription).
+        if (! $order->requires_countersign) {
+            $this->applyCeaseOrder($order);
+        }
 
         return redirect()->back();
+    }
+
+    /**
+     * A "cease" prescriber order referencing an active medication must actually
+     * stop the medication appearing on rounds/MAR — recording the order without
+     * discontinuing the ClientMedication left it administrable.
+     */
+    private function applyCeaseOrder(MedicationPrescriberOrder $order): void
+    {
+        if ($order->order_type !== 'cease' || ! $order->client_medication_id) {
+            return;
+        }
+
+        $medication = ClientMedication::find($order->client_medication_id);
+        if (! $medication || $medication->state === 'ceased') {
+            return;
+        }
+
+        $medication->update([
+            'state' => 'ceased',
+            'active' => false,
+            'end_date' => now()->toDateString(),
+            'ceased_reason' => 'Prescriber cease order — '.$order->prescriber_name
+                .(filled($order->clinical_notes) ? ': '.$order->clinical_notes : ''),
+            'ceased_at' => now(),
+            'ceased_by' => $order->received_by,
+        ]);
     }
 
     public function updatePrescription(Request $request, MedicationPrescriberOrder $order)
@@ -2929,6 +3027,9 @@ class EmarController extends Controller
             'countersign_method' => $validated['countersign_method'] ?? null,
             'status' => $order->status === 'pending' ? 'confirmed' : $order->status,
         ]);
+
+        // A verbal/telephone cease order takes effect once countersigned.
+        $this->applyCeaseOrder($order->fresh());
 
         return redirect()->back();
     }
@@ -3755,9 +3856,47 @@ class EmarController extends Controller
             MedicationDestruction::create($validated);
 
             if (! empty($validated['client_medication_id'])) {
-                $stock = ClientMedicationStock::where('client_medication_id', $validated['client_medication_id'])->first();
+                $stock = ClientMedicationStock::where('client_medication_id', $validated['client_medication_id'])
+                    ->lockForUpdate()
+                    ->first();
+
                 if ($stock) {
-                    $stock->decrement('on_hand', $validated['quantity']);
+                    $before = (float) $stock->on_hand;
+                    $qty = (float) $validated['quantity'];
+
+                    // Validate here rather than letting the chk_stock_non_negative
+                    // DB constraint turn an over-destruction into a 500.
+                    if ($qty > $before) {
+                        throw ValidationException::withMessages([
+                            'quantity' => "Only {$before} {$stock->unit} on hand — you cannot destroy {$qty}. Reconcile the stock count first.",
+                        ]);
+                    }
+
+                    $stock->on_hand = $before - $qty;
+                    $stock->last_counted_at = now();
+                    $stock->save();
+
+                    // A controlled-drug destruction is a register movement (MoD
+                    // Regs 1977): write the disposal exit entry so the CD
+                    // register balance stays reconciled with stock.
+                    if (! empty($validated['is_controlled_drug'])) {
+                        ClientControlledDrugEntry::create([
+                            'client_id' => $validated['client_id'],
+                            'client_medication_id' => $validated['client_medication_id'],
+                            'service_context_id' => Client::find($validated['client_id'])?->service_context_id,
+                            'entry_type' => 'disposal',
+                            'quantity' => $qty,
+                            'unit' => $validated['unit'] ?? $stock->unit,
+                            'batch_number' => $validated['batch_number'] ?? null,
+                            'on_hand_before' => $before,
+                            'on_hand_after' => $stock->on_hand,
+                            'reason' => 'Destruction — '.$validated['reason'],
+                            'notes' => $validated['disposal_method'].(empty($validated['notes']) ? '' : "\n".$validated['notes']),
+                            'recorded_at' => now(),
+                            'recorded_by' => $validated['destroyed_by'],
+                            'witnessed_by' => $validated['witness_1_id'],
+                        ]);
+                    }
                 }
             }
         });
@@ -4068,7 +4207,9 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'client_medication_id' => 'required|exists:client_medications,id',
-            'quantity' => 'required|integer|min:1',
+            // on_hand is decimal (half/quarter tablets exist) — don't reject
+            // fractional receipts with an integer rule.
+            'quantity' => 'required|numeric|min:0.25|max:100000',
             'notes' => 'nullable|string|max:2000',
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
@@ -4179,7 +4320,7 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'client_medication_id' => 'required|exists:client_medications,id',
-            'new_quantity' => 'required|integer|min:0',
+            'new_quantity' => 'required|numeric|min:0|max:1000000',
             'reason' => 'required|string|max:500',
         ]);
 
@@ -4404,6 +4545,8 @@ class EmarController extends Controller
             return response()->json($cached);
         }
 
+        $this->assertControlledWitnessAuthorised((int) $validated['witnessed_by']);
+
         $client = Client::findOrFail($validated['client_id']);
         $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);
         $onHandBefore = $validated['on_hand_before'] ?? $validated['balance_before'] ?? null;
@@ -4541,6 +4684,8 @@ class EmarController extends Controller
         ) {
             return response()->json($cached);
         }
+
+        $this->assertControlledWitnessAuthorised((int) $validated['witnessed_by']);
 
         $client = Client::findOrFail($validated['client_id']);
         $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);

@@ -764,7 +764,7 @@ class RestraintController extends Controller
             $out = fopen('php://output', 'w');
 
             if ($lens === 'plans') {
-                fputcsv($out, ['Reference', 'Client', 'Title', 'Status', 'Restrictive practice', 'Review date', 'Review state']);
+                $this->putCsv($out, ['Reference', 'Client', 'Title', 'Status', 'Restrictive practice', 'Review date', 'Review state']);
                 BehaviourSupportPlan::with('client:id,first_name,last_name')
                     ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                     ->when($type, fn ($q) => $q->where('restrictive_practice_type', $type))
@@ -773,7 +773,7 @@ class RestraintController extends Controller
                     ->orderByDesc('created_at')
                     ->chunk(200, function ($plans) use ($out) {
                         foreach ($plans as $p) {
-                            fputcsv($out, [
+                            $this->putCsv($out, [
                                 $this->planRef($p->id),
                                 $p->client ? trim("{$p->client->first_name} {$p->client->last_name}") : '',
                                 $p->title,
@@ -785,7 +785,7 @@ class RestraintController extends Controller
                         }
                     });
             } else {
-                fputcsv($out, ['Reference', 'Client', 'Site', 'Type', 'Severity', 'Started', 'Ended', 'Duration (min)', 'Within plan', 'Injury', 'Reviewed']);
+                $this->putCsv($out, ['Reference', 'Client', 'Site', 'Type', 'Severity', 'Started', 'Ended', 'Duration (min)', 'Within plan', 'Injury', 'Reviewed']);
                 RestraintEvent::with(['client:id,first_name,last_name', 'site:id,name'])
                     ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                     ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
@@ -795,7 +795,7 @@ class RestraintController extends Controller
                     ->orderByDesc('started_at')
                     ->chunk(200, function ($events) use ($out) {
                         foreach ($events as $e) {
-                            fputcsv($out, [
+                            $this->putCsv($out, [
                                 $this->eventRef($e->id),
                                 $e->client ? trim("{$e->client->first_name} {$e->client->last_name}") : '',
                                 $e->site?->name,

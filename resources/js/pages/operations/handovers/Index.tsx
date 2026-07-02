@@ -29,7 +29,7 @@ type Props = {
     weekEnd: string;
     filters: { week: string };
     catalogue: Catalogue;
-    can: { create: boolean; manage: boolean };
+    can: { create: boolean; manage: boolean; view_medications?: boolean };
     currentUser: { id: number; name: string };
 };
 
@@ -266,6 +266,9 @@ export default function HandoversIndex({
                 onEdit={openEdit}
                 onSubmit={submitHandover}
                 onAcknowledge={acknowledgeHandover}
+                // Same live MAR lens the eMAR handover view shows, so the ops
+                // side isn't blind to "5 meds overdue" on the same shift.
+                medicationSnapshotUrl={can.view_medications ? '/emar/handovers/shift-medications' : undefined}
             />
 
             {wizardOpen ? (

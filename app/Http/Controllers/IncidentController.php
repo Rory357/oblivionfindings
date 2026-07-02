@@ -317,6 +317,13 @@ class IncidentController extends Controller
 
         $inv = $hsEvent?->latestInvestigation;
 
+        // Medication error that raised / was linked to this incident, so the
+        // incident side carries a back-link into the eMAR error report.
+        $medicationError = \App\Models\MedicationError::query()
+            ->where('client_incident_id', $incident->id)
+            ->with('medication:id,name')
+            ->first();
+
         return [
             'id' => $incident->id,
             'type' => $incident->type,
@@ -372,6 +379,15 @@ class IncidentController extends Controller
                 'created_by' => $f->creator?->name,
                 'overdue' => $f->due_at && ! $f->completed_at ? $f->due_at->isPast() : false,
             ])->values(),
+            'medication_error' => $medicationError ? [
+                'id' => $medicationError->id,
+                'error_type' => $medicationError->error_type,
+                'severity' => $medicationError->severity,
+                'status' => $medicationError->status,
+                'medication' => $medicationError->medication?->name,
+                'reported_at' => $medicationError->reported_at,
+                'url' => '/emar/errors',
+            ] : null,
             'control_room_alert' => $incident->controlRoomAlert ? [
                 'id' => $incident->controlRoomAlert->id,
                 'status' => $incident->controlRoomAlert->status,

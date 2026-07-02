@@ -12,6 +12,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -577,6 +578,16 @@ class EnhancedMarService
             return $witnessValidation;
         }
 
+        $competencyValidation = $this->validateAdministratorCompetency($data, $userId);
+        if ($competencyValidation !== null) {
+            return $competencyValidation;
+        }
+
+        $covertValidation = $this->validateCovertAuthorisation($medication, $data);
+        if ($covertValidation !== null) {
+            return $covertValidation;
+        }
+
         // Validate safety check (including dose validation)
         $safetyCheck = $this->safetyService->performSafetyCheck(
             $client,
@@ -586,12 +597,31 @@ class EnhancedMarService
         );
 
         if ($safetyCheck['blocked'] && !($data['override_safety'] ?? false)) {
+            // A blocked PRN over its 24h limit is an incident-worthy event no
+            // matter which surface attempted it (MAR wizard, My Day, guided
+            // round). Fire it here — the shared choke point — deduped so a
+            // worker re-tapping doesn't raise duplicates.
+            if ($medication->is_prn && $medication->fresh()->isPrnBlocked()) {
+                $limitIncidentKey = 'emar:prn-over-limit:'.$client->id.':'.$medication->id.':'.now()->format('YmdHi');
+                if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
+                    app(MedicationIncidentIntegrationService::class)
+                        ->handlePrnOverLimit($client, $medication->fresh(), $userId);
+                }
+            }
+
             return [
                 'success' => false,
                 'error' => $safetyCheck['block_reason'],
                 'error_field' => 'client_medication_id',
                 'safety_check' => $safetyCheck,
             ];
+        }
+
+        // A blocked safety check that proceeds via override_safety must leave a
+        // durable trace on the MAR record — a silent override is an audit gap.
+        if ($safetyCheck['blocked'] && ($data['override_safety'] ?? false)) {
+            $overrideNote = '⚠ Safety check overridden by recorder: '.($safetyCheck['block_reason'] ?? 'blocked');
+            $data['notes'] = trim(($data['notes'] ?? '') === '' ? $overrideNote : $data['notes']."\n".$overrideNote);
         }
 
         // Validate time window for scheduled doses
@@ -621,7 +651,7 @@ class EnhancedMarService
             }
         }
 
-        return DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation) {
+        $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation) {
             // Re-fetch medication with lock to prevent race conditions
             $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
 
@@ -703,7 +733,13 @@ class EnhancedMarService
 
             // Handle controlled drug register entry
             if ($medication->controlled_drug && $admin->status === 'given') {
-                $this->recordControlledDrugEntry($medication, $admin, $userId, $admin->witnessed_by);
+                $this->recordControlledDrugEntry(
+                    $medication,
+                    $admin,
+                    $userId,
+                    $admin->witnessed_by,
+                    (float) ($data['quantity_administered'] ?? 1)
+                );
             }
 
             return [
@@ -712,6 +748,34 @@ class EnhancedMarService
                 'safety_check' => $safetyCheck,
             ];
         });
+
+        // Incident integration fires after the transaction commits so a rolled-back
+        // dose never raises an incident. Living here (not per-controller) means the
+        // MAR wizard, My Day, guided rounds and the client-medical form all raise
+        // the same missed/refused/late incidents.
+        if (($result['success'] ?? false) && empty($result['duplicate']) && isset($result['administration'])) {
+            $this->fireIncidentHooks($result['administration'], $medication, $userId);
+        }
+
+        return $result;
+    }
+
+    private function fireIncidentHooks(
+        ClientMedicationAdministration $admin,
+        ClientMedication $medication,
+        int $userId
+    ): void {
+        $incidents = app(MedicationIncidentIntegrationService::class);
+
+        if ($admin->status === 'missed') {
+            $incidents->handleMissedDose($admin, $userId);
+        } elseif ($admin->status === 'refused' && ($medication->high_risk || $medication->controlled_drug)) {
+            $incidents->handleRefusedDose($admin);
+        }
+
+        if ($admin->late_minutes && $admin->late_minutes > 120) {
+            $incidents->handleLateDose($admin, $admin->late_minutes);
+        }
     }
 
     private function validateNotGivenReason(array $data): ?array
@@ -780,6 +844,70 @@ class EnhancedMarService
     private function missingValue(array $data, string $field): bool
     {
         return ! array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '';
+    }
+
+    /**
+     * Block a "given" administration when the administering user's LATEST
+     * medication competency assessment is failed or expired. Staff with no
+     * assessment on file stay permission-gated only (canDo), so admins and
+     * clinical managers who are not on the competency register are unaffected,
+     * and recording a refusal/missed dose (documentation) is never blocked.
+     */
+    private function validateAdministratorCompetency(array $data, int $userId): ?array
+    {
+        if (($data['status'] ?? null) !== 'given') {
+            return null;
+        }
+
+        $latest = \App\Models\MedicationCompetencyAssessment::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('assessment_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $latest || $latest->isPassed()) {
+            return null;
+        }
+
+        $why = $latest->status !== 'passed'
+            ? 'your latest medication competency assessment is recorded as "'.str_replace('_', ' ', (string) $latest->status).'"'
+            : 'your medication competency expired on '.$latest->expiry_date?->format('d/m/Y');
+
+        return [
+            'success' => false,
+            'error' => 'You cannot sign this dose as given — '.$why.'. Ask a competency assessor to reassess you before administering medications.',
+            'error_field' => 'status',
+        ];
+    }
+
+    /**
+     * A covert medication (hidden in food/drink) may only be administered under
+     * a current covert authorisation — a restrictive practice under NZ law. Once
+     * the authorisation's review date has passed the legal basis has lapsed, so
+     * block administration until it is renewed rather than silently continuing
+     * (the review-overdue flag was previously advisory-only in the UI).
+     */
+    private function validateCovertAuthorisation(ClientMedication $medication, array $data): ?array
+    {
+        if (($data['status'] ?? null) !== 'given') {
+            return null;
+        }
+
+        $covert = $medication->relationLoaded('covertAuthorisation')
+            ? $medication->covertAuthorisation
+            : $medication->covertAuthorisation()->first();
+
+        if (! $covert || ! $covert->isExpired()) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'error' => 'Covert administration is not authorised — the covert authorisation review was due on '
+                .$covert->review_date?->format('d/m/Y')
+                .'. Renew the covert authorisation review before administering this medication.',
+            'error_field' => 'client_medication_id',
+        ];
     }
 
     private function validateWitness(ClientMedication $medication, array $adminRules, array $data, int $userId): array
@@ -881,14 +1009,16 @@ class EnhancedMarService
         ClientMedication $medication,
         ClientMedicationAdministration $admin,
         int $recordedBy,
-        ?int $witnessedBy
+        ?int $witnessedBy,
+        float $quantity = 1.0
     ): void {
+        $quantity = $quantity > 0 ? $quantity : 1.0;
         $stock = $medication->stock;
         $before = $stock?->on_hand;
-        
+
         // Update stock if applicable
         if ($stock && $before !== null) {
-            $stock->on_hand = max(0, $before - 1);
+            $stock->on_hand = max(0, $before - $quantity);
             $stock->last_counted_at = now();
             $stock->save();
         }
@@ -900,7 +1030,7 @@ class EnhancedMarService
             'shift_id' => $admin->shift_id,
             'service_context_id' => $admin->service_context_id,
             'entry_type' => 'administered',
-            'quantity' => 1,
+            'quantity' => $quantity,
             'unit' => $stock?->unit,
             'on_hand_before' => $before,
             'on_hand_after' => $stock?->on_hand,

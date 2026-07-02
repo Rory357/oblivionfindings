@@ -19,6 +19,7 @@ import {
     ListTodo,
     Paperclip,
     Pencil,
+    Pill,
     Plus,
     RadioTower,
     Truck,
@@ -110,6 +111,7 @@ export type IncidentDetail = {
     assignable_staff: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{ id: number; reference_number: string | null; status: string | null; severity: string | null; can_view: boolean }>;
     fleet_incident?: { id: number; reference: string; type: string } | null;
+    medication_error?: { id: number; error_type: string; severity: string; status: string; medication: string | null; reported_at: string | null; url: string } | null;
     restraint_events?: Array<{ id: number; reference: string; restraint_type: string; severity: string; within_support_plan: boolean; injury_occurred: boolean }>;
     first_aid_records?: Array<{ id: number; reference: string; person: string; injury: string; treatment_date: string | null; ambulance_called: boolean }>;
 };
@@ -849,6 +851,14 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
             {d.fleet_incident ? (
                 <LinkedRow icon={Truck} title="Fleet incident" sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`} href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`} />
             ) : null}
+            {d.medication_error ? (
+                <LinkedRow
+                    icon={Pill}
+                    title="Medication error report"
+                    sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
+                    href={d.medication_error.url}
+                />
+            ) : null}
             {(d.restraint_events ?? []).map((r) => (
                 <LinkedRow
                     key={`re-${r.id}`}
@@ -868,7 +878,7 @@ function LinkedSection({ d, clientName }: { d: IncidentDetail; clientName: strin
                 />
             ))}
             {d.client ? <LinkedRow icon={User} title="Client record" sub={clientName} href={`/operations/clients/${d.client.id}/care`} /> : null}
-            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length && !(d.first_aid_records ?? []).length ? (
+            {!d.control_room_alert && !d.hs_event && !d.client && !d.fleet_incident && !d.medication_error && !(d.safeguarding_concerns ?? []).length && !(d.restraint_events ?? []).length && !(d.first_aid_records ?? []).length ? (
                 <p className="text-sm text-muted-foreground">No linked records.</p>
             ) : null}
         </div>

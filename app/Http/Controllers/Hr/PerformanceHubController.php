@@ -129,9 +129,9 @@ class PerformanceHubController extends Controller
         return response()->streamDownload(function () use ($rows, $headers) {
             $out = fopen('php://output', 'w');
             if ($headers !== []) {
-                fputcsv($out, $headers);
+                $this->putCsv($out, $headers);
                 foreach ($rows as $row) {
-                    fputcsv($out, array_map(fn ($v) => is_array($v) ? json_encode($v) : $v, array_values((array) $row)));
+                    $this->putCsv($out, array_map(fn ($v) => is_array($v) ? json_encode($v) : $v, array_values((array) $row)));
                 }
             }
             fclose($out);

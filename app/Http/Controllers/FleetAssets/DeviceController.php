@@ -39,10 +39,10 @@ class DeviceController extends Controller
 
             return response()->streamDownload(function () use ($allDevices) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Vendor', 'Device UID', 'IMEI', 'Serial Number', 'Linked Asset', 'Status', 'Last Seen']);
+                $this->putCsv($handle, ['Vendor', 'Device UID', 'IMEI', 'Serial Number', 'Linked Asset', 'Status', 'Last Seen']);
                 foreach ($allDevices as $d) {
                     $link = $d->activeAssetLinks->first();
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $d->provider, $d->device_uid, $d->imei, $d->serial_number,
                         $link?->asset?->name ?? '',
                         $d->status?->value ?? '',

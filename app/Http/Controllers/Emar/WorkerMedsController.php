@@ -178,6 +178,7 @@ class WorkerMedsController extends Controller
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'cd_balance' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
@@ -209,6 +210,7 @@ class WorkerMedsController extends Controller
                     'reason' => $data['reason'] ?? null,
                     'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
                     'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
+                    'quantity_administered' => $data['quantity_administered'] ?? null,
                     'scheduled_for' => $data['scheduled_for'],
                     'administered_at' => $data['administered_at']
                         ?? $data['captured_offline_at']
@@ -285,6 +287,7 @@ class WorkerMedsController extends Controller
             'client_medication_id' => ['required', 'integer', 'exists:client_medications,id'],
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
@@ -312,6 +315,7 @@ class WorkerMedsController extends Controller
                     'status' => 'given',
                     'reason' => trim($data['reason']),
                     'dose_given' => $data['dose_given'] ?? null,
+                    'quantity_administered' => $data['quantity_administered'] ?? null,
                     'witnessed_by' => $data['witnessed_by'] ?? null,
                     'witness_credential' => $data['witness_credential'] ?? null,
                     'blood_glucose_level' => $data['blood_glucose_level'] ?? null,

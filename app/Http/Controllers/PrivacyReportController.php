@@ -108,11 +108,11 @@ class PrivacyReportController extends Controller
      */
     private function writeBreachRegister($out, Carbon $startDate): void
     {
-        fputcsv($out, ['Reference', 'Discovered', 'Nature', 'Affected', 'Severity', 'Status', 'OPC required', 'OPC notified', 'Subjects notified', 'Resolved']);
+        $this->putCsv($out, ['Reference', 'Discovered', 'Nature', 'Affected', 'Severity', 'Status', 'OPC required', 'OPC notified', 'Subjects notified', 'Resolved']);
 
         DataBreachLog::where('discovered_at', '>=', $startDate)->orderByDesc('discovered_at')
             ->each(function (DataBreachLog $b) use ($out) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $b->breach_reference,
                     optional($b->discovered_at)->toDateString(),
                     $b->nature_of_breach,
@@ -132,14 +132,14 @@ class PrivacyReportController extends Controller
      */
     private function writeSlaReport($out, Carbon $startDate): void
     {
-        fputcsv($out, ['Reference', 'Type', 'Received', 'Due', 'Completed', 'Status', 'Working days to complete', 'Overdue']);
+        $this->putCsv($out, ['Reference', 'Type', 'Received', 'Due', 'Completed', 'Status', 'Working days to complete', 'Overdue']);
 
         DataSubjectRequest::where('created_at', '>=', $startDate)->orderByDesc('received_at')
             ->each(function (DataSubjectRequest $r) use ($out) {
                 $days = $r->received_at && $r->completed_at
                     ? (int) $r->received_at->diffInDays($r->completed_at)
                     : '';
-                fputcsv($out, [
+                $this->putCsv($out, [
                     $r->reference_number,
                     $r->request_type,
                     optional($r->received_at)->toDateString(),
@@ -157,10 +157,10 @@ class PrivacyReportController extends Controller
      */
     private function writeRetentionReport($out): void
     {
-        fputcsv($out, ['Policy', 'Applies to', 'Retention (years)', 'Archive after', 'Hard delete after', 'Active', 'Next review', 'Last applied', 'Legal basis']);
+        $this->putCsv($out, ['Policy', 'Applies to', 'Retention (years)', 'Archive after', 'Hard delete after', 'Active', 'Next review', 'Last applied', 'Legal basis']);
 
         DataRetentionPolicy::orderBy('model_type')->each(function (DataRetentionPolicy $p) use ($out) {
-            fputcsv($out, [
+            $this->putCsv($out, [
                 $p->policy_name,
                 class_basename($p->model_type),
                 $p->retention_period_years,
@@ -179,11 +179,11 @@ class PrivacyReportController extends Controller
      */
     private function writeFullReport($out, Carbon $startDate): void
     {
-        fputcsv($out, ['Privacy compliance report']);
-        fputcsv($out, ['Generated', now()->toDayDateTimeString()]);
-        fputcsv($out, ['Since', $startDate->toDateString()]);
-        fputcsv($out, []);
-        fputcsv($out, ['Section', 'Metric', 'Value']);
+        $this->putCsv($out, ['Privacy compliance report']);
+        $this->putCsv($out, ['Generated', now()->toDayDateTimeString()]);
+        $this->putCsv($out, ['Since', $startDate->toDateString()]);
+        $this->putCsv($out, []);
+        $this->putCsv($out, ['Section', 'Metric', 'Value']);
 
         $rows = [
             ['Access & correction requests', 'Total', DataSubjectRequest::where('created_at', '>=', $startDate)->count()],
@@ -199,7 +199,7 @@ class PrivacyReportController extends Controller
         ];
 
         foreach ($rows as $row) {
-            fputcsv($out, $row);
+            $this->putCsv($out, $row);
         }
     }
 

@@ -637,6 +637,7 @@ class MedicationsApiController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
@@ -762,17 +763,8 @@ class MedicationsApiController extends Controller
         );
 
         if (!$result['success']) {
-            if (
-                $medication->is_prn
-                && ($result['safety_check']['blocked'] ?? false)
-                && $medication->fresh()->isPrnBlocked()
-            ) {
-                $limitIncidentKey = 'emar:prn-over-limit:' . $client->id . ':' . $medication->id . ':' . now()->format('YmdHi');
-                if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
-                    $this->incidentService->handlePrnOverLimit($client, $medication->fresh(), $user->id);
-                }
-            }
-
+            // PRN over-limit incidents are raised inside EnhancedMarService
+            // (shared across all recording surfaces), so no handling here.
             return response()->json($this->withSync($result, $data, 'rejected', false, $result['error'] ?? null), 422);
         }
 
@@ -816,17 +808,9 @@ class MedicationsApiController extends Controller
             'created_by' => $user->id,
         ]);
 
-        // Handle incident creation for specific outcomes
-        if ($data['status'] === 'missed') {
-            $this->incidentService->handleMissedDose($administration, $user->id);
-        } elseif ($data['status'] === 'refused' && ($medication->high_risk || $medication->controlled_drug)) {
-            $this->incidentService->handleRefusedDose($administration);
-        }
-
-        // Handle late dose incident
-        if ($administration->late_minutes && $administration->late_minutes > 120) {
-            $this->incidentService->handleLateDose($administration, $administration->late_minutes);
-        }
+        // Missed/refused/late incident creation now lives in
+        // EnhancedMarService::recordAdministration so every recording surface
+        // (MAR wizard, My Day, guided rounds) raises the same incidents.
 
         // Generate fresh alerts
         $this->alertService->generateClientAlerts($client);

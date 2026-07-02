@@ -100,6 +100,7 @@ const RECORD_STEP_FIELDS = [
     'administered_at',
     'witnessed_by',
     'witness_credential',
+    'quantity_administered',
     'cd_balance',
     'blood_glucose_level',
     'pulse_bpm',
@@ -146,6 +147,7 @@ export function RecordDoseWizard({
         time: nowHm(),
         witnessed_by: '',
         witness_credential: '',
+        quantity_administered: '',
         cd_balance: '',
         blood_glucose_level: '',
         pulse_bpm: '',
@@ -203,6 +205,9 @@ export function RecordDoseWizard({
             if (needsWitness && form.data.witnessed_by && !form.data.witness_credential)
                 e.witness_credential =
                     'The witness confirms by entering their password';
+            if (needsBalance && form.data.quantity_administered === '')
+                e.quantity_administered =
+                    'Record how many units were given';
             if (needsBalance && form.data.cd_balance === '')
                 e.cd_balance = 'Record the running balance';
         }
@@ -231,6 +236,10 @@ export function RecordDoseWizard({
                 ? parseInt(data.witnessed_by, 10)
                 : null,
             witness_credential: data.witness_credential || null,
+            quantity_administered:
+                data.quantity_administered === ''
+                    ? null
+                    : Number(data.quantity_administered),
             cd_balance:
                 data.cd_balance === '' ? null : parseInt(data.cd_balance, 10),
             blood_glucose_level:
@@ -596,26 +605,49 @@ export function RecordDoseWizard({
                         ) : null}
 
                         {needsBalance ? (
-                            <Field
-                                label="Running balance after dose"
-                                required
-                                hint="CD register"
-                                error={err('cd_balance')}
-                            >
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    placeholder="e.g. 26"
-                                    value={form.data.cd_balance}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'cd_balance',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="max-w-[220px]"
-                                />
-                            </Field>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field
+                                    label="Units given"
+                                    required
+                                    hint="removed from stock"
+                                    error={err('quantity_administered')}
+                                >
+                                    <Input
+                                        type="number"
+                                        min={0.25}
+                                        step="0.25"
+                                        placeholder="e.g. 2"
+                                        value={form.data.quantity_administered}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'quantity_administered',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="max-w-[220px]"
+                                    />
+                                </Field>
+                                <Field
+                                    label="Running balance after dose"
+                                    required
+                                    hint="CD register"
+                                    error={err('cd_balance')}
+                                >
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        placeholder="e.g. 26"
+                                        value={form.data.cd_balance}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'cd_balance',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="max-w-[220px]"
+                                    />
+                                </Field>
+                            </div>
                         ) : null}
 
                         {!isGiven ? (

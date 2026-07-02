@@ -24,9 +24,9 @@ class VehicleBookingController extends Controller
             $all = (clone $query)->latest()->limit(5000)->get();
             return response()->streamDownload(function () use ($all) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Vehicle', 'User', 'Purpose', 'Start', 'End', 'Status']);
+                $this->putCsv($handle, ['Vehicle', 'User', 'Purpose', 'Start', 'End', 'Status']);
                 foreach ($all as $b) {
-                    fputcsv($handle, [
+                    $this->putCsv($handle, [
                         $b->asset?->name ?? '', $b->user?->name ?? '', $b->purpose,
                         optional($b->starts_at)->format('Y-m-d H:i') ?? '',
                         optional($b->ends_at)->format('Y-m-d H:i') ?? '',

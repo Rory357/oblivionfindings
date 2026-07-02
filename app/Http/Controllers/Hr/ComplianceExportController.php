@@ -61,14 +61,14 @@ class ComplianceExportController extends Controller
     /** @param resource $out */
     private function streamStaff($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Staff member', 'Email', 'Requirement', 'Code', 'Status', 'Valid from', 'Expires', 'Exempted until', 'Notes']);
+        $this->putCsv($out, ['Staff member', 'Email', 'Requirement', 'Code', 'Status', 'Valid from', 'Expires', 'Exempted until', 'Notes']);
 
         HrStaffComplianceStatus::where('tenant_id', $tenantId)
             ->with(['user:id,name,email', 'requirement:id,code,name'])
             ->orderBy('user_id')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $r->user?->name ?? '',
                         $r->user?->email ?? '',
                         $r->requirement?->name ?? '',
@@ -86,7 +86,7 @@ class ComplianceExportController extends Controller
     /** @param resource $out */
     private function streamVetting($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Staff member', 'Check type', 'Provider', 'Reference', 'Status', 'Check date', 'Expires']);
+        $this->putCsv($out, ['Staff member', 'Check type', 'Provider', 'Reference', 'Status', 'Check date', 'Expires']);
 
         StaffBackgroundCheck::query()
             ->whereHas('user.hrEmployeeProfile', fn ($q) => $q->where('tenant_id', $tenantId))
@@ -94,7 +94,7 @@ class ComplianceExportController extends Controller
             ->orderByDesc('created_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $r->user?->name ?? '',
                         ucfirst(str_replace('_', ' ', (string) $r->check_type)),
                         $r->provider,
@@ -110,14 +110,14 @@ class ComplianceExportController extends Controller
     /** @param resource $out */
     private function streamDrivers($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Driver', 'Licence class', 'Licence number', 'Endorsements', 'Status', 'Can drive clients', 'Expires']);
+        $this->putCsv($out, ['Driver', 'Licence class', 'Licence number', 'Endorsements', 'Status', 'Can drive clients', 'Expires']);
 
         HrDriverEligibility::where('tenant_id', $tenantId)
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    fputcsv($out, [
+                    $this->putCsv($out, [
                         $r->user?->name ?? '',
                         $r->licence_class,
                         $r->licence_number,
@@ -133,7 +133,7 @@ class ComplianceExportController extends Controller
     /** @param resource $out */
     private function streamRenewals($out, ?int $tenantId): void
     {
-        fputcsv($out, ['Type', 'Staff member', 'Item', 'Due date', 'Status']);
+        $this->putCsv($out, ['Type', 'Staff member', 'Item', 'Due date', 'Status']);
 
         HrStaffComplianceStatus::where('tenant_id', $tenantId)
             ->whereNotNull('expires_at')
@@ -141,7 +141,7 @@ class ComplianceExportController extends Controller
             ->orderBy('expires_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    fputcsv($out, ['Compliance', $r->user?->name ?? '', $r->requirement?->name ?? '', optional($r->expires_at)->toDateString(), $r->status]);
+                    $this->putCsv($out, ['Compliance', $r->user?->name ?? '', $r->requirement?->name ?? '', optional($r->expires_at)->toDateString(), $r->status]);
                 }
             });
 
@@ -151,7 +151,7 @@ class ComplianceExportController extends Controller
             ->orderBy('licence_expires_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    fputcsv($out, ['Driver', $r->user?->name ?? '', 'Class ' . $r->licence_class . ' licence', optional($r->licence_expires_at)->toDateString(), $r->status]);
+                    $this->putCsv($out, ['Driver', $r->user?->name ?? '', 'Class ' . $r->licence_class . ' licence', optional($r->licence_expires_at)->toDateString(), $r->status]);
                 }
             });
     }

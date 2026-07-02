@@ -302,6 +302,14 @@ const DEFAULT_SOURCES: SourceDef[] = [
         origin: 'Worker participation',
     },
     {
+        key: 'medication',
+        label: 'Medication',
+        short: 'Medication',
+        group: 'auto',
+        icon: 'Pill',
+        origin: 'eMAR',
+    },
+    {
         key: 'external',
         label: 'External busy',
         short: 'External',

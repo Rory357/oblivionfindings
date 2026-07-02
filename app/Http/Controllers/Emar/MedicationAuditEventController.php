@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Client;
@@ -28,6 +29,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class MedicationAuditEventController extends Controller
 {
+    use SanitizesCsvOutput;
+
     public function __construct(private readonly MedicationAuditIntegrityService $integrity) {}
 
     /** Synthetic id prefix → backing model. Longest/most-specific prefixes first. */
@@ -72,20 +75,20 @@ class MedicationAuditEventController extends Controller
         return response()->streamDownload(function () use ($model, $logs) {
             $out = fopen('php://output', 'w');
 
-            fputcsv($out, ['Record', class_basename($model).' #'.$model->getKey()]);
-            fputcsv($out, []);
-            fputcsv($out, ['Field', 'Value']);
+            $this->putCsv($out, ['Record', class_basename($model).' #'.$model->getKey()]);
+            $this->putCsv($out, []);
+            $this->putCsv($out, ['Field', 'Value']);
             $attrs = $model->getAttributes();
             ksort($attrs);
             foreach ($attrs as $field => $value) {
-                fputcsv($out, [$field, is_scalar($value) || $value === null ? (string) $value : (string) json_encode($value)]);
+                $this->putCsv($out, [$field, is_scalar($value) || $value === null ? (string) $value : (string) json_encode($value)]);
             }
 
-            fputcsv($out, []);
-            fputcsv($out, ['Change history (append-only audit log)']);
-            fputcsv($out, ['Time', 'Action', 'By', 'IP', 'Changed fields']);
+            $this->putCsv($out, []);
+            $this->putCsv($out, ['Change history (append-only audit log)']);
+            $this->putCsv($out, ['Time', 'Action', 'By', 'IP', 'Changed fields']);
             foreach ($logs as $log) {
-                fputcsv($out, [
+                $this->putCsv($out, [
                     optional($log->created_at)->toDateTimeString(),
                     $log->action,
                     $log->user?->name ?? '',

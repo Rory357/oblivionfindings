@@ -81,12 +81,12 @@ class ModuleReportController extends Controller
 
         return response()->streamDownload(function () use ($query, $columns, $labels) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, $labels);
+            $this->putCsv($out, $labels);
 
             $query->chunk(500, function ($records) use ($out, $columns) {
                 foreach ($records as $record) {
                     $row = $this->serializeRow($record, $columns);
-                    fputcsv($out, array_values($row));
+                    $this->putCsv($out, array_values($row));
                 }
             });
 

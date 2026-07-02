@@ -43,6 +43,7 @@ class MyDayMedicationsController extends Controller
         $data = $request->validate([
             'scheduled_for' => ['nullable', 'date'],
             'dose_given' => ['nullable', 'string', 'max:255'],
+            'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
@@ -56,6 +57,7 @@ class MyDayMedicationsController extends Controller
                 'scheduled_for' => $data['scheduled_for'] ?? now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
                 'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
                 'dose_given' => $data['dose_given'] ?? $medication->dosage,
+                'quantity_administered' => $data['quantity_administered'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'witnessed_by' => $data['witnessed_by'] ?? null,
                 'witness_credential' => $data['witness_credential'] ?? null,

@@ -144,6 +144,7 @@ export default function RecordAdministrationDialog({
     const [administeredAt, setAdministeredAt] = useState('');
     const [witnessedBy, setWitnessedBy] = useState('');
     const [witnessCredential, setWitnessCredential] = useState('');
+    const [quantityAdministered, setQuantityAdministered] = useState('');
     const [outcome, setOutcome] = useState('');
     const [site, setSite] = useState('');
     const [bloodGlucoseLevel, setBloodGlucoseLevel] = useState('');
@@ -172,6 +173,7 @@ export default function RecordAdministrationDialog({
             setAdministeredAt(new Date().toISOString().slice(0, 16));
             setWitnessedBy('');
             setWitnessCredential('');
+            setQuantityAdministered('');
             setOutcome('');
             setSite('');
             setBloodGlucoseLevel('');
@@ -226,6 +228,12 @@ export default function RecordAdministrationDialog({
             return false;
         if (
             status === 'given' &&
+            medication?.controlled_drug &&
+            quantityAdministered.trim() === ''
+        )
+            return false;
+        if (
+            status === 'given' &&
             requiredObservations.includes('bsl') &&
             bloodGlucoseLevel.trim() === ''
         )
@@ -254,6 +262,7 @@ export default function RecordAdministrationDialog({
         needsScanVerification,
         needsWitness,
         pulseBpm,
+        quantityAdministered,
         reason,
         reasonCode,
         requiredObservations,
@@ -273,6 +282,9 @@ export default function RecordAdministrationDialog({
             reason: reason || null,
             reason_code: status !== 'given' ? reasonCode : null,
             dose_given: doseGiven || null,
+            quantity_administered: quantityAdministered
+                ? Number(quantityAdministered)
+                : null,
             notes: notes || null,
             administered_at: administeredAt
                 ? new Date(administeredAt).toISOString()
@@ -638,6 +650,29 @@ export default function RecordAdministrationDialog({
                                     placeholder="Why is this PRN being given?"
                                     className="min-h-[60px]"
                                 />
+                            </div>
+                        )}
+
+                        {status === 'given' && medication.controlled_drug && (
+                            <div>
+                                <Label>Units Given *</Label>
+                                <Input
+                                    type="number"
+                                    min={0.25}
+                                    step={0.25}
+                                    value={quantityAdministered}
+                                    onChange={(event) =>
+                                        setQuantityAdministered(
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="e.g. 1"
+                                    className="max-w-[220px]"
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Removed from CD stock — the register entry
+                                    uses this quantity.
+                                </p>
                             </div>
                         )}
 

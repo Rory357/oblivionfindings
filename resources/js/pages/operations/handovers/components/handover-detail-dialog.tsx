@@ -231,6 +231,7 @@ export function HandoverDetailDialog({
     onSubmit,
     onAcknowledge,
     medicationSnapshotUrl,
+    emarLens = false,
 }: {
     handover: Handover | null;
     open: boolean;
@@ -238,10 +239,13 @@ export function HandoverDetailDialog({
     onEdit: (h: Handover) => void;
     onSubmit: (h: Handover) => void;
     onAcknowledge: (h: Handover) => void;
-    /** eMAR lens only: endpoint for the live "Medications this shift" snapshot
-     *  (GET ?shift_id=…). Operations leaves this unset, so the section is hidden
-     *  and no request fires there. */
+    /** Endpoint for the live "Medications this shift" snapshot (GET ?shift_id=…).
+     *  Both the eMAR and Operations handover views can surface it. */
     medicationSnapshotUrl?: string;
+    /** True only in the eMAR handover surface — shows the "same record as
+     *  Operations handovers" cross-reference banner (the copy is written from
+     *  the eMAR side). Operations leaves it false. */
+    emarLens?: boolean;
 }) {
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
@@ -380,7 +384,7 @@ export function HandoverDetailDialog({
                         </span>
                     </div>
 
-                    {medicationSnapshotUrl ? (
+                    {emarLens ? (
                         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
                             <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                             Same shift-handover record as{' '}
