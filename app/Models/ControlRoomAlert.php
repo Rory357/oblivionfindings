@@ -9,7 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ControlRoomAlert extends Model
 {
+    use Concerns\HasReferenceNumber;
     use HasFactory;
+
+    public const REFERENCE_PREFIX = 'CR';
 
     // --- Lifecycle statuses ---
     public const STATUS_OPEN = 'open';
@@ -48,6 +51,7 @@ class ControlRoomAlert extends Model
     public const MAX_ESCALATION_LEVEL = 5;
 
     protected $fillable = [
+        'reference_number',
         'source',
         'alert_type',
         'severity',

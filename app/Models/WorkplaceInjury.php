@@ -11,11 +11,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkplaceInjury extends Model
 {
+    use Concerns\HasReferenceNumber;
     use HasFactory;
     use AuditableChanges;
     use SoftDeletes;
 
+    public const REFERENCE_PREFIX = 'INJ';
+
     protected $fillable = [
+        'reference_number',
         'user_id',
         'site_id',
         'related_incident_id',

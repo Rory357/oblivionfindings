@@ -10,11 +10,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ControlledDrugLossReport extends Model
 {
+    use Concerns\HasReferenceNumber;
     use SoftDeletes;
+
+    public const REFERENCE_PREFIX = 'CDL';
 
     protected $table = 'controlled_drug_loss_reports';
 
     protected $fillable = [
+        'reference_number',
         'client_id',
         'client_medication_id',
         'incident_id',

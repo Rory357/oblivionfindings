@@ -10,10 +10,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MedicationError extends Model
 {
+    use Concerns\HasReferenceNumber;
     use HasFactory;
     use SoftDeletes;
 
+    public const REFERENCE_PREFIX = 'MED';
+
     protected $fillable = [
+        'reference_number',
         'client_id',
         'client_medication_id',
         'client_incident_id',

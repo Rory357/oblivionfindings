@@ -58,6 +58,7 @@ import {
     LayoutDashboard,
     LayoutGrid,
     Link2,
+    ListChecks,
     Map,
     MapPin,
     Megaphone,
@@ -401,8 +402,22 @@ function buildIconNavItems({
             // Rostering Calendar tab and the Site Calendar.
             label: 'My Calendar',
             href: '/my-calendar',
-            dividerAfter: true,
+            dividerAfter: !can?.tasks?.view,
         },
+        // Company-wide work-item dashboard — every open incident, corrective
+        // action, alert and follow-up across all modules, ticket-numbered.
+        ...(can?.tasks?.view
+            ? [
+                  {
+                      id: 'all-tasks',
+                      icon: ListChecks,
+                      label: 'All Tasks',
+                      href: '/tasks',
+                      badge: can?.tasks?.badge,
+                      dividerAfter: true,
+                  } as IconNavItem,
+              ]
+            : []),
     ];
 
     // Sites & Locations

@@ -72,6 +72,19 @@ class HandleInertiaRequests extends Middleware
             if ($showsWorkerMedsItem && isset($can['medications'])) {
                 $can['medications']['overdueTodayCount'] = $this->medsOverdueTodayCount($user);
             }
+
+            // Company-wide /tasks entry: visible when the user can see at
+            // least one module feed; badge = my open + overdue items. Both
+            // cached — the aggregator fans out across ~17 modules.
+            $taskAggregator = app(\App\Services\Tasks\TaskAggregator::class);
+            $can['tasks'] = [
+                'view' => (bool) Cache::remember(
+                    "tasks.nav-view.{$user->id}",
+                    now()->addMinutes(10),
+                    fn () => $taskAggregator->sourcesFor($user) !== [],
+                ),
+                'badge' => $taskAggregator->badgeCountFor($user),
+            ];
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)

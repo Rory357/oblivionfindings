@@ -16,9 +16,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClientIncident extends Model implements EmitsToTimeline
 {
     use AuditableChanges;
+    use Concerns\HasReferenceNumber;
     use HasFactory;
 
+    public const REFERENCE_PREFIX = 'INC';
+
     protected $fillable = [
+        'reference_number',
         'client_id',
         'reported_by',
         'shift_id',

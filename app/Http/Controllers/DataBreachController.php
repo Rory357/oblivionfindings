@@ -88,12 +88,7 @@ class DataBreachController extends Controller
             'requires_subject_notification' => 'boolean',
         ]);
 
-        $validated['breach_reference'] = 'BR-' . now()->year . '-' . str_pad(
-            DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
-            4,
-            '0',
-            STR_PAD_LEFT
-        );
+        $validated['breach_reference'] = app(\App\Services\References\ReferenceNumberGenerator::class)->next('BR');
         $validated['discovered_by_user_id'] = auth()->id();
         $validated['created_by'] = auth()->id();
         $validated['status'] = 'discovered';
