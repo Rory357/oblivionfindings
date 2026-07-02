@@ -33,29 +33,46 @@ class ReferenceNumberGenerator
 
     /**
      * Allocate the next integer for a scope, creating the sequence row on
-     * first use. The SELECT ... FOR UPDATE serialises concurrent allocations.
+     * first use.
+     *
+     * Uses the single-statement MySQL sequence idiom
+     * (UPDATE ... SET x = LAST_INSERT_ID(x) + 1) which takes only an
+     * exclusive record lock — unlike insertOrIgnore + SELECT ... FOR UPDATE,
+     * whose shared-then-exclusive lock upgrade deadlocks two concurrent
+     * allocators of the same scope. LAST_INSERT_ID() is connection-scoped,
+     * and no wrapping transaction is needed (inside an outer transaction a
+     * rollback simply reverts the increment — gaps are fine, duplicates
+     * are impossible because the row lock is held to the outer commit).
      */
     private function allocate(string $scope): int
     {
-        return DB::transaction(function () use ($scope): int {
-            DB::table('reference_sequences')->insertOrIgnore([
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $claimed = DB::update(
+                'update reference_sequences set next_value = last_insert_id(next_value) + 1, updated_at = ? where scope = ?',
+                [now(), $scope],
+            );
+
+            if ($claimed > 0) {
+                return (int) DB::scalar('select last_insert_id()');
+            }
+
+            // First use of this scope: claim 1 by inserting the row with the
+            // sequence already advanced past it.
+            $inserted = DB::table('reference_sequences')->insertOrIgnore([
                 'scope' => $scope,
-                'next_value' => 1,
+                'next_value' => 2,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            $current = (int) DB::table('reference_sequences')
-                ->where('scope', $scope)
-                ->lockForUpdate()
-                ->value('next_value');
+            if ($inserted > 0) {
+                return 1;
+            }
 
-            DB::table('reference_sequences')
-                ->where('scope', $scope)
-                ->update(['next_value' => $current + 1, 'updated_at' => now()]);
+            // Lost the first-use race to a concurrent insert — retry the UPDATE.
+        }
 
-            return $current;
-        });
+        throw new \RuntimeException("Unable to allocate a reference number for scope [{$scope}].");
     }
 
     /**

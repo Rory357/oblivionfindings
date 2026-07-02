@@ -174,7 +174,8 @@ class IncidentController extends Controller
 
         return back()
             ->with('success', 'Incident '.$incident->reference().' reported.')
-            ->with('created_fleet_incident_id', $incident->id);
+            ->with('created_fleet_incident_id', $incident->id)
+            ->with('created_fleet_incident_reference', $incident->reference());
     }
 
     public function show(Request $request, FleetIncident $incident)

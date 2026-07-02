@@ -27,7 +27,7 @@ import {
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, ChevronDown, ListChecks, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirror app/Services/Tasks/TaskItem::toArray()               */
@@ -155,8 +155,15 @@ function toggleKey(list: string[] | null, key: string): string[] {
 export default function TasksIndex({ items, stats, sources, filters }: Props) {
     const [search, setSearch] = useState(filters.q ?? '');
 
+    // The debounce timer must always read the LATEST committed filters —
+    // a closure over the render-time `filters` re-applies stale filters
+    // when the user clears or toggles them inside the 300ms window.
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+    const suppressDebounce = useRef(false);
+
     const go = (next: Partial<Filters>) =>
-        router.get('/tasks', buildParams({ ...filters, ...next }), {
+        router.get('/tasks', buildParams({ ...filtersRef.current, ...next }), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -165,7 +172,11 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
     // Debounced search → shareable ?q= param.
     useEffect(() => {
         const t = setTimeout(() => {
-            if (search === (filters.q ?? '')) return;
+            if (suppressDebounce.current) {
+                suppressDebounce.current = false;
+                return;
+            }
+            if (search === (filtersRef.current.q ?? '')) return;
             go({ q: search || null });
         }, 300);
         return () => clearTimeout(t);
@@ -186,6 +197,7 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         filters.include_done
     );
     const clearFilters = () => {
+        suppressDebounce.current = true;
         setSearch('');
         router.get('/tasks', {}, { preserveState: true, preserveScroll: true, replace: true });
     };

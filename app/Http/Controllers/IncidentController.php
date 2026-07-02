@@ -299,8 +299,8 @@ class IncidentController extends Controller
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
-                'restraintEvents:id,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
-                'firstAidRecords:id,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
+                'restraintEvents:id,reference_number,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
+                'firstAidRecords:id,reference_number,related_incident_id,treated_person_name,injury_illness_type,treatment_date,ambulance_called',
             ])
             ->find($incidentId);
 
@@ -445,7 +445,7 @@ class IncidentController extends Controller
             // against this incident (RestraintEvent.related_incident_id).
             'restraint_events' => $incident->restraintEvents->map(fn ($e) => [
                 'id' => $e->id,
-                'reference' => 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
+                'reference' => $e->reference_number ?? 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
                 'restraint_type' => $e->restraint_type,
                 'severity' => $e->severity,
                 'within_support_plan' => (bool) $e->within_support_plan,
@@ -455,7 +455,7 @@ class IncidentController extends Controller
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
             'first_aid_records' => $incident->firstAidRecords->map(fn ($r) => [
                 'id' => $r->id,
-                'reference' => 'FA-'.str_pad((string) $r->id, 4, '0', STR_PAD_LEFT),
+                'reference' => $r->reference_number ?? 'FA-'.str_pad((string) $r->id, 4, '0', STR_PAD_LEFT),
                 'person' => $r->treated_person_name,
                 'injury' => $r->injury_illness_type,
                 'treatment_date' => $r->treatment_date?->toISOString(),

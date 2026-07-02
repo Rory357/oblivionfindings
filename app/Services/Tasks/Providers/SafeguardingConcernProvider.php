@@ -37,11 +37,17 @@ class SafeguardingConcernProvider implements TaskProvider
             $query->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES);
         }
 
-        return $query->get()->map(function (SafeguardingConcern $concern) {
-            // Need-to-know: titles use the concern-type label only, and sensitive
-            // rows never expose free-text or the subject (mirrors the register's
-            // per-row redaction without widening access).
-            $sensitive = (bool) $concern->is_sensitive;
+        $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
+
+        return $query->get()->map(function (SafeguardingConcern $concern) use ($user, $canSensitive) {
+            // Need-to-know parity with SafeguardingConcernController::isConcernRestricted():
+            // a sensitive concern is restricted unless the viewer has viewSensitive
+            // or is the assignee/reporter. Restricted rows expose no free-text,
+            // no subject, and no site (a site name narrows the subject pool).
+            $restricted = $concern->is_sensitive
+                && ! $canSensitive
+                && $concern->assigned_to_user_id !== $user->id
+                && $concern->reported_by_user_id !== $user->id;
 
             return new TaskItem(
                 id: 'safeguarding-'.$concern->id,
@@ -59,17 +65,17 @@ class SafeguardingConcernProvider implements TaskProvider
                 assignee: $concern->assignedTo
                     ? ['id' => $concern->assignedTo->id, 'name' => $concern->assignedTo->name]
                     : null,
-                client: (! $sensitive && $concern->subject_type === Client::class && $concern->subject_id)
+                client: (! $restricted && $concern->subject_type === Client::class && $concern->subject_id)
                     ? ['id' => (int) $concern->subject_id, 'name' => (string) $concern->subject_name]
                     : null,
-                site: $concern->site
+                site: (! $restricted && $concern->site)
                     ? ['id' => $concern->site->id, 'name' => $concern->site->name]
                     : null,
                 dueAt: null,
                 createdAt: optional($concern->created_at)->toIso8601String(),
                 link: "/safeguarding?concern={$concern->id}",
                 type: 'Concern',
-                description: (! $sensitive && $concern->description)
+                description: (! $restricted && $concern->description)
                     ? str($concern->description)->limit(140)->toString()
                     : null,
             );

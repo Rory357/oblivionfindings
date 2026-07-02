@@ -38,9 +38,12 @@ class TaskItem
         public ?string $description = null,
     ) {}
 
+    private ?bool $overdue = null;
+
     public function isOverdue(): bool
     {
-        return $this->bucket !== self::BUCKET_DONE
+        // Memoised — the aggregator's sort comparator calls this O(n log n) times.
+        return $this->overdue ??= $this->bucket !== self::BUCKET_DONE
             && $this->dueAt !== null
             && Carbon::parse($this->dueAt)->isPast();
     }

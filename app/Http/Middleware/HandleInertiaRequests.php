@@ -74,17 +74,22 @@ class HandleInertiaRequests extends Middleware
             }
 
             // Company-wide /tasks entry: visible when the user can see at
-            // least one module feed; badge = my open + overdue items. Both
-            // cached — the aggregator fans out across ~17 modules.
-            $taskAggregator = app(\App\Services\Tasks\TaskAggregator::class);
-            $can['tasks'] = [
-                'view' => (bool) Cache::remember(
-                    "tasks.nav-view.{$user->id}",
-                    now()->addMinutes(10),
-                    fn () => $taskAggregator->sourcesFor($user) !== [],
-                ),
-                'badge' => $taskAggregator->badgeCountFor($user),
-            ];
+            // least one module feed; badge = my open + overdue items. One
+            // cache entry per user — the aggregator fans out across ~17
+            // modules, and users with no feeds never pay for the badge.
+            $can['tasks'] = Cache::remember(
+                "tasks.nav.{$user->id}",
+                now()->addMinutes(5),
+                function () use ($user) {
+                    $taskAggregator = app(\App\Services\Tasks\TaskAggregator::class);
+                    $view = $taskAggregator->sourcesFor($user) !== [];
+
+                    return [
+                        'view' => $view,
+                        'badge' => $view ? $taskAggregator->badgeCountFor($user) : 0,
+                    ];
+                },
+            );
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -246,9 +251,10 @@ class HandleInertiaRequests extends Middleware
                 // The Safeguarding raise wizard reads this so its success pane can
                 // open the newly-raised concern.
                 'created_concern_id' => session('created_concern_id'),
-                // The Fleet incident report wizard reads this so its success pane
-                // can open the newly-reported incident.
+                // The Fleet incident report wizard reads these so its success pane
+                // can open the newly-reported incident and show its ticket number.
                 'created_fleet_incident_id' => session('created_fleet_incident_id'),
+                'created_fleet_incident_reference' => session('created_fleet_incident_reference'),
                 // The First Aid report wizard reads this so its success pane can
                 // open the newly-recorded treatment on the register.
                 'created_first_aid_id' => session('created_first_aid_id'),

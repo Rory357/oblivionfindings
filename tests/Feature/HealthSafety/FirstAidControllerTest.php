@@ -118,7 +118,7 @@ class FirstAidControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p
                 ->where('detail.id', $record->id)
-                ->where('detail.reference', 'FA-'.str_pad((string) $record->id, 4, '0', STR_PAD_LEFT))
+                ->where('detail.reference', $record->fresh()->reference_number)
                 ->has('detail.attachments')
                 ->has('detail.followups')
                 ->has('detail.history')
@@ -328,7 +328,7 @@ class FirstAidControllerTest extends TestCase
         $res = $this->actingAs($this->admin)->get('/health-safety/first-aid/export');
         $res->assertOk();
         $this->assertStringContainsString('text/csv', (string) $res->headers->get('Content-Type'));
-        $this->assertStringContainsString('FA-'.str_pad((string) $record->id, 4, '0', STR_PAD_LEFT), $res->streamedContent());
+        $this->assertStringContainsString($record->fresh()->reference_number, $res->streamedContent());
     }
 
     /* ================================================================== */

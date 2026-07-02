@@ -21,7 +21,9 @@ class DataSubjectRequestProvider implements TaskProvider
 
     public function canView(User $user): bool
     {
-        return $user->canDo('privacy.viewRequests') || $user->canDo('privacy.processRequests');
+        // Only privacy.viewRequests can reach the module's list/show routes —
+        // processRequests alone has no read surface, so it gets no feed either.
+        return $user->canDo('privacy.viewRequests');
     }
 
     public function tasks(User $user, array $filters = []): array

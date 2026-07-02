@@ -26,7 +26,7 @@ function makeTasksUser(array $permissionKeys): User
 }
 
 it('renders the dashboard with an open incident for a permitted user', function () {
-    $user = makeTasksUser(['incidents.view']);
+    $user = makeTasksUser(['incidents.viewAny']);
     $incident = ClientIncident::factory()->create(['status' => 'submitted']);
 
     $this->actingAs($user)
@@ -54,7 +54,7 @@ it('shows no sources or items to a user with no module permissions', function ()
 });
 
 it('excludes closed items by default and includes them with done=1', function () {
-    $user = makeTasksUser(['incidents.view']);
+    $user = makeTasksUser(['incidents.viewAny']);
     $closed = ClientIncident::factory()->create(['status' => 'closed']);
 
     $inList = fn ($items) => collect($items)->contains(fn ($i) => $i['id'] === 'incident-'.$closed->id);
@@ -67,7 +67,7 @@ it('excludes closed items by default and includes them with done=1', function ()
 });
 
 it('finds an item by its ticket number via q', function () {
-    $user = makeTasksUser(['incidents.view']);
+    $user = makeTasksUser(['incidents.viewAny']);
     $incident = ClientIncident::factory()->create(['status' => 'submitted']);
     ClientIncident::factory()->create(['status' => 'submitted']);
 
@@ -81,7 +81,7 @@ it('finds an item by its ticket number via q', function () {
 it('gates every provider on the module permission', function () {
     $aggregator = new TaskAggregator;
 
-    $incidentOnly = makeTasksUser(['incidents.view']);
+    $incidentOnly = makeTasksUser(['incidents.viewAny']);
     $sources = collect($aggregator->sourcesFor($incidentOnly))->pluck('key');
 
     expect($sources)->toContain('incident')
@@ -92,7 +92,7 @@ it('gates every provider on the module permission', function () {
 });
 
 it('sorts overdue items first', function () {
-    $user = makeTasksUser(['incidents.view']);
+    $user = makeTasksUser(['incidents.viewAny']);
     ClientIncident::factory()->create(['status' => 'submitted', 'severity' => 'high']);
     $overdueFollowupIncident = ClientIncident::factory()->create(['status' => 'submitted', 'severity' => 'low']);
     $overdueFollowupIncident->followups()->create([

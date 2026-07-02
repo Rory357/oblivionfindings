@@ -169,22 +169,17 @@ class TaskAggregator
     }
 
     /**
-     * Cached sidebar badge: my open + overdue item count.
+     * Sidebar badge: my open + overdue item count. Uncached — the caller
+     * (HandleInertiaRequests) caches view+badge together per user.
      */
     public function badgeCountFor(User $user): int
     {
-        return (int) Cache::remember(
-            "tasks.badge.{$user->id}",
-            now()->addMinutes(5),
-            function () use ($user) {
-                $items = $this->itemsFor($user, []);
+        $items = $this->itemsFor($user, []);
 
-                return count(array_filter(
-                    $items,
-                    fn (TaskItem $i) => $i->isOverdue() || ($i->assignee['id'] ?? null) === $user->id,
-                ));
-            },
-        );
+        return count(array_filter(
+            $items,
+            fn (TaskItem $i) => $i->isOverdue() || ($i->assignee['id'] ?? null) === $user->id,
+        ));
     }
 
     /**

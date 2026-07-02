@@ -42,7 +42,7 @@ class MedicationErrorController extends Controller
     {
         return [
             'id' => $error->id,
-            'ref' => 'ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT),
+            'ref' => $error->reference_number ?? 'ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT),
             'error_type' => $error->error_type,
             'severity' => $error->severity,
             'reached_client' => $error->reached_client,
@@ -73,7 +73,7 @@ class MedicationErrorController extends Controller
             ] : null,
             'incident' => $error->incident ? [
                 'id' => $error->incident->id,
-                'ref' => 'INC-'.str_pad((string) $error->incident->id, 4, '0', STR_PAD_LEFT),
+                'ref' => $error->incident->reference_number ?? 'INC-'.str_pad((string) $error->incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
             'mar_url' => $error->client_id ? EmarUrl::mar($error->client_id) : null,
             'reported_by_user' => $error->reportedBy ? [
@@ -99,7 +99,7 @@ class MedicationErrorController extends Controller
         // Flat, client-side-filterable register — the redesigned page facets by
         // tab/search/severity/type/reporter with live counts (drops pagination).
         $models = MedicationError::query()
-            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'medication:id,name', 'incident:id', 'reportedBy:id,name', 'reviewedBy:id,name', 'attachments.uploadedBy:id,name'])
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'medication:id,name', 'incident:id,reference_number', 'reportedBy:id,name', 'reviewedBy:id,name', 'attachments.uploadedBy:id,name'])
             ->when($siteFilter, $bySite)
             ->orderByDesc('reported_at')
             ->limit(300)

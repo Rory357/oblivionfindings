@@ -607,16 +607,10 @@ class SiteHazardController extends Controller
 
     private function nextActionReference(): string
     {
-        $latest = SiteHazardAction::where('reference_number', 'like', 'CA-%')
-            ->orderByDesc('id')
-            ->value('reference_number');
-
-        $next = 1;
-        if ($latest && preg_match('/CA-(\d+)/', $latest, $m)) {
-            $next = (int) $m[1] + 1;
-        }
-
-        return 'CA-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        // HZA (hazard action) — race-safe via the central allocator, and a
+        // prefix distinct from the H&S corrective-action register's CA-YYYY-NNNN.
+        // Pre-2026-07 rows keep their legacy CA-NNNN references.
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('HZA');
     }
 
     /**

@@ -21,13 +21,20 @@ class ClientIncidentProvider implements TaskProvider
 
     public function canView(User $user): bool
     {
-        return $user->canDo('incidents.view');
+        // Mirrors routes/incidents.php: permission:incidents.viewAny|incidents.viewAssigned.
+        return $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
     }
 
     public function tasks(User $user, array $filters = []): array
     {
         $query = ClientIncident::query()
-            ->with(['client:id,first_name,last_name', 'reporter:id,name'])
+            ->with(['client:id,first_name,last_name'])
+            // viewAssigned-only staff see just their assigned clients' incidents,
+            // exactly as IncidentController::index scopes the register.
+            ->when(
+                ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
+                fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id)),
+            )
             ->orderByDesc('occurred_at')
             ->limit(300);
 
@@ -35,7 +42,15 @@ class ClientIncidentProvider implements TaskProvider
             $query->whereNotIn('status', ['closed']);
         }
 
-        return $query->get()->map(function (ClientIncident $incident) {
+        $incidents = $query->get();
+
+        // Resolve investigation assignees in one query — there is no
+        // Eloquent relation for investigation_assigned_to.
+        $assigneeNames = User::query()
+            ->whereIn('id', $incidents->pluck('investigation_assigned_to')->filter()->unique())
+            ->pluck('name', 'id');
+
+        return $incidents->map(function (ClientIncident $incident) use ($assigneeNames) {
             $client = $incident->client;
 
             return new TaskItem(
@@ -52,8 +67,11 @@ class ClientIncidentProvider implements TaskProvider
                     default => TaskItem::BUCKET_OPEN,
                 },
                 severity: TaskItem::normaliseSeverity($incident->severity),
-                assignee: $incident->investigation_assigned_to
-                    ? ['id' => (int) $incident->investigation_assigned_to, 'name' => '']
+                assignee: $incident->investigation_assigned_to && $assigneeNames->has($incident->investigation_assigned_to)
+                    ? [
+                        'id' => (int) $incident->investigation_assigned_to,
+                        'name' => (string) $assigneeNames[$incident->investigation_assigned_to],
+                    ]
                     : null,
                 client: $client
                     ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]

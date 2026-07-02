@@ -26,7 +26,7 @@ class AllTasksController extends Controller
             'bucket' => $this->csv($request->query('bucket')),
             'assigned' => $request->query('assigned') === 'me' ? 'me' : null,
             'overdue' => $request->boolean('overdue'),
-            'q' => trim((string) $request->query('q', '')) ?: null,
+            'q' => ($q = trim((string) $request->query('q', ''))) === '' ? null : $q,
             'include_done' => $request->boolean('done'),
         ];
 

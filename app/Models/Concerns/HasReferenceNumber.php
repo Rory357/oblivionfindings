@@ -17,9 +17,19 @@ trait HasReferenceNumber
     public static function bootHasReferenceNumber(): void
     {
         static::creating(function ($model): void {
-            if (empty($model->reference_number)) {
+            if (! empty($model->reference_number)) {
+                return;
+            }
+
+            try {
                 $model->reference_number = app(ReferenceNumberGenerator::class)
                     ->next(static::REFERENCE_PREFIX);
+            } catch (\Throwable $e) {
+                // Never block a create because ticket allocation failed —
+                // these are safety-critical records (incidents, alerts) and
+                // the column is nullable. Covers e.g. the mid-deploy window
+                // before the reference_sequences migration has run.
+                report($e);
             }
         });
     }

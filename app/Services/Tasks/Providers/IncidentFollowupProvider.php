@@ -21,7 +21,8 @@ class IncidentFollowupProvider implements TaskProvider
 
     public function canView(User $user): bool
     {
-        return $user->canDo('incidents.view');
+        // Mirrors routes/incidents.php: permission:incidents.viewAny|incidents.viewAssigned.
+        return $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
     }
 
     public function tasks(User $user, array $filters = []): array
@@ -32,6 +33,11 @@ class IncidentFollowupProvider implements TaskProvider
                 'incident.client:id,first_name,last_name',
                 'assignedTo:id,name',
             ])
+            // Same viewAssigned client scoping as the incidents register.
+            ->when(
+                ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
+                fn ($q) => $q->whereHas('incident.client.supportWorkers', fn ($qq) => $qq->whereKey($user->id)),
+            )
             ->orderByDesc('created_at')
             ->limit(300);
 

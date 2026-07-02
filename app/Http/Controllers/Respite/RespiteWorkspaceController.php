@@ -171,16 +171,20 @@ class RespiteWorkspaceController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'staff' => User::query()->orderBy('name')->get(['id', 'name']),
             'incidents' => ClientIncident::query()
-                ->select('id', 'client_id', 'type', 'occurred_at')
+                ->select('id', 'reference_number', 'client_id', 'type', 'occurred_at')
                 ->orderByDesc('occurred_at')
                 ->limit(100)
                 ->get()
-                ->map(fn (ClientIncident $i) => [
-                    'id' => $i->id,
-                    'client_id' => $i->client_id,
-                    'reference' => 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT),
-                    'label' => 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT).' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
-                ])
+                ->map(function (ClientIncident $i) {
+                    $ref = $i->reference_number ?? 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT);
+
+                    return [
+                        'id' => $i->id,
+                        'client_id' => $i->client_id,
+                        'reference' => $ref,
+                        'label' => $ref.' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
+                    ];
+                })
                 ->all(),
             'plans' => BehaviourSupportPlan::query()
                 ->where('status', '!=', 'archived')

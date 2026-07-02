@@ -45,14 +45,26 @@ return new class extends Migration
     public function up(): void
     {
         foreach (self::NEW_REF_TABLES as $tableName => $prefix) {
-            if (! Schema::hasTable($tableName) || Schema::hasColumn($tableName, 'reference_number')) {
+            if (! Schema::hasTable($tableName)) {
                 continue;
             }
 
-            Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                $table->string('reference_number', 32)->nullable()->after('id');
-                $table->unique('reference_number', $tableName.'_reference_number_unique');
-            });
+            // Each step is individually guarded so a partially-failed run
+            // (DDL auto-commits; a backfill can die mid-chunk) resumes
+            // cleanly instead of wedging the table with a half-backfill.
+            if (! Schema::hasColumn($tableName, 'reference_number')) {
+                Schema::table($tableName, function (Blueprint $table) {
+                    $table->string('reference_number', 32)->nullable()->after('id');
+                });
+            }
+
+            try {
+                Schema::table($tableName, function (Blueprint $table) use ($tableName) {
+                    $table->unique('reference_number', $tableName.'_reference_number_unique');
+                });
+            } catch (\Illuminate\Database\QueryException) {
+                // Unique index already exists from a previous partial run.
+            }
 
             $this->backfill($tableName, $prefix);
         }
@@ -70,7 +82,11 @@ return new class extends Migration
         foreach (array_keys(self::NEW_REF_TABLES) as $tableName) {
             if (Schema::hasTable($tableName) && Schema::hasColumn($tableName, 'reference_number')) {
                 Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                    $table->dropUnique($tableName.'_reference_number_unique');
+                    try {
+                        $table->dropUnique($tableName.'_reference_number_unique');
+                    } catch (\Illuminate\Database\QueryException) {
+                        // Index missing (half-applied up()) — still drop the column.
+                    }
                     $table->dropColumn('reference_number');
                 });
             }
@@ -78,15 +94,29 @@ return new class extends Migration
     }
 
     /**
-     * Number existing rows in id (creation) order, scoped to the year each
-     * row was created, then point the sequence past the highest number used.
+     * Number un-referenced rows in id (creation) order, scoped to the year
+     * each row was created, then point the sequence past the highest number
+     * used. Resume-safe: counters start above any references a previous
+     * (interrupted) run already assigned.
      */
     private function backfill(string $tableName, string $prefix): void
     {
         $counters = [];
 
         DB::table($tableName)
+            ->whereNotNull('reference_number')
+            ->where('reference_number', 'like', "{$prefix}-%")
+            ->pluck('reference_number')
+            ->each(function ($ref) use ($prefix, &$counters) {
+                if (preg_match('/^'.preg_quote($prefix, '/').'-(\d{4})-(\d+)$/', (string) $ref, $m)) {
+                    $year = (int) $m[1];
+                    $counters[$year] = max($counters[$year] ?? 0, (int) $m[2]);
+                }
+            });
+
+        DB::table($tableName)
             ->select('id', 'created_at')
+            ->whereNull('reference_number')
             ->orderBy('id')
             ->chunkById(500, function ($rows) use ($tableName, $prefix, &$counters) {
                 foreach ($rows as $row) {
