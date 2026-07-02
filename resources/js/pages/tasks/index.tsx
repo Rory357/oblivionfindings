@@ -13,6 +13,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TabStrip, type RosterTabItem } from '@/components/rostering';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
@@ -21,12 +22,24 @@ import {
     HeroCluster,
     HeroClusterTile,
     HeroMedallion,
-    HeroSegmented,
     HeroShell,
     HeroStatusPill,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, ChevronDown, Download, ListChecks, Search, Siren } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarClock,
+    CheckCircle2,
+    ChevronDown,
+    Clock,
+    Download,
+    LayoutList,
+    ListChecks,
+    Search,
+    Siren,
+    UserCheck,
+    UserX,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -93,11 +106,29 @@ interface Props {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const QUICK_VIEWS = [
-    { key: 'all', label: 'All' },
-    { key: 'mine', label: 'Mine' },
-    { key: 'overdue', label: 'Overdue' },
-] as const;
+/** Register views — the TabStrip below the hero owns these dimensions. */
+type TabKey = 'all' | 'mine' | 'overdue' | 'unassigned' | 'week' | 'high' | 'done';
+
+/** Filter override applied when a tab is clicked (search + modules persist). */
+const TAB_FILTERS: Record<TabKey, Partial<Filters>> = {
+    all: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    mine: { assigned: 'me', overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    overdue: { assigned: null, overdue: true, due: null, severity: null, bucket: null, include_done: false },
+    unassigned: { assigned: 'unassigned', overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    week: { assigned: null, overdue: false, due: 'week', severity: null, bucket: null, include_done: false },
+    high: { assigned: null, overdue: false, due: null, severity: ['critical', 'high'], bucket: null, include_done: false },
+    done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true },
+};
+
+function deriveTab(f: Filters): TabKey {
+    if (f.include_done && (f.bucket ?? []).join(',') === 'done') return 'done';
+    if (f.overdue && !f.assigned) return 'overdue';
+    if (f.assigned === 'me') return 'mine';
+    if (f.assigned === 'unassigned') return 'unassigned';
+    if (f.due === 'week') return 'week';
+    if ((f.severity ?? []).slice().sort().join(',') === 'critical,high') return 'high';
+    return 'all';
+}
 
 const SEVERITIES: Array<{ key: TaskSeverity; label: string }> = [
     { key: 'critical', label: 'Critical' },
@@ -105,11 +136,6 @@ const SEVERITIES: Array<{ key: TaskSeverity; label: string }> = [
     { key: 'medium', label: 'Medium' },
     { key: 'low', label: 'Low' },
     { key: 'info', label: 'Info' },
-];
-
-const BUCKETS: Array<{ key: TaskBucket; label: string }> = [
-    { key: 'open', label: 'Open' },
-    { key: 'in_progress', label: 'In progress' },
 ];
 
 const SEVERITY_VARIANT: Record<TaskSeverity, StatusVariant> = {
@@ -201,9 +227,18 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const quickView = filters.overdue ? 'overdue' : filters.assigned === 'me' ? 'mine' : 'all';
-    const setQuickView = (key: string) =>
-        go({ assigned: key === 'mine' ? 'me' : null, overdue: key === 'overdue' });
+    const tab = deriveTab(filters);
+    const setTab = (id: string) => go(TAB_FILTERS[id as TabKey] ?? TAB_FILTERS.all);
+
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: stats.open || undefined },
+        { id: 'mine', label: 'Mine', icon: UserCheck, tone: 'info', badge: stats.mine || undefined },
+        { id: 'overdue', label: 'Overdue', icon: Clock, tone: 'critical', badge: stats.overdue || undefined },
+        { id: 'unassigned', label: 'Unassigned', icon: UserX, tone: 'warning', badge: stats.unassigned || undefined },
+        { id: 'week', label: 'Due this week', icon: CalendarClock, tone: 'info', badge: stats.dueWeek || undefined },
+        { id: 'high', label: 'High priority', icon: AlertTriangle, tone: 'warning', badge: stats.critical || undefined },
+        { id: 'done', label: 'Done', icon: CheckCircle2, tone: 'success' },
+    ];
 
     const hasFilters = !!(
         filters.sources?.length ||
@@ -249,23 +284,7 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
 
             <div className="flex flex-col gap-4 p-6">
                 {/* ── Hero ── */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <HeroSegmented
-                                label="View"
-                                ariaLabel="Quick view"
-                                variant="pill"
-                                value={quickView}
-                                onChange={setQuickView}
-                                items={QUICK_VIEWS}
-                            />
-                            <span className="text-xs text-primary-foreground/70 tabular-nums">
-                                {items.length} task{items.length === 1 ? '' : 's'} in view
-                            </span>
-                        </div>
-                    }
-                >
+                <HeroShell>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ListChecks} />
@@ -353,6 +372,9 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                     </div>
                 </HeroShell>
 
+                {/* ── Register views ── */}
+                <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Task views" />
+
                 {/* ── Filter bar ── */}
                 <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
                     <div className="relative min-w-[240px] flex-1">
@@ -409,44 +431,15 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                         })}
                     </div>
 
-                    <div role="group" aria-label="Status filter" className="flex items-center gap-1 rounded-lg bg-muted p-1">
-                        {BUCKETS.map((b) => {
-                            const active = (filters.bucket ?? []).includes(b.key);
-                            return (
-                                <button
-                                    key={b.key}
-                                    type="button"
-                                    aria-pressed={active}
-                                    onClick={() => go({ bucket: toggleKey(filters.bucket, b.key) })}
-                                    className={cn(
-                                        'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                                        active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                                    )}
-                                >
-                                    {b.label}
-                                </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            aria-pressed={filters.include_done}
-                            onClick={() => go({ include_done: !filters.include_done })}
-                            className={cn(
-                                'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                                filters.include_done
-                                    ? 'bg-card text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground',
-                            )}
-                        >
-                            Include done
-                        </button>
-                    </div>
-
                     {hasFilters ? (
                         <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
                             Clear filters
                         </Button>
                     ) : null}
+
+                    <span className="ml-auto pr-1 text-xs text-muted-foreground tabular-nums">
+                        {items.length} in view
+                    </span>
                 </div>
 
                 {/* ── Queue ── */}
