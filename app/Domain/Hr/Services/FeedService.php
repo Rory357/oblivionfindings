@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
+use App\Domain\Hr\Notifications\KudosReceivedNotification;
 use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Models\User;
 use Carbon\Carbon;
@@ -18,6 +19,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FeedService
 {
@@ -123,7 +125,7 @@ class FeedService
     public function sendKudos(User $from, int $toUserId, string $category, string $message, ?int $tenantId = null, ?string $impact = null): HrKudos
     {
         return DB::transaction(function () use ($from, $toUserId, $category, $message, $tenantId, $impact) {
-            User::findOrFail($toUserId);
+            $recipient = User::findOrFail($toUserId);
             $resolvedTenantId = $tenantId ?? $from->tenant_id;
 
             // Create a feed post for the kudos
@@ -135,7 +137,7 @@ class FeedService
                 'is_pinned' => false,
             ]);
 
-            return HrKudos::create([
+            $kudos = HrKudos::create([
                 'tenant_id' => $resolvedTenantId,
                 'from_user_id' => $from->id,
                 'to_user_id' => $toUserId,
@@ -145,6 +147,23 @@ class FeedService
                 'is_public' => true,
                 'feed_post_id' => $feedPost->id,
             ]);
+
+            // Tell the recipient they've been recognised (never the sender —
+            // a self-kudos stays silent). Best-effort: the notification is
+            // afterCommit-queued, and a failure never rolls back the kudos.
+            if ($recipient->id !== $from->id) {
+                try {
+                    $recipient->notify(new KudosReceivedNotification($kudos, $from->name));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send kudos-received notification', [
+                        'kudos_id' => $kudos->id,
+                        'recipient_id' => $recipient->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+
+            return $kudos;
         });
     }
 

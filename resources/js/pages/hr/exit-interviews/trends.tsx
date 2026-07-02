@@ -15,7 +15,8 @@ interface Trends {
     departure_reasons: { reason: string; count: number }[];
     satisfaction_over_time: {
         month: string;
-        avg_satisfaction: number;
+        avg_satisfaction: number | null;
+        suppressed?: boolean;
         count: number;
     }[];
     recommend_stats: {
@@ -78,7 +79,9 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
     const maxSatisfaction = useMemo(
         () =>
             Math.max(
-                ...trends.satisfaction_over_time.map((s) => s.avg_satisfaction),
+                ...trends.satisfaction_over_time.map(
+                    (s) => s.avg_satisfaction ?? 0,
+                ),
                 5,
             ),
         [trends.satisfaction_over_time],
@@ -300,7 +303,8 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                     {trends.satisfaction_over_time.map(
                                         (item) => {
                                             const pct =
-                                                (item.avg_satisfaction / 5) *
+                                                ((item.avg_satisfaction ?? 0) /
+                                                    5) *
                                                 100;
                                             return (
                                                 <div key={item.month}>
@@ -309,11 +313,10 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                                             {item.month}
                                                         </span>
                                                         <span className="text-muted-foreground">
-                                                            {
-                                                                item.avg_satisfaction
-                                                            }
-                                                            /5 ({item.count}{' '}
-                                                            interviews)
+                                                            {item.avg_satisfaction ===
+                                                            null
+                                                                ? `Suppressed (fewer than 3 responses)`
+                                                                : `${item.avg_satisfaction}/5 (${item.count} interviews)`}
                                                         </span>
                                                     </div>
                                                     <div className="h-2 overflow-hidden rounded-full bg-muted">

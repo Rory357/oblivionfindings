@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
@@ -556,6 +557,43 @@ trait BuildsMyHrOverview
                 'cta' => 'Sign now',
                 'go' => 'documents',
             ];
+        }
+
+        // 1.5 Overdue tasks on my own active onboarding checklist (only the
+        //     ones the subject can actually action — assigned to them, or
+        //     unassigned and not sign-off). Deep-links to the Overview's
+        //     "Getting started" card.
+        $profileId = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->value('id');
+        if ($profileId) {
+            $overdueOnboarding = HrOnboardingTask::query()
+                ->whereHas('checklist', fn ($q) => $q
+                    ->where('tenant_id', $tenantId)
+                    ->where('employee_profile_id', $profileId)
+                    ->whereIn('status', ['pending', 'in_progress']))
+                ->where('status', '!=', 'completed')
+                ->whereNotNull('due_date')
+                ->whereDate('due_date', '<', $now->toDateString())
+                ->where(fn ($q) => $q
+                    ->where('assigned_to_user_id', $user->id)
+                    ->orWhere(fn ($qq) => $qq
+                        ->whereNull('assigned_to_user_id')
+                        ->where('sign_off_required', false)))
+                ->count();
+
+            if ($overdueOnboarding > 0) {
+                $items[] = [
+                    'id' => 'onboarding',
+                    'tone' => 'warning',
+                    'icon' => 'alert',
+                    'label' => $overdueOnboarding.' onboarding task'.($overdueOnboarding === 1 ? '' : 's').' overdue',
+                    'meta' => 'Finish your Getting started checklist below',
+                    'badge' => 'Onboarding',
+                    'cta' => 'Open',
+                    'go' => 'overview',
+                ];
+            }
         }
 
         // 2. Policy attestation due.

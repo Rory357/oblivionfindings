@@ -131,6 +131,20 @@ class EmployeeIntakeService
             $this->maybeGenerateOnboarding($profile, $actorId);
         }
 
+        // 3b. Seed the compliance DISPLAY matrix for the new hire (audit fix
+        // round 2). Rostering hard-stops are already live-checked at assign
+        // time (LiveComplianceValidator) — this only materialises the
+        // hr_staff_compliance_status rows so the person isn't invisible on
+        // /hr/compliance until the nightly EvaluateComplianceMatrixJob runs.
+        try {
+            app(ComplianceMatrixService::class)->evaluateStaff($user);
+        } catch (\Throwable $e) {
+            Log::warning('Compliance matrix seed failed for new hire.', [
+                'employee_profile_id' => $profile->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         // 4. One invite path — the password-reset link doubles as "set your
         //    password & first login". Shared by both doors.
         if ($sendInvite) {

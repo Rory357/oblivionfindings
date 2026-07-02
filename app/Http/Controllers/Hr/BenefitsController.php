@@ -186,6 +186,25 @@ class BenefitsController extends Controller
 
         $enrollment->update($data);
 
+        // Material change (rate/status) → confirm to the employee. Checked
+        // before any refresh so wasChanged() still reflects this update.
+        $material = $enrollment->wasChanged([
+            'status',
+            'employee_contribution_rate',
+            'employer_contribution_rate',
+        ]);
+
+        // KiwiSaver → payroll sync: payroll reads the employee profile's
+        // kiwisaver_rate (not this enrolment row), so mirror active-rate
+        // changes and zero it on opt-out. See BenefitsService::syncKiwiSaverToProfile.
+        $this->benefitsService->syncKiwiSaverToProfile(
+            $enrollment->fresh(['benefitPlan', 'employeeProfile']),
+        );
+
+        if ($material) {
+            $this->benefitsService->notifyEnrollmentChange($enrollment);
+        }
+
         return redirect()->back()->with('success', 'Enrollment updated.');
     }
 

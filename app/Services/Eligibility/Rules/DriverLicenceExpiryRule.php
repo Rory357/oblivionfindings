@@ -12,10 +12,23 @@ use Carbon\CarbonInterface;
 /**
  * When a shift requires the 'driver' coverage role, validates that the
  * staff member's driving licence has not expired and will not expire
- * before the shift starts.
+ * before the shift starts, and that their driver eligibility has not been
+ * suspended.
  *
  * Complements CoverageRoleService (which checks status + can_drive_clients)
- * by adding the temporal licence-expiry dimension.
+ * by adding the temporal licence-expiry dimension and an explicit,
+ * human-readable suspension block (belt-and-braces: CoverageRoleService
+ * already withholds the 'driver' role from non-eligible staff, but that
+ * surfaces only as a generic missing-role message).
+ *
+ * DEFERRED (audit round 2, item 5): licence CLASS / endorsement matching at
+ * the roster gate. Neither shifts nor coverage roles declare a required
+ * licence class today — `shifts.coverage_roles` is a plain list of role keys
+ * and CoverageRoleService::supportedRoles() carries no class metadata — so
+ * there is nothing to match hr_driver_eligibility.licence_class /
+ * licence_endorsements against. If a `required_licence_class` (or similar)
+ * field is ever added to shifts/coverage requirements, extend evaluate() to
+ * block when the assigned driver's class/endorsements don't satisfy it.
  */
 class DriverLicenceExpiryRule implements EligibilityRuleInterface
 {
@@ -47,6 +60,22 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
                 'severity' => 'block',
                 'overrideable' => false,
                 'message' => 'No driver eligibility record on file.',
+            ];
+        }
+
+        // Suspended drivers are hard-blocked regardless of licence dates
+        // (status values in use: eligible | pending_review | review_required |
+        // suspended — there is no separate stood-down value; suspension_reason
+        // carries the why).
+        if ($eligibility->status === 'suspended') {
+            return [
+                'rule' => 'driver_licence',
+                'passed' => false,
+                'severity' => 'block',
+                'overrideable' => false,
+                'message' => 'Driver eligibility is suspended'
+                    . ($eligibility->suspension_reason ? " ({$eligibility->suspension_reason})" : '')
+                    . '.',
             ];
         }
 

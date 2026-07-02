@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ShiftCoverageService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Single entry point that fans the org/manager `/hr/calendar` page out across
@@ -84,7 +85,7 @@ class HrCalendarAggregator
             $out = $out->concat($this->shifts($start, $end, $filters, $viewer));
         }
         if ($want('compliance')) {
-            $out = $out->concat($this->compliance($start, $end, $filters));
+            $out = $out->concat($this->compliance($tenantId, $start, $end, $filters));
         }
         if ($want('milestone')) {
             $out = $out->concat($this->milestones($tenantId, $start, $end, $filters));
@@ -262,7 +263,7 @@ class HrCalendarAggregator
      */
     private function occurrences(HrCalendarEvent $e, Carbon $rangeStart, Carbon $rangeEnd): array
     {
-        $rule = $this->parseRrule($e->rrule);
+        $rule = $this->parseRrule($e->rrule, $e->id);
         if (! $rule || ! $e->starts_at) {
             return [];
         }
@@ -298,7 +299,7 @@ class HrCalendarAggregator
     }
 
     /** @return array{freq: string, interval: int, count: int|null}|null */
-    private function parseRrule(?string $rrule): ?array
+    private function parseRrule(?string $rrule, ?int $eventId = null): ?array
     {
         if (! $rrule) {
             return null;
@@ -310,6 +311,13 @@ class HrCalendarAggregator
         }
         $freq = $parts['FREQ'] ?? null;
         if (! in_array($freq, ['DAILY', 'WEEKLY', 'MONTHLY'], true)) {
+            // A non-empty RRULE we can't expand means the event silently loses
+            // all its occurrences — leave a trace instead of failing mute.
+            Log::info('HR calendar RRULE failed to parse; recurring event will not expand.', [
+                'event_id' => $eventId,
+                'rrule' => $rrule,
+            ]);
+
             return null;
         }
 
@@ -474,7 +482,7 @@ class HrCalendarAggregator
 
     /* ── Compliance renewals (read-only; deep-link to Compliance) ────────── */
 
-    private function compliance(Carbon $start, Carbon $end, array $filters): Collection
+    private function compliance(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
     {
         $now = now();
         $out = collect();
@@ -482,7 +490,10 @@ class HrCalendarAggregator
             return $expires->lt($now) || $expires->diffInDays($now) <= 30 ? 'critical' : 'warning';
         };
 
+        // Tenant-scoped like every other layer (audit fix round 2 — this layer
+        // previously queried all three tables unscoped).
         HrStaffComplianceStatus::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$start, $end])
             ->with(['user:id,name', 'requirement:id,name,code'])
@@ -497,7 +508,13 @@ class HrCalendarAggregator
                 ));
             });
 
+        // staff_background_checks has no tenant_id column — scope through the
+        // owner's employee profile instead.
         StaffBackgroundCheck::query()
+            ->when($tenantId !== null, fn ($q) => $q->whereHas(
+                'user.hrEmployeeProfile',
+                fn ($p) => $p->where('tenant_id', $tenantId),
+            ))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$start, $end])
             ->with('user:id,name')
@@ -513,6 +530,7 @@ class HrCalendarAggregator
             });
 
         HrDriverEligibility::query()
+            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
             ->whereNotNull('licence_expires_at')
             ->whereBetween('licence_expires_at', [$start, $end])
             ->with('user:id,name')

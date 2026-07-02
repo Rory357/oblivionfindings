@@ -53,7 +53,7 @@ type Props = {
     employees: FeedEmployee[];
     sites: Array<{ id: number; name: string }>;
     currentUserId: number;
-    can: { manageAnnouncements: boolean };
+    can: { manageAnnouncements: boolean; moderate: boolean };
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -306,6 +306,7 @@ export default function FeedIndex({
                                     categoryLabel={kudosCategories[post.kudos.category] ?? post.kudos.category}
                                     impactLabel={kudosImpacts[post.kudos.impact] ?? post.kudos.impact}
                                     employeeById={employeeById}
+                                    canModerate={can.moderate}
                                 />
                             ) : (
                                 <UpdateCard
@@ -313,6 +314,7 @@ export default function FeedIndex({
                                     post={post}
                                     employeeById={employeeById}
                                     siteNameById={siteNameById}
+                                    canModerate={can.moderate}
                                 />
                             ),
                         )}

@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -143,11 +146,41 @@ class ItProvisioningController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
 
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $reason = trim((string) ($validated['reason'] ?? '')) ?: null;
+
         if ($provisioning->status === 'done') {
             return redirect()->back()->with('error', 'A fulfilled request cannot be cancelled.');
         }
 
         $provisioning->update(['status' => 'cancelled']);
+
+        // Cross-loop: a cancelled request must not orphan its source onboarding
+        // task — annotate the still-open task and tell the checklist creator so
+        // it gets resolved manually. Best-effort: never blocks the cancel.
+        if ($provisioning->onboarding_task_id) {
+            try {
+                $task = $provisioning->onboardingTask()->with('checklist.employeeProfile.user:id,name')->first();
+                if ($task && $task->status !== 'completed') {
+                    $note = 'IT request cancelled'.($reason ? ": {$reason}" : '').' — resolve this task manually.';
+                    $existing = trim((string) $task->notes);
+                    $task->update(['notes' => $existing === '' ? $note : $existing."\n".$note]);
+
+                    $creator = $task->checklist?->created_by
+                        ? User::find($task->checklist->created_by)
+                        : null;
+                    $creator?->notify(new ItProvisioningCancelledNotification($provisioning, $task, $reason));
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to annotate/notify onboarding task after IT request cancellation', [
+                    'provisioning_request_id' => $provisioning->id,
+                    'onboarding_task_id' => $provisioning->onboarding_task_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Request cancelled.');
     }

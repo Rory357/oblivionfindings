@@ -6,13 +6,19 @@ use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedAttachment;
 use App\Domain\Hr\Models\HrFeedPost;
+use App\Domain\Hr\Models\HrFeedReaction;
+use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Services\FeedService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\AuditLog;
 use App\Models\Site;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -70,6 +76,10 @@ class FeedController extends Controller
             'currentUserId' => $user->id,
             'can' => [
                 'manageAnnouncements' => (bool) $user->canDo('hr.announcements.manage'),
+                // Moderation (remove post/kudos). No hr.recognition.manage key
+                // exists (recognition ships only view/give), so the strongest
+                // people-management permission stands in.
+                'moderate' => (bool) $user->canDo('hr.employees.manage'),
             ],
         ]);
     }
@@ -236,6 +246,125 @@ class FeedController extends Controller
         );
 
         return redirect()->back()->with('success', 'Reply posted.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Moderation — remove an inappropriate post or kudos                 */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Remove a feed post (and, for a kudos post, its linked kudos + social
+     * thread). Neither model has SoftDeletes, so this is a hard delete with
+     * an audit-log entry for accountability. Route-gated + re-checked here on
+     * hr.employees.manage (no dedicated feed/recognition manage key exists).
+     */
+    public function destroyPost(Request $request, HrFeedPost $post)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $post->tenant_id);
+
+        $this->removeFeedPost($request, $post);
+
+        return redirect()->back()->with('success', 'Post removed.');
+    }
+
+    /**
+     * Remove a kudos (and its feed post + social thread) — the kudos-keyed
+     * twin of {@see destroyPost} so both wall card types can be moderated.
+     */
+    public function destroyKudos(Request $request, HrKudos $kudos)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+
+        $post = $kudos->feedPost;
+        if ($post) {
+            $this->removeFeedPost($request, $post->setRelation('kudos', $kudos));
+        } else {
+            $this->removeKudosRow($request, $kudos);
+        }
+
+        return redirect()->back()->with('success', 'Kudos removed.');
+    }
+
+    /**
+     * Hard-delete a wall post with its dependents (kudos + reactions/replies,
+     * polymorphic post reactions/replies, image attachment) and write the
+     * audit-log entry. Everything commits together.
+     */
+    private function removeFeedPost(Request $request, HrFeedPost $post): void
+    {
+        DB::transaction(function () use ($request, $post) {
+            $kudos = $post->kudos ?? $post->kudos()->first();
+            if ($kudos) {
+                $this->removeKudosRow($request, $kudos, auditSeparately: false);
+            }
+
+            // Polymorphic reactions/replies on the post itself.
+            HrFeedReaction::where('subject_type', 'post')->where('subject_id', $post->id)->delete();
+            HrFeedReply::where('subject_type', 'post')->where('subject_id', $post->id)->delete();
+
+            $attachment = $post->attachment;
+            if ($attachment) {
+                try {
+                    Storage::disk($attachment->disk)->delete($attachment->path);
+                } catch (\Throwable) {
+                    // Best-effort file cleanup — the DB row still goes.
+                }
+                $attachment->delete();
+            }
+
+            AuditLog::create([
+                'user_id' => $request->user()?->id,
+                'action' => 'hr.feed.post.removed',
+                'auditable_type' => HrFeedPost::class,
+                'auditable_id' => $post->id,
+                'meta' => [
+                    'post_type' => $post->post_type,
+                    'author_user_id' => $post->user_id,
+                    'content_excerpt' => Str::limit((string) $post->content, 200),
+                    'kudos_id' => $kudos?->id,
+                ],
+                'ip_address' => $request->ip(),
+                'user_agent' => (string) $request->userAgent(),
+            ]);
+
+            $post->delete();
+        });
+    }
+
+    /** Delete a kudos row with its reactions/replies (+ audit entry when standalone). */
+    private function removeKudosRow(Request $request, HrKudos $kudos, bool $auditSeparately = true): void
+    {
+        DB::transaction(function () use ($request, $kudos, $auditSeparately) {
+            $kudos->reactions()->delete();
+            $kudos->replies()->delete();
+
+            if ($auditSeparately) {
+                AuditLog::create([
+                    'user_id' => $request->user()?->id,
+                    'action' => 'hr.feed.kudos.removed',
+                    'auditable_type' => HrKudos::class,
+                    'auditable_id' => $kudos->id,
+                    'meta' => [
+                        'from_user_id' => $kudos->from_user_id,
+                        'to_user_id' => $kudos->to_user_id,
+                        'category' => $kudos->category,
+                        'content_excerpt' => Str::limit((string) $kudos->message, 200),
+                    ],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => (string) $request->userAgent(),
+                ]);
+            }
+
+            $kudos->delete();
+        });
     }
 
     /* ------------------------------------------------------------------ */

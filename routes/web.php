@@ -98,13 +98,13 @@ Route::post('/contact', [ContactController::class, 'store']);
 Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.index');
 // Public capability-token lookup — throttle to blunt token enumeration.
 Route::get('/careers/application/{token}', [App\Http\Controllers\CareerPortalController::class, 'applicationStatus'])->middleware('throttle:30,1')->name('careers.application.status');
-Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->name('careers.offer.show');
-Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->name('careers.offer.respond');
+Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->middleware('throttle:30,1')->name('careers.offer.show');
+Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->middleware('throttle:10,1')->name('careers.offer.respond');
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
-Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->name('careers.reference.show');
-Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->name('careers.reference.submit');
+Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->middleware('throttle:30,1')->name('careers.reference.show');
+Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->middleware('throttle:10,1')->name('careers.reference.submit');
 Route::get('/careers/{slug}', fn () => redirect()->route('careers.index'))->where('slug', '^(?!application|offers|jobs|references).*$')->name('careers.show');
 
 // Authenticated routes

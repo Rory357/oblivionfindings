@@ -296,6 +296,29 @@ class ComplianceController extends Controller
             ->where('starts_at', '<', now()->addDays(14))
             ->count();
 
+        // Expiring licence vs already-rostered future shifts (audit fix round
+        // 2, item 6): shifts this driver is booked on that START AFTER the
+        // licence lapses. The roster gate blocks NEW assignments, but shifts
+        // rostered before the expiry was recorded stay silently on the books —
+        // surface them so HR can re-roster proactively.
+        $atRiskShifts = [];
+        if ($driverRecord && $driverRecord->licence_expires_at) {
+            $atRiskShifts = Shift::where('user_id', $staff->id)
+                ->where('status', 'scheduled')
+                ->where('starts_at', '>', now())
+                ->where('starts_at', '>', $driverRecord->licence_expires_at->copy()->endOfDay())
+                ->orderBy('starts_at')
+                ->limit(10)
+                ->with('site:id,name')
+                ->get()
+                ->map(fn (Shift $s) => [
+                    'id' => $s->id,
+                    'date' => $s->starts_at->toDateString(),
+                    'site' => $s->site?->name,
+                ])
+                ->all();
+        }
+
         // Active requirements offered in the Record / Waive wizards launched here.
         $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
             ->where('is_active', true)
@@ -335,6 +358,7 @@ class ComplianceController extends Controller
                 'licence_class' => $driverRecord->licence_class,
                 'licence_number' => $driverRecord->licence_number,
                 'expires_at' => optional($driverRecord->licence_expires_at)->toDateString(),
+                'at_risk_shifts' => $atRiskShifts,
             ] : null,
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),

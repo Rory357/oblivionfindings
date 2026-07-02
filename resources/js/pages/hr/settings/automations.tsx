@@ -270,6 +270,13 @@ export default function HrAutomationsPage({
         );
     };
 
+    const deleteRule = (id: number) => {
+        if (!window.confirm('Delete this automation rule? Its run history is kept.')) return;
+        router.delete(`/hr/settings/automations/${id}`, {
+            preserveScroll: true,
+        });
+    };
+
     const updateRecipients = (value: string) => {
         const id = Number(value);
         if (!Number.isFinite(id) || id <= 0) return;
@@ -976,6 +983,16 @@ export default function HrAutomationsPage({
                                                         {rule.is_active
                                                             ? 'Pause'
                                                             : 'Resume'}
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="text-status-critical hover:text-status-critical"
+                                                        onClick={() =>
+                                                            deleteRule(rule.id)
+                                                        }
+                                                    >
+                                                        Delete
                                                     </Button>
                                                 </div>
                                             )}

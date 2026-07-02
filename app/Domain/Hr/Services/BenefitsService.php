@@ -5,7 +5,9 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\BenefitEnrolledNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BenefitsService
 {
@@ -14,8 +16,8 @@ class BenefitsService
      */
     public function enrollEmployee(HrEmployeeProfile $profile, HrBenefitPlan $plan, array $data): HrBenefitEnrollment
     {
-        return DB::transaction(function () use ($profile, $plan, $data) {
-            return HrBenefitEnrollment::create([
+        $enrollment = DB::transaction(function () use ($profile, $plan, $data) {
+            $enrollment = HrBenefitEnrollment::create([
                 'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
                 'benefit_plan_id' => $plan->id,
@@ -25,7 +27,19 @@ class BenefitsService
                 'employer_contribution_rate' => $data['employer_contribution_rate'] ?? $plan->employer_contribution_rate,
                 'notes' => $data['notes'] ?? null,
             ]);
+
+            $enrollment->setRelation('benefitPlan', $plan);
+            $enrollment->setRelation('employeeProfile', $profile);
+
+            // KiwiSaver → payroll sync (see syncKiwiSaverToProfile).
+            $this->syncKiwiSaverToProfile($enrollment);
+
+            return $enrollment;
         });
+
+        $this->notifyEnrollmentChange($enrollment);
+
+        return $enrollment;
     }
 
     /**
@@ -41,9 +55,77 @@ class BenefitsService
             }
 
             $enrollment->update($update);
+            $this->syncKiwiSaverToProfile($enrollment->fresh(['benefitPlan', 'employeeProfile']));
 
             return $enrollment->fresh();
         });
+    }
+
+    /**
+     * Keep the employee profile's kiwisaver_rate in lockstep with a KiwiSaver
+     * benefit enrolment.
+     *
+     * Payroll never reads hr_benefit_enrollments — the payroll export and
+     * payslip calculations read HrEmployeeProfile.kiwisaver_rate, so an
+     * enrolment that isn't mirrored there silently never deducts. Active
+     * enrolment → profile rate matches the employee contribution rate;
+     * opted-out → profile rate 0. Non-KiwiSaver plans are a no-op.
+     */
+    public function syncKiwiSaverToProfile(HrBenefitEnrollment $enrollment): void
+    {
+        $plan = $enrollment->benefitPlan ?? $enrollment->benefitPlan()->first();
+        if (! $plan || $plan->type !== 'kiwisaver') {
+            return;
+        }
+
+        $profile = $enrollment->employeeProfile ?? $enrollment->employeeProfile()->first();
+        if (! $profile) {
+            return;
+        }
+
+        if ($enrollment->status === 'opted_out') {
+            $rate = 0.0;
+        } elseif ($enrollment->status === 'active' && $enrollment->employee_contribution_rate !== null) {
+            $rate = (float) $enrollment->employee_contribution_rate;
+        } else {
+            // Suspended/terminated (or an active enrolment with no rate yet):
+            // leave the profile rate as-is rather than guessing.
+            return;
+        }
+
+        if ((float) ($profile->kiwisaver_rate ?? -1) === $rate) {
+            return;
+        }
+
+        // kiwisaver_rate lives on the (encrypted-at-rest) profile — plain
+        // assignment; the model cast handles storage.
+        $profile->update(['kiwisaver_rate' => $rate]);
+
+        Log::info('KiwiSaver rate synced from benefit enrolment to employee profile (payroll SSOT).', [
+            'enrollment_id' => $enrollment->id,
+            'employee_profile_id' => $profile->id,
+            'status' => $enrollment->status,
+            'kiwisaver_rate' => $rate,
+        ]);
+    }
+
+    /**
+     * Best-effort enrolment confirmation (mail + database) to the covered
+     * employee — used on creation and on material updates (rate/status).
+     */
+    public function notifyEnrollmentChange(HrBenefitEnrollment $enrollment): void
+    {
+        try {
+            $enrollment->loadMissing(['benefitPlan', 'employeeProfile.user']);
+            $employee = $enrollment->employeeProfile?->user;
+
+            $employee?->notify(new BenefitEnrolledNotification($enrollment));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send benefit enrolment notification', [
+                'enrollment_id' => $enrollment->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**

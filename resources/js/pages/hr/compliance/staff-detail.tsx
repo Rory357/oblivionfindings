@@ -34,7 +34,14 @@ interface Props {
     requirements: ReqOption[];
     wizard: { people: PersonOption[]; requirements: ReqOption[]; roles: RoleOption[]; siteTypes: string[] };
     vetting: { id: number; status: string; check_type: string; provider: string | null; reference_number: string | null; expires_at: string | null } | null;
-    driver: { id: number; status: string; licence_class: string | null; licence_number: string | null; expires_at: string | null } | null;
+    driver: {
+        id: number;
+        status: string;
+        licence_class: string | null;
+        licence_number: string | null;
+        expires_at: string | null;
+        at_risk_shifts: { id: number; date: string; site: string | null }[];
+    } | null;
     can: { manage: boolean; vetting: boolean; driver: boolean };
 }
 
@@ -214,6 +221,23 @@ export default function StaffDetail({ staff, complianceStatuses, summary, hardSt
                                         {driver.licence_class ? `Class ${driver.licence_class}` : 'Licence'}
                                         {driver.expires_at ? ` · expires ${fmtDate(driver.expires_at)}` : ''}
                                     </p>
+                                    {driver.at_risk_shifts.length > 0 && (
+                                        <div className="mt-3 rounded-lg border border-status-critical/30 bg-status-critical/5 p-2.5">
+                                            <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-status-critical">
+                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                                {driver.at_risk_shifts.length} rostered shift{driver.at_risk_shifts.length === 1 ? '' : 's'} after licence expiry
+                                            </p>
+                                            <ul className="mt-1.5 space-y-1">
+                                                {driver.at_risk_shifts.map((s) => (
+                                                    <li key={s.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                                                        <span>{fmtDate(s.date)}</span>
+                                                        <span className="truncate pl-2">{s.site ?? '—'}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <p className="mt-1.5 text-[11px] text-muted-foreground">Re-roster or renew the licence before these dates.</p>
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <p className="text-xs text-muted-foreground">No driver record.</p>
