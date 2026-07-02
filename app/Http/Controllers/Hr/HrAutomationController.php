@@ -203,6 +203,18 @@ class HrAutomationController extends Controller
         return redirect()->back()->with('success', $wasActive ? 'Automation rule paused.' : 'Automation rule resumed.');
     }
 
+    public function destroy(Request $request, HrAutomationRule $rule)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
+
+        $rule->delete();
+
+        return redirect()->back()->with('success', 'Automation rule deleted.');
+    }
+
     /**
      * @return array<string, mixed>
      */

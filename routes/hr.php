@@ -1274,6 +1274,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/automations', [HrAutomationController::class, 'store'])->name('automations.store');
         Route::put('/automations/{rule}', [HrAutomationController::class, 'update'])->name('automations.update');
         Route::post('/automations/{rule}/toggle-active', [HrAutomationController::class, 'toggle'])->name('automations.toggleActive');
+        Route::delete('/automations/{rule}', [HrAutomationController::class, 'destroy'])->name('automations.destroy');
 
         Route::get('/webhooks', [HrWebhookController::class, 'index'])->name('webhooks.index');
         Route::post('/webhooks', [HrWebhookController::class, 'store'])->name('webhooks.store');
