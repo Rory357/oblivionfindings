@@ -60,6 +60,7 @@ import {
 
 type IncidentRow = {
     id: number;
+    ref: string | null;
     occurred_at: string | null;
     type: string;
     description: string | null;
@@ -82,6 +83,7 @@ type IncidentRow = {
 type FollowupRow = {
     id: number;
     incident_id: number;
+    incident_ref: string | null;
     incident_type: string | null;
     client_name: string | null;
     assigned_to: string | null;
@@ -604,7 +606,7 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                         <Calendar className="h-3 w-3" />
                                         {i.occurred_at ? formatDateTime(i.occurred_at) : '—'}
                                     </div>
-                                    <div className="mt-0.5 text-[11px] text-muted-foreground/60">INC-{i.id}</div>
+                                    <div className="mt-0.5 text-[11px] text-muted-foreground/60">{i.ref ?? `INC-${i.id}`}</div>
                                 </td>
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-2">
@@ -714,7 +716,7 @@ function FollowupTable({ rows, onOpen }: { rows: FollowupRow[]; onOpen: (id: num
                                 </div>
                             </td>
                             <td className="px-4 py-3 align-top whitespace-nowrap text-muted-foreground">
-                                <span className="font-medium text-foreground">INC-{f.incident_id}</span>
+                                <span className="font-medium text-foreground">{f.incident_ref ?? `INC-${f.incident_id}`}</span>
                                 {f.incident_type ? <span className="block text-xs capitalize">{titleCase(f.incident_type)}</span> : null}
                             </td>
                             <td className="px-4 py-3 align-top">{f.client_name ?? '—'}</td>

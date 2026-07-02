@@ -81,6 +81,7 @@ type ConcernRow = {
         action_overdue: boolean;
     };
     related_incident_id: number | null;
+    related_incident_ref: string | null;
     control_room_alert_id: number | null;
     can: { update: boolean; investigate: boolean; report_external: boolean };
 };
@@ -327,7 +328,7 @@ export default function SafeguardingIndex({
                 ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => router.visit(c.subject!.href!) } satisfies ShiftCtxItem]
                 : []),
             ...(c.related_incident_id
-                ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents?incident=${c.related_incident_id}`) } satisfies ShiftCtxItem]
+                ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: c.related_incident_ref ?? `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents?incident=${c.related_incident_id}`) } satisfies ShiftCtxItem]
                 : []),
         ];
 

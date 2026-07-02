@@ -42,6 +42,7 @@ type JsonRec = { description?: string; priority?: string; target_area?: string }
 
 export type IncidentDetail = {
     id: number;
+    ref: string | null;
     type: string;
     source: string;
     interactive: boolean;
@@ -157,6 +158,7 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
     const [editing, setEditing] = useState(false);
 
     const d = detail;
+    const incidentRef = d.ref ?? `INC-${d.id}`;
     const clientName = d.client ? `${d.client.first_name} ${d.client.last_name}`.trim() : 'No client linked';
     const isNearMiss = d.type === 'near_miss';
     const openFollowups = d.followups.filter((f) => !f.completed_at).length;
@@ -225,11 +227,11 @@ export function IncidentDetailDialog({ detail, open, onClose }: { detail: Incide
         <WizardShell
             open={open}
             onClose={onClose}
-            title={`Incident INC-${d.id}`}
+            title={`Incident ${incidentRef}`}
             description={`${titleCase(d.type)} — ${clientName}`}
             railIcon={isNearMiss ? ShieldAlert : AlertTriangle}
             railTitle={clientName}
-            railSub={`INC-${d.id} · ${titleCase(d.type)}`}
+            railSub={`${incidentRef} · ${titleCase(d.type)}`}
             steps={SECTIONS}
             stepIndex={stepIndex}
             onStepClick={(i) => setSection(SECTIONS[i].key)}

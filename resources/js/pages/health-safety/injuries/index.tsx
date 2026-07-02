@@ -159,7 +159,7 @@ export default function InjuriesIndex({ injuries, tab, tabCounts, hero, filters,
             if (row.status !== 'closed') items.push({ icon: <X className="h-4 w-4" />, label: 'Close', tone: 'critical', onClick: () => transition(row.id, 'closed') });
         }
         items.push({ sep: true });
-        if (row.related_incident_id) items.push({ icon: <Link2 className="h-4 w-4" />, label: 'Open linked incident', sub: `INC-${String(row.related_incident_id).padStart(4, '0')}`, onClick: () => router.visit(`/incidents?incident=${row.related_incident_id}`) });
+        if (row.related_incident_id) items.push({ icon: <Link2 className="h-4 w-4" />, label: 'Open linked incident', sub: row.related_incident_ref ?? `INC-${String(row.related_incident_id).padStart(4, '0')}`, onClick: () => router.visit(`/incidents?incident=${row.related_incident_id}`) });
         items.push({ icon: <Copy className="h-4 w-4" />, label: 'Copy link', onClick: () => navigator.clipboard?.writeText(`${window.location.origin}/health-safety/injuries/${row.id}`) });
         items.push({ icon: <ExternalLink className="h-4 w-4" />, label: 'Open full page', sub: `/health-safety/injuries/${row.id}`, onClick: () => router.visit(`/health-safety/injuries/${row.id}`) });
 

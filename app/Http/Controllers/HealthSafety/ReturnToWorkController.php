@@ -90,7 +90,7 @@ class ReturnToWorkController extends Controller
             $this->applyTab($this->scopedBase($request), $tab),
             $request
         )
-            ->with(['user:id,name', 'site:id,name'])
+            ->with(['user:id,name', 'site:id,name', 'relatedIncident:id,reference_number'])
             ->withCount(['returnToWorkPlans', 'capacityAssessments', 'attachments'])
             ->orderByDesc('injury_date')
             ->paginate(25)
@@ -271,6 +271,7 @@ class ReturnToWorkController extends Controller
             'acc_claim_lodged' => (bool) $i->acc_claim_lodged,
             'acc_claim_number' => $i->acc_claim_number,
             'related_incident_id' => $i->related_incident_id,
+            'related_incident_ref' => $i->relatedIncident?->reference_number,
             'worker' => $i->user ? ['id' => $i->user->id, 'name' => $i->user->name] : null,
             'site' => $i->site ? ['id' => $i->site->id, 'name' => $i->site->name] : null,
             'rtw_count' => (int) ($i->return_to_work_plans_count ?? 0),

@@ -22,6 +22,7 @@ export type InjuryRow = {
     acc_claim_lodged: boolean;
     acc_claim_number: string | null;
     related_incident_id: number | null;
+    related_incident_ref: string | null;
     worker: Person;
     site: { id: number; name: string } | null;
     rtw_count: number;

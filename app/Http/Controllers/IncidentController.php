@@ -101,7 +101,7 @@ class IncidentController extends Controller
         // every other tab is a list of incident rows.
         if ($tab === 'followups') {
             $rows = $openFollowupsQuery()
-                ->with(['incident:id,type,client_id', 'incident.client:id,first_name,last_name', 'assignedTo:id,name'])
+                ->with(['incident:id,type,client_id,reference_number', 'incident.client:id,first_name,last_name', 'assignedTo:id,name'])
                 ->orderByRaw('due_at is null')
                 ->orderBy('due_at')
                 ->paginate(50)
@@ -109,6 +109,7 @@ class IncidentController extends Controller
                 ->through(fn (IncidentFollowup $f) => [
                     'id' => $f->id,
                     'incident_id' => $f->client_incident_id,
+                    'incident_ref' => $f->incident?->reference_number,
                     'incident_type' => $f->incident?->type,
                     'client_name' => $f->incident?->client
                         ? trim(($f->incident->client->first_name ?? '').' '.($f->incident->client->last_name ?? ''))
@@ -132,6 +133,7 @@ class IncidentController extends Controller
                 ->withQueryString()
                 ->through(fn (ClientIncident $i) => [
                     'id' => $i->id,
+                    'ref' => $i->reference_number,
                     'occurred_at' => $i->occurred_at,
                     'type' => $i->type,
                     'description' => $i->description,
@@ -326,6 +328,7 @@ class IncidentController extends Controller
 
         return [
             'id' => $incident->id,
+            'ref' => $incident->reference_number,
             'type' => $incident->type,
             'source' => $incident->source,
             'interactive' => $incident->interactive,
