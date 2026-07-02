@@ -9,16 +9,34 @@ import {
     MapPin,
     MessageCircle,
     Megaphone,
+    MoreHorizontal,
     PartyPopper,
     Pin,
     Send,
     Sparkles,
+    Trash2,
     Trophy,
 } from 'lucide-react';
 import { useState } from 'react';
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
@@ -279,6 +297,68 @@ function ReactionBar({
     );
 }
 
+/**
+ * Manage-gated overflow menu on a wall card — "Remove post" with a confirm
+ * dialog. The delete endpoints are gated on hr.employees.manage server-side
+ * (no dedicated recognition-manage permission exists); `deleteUrl` picks the
+ * post- or kudos-keyed endpoint.
+ */
+function ModerationMenu({ deleteUrl, only }: { deleteUrl: string; only: string[] }) {
+    const [confirming, setConfirming] = useState(false);
+
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label="Post actions"
+                        title="Post actions"
+                        className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setConfirming(true)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Remove post
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <AlertDialog open={confirming} onOpenChange={setConfirming}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove this post?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            The post and its reactions and replies will be removed
+                            from the wall for everyone. This can’t be undone (an
+                            audit-log entry records the removal).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() =>
+                                router.delete(deleteUrl, {
+                                    preserveScroll: true,
+                                    only,
+                                })
+                            }
+                        >
+                            Remove post
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Kudos card — value + impact badges, reactions, reply thread        */
 /* ------------------------------------------------------------------ */
@@ -288,11 +368,13 @@ export function KudosCard({
     categoryLabel,
     impactLabel,
     employeeById,
+    canModerate = false,
 }: {
     post: FeedPost;
     categoryLabel: string;
     impactLabel: string;
     employeeById: Map<number, FeedEmployee>;
+    canModerate?: boolean;
 }) {
     const kudos = post.kudos!;
     const author = post.user;
@@ -314,6 +396,12 @@ export function KudosCard({
                             </Badge>
                             {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>
+                            {canModerate ? (
+                                <ModerationMenu
+                                    deleteUrl={`/hr/feed/kudos/${kudos.id}`}
+                                    only={['posts', 'metrics', 'leaderboard', 'valueBreakdown', 'kudosTrend']}
+                                />
+                            ) : null}
                         </div>
 
                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
@@ -464,10 +552,12 @@ export function UpdateCard({
     post,
     employeeById,
     siteNameById,
+    canModerate = false,
 }: {
     post: FeedPost;
     employeeById: Map<number, FeedEmployee>;
     siteNameById?: Map<number, string>;
+    canModerate?: boolean;
 }) {
     const badgeKey =
         post.post_type === 'milestone'
@@ -496,6 +586,12 @@ export function UpdateCard({
                             ) : null}
                             {post.is_pinned ? <Pin className="h-3.5 w-3.5 text-status-warning" /> : null}
                             <span className="text-xs text-muted-foreground">{post.created_at}</span>
+                            {canModerate ? (
+                                <ModerationMenu
+                                    deleteUrl={`/hr/feed/posts/${post.id}`}
+                                    only={['posts', 'metrics']}
+                                />
+                            ) : null}
                         </div>
                         <p className="mt-2 text-sm whitespace-pre-wrap">{post.content}</p>
 

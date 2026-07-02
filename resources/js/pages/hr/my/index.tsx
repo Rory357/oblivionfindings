@@ -19,6 +19,7 @@ import {
     PartyPopper,
     PenLine,
     ShieldCheck,
+    Sprout,
     Users,
     X,
 } from 'lucide-react';
@@ -96,6 +97,26 @@ interface TodayShift {
     shift_type: string;
 }
 
+interface OnboardingTaskItem {
+    id: number;
+    title: string;
+    category: string | null;
+    due_date: string | null;
+    status: string;
+    completed: boolean;
+    overdue: boolean;
+    sign_off_required: boolean;
+    can_complete: boolean;
+}
+
+interface OnboardingChecklist {
+    id: number;
+    status: string;
+    due_date: string | null;
+    progress: { total: number; completed: number; percent: number };
+    tasks: OnboardingTaskItem[];
+}
+
 interface Props {
     myHr: MyHrShellData;
     leaveTypes?: string[];
@@ -114,6 +135,8 @@ interface Props {
     balances: LeaveBalanceLite[];
     canViewFeed?: boolean;
     safeWorkProcedures?: ApplicableProcedure[];
+    /** The new hire's own active onboarding checklist (null when none). */
+    onboarding?: OnboardingChecklist | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,6 +199,159 @@ function shiftTypeLabel(shift: TodayShift): string {
     if (shift.shift_type === 'on_call') return 'On-call';
     const start = shift.starts_at ? new Date(shift.starts_at).getHours() : 9;
     return start < 12 ? 'Day support' : 'Evening support';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Getting started (new-hire onboarding) card                         */
+/* ------------------------------------------------------------------ */
+
+function categoryLabel(category: string | null): string {
+    if (!category) return 'General';
+    return category
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function dueLabel(t: OnboardingTaskItem): string | null {
+    if (!t.due_date) return null;
+    const d = new Date(t.due_date);
+    if (Number.isNaN(d.getTime())) return null;
+    const label = d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    return t.overdue ? `Was due ${label}` : `Due ${label}`;
+}
+
+function GettingStartedCard({ onboarding }: { onboarding: OnboardingChecklist }) {
+    const [busy, setBusy] = useState<number | null>(null);
+    const pct = Math.max(0, Math.min(100, onboarding.progress.percent));
+
+    function complete(t: OnboardingTaskItem) {
+        if (!t.can_complete || busy !== null) return;
+        setBusy(t.id);
+        router.post(
+            `/hr/my/onboarding/tasks/${t.id}/complete`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Task done ✓', {
+                        description: t.title,
+                    });
+                    if (onboarding.progress.completed + 1 >= onboarding.progress.total) {
+                        fireConfetti();
+                    }
+                },
+                onError: () => toast.error('Could not complete that task'),
+                onFinish: () => setBusy(null),
+            },
+        );
+    }
+
+    return (
+        <div
+            className="rounded-[20px] border p-[22px]"
+            style={{
+                background:
+                    'linear-gradient(140deg, color-mix(in oklch, var(--status-success) 7%, var(--card)), var(--card) 58%)',
+                borderColor:
+                    'color-mix(in oklch, var(--status-success) 22%, var(--border))',
+            }}
+        >
+            <div className="flex items-center gap-2.5">
+                <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-status-success-bg text-status-success">
+                    <Sprout className="h-4 w-4" />
+                </span>
+                <div>
+                    <h2 className="text-[15px] font-bold">Getting started</h2>
+                    <p className="text-[11.5px] text-muted-foreground">
+                        Your onboarding checklist — tick off what you can, we’ll
+                        handle the rest 🌱
+                    </p>
+                </div>
+                <span className="ml-auto text-[12px] font-bold tabular-nums text-muted-foreground">
+                    {onboarding.progress.completed}/{onboarding.progress.total} done
+                </span>
+            </div>
+
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                    className="h-full rounded-full bg-status-success transition-[width] duration-700"
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+
+            <div className="mt-3 flex flex-col">
+                {onboarding.tasks.map((t) => {
+                    const due = dueLabel(t);
+                    return (
+                        <div
+                            key={t.id}
+                            className="flex items-center gap-3 rounded-[11px] px-1.5 py-2 transition-colors hover:bg-muted/60"
+                        >
+                            <span
+                                className={cn(
+                                    'grid h-6 w-6 shrink-0 place-items-center rounded-full border',
+                                    t.completed
+                                        ? 'border-status-success bg-status-success-bg text-status-success'
+                                        : 'border-border bg-card text-muted-foreground',
+                                )}
+                            >
+                                {t.completed ? (
+                                    <CheckCircle2 className="h-4 w-4" />
+                                ) : (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                                )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                                <div
+                                    className={cn(
+                                        'truncate text-[13px] font-semibold leading-tight',
+                                        t.completed &&
+                                            'text-muted-foreground line-through decoration-muted-foreground/50',
+                                    )}
+                                >
+                                    {t.title}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-muted-foreground">
+                                    <span>{categoryLabel(t.category)}</span>
+                                    {due ? (
+                                        <span
+                                            className={cn(
+                                                t.overdue &&
+                                                    !t.completed &&
+                                                    'font-semibold text-status-warning',
+                                            )}
+                                        >
+                                            · {due}
+                                        </span>
+                                    ) : null}
+                                    {t.sign_off_required && !t.completed ? (
+                                        <span>· Needs manager sign-off</span>
+                                    ) : null}
+                                </div>
+                            </div>
+                            {!t.completed && t.can_complete ? (
+                                <button
+                                    type="button"
+                                    onClick={() => complete(t)}
+                                    disabled={busy !== null}
+                                    className={cn(
+                                        'shrink-0 rounded-lg border border-status-success/40 bg-card px-2.5 py-1.5 text-xs font-semibold text-status-success transition-colors hover:bg-status-success-bg',
+                                        busy !== null && 'cursor-not-allowed opacity-50',
+                                    )}
+                                >
+                                    {busy === t.id ? 'Saving…' : 'Mark done'}
+                                </button>
+                            ) : !t.completed ? (
+                                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                                    With your team
+                                </span>
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -406,6 +582,7 @@ export default function MyHrIndex({
     balances,
     canViewFeed = false,
     safeWorkProcedures = [],
+    onboarding = null,
 }: Props) {
     const leaveTypeOptions = leaveTypes.map((t) => ({
         value: t,
@@ -554,6 +731,9 @@ export default function MyHrIndex({
             heroHandlers={{ onRequestLeave: () => setLeaveOpen(true) }}
         >
             <div className="flex flex-col gap-5">
+                {/* ── Getting started (new hires with an active checklist) ── */}
+                {onboarding ? <GettingStartedCard onboarding={onboarding} /> : null}
+
                 {/* ── Row 1 · Your day ── */}
                 <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
                     <NextShiftCard

@@ -91,6 +91,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/expenses', [MyHrController::class, 'submitExpense'])->name('expenses.store');
         Route::post('/expenses/{expenseClaim}/submit', [MyHrController::class, 'submitExpenseClaim'])->name('expenses.submit');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
+        Route::get('/benefits', [MyHrController::class, 'benefits'])->name('benefits');
+        // Owner-gated: a new hire completes their own onboarding task from the
+        // Overview's "Getting started" card (subject-only; enforced in-controller).
+        Route::post('/onboarding/tasks/{task}/complete', [MyHrController::class, 'completeOnboardingTask'])->name('onboarding.tasks.complete');
         Route::get('/policies', [MyHrController::class, 'policies'])->name('policies');
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
         Route::get('/profile', [MyHrController::class, 'profile'])->name('profile');
@@ -1014,6 +1018,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             // Polymorphic react/reply for the wall's non-kudos items (posts + announcements).
             Route::post('/react', [FeedController::class, 'reactFeed'])->name('react');
             Route::post('/reply', [FeedController::class, 'replyFeed'])->name('reply');
+        });
+
+        // Moderation — remove an inappropriate post/kudos. There is no dedicated
+        // hr.recognition.manage key (recognition ships only view/give), so the
+        // strongest people-management permission stands in as the gate.
+        Route::middleware('permission:hr.employees.manage')->group(function () {
+            Route::delete('/posts/{post}', [FeedController::class, 'destroyPost'])->name('posts.destroy');
+            Route::delete('/kudos/{kudos}', [FeedController::class, 'destroyKudos'])->name('kudos.destroy');
         });
     });
 

@@ -7,6 +7,8 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrICalToken;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -38,10 +40,12 @@ class ICalController extends Controller
         }
 
         // Calendar events — tenant-scoped (previously leaked across tenants).
+        // Limit raised 100→500 (audit fix round 2): busy orgs were silently
+        // truncated after ~1 month of events.
         $calEvents = HrCalendarEvent::forTenant($tenantId)
             ->where('starts_at', '>=', now()->subMonths(3))
             ->orderBy('starts_at')
-            ->limit(100)
+            ->limit(500)
             ->get();
 
         foreach ($calEvents as $event) {
@@ -52,6 +56,50 @@ class ICalController extends Controller
                 'event-' . $event->id,
                 $event->description,
                 $event->location,
+            );
+        }
+
+        // The token user's OWN rostered shifts (audit fix round 2). Shifts
+        // carry user_id directly, so this is a cheap single-table query and —
+        // being strictly the subscriber's own roster — safe under roster perm
+        // semantics (staff always see their own shifts on /hr/my). Nobody
+        // else's shifts are ever emitted on this feed.
+        $shifts = Shift::query()
+            ->where('user_id', $user->id)
+            ->whereNotIn('status', ['cancelled'])
+            ->where('starts_at', '>=', now()->subMonths(3))
+            ->orderBy('starts_at')
+            ->limit(500)
+            ->with('site:id,name')
+            ->get();
+
+        foreach ($shifts as $shift) {
+            if (! $shift->starts_at || ! $shift->ends_at) {
+                continue;
+            }
+            $events[] = $this->formatEvent(
+                'Shift' . ($shift->site?->name ? ': ' . $shift->site->name : ''),
+                $shift->starts_at,
+                $shift->ends_at,
+                'shift-' . $shift->id,
+                null,
+                $shift->site?->name ?? $shift->location,
+            );
+        }
+
+        // Org public holidays (audit fix round 2) — all-day rows.
+        $holidays = HrPublicHoliday::forTenant($tenantId)
+            ->where('date', '>=', now()->subMonths(3))
+            ->orderBy('date')
+            ->limit(100)
+            ->get();
+
+        foreach ($holidays as $holiday) {
+            $events[] = $this->formatEvent(
+                'Public holiday: ' . $holiday->name,
+                $holiday->date->copy()->startOfDay(),
+                $holiday->date->copy()->addDay()->startOfDay(),
+                'holiday-' . $holiday->id,
             );
         }
 

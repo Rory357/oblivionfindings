@@ -702,3 +702,15 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00')
     ->withoutOverlapping();
+
+// ── Probation review sweep (audit fixes round 2, 2026-07-02) ────────────────
+
+// Probation end dates within 14 days (or already past) with no concluding
+// probation review on file → notify the employee's manager (fallback:
+// provider managers). Deduped via hr_employee_profiles.probation_reminder_sent_at,
+// which storeProbation clears when an extension moves the end date: daily 08:45 NZ
+app(Schedule::class)
+    ->command('hr:probation-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:45')
+    ->withoutOverlapping();

@@ -13,6 +13,7 @@ use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -484,6 +485,29 @@ class PerformanceReviewController extends Controller
             'created_by' => $user->id,
             ...$data,
         ]);
+
+        // Audit fix (round 2, item 1b): an "extend" recommendation actually
+        // moves the employee's probation end date — previously the review was
+        // recorded but hr_employee_profiles.probation_end_date never changed,
+        // so the extension existed only on paper. Base: the current
+        // probation_end_date (fallback: the review date when none was set).
+        // Clearing the reminder stamp lets hr:probation-reminders fire again
+        // for the new end date.
+        if (($data['recommendation'] ?? null) === 'extend' && ! empty($data['extension_weeks'])) {
+            $profile = HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $data['employee_user_id'])
+                ->first();
+
+            if ($profile) {
+                $base = $profile->probation_end_date ?? Carbon::parse($data['review_date']);
+                $profile->forceFill([
+                    'probation_end_date' => $base->copy()->addWeeks((int) $data['extension_weeks'])->toDateString(),
+                    'probation_reminder_sent_at' => null,
+                    'updated_by' => $user->id,
+                ])->save();
+            }
+        }
 
         return redirect()->back()->with('success', 'Probation review recorded.');
     }

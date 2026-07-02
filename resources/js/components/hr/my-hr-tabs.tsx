@@ -4,6 +4,7 @@ import {
     Clock,
     FileText,
     GraduationCap,
+    HeartHandshake,
     LayoutDashboard,
     Megaphone,
     MessagesSquare,
@@ -31,6 +32,7 @@ export type MyHrTab =
     | 'directory'
     | 'expenses'
     | 'payslips'
+    | 'benefits'
     | 'training'
     | 'policies'
     | 'reviews'
@@ -48,6 +50,7 @@ const TAB_URLS: Record<MyHrTab, string> = {
     directory: '/hr/my/directory',
     expenses: '/hr/my/expenses',
     payslips: '/hr/my/payslips',
+    benefits: '/hr/my/benefits',
     training: '/hr/my/training',
     policies: '/hr/my/policies',
     reviews: '/hr/my/reviews',
@@ -71,6 +74,7 @@ const ITEMS: Omit<HrTabItem, 'badge'>[] = [
     { id: 'directory', label: 'Directory', icon: Users, tone: 'info' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning' },
     { id: 'payslips', label: 'Payslips', icon: Wallet, tone: 'success' },
+    { id: 'benefits', label: 'Benefits', icon: HeartHandshake, tone: 'success' },
     { id: 'training', label: 'Training', icon: GraduationCap, tone: 'violet' },
     { id: 'policies', label: 'Policies', icon: ScrollText, tone: 'warning' },
     { id: 'reviews', label: 'Reviews', icon: Star, tone: 'info' },

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrAnnouncement;
+use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
@@ -15,6 +16,8 @@ use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
@@ -29,6 +32,7 @@ use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
@@ -56,6 +60,7 @@ class MyHrController extends Controller
         private readonly AttendanceService $attendanceService,
         private readonly ExpenseService $expenseService,
         private readonly FeedService $feedService,
+        private readonly OnboardingService $onboardingService,
     ) {}
 
     public function sendKudos(Request $request)
@@ -289,6 +294,9 @@ class MyHrController extends Controller
         return Inertia::render('hr/my/index', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
             'overview' => $this->myHrOverviewProps($user, $tenantId),
+            // "Getting started" — the new hire's own active onboarding checklist
+            // (null once completed/cancelled, or when they never had one).
+            'onboarding' => $this->myOnboardingChecklist($user->id, $tenantId, $profile?->id),
             'safeWorkProcedures' => $safeWorkProcedures,
             // Shaped for the Overview's hosted "Request leave" wizard (mirrors
             // the Leave tab's `balances` contract).
@@ -322,6 +330,157 @@ class MyHrController extends Controller
             // calendar holiday highlight).
             'leaveTypes' => LeaveService::LEAVE_TYPES,
             'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Onboarding (Getting started — subject self-service) */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The employee's own ACTIVE onboarding checklist for the Overview's
+     * "Getting started" card. Tasks the subject may complete themselves —
+     * assigned to them, or unassigned and not requiring sign-off — carry
+     * can_complete so the card can offer a "Mark done" affordance.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function myOnboardingChecklist(int $userId, int $tenantId, ?int $profileId): ?array
+    {
+        if (! $profileId) {
+            return null;
+        }
+
+        $checklist = HrOnboardingChecklist::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_profile_id', $profileId)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->with(['tasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $checklist) {
+            return null;
+        }
+
+        $progress = $this->onboardingService->getProgress($checklist);
+        $today = now()->startOfDay();
+
+        return [
+            'id' => $checklist->id,
+            'status' => $checklist->status,
+            'due_date' => $checklist->due_date?->toDateString(),
+            'progress' => [
+                'total' => $progress['total'],
+                'completed' => $progress['completed'],
+                'percent' => $progress['percent'],
+            ],
+            'tasks' => $checklist->tasks->map(fn (HrOnboardingTask $t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'category' => $t->category,
+                'due_date' => $t->due_date?->toDateString(),
+                'status' => $t->status,
+                'completed' => $t->status === 'completed',
+                'overdue' => $t->status !== 'completed'
+                    && $t->due_date !== null
+                    && $t->due_date->lt($today),
+                'sign_off_required' => (bool) $t->sign_off_required,
+                'can_complete' => $t->status !== 'completed'
+                    && $this->subjectMayCompleteTask($t, $userId),
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * The subject may complete their own tasks when the task is assigned to
+     * them, or unassigned AND not a sign-off task (sign-offs stay with the
+     * manager/HR flow in /hr/onboarding).
+     */
+    private function subjectMayCompleteTask(HrOnboardingTask $task, int $userId): bool
+    {
+        return (int) $task->assigned_to_user_id === $userId
+            || ($task->assigned_to_user_id === null && ! $task->sign_off_required);
+    }
+
+    /**
+     * Owner-gated: a new hire completes one of their own onboarding tasks from
+     * the "Getting started" card. Runs through OnboardingService::completeTask
+     * so dependency validation, checklist rollup and the completion webhook all
+     * fire exactly as they do for the manager flow.
+     */
+    public function completeOnboardingTask(Request $request, HrOnboardingTask $task)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $checklist = $task->checklist()->with('employeeProfile:id,user_id,tenant_id')->firstOrFail();
+        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+
+        // Owner-only: the checklist must belong to the requesting employee.
+        abort_unless($checklist->employeeProfile?->user_id === $user->id, 403);
+        abort_unless($this->subjectMayCompleteTask($task, $user->id), 403);
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->onboardingService->completeTask($task, $user->id, array_filter([
+                'notes' => $validated['notes'] ?? null,
+            ], fn ($v) => $v !== null));
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', "Nice — “{$task->title}” done.");
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Benefits (read-only self-service) */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * The employee's own benefit enrolments (KiwiSaver, insurances…) —
+     * read-only; changes go through HR (Compensation & Benefits hub).
+     */
+    public function benefits(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $profileId = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->value('id');
+
+        $enrolments = $profileId
+            ? HrBenefitEnrollment::forTenant($tenantId)
+                ->where('employee_profile_id', $profileId)
+                ->with('benefitPlan:id,name,type,provider,description')
+                ->orderByDesc('enrollment_date')
+                ->get()
+                ->map(fn (HrBenefitEnrollment $e) => [
+                    'id' => $e->id,
+                    'plan_name' => $e->benefitPlan?->name ?? 'Benefit plan',
+                    'plan_type' => $e->benefitPlan?->type ?? 'other',
+                    'provider' => $e->benefitPlan?->provider,
+                    'description' => $e->benefitPlan?->description,
+                    'status' => $e->status,
+                    'employee_contribution_rate' => $e->employee_contribution_rate !== null
+                        ? (float) $e->employee_contribution_rate
+                        : null,
+                    'employer_contribution_rate' => $e->employer_contribution_rate !== null
+                        ? (float) $e->employer_contribution_rate
+                        : null,
+                    'enrollment_date' => $e->enrollment_date?->toDateString(),
+                    'opt_out_date' => $e->opt_out_date?->toDateString(),
+                ])
+                ->values()
+            : collect();
+
+        return Inertia::render('hr/my/benefits', [
+            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'enrolments' => $enrolments,
         ]);
     }
 
