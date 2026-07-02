@@ -148,8 +148,13 @@ class WorkforceAnalyticsService
      */
     public function getComplianceScore(?int $tenantId): array
     {
-        $total = HrStaffComplianceStatus::count();
-        $compliant = HrStaffComplianceStatus::where('status', 'compliant')->count();
+        $total = HrStaffComplianceStatus::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->count();
+        $compliant = HrStaffComplianceStatus::query()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('status', 'compliant')
+            ->count();
 
         $score = $total > 0 ? round(($compliant / $total) * 100, 1) : 100;
 

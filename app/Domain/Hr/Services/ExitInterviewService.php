@@ -72,10 +72,14 @@ class ExitInterviewService
             ->groupBy('month')
             ->orderBy('month')
             ->get()
+            // Privacy floor: with fewer than 3 respondents a monthly average
+            // effectively discloses individual ratings (NZ Privacy Act IPPs) —
+            // suppress the value but keep the month + count for the chart axis.
             ->map(fn ($row) => [
                 'month' => $row->month,
-                'avg_satisfaction' => round($row->avg_satisfaction, 2),
+                'avg_satisfaction' => $row->count >= 3 ? round($row->avg_satisfaction, 2) : null,
                 'count' => $row->count,
+                'suppressed' => $row->count < 3,
             ])
             ->toArray();
 

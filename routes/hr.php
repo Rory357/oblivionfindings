@@ -1311,7 +1311,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | iCal Feed
     |--------------------------------------------------------------------------
     */
-    Route::get('/ical/{token}', [ICalController::class, 'feed'])->name('ical.feed')->withoutMiddleware('auth');
+    Route::get('/ical/{token}', [ICalController::class, 'feed'])->middleware('throttle:60,1')->name('ical.feed')->withoutMiddleware('auth');
     Route::post('/ical/token', [ICalController::class, 'generateToken'])->name('ical.token');
 
     /*

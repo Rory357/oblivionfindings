@@ -489,6 +489,12 @@ class HrDocumentController extends Controller
 
         $filename = $document->original_name ?: basename($document->storage_path);
 
+        // Sensitive-file access must leave a trail (NZ Privacy Act expectations).
+        \App\Services\AuditLogger::log('hr.document.downloaded', $document, [
+            'is_restricted' => (bool) $document->is_restricted,
+            'filename' => $filename,
+        ]);
+
         return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
     }
 
@@ -574,6 +580,11 @@ class HrDocumentController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
+        // The signed rendition inherits the source document's restriction.
+        if ($document->is_restricted) {
+            abort_unless($user->canDo('hr.documents.manage'), 403, 'This document is restricted to managers.');
+        }
+
         abort_unless(
             $document->signed_document_path && Storage::disk('private')->exists($document->signed_document_path),
             404,
@@ -581,6 +592,12 @@ class HrDocumentController extends Controller
         );
 
         $filename = Str::slug($document->title) . '-signed.pdf';
+
+        \App\Services\AuditLogger::log('hr.document.downloaded', $document, [
+            'is_restricted' => (bool) $document->is_restricted,
+            'variant' => 'signed',
+            'filename' => $filename,
+        ]);
 
         return Storage::disk('private')->download($document->signed_document_path, $filename);
     }
@@ -631,6 +648,12 @@ class HrDocumentController extends Controller
             $zip->addFromString($name, (string) $disk->get($document->storage_path));
         }
         $zip->close();
+
+        \App\Services\AuditLogger::log('hr.document.bulk_downloaded', null, [
+            'document_ids' => $documents->pluck('id')->all(),
+            'count' => $documents->count(),
+            'restricted_count' => $documents->where('is_restricted', true)->count(),
+        ]);
 
         return response()->streamDownload(function () use ($tmp) {
             readfile($tmp);

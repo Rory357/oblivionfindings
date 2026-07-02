@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCustomFieldDefinition;
 use App\Domain\Hr\Models\HrCustomFieldValue;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -13,6 +14,8 @@ use Inertia\Inertia;
 
 class CustomFieldController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List all custom field definitions.
      */
@@ -21,7 +24,7 @@ class CustomFieldController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
 
-        $definitions = HrCustomFieldDefinition::forTenant($user->tenant_id)
+        $definitions = HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))
             ->ordered()
             ->with('creator:id,name')
             ->get();
@@ -54,13 +57,13 @@ class CustomFieldController extends Controller
         // Ensure unique field_key per tenant
         $suffix = 0;
         $baseKey = $fieldKey;
-        while (HrCustomFieldDefinition::forTenant($user->tenant_id)->where('field_key', $fieldKey)->exists()) {
+        while (HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))->where('field_key', $fieldKey)->exists()) {
             $suffix++;
             $fieldKey = $baseKey . '_' . $suffix;
         }
 
         HrCustomFieldDefinition::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $validated['name'],
             'field_key' => $fieldKey,
             'field_type' => $validated['field_type'],
@@ -82,7 +85,7 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        abort_unless($definition->tenant_id === $user->tenant_id, 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $definition->tenant_id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -107,7 +110,7 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        abort_unless($definition->tenant_id === $user->tenant_id, 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $definition->tenant_id);
 
         $definition->delete(); // cascadeOnDelete handles values
 
@@ -122,8 +125,9 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
 
-        $definitions = HrCustomFieldDefinition::forTenant($user->tenant_id)
+        $definitions = HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))
             ->active()
             ->ordered()
             ->get();
@@ -148,6 +152,7 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
 
         $validated = $request->validate([
             'fields' => ['required', 'array'],
