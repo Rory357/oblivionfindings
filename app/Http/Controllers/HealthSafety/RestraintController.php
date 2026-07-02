@@ -246,7 +246,7 @@ class RestraintController extends Controller
             'client:id,first_name,last_name',
             'site:id,name',
             'behaviourSupportPlan:id,title,status',
-            'relatedIncident:id,type,occurred_at',
+            'relatedIncident:id,reference_number,type,occurred_at',
             'reviewedBy:id,name',
             'authorisedBy:id,name',
             'attachments.uploader:id,name',
@@ -264,7 +264,7 @@ class RestraintController extends Controller
         return [
             'kind' => 'event',
             'id' => $e->id,
-            'reference' => $this->eventRef($e->id),
+            'reference' => $this->eventRef($e),
             'client' => $e->client ? ['id' => $e->client->id, 'name' => trim("{$e->client->first_name} {$e->client->last_name}")] : null,
             'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
             'restraint_type' => $e->restraint_type,
@@ -294,7 +294,7 @@ class RestraintController extends Controller
             ] : null,
             'related_incident' => $e->relatedIncident ? [
                 'id' => $e->relatedIncident->id,
-                'reference' => $this->incidentRef($e->relatedIncident->id),
+                'reference' => $this->incidentRef($e->relatedIncident),
                 'type' => $e->relatedIncident->type,
             ] : null,
             'reviewed_at' => $e->reviewed_at,
@@ -404,7 +404,7 @@ class RestraintController extends Controller
             ] : null,
             'recent_events' => $events->map(fn (RestraintEvent $e) => [
                 'id' => $e->id,
-                'reference' => $this->eventRef($e->id),
+                'reference' => $this->eventRef($e),
                 'restraint_type' => $e->restraint_type,
                 'severity' => $e->severity,
                 'started_at' => $e->started_at,
@@ -796,7 +796,7 @@ class RestraintController extends Controller
                     ->chunk(200, function ($events) use ($out) {
                         foreach ($events as $e) {
                             $this->putCsv($out, [
-                                $this->eventRef($e->id),
+                                $this->eventRef($e),
                                 $e->client ? trim("{$e->client->first_name} {$e->client->last_name}") : '',
                                 $e->site?->name,
                                 $e->restraint_type,
@@ -824,7 +824,7 @@ class RestraintController extends Controller
     {
         return [
             'id' => $e->id,
-            'reference' => $this->eventRef($e->id),
+            'reference' => $this->eventRef($e),
             'client' => $e->client ? ['id' => $e->client->id, 'name' => trim("{$e->client->first_name} {$e->client->last_name}")] : null,
             'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
             'restraint_type' => $e->restraint_type,
@@ -891,22 +891,22 @@ class RestraintController extends Controller
     private function recentIncidentsForPicker(): array
     {
         return ClientIncident::query()
-            ->select('id', 'client_id', 'type', 'occurred_at')
+            ->select('id', 'reference_number', 'client_id', 'type', 'occurred_at')
             ->orderByDesc('occurred_at')
             ->limit(100)
             ->get()
             ->map(fn (ClientIncident $i) => [
                 'id' => $i->id,
                 'client_id' => $i->client_id,
-                'reference' => $this->incidentRef($i->id),
-                'label' => $this->incidentRef($i->id).' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
+                'reference' => $this->incidentRef($i),
+                'label' => $this->incidentRef($i).' · '.ucfirst(str_replace('_', ' ', (string) $i->type)).' · '.optional($i->occurred_at)->format('d M Y'),
             ])
             ->all();
     }
 
-    private function eventRef(int $id): string
+    private function eventRef(RestraintEvent $event): string
     {
-        return 'RE-'.str_pad((string) $id, 3, '0', STR_PAD_LEFT);
+        return $event->reference_number ?? 'RE-'.str_pad((string) $event->id, 3, '0', STR_PAD_LEFT);
     }
 
     private function planRef(int $id): string
@@ -914,9 +914,9 @@ class RestraintController extends Controller
         return 'BSP-'.str_pad((string) $id, 3, '0', STR_PAD_LEFT);
     }
 
-    private function incidentRef(int $id): string
+    private function incidentRef(ClientIncident $incident): string
     {
-        return 'INC-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT);
+        return $incident->reference_number ?? 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT);
     }
 
     /* ================================================================== */

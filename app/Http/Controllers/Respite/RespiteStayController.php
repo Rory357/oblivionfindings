@@ -507,12 +507,7 @@ class RespiteStayController extends Controller
 
     private function nextBreachReference(): string
     {
-        return 'BR-'.now()->year.'-'.str_pad(
-            DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
-            4,
-            '0',
-            STR_PAD_LEFT
-        );
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('BR');
     }
 
     /**

@@ -8,15 +8,16 @@ import { Head, router } from '@inertiajs/react';
  * modal content for a direct /incidents/{id} link. Closing returns to the register.
  */
 export default function IncidentShow({ detail }: { detail: IncidentDetail }) {
+    const ref = detail.ref ?? `INC-${detail.id}`;
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Health & Safety', href: '/health-safety' },
                 { title: 'Incidents', href: '/incidents' },
-                { title: `INC-${detail.id}`, href: `/incidents/${detail.id}` },
+                { title: ref, href: `/incidents/${detail.id}` },
             ]}
         >
-            <Head title={`Incident INC-${detail.id}`} />
+            <Head title={`Incident ${ref}`} />
             <IncidentDetailDialog detail={detail} open onClose={() => router.visit('/incidents')} />
         </AppLayout>
     );

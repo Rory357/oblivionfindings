@@ -232,20 +232,6 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
 
     private function generateReferenceNumber(): string
     {
-        // Derive from the highest existing reference (incl. soft-deleted) rather
-        // than a row count, so a soft-deleted hazard can't make two creates
-        // compute the same number under the unique constraint.
-        $year = now()->year;
-        $latest = SiteHazard::withTrashed()
-            ->where('reference_number', 'like', "HAZ-{$year}-%")
-            ->orderByDesc('id')
-            ->value('reference_number');
-
-        $next = 1;
-        if ($latest && preg_match('/HAZ-\d{4}-(\d+)/', $latest, $m)) {
-            $next = (int) $m[1] + 1;
-        }
-
-        return sprintf('HAZ-%d-%04d', $year, $next);
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('HAZ');
     }
 }

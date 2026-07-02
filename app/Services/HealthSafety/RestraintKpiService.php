@@ -64,7 +64,7 @@ class RestraintKpiService
             ->get()
             ->map(fn (RestraintEvent $e) => [
                 'id' => $e->id,
-                'reference' => 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
+                'reference' => $e->reference_number ?? 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
                 'client' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : null,
                 'restraint_type' => $e->restraint_type,
                 'severity' => $e->severity,

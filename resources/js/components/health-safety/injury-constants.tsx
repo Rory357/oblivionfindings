@@ -113,8 +113,10 @@ export function statusLabel(value: string | null | undefined): string {
     return STATUS_META[value]?.label ?? value.replace(/_/g, ' ');
 }
 
-export function injuryReference(id: number): string {
-    return `WI-${String(id).padStart(4, '0')}`;
+export function injuryReference(injury: { id: number; reference?: string | null; reference_number?: string | null }): string {
+    // Stored ticket number (INJ-YYYY-NNNN) since 2026-07; WI-<id> only for
+    // rows that predate the backfill. The RTW payloads send it as `reference`.
+    return injury.reference ?? injury.reference_number ?? `WI-${String(injury.id).padStart(4, '0')}`;
 }
 
 /** ACC claim kinds for the premium document upload. */

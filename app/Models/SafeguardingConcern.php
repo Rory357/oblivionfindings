@@ -96,21 +96,7 @@ class SafeguardingConcern extends Model
      */
     public static function generateReferenceNumber(): string
     {
-        $year = now()->year;
-        $prefix = 'SG-' . $year . '-';
-
-        $lastConcern = static::where('reference_number', 'like', $prefix . '%')
-            ->orderByDesc('reference_number')
-            ->first();
-
-        if ($lastConcern) {
-            $lastNumber = (int) str_replace($prefix, '', $lastConcern->reference_number);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('SG');
     }
 
     /**

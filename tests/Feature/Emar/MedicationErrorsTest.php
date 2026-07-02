@@ -50,7 +50,7 @@ class MedicationErrorsTest extends TestCase
                 ->component('emar/MedicationErrors')
                 ->where('site_brand_colour', '#5E35B1')
                 ->has('errors', 1)
-                ->where('errors.0.ref', 'ERR-'.str_pad((string) MedicationError::query()->first()->id, 4, '0', STR_PAD_LEFT))
+                ->where('errors.0.ref', MedicationError::query()->first()->reference_number)
                 ->has('stats.trend', 8)
                 ->has('stats.by_severity')
                 ->where('stats.near_miss', 1)

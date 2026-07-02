@@ -12,8 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class FirstAidRecord extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
+    use Concerns\HasReferenceNumber;
+
+    public const REFERENCE_PREFIX = 'FA';
 
     protected $fillable = [
+        'reference_number',
         'site_id',
         'treated_person_id',
         'client_id',

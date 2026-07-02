@@ -91,7 +91,7 @@ class FirstAidController extends Controller
         $filters = $this->filters($request);
         $tab = $request->string('tab')->toString() ?: 'all';
         $query = $this->applyTab($this->applyPeriod($this->scopedQuery($request), $filters['period']), $tab)
-            ->with(['site:id,name', 'firstAider:id,name'])
+            ->with(['site:id,name', 'firstAider:id,name', 'relatedIncident:id,reference_number'])
             ->orderByDesc('treatment_date')
             ->orderByDesc('id'); // stable tiebreaker so chunk() can't skip/dup rows sharing a timestamp
 
@@ -103,7 +103,7 @@ class FirstAidController extends Controller
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $r) {
                     fputcsv($out, [
-                        $this->reference($r->id),
+                        $this->reference($r),
                         $this->csvCell($r->treated_person_name),
                         $r->treated_person_type,
                         $this->csvCell($r->site?->name),
@@ -114,7 +114,7 @@ class FirstAidController extends Controller
                         str_replace('_', ' ', (string) $r->treatment_outcome),
                         $r->ambulance_called ? 'Yes' : 'No',
                         $this->csvCell($r->firstAider?->name),
-                        $r->related_incident_id ? 'INC-'.str_pad((string) $r->related_incident_id, 4, '0', STR_PAD_LEFT) : '',
+                        $r->related_incident_id ? ($r->relatedIncident?->reference_number ?? 'INC-'.str_pad((string) $r->related_incident_id, 4, '0', STR_PAD_LEFT)) : '',
                     ]);
                 }
             });
@@ -469,7 +469,7 @@ class FirstAidController extends Controller
     {
         return [
             'id' => $r->id,
-            'reference' => $this->reference($r->id),
+            'reference' => $this->reference($r),
             'treatment_date' => $r->treatment_date?->toISOString(),
             'treated_person_name' => $r->treated_person_name,
             'treated_person_type' => $r->treated_person_type,
@@ -549,7 +549,7 @@ class FirstAidController extends Controller
                 'firstAider:id,name',
                 'treatedPerson:id,name',
                 'client:id,first_name,last_name',
-                'relatedIncident:id,title,type,occurred_at',
+                'relatedIncident:id,reference_number,title,type,occurred_at',
                 'creator:id,name',
                 'updater:id,name',
                 'attachments' => fn ($q) => $q->latest()->with('uploader:id,name'),
@@ -565,7 +565,7 @@ class FirstAidController extends Controller
 
         return [
             'id' => $record->id,
-            'reference' => $this->reference($record->id),
+            'reference' => $this->reference($record),
             'treated_person_name' => $record->treated_person_name,
             'treated_person_type' => $record->treated_person_type,
             'treatment_date' => $record->treatment_date?->toISOString(),
@@ -586,7 +586,7 @@ class FirstAidController extends Controller
             'client_id' => $record->client_id,
             'related_incident' => $incident ? [
                 'id' => $incident->id,
-                'reference' => 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT),
+                'reference' => $incident->reference_number ?? 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT),
                 'title' => $incident->title,
             ] : null,
             'created_by_name' => $record->creator?->name,
@@ -728,9 +728,9 @@ class FirstAidController extends Controller
         return ClientIncident::query()
             ->orderByDesc('occurred_at')
             ->limit(50)
-            ->get(['id', 'title', 'occurred_at'])
+            ->get(['id', 'reference_number', 'title', 'occurred_at'])
             ->map(function (ClientIncident $i) {
-                $ref = 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT);
+                $ref = $i->reference_number ?? 'INC-'.str_pad((string) $i->id, 4, '0', STR_PAD_LEFT);
 
                 return [
                     'id' => $i->id,
@@ -764,9 +764,9 @@ class FirstAidController extends Controller
         return (bool) $request->user()?->canDo('hazards.manage');
     }
 
-    private function reference(int $id): string
+    private function reference(FirstAidRecord $record): string
     {
-        return 'FA-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT);
+        return $record->reference_number ?? 'FA-'.str_pad((string) $record->id, 4, '0', STR_PAD_LEFT);
     }
 
     /**

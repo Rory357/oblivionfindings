@@ -112,7 +112,7 @@ return new class extends Migration {
         return HsInvestigation::create([
             'hs_event_id' => $hsEvent->id,
             'organization_id' => $hsEvent->organization_id,
-            'reference_number' => HsInvestigation::generateReferenceNumber(),
+            'reference_number' => $this->nextReference('hs_investigations', 'INV'),
             'investigation_type' => 'standard',
             'status' => 'completed', // legacy data was recorded after the fact
             'root_causes' => $row->root_cause_description
@@ -142,7 +142,7 @@ return new class extends Migration {
                 'hs_event_id' => $hsEvent->id,
                 'hs_investigation_id' => $investigation?->id,
                 'organization_id' => $hsEvent->organization_id,
-                'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
+                'reference_number' => $this->nextReference('hs_corrective_actions', 'CA'),
                 'action_type' => 'corrective',
                 'priority' => 'medium',
                 'title' => Str::limit($description, 250, ''),
@@ -152,5 +152,26 @@ return new class extends Migration {
                 'completed_at' => $action['completed_at'] ?? null,
             ]);
         }
+    }
+
+    /**
+     * Self-contained reference generator: migrations must not depend on the
+     * central reference_sequences table (created 2026-07-03, i.e. AFTER this
+     * migration) — replaying over a data-bearing snapshot would 42S02.
+     * Single-threaded migration context, so a MAX() scan is race-free here.
+     */
+    private function nextReference(string $table, string $prefix): string
+    {
+        $year = now()->year;
+        $like = "{$prefix}-{$year}-";
+
+        $last = DB::table($table)
+            ->where('reference_number', 'like', $like.'%')
+            ->orderByDesc('reference_number')
+            ->value('reference_number');
+
+        $next = $last ? ((int) str_replace($like, '', $last)) + 1 : 1;
+
+        return $like.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 };

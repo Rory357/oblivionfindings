@@ -59,10 +59,7 @@ class ActionItem extends Model
 
     public static function generateReference(): string
     {
-        $year = now()->year;
-        $prefix = "ACT-{$year}-";
-        $last = static::whereYear('created_at', $year)->count() + 1;
-        return $prefix . str_pad($last, 4, '0', STR_PAD_LEFT);
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('ACT');
     }
 
     public function assignedTo(): BelongsTo

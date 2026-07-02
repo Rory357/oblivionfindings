@@ -222,16 +222,6 @@ class HsRiskAssessment extends Model
 
     public static function generateReferenceNumber(): string
     {
-        $year = now()->year;
-        $prefix = "RA-{$year}-";
-
-        $last = static::withTrashed()
-            ->where('reference_number', 'like', "{$prefix}%")
-            ->orderByDesc('reference_number')
-            ->value('reference_number');
-
-        $next = $last ? ((int) str_replace($prefix, '', $last)) + 1 : 1;
-
-        return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('RA');
     }
 }

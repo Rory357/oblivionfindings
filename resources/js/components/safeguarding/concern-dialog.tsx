@@ -95,6 +95,7 @@ export type ConcernDetail = {
         download_url?: string;
     }>;
     related_incident_id?: number | null;
+    related_incident_ref?: string | null;
     hs_event?: { id: number; reference_number: string; status: string } | null;
     control_room_alert_id?: number | null;
     access_log?: { by: string; at: string | null }[];
@@ -1202,7 +1203,7 @@ function LinkedSection({ d, subject }: { d: ConcernDetail; subject: Person }) {
     return (
         <div className="flex flex-col gap-2">
             {d.control_room_alert_id ? <LinkedRow icon={RadioTower} title="Control Room alert" sub="Active alert" href={`/control-room/alerts/${d.control_room_alert_id}`} /> : null}
-            {d.related_incident_id ? <LinkedRow icon={ShieldAlert} title="Originating incident" sub={`INC-${d.related_incident_id}`} href={`/incidents?incident=${d.related_incident_id}`} /> : null}
+            {d.related_incident_id ? <LinkedRow icon={ShieldAlert} title="Originating incident" sub={d.related_incident_ref ?? `INC-${d.related_incident_id}`} href={`/incidents?incident=${d.related_incident_id}`} /> : null}
             {d.hs_event ? <LinkedRow icon={Shield} title="Health & Safety event" sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`} href={`/health-safety/events/${d.hs_event.id}`} /> : null}
             {subject?.href ? <LinkedRow icon={UserIcon} title="Subject record" sub={subject.name} href={subject.href} /> : null}
             {d.alerts?.length ? (

@@ -267,12 +267,7 @@ class DataSettingsController extends Controller
             || in_array($validated['severity'], ['high', 'critical'], true);
 
         $breach = DataBreachLog::create([
-            'breach_reference' => 'BR-'.now()->year.'-'.str_pad(
-                DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
-                4,
-                '0',
-                STR_PAD_LEFT
-            ),
+            'breach_reference' => app(\App\Services\References\ReferenceNumberGenerator::class)->next('BR'),
             'breach_type' => $validated['breach_type'],
             'severity' => $validated['severity'],
             'discovered_at' => Carbon::parse($validated['discovery_date']),

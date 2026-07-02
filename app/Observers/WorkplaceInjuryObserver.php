@@ -205,7 +205,7 @@ class WorkplaceInjuryObserver implements ShouldHandleEventsAfterCommit
             $occurred = $injury->injury_date ?? $injury->created_at ?? now();
             // Map the injury severity vocabulary to the governance taxonomy (critical|high|medium).
             $severity = $injury->severity === 'critical' ? 'critical' : 'high';
-            $reference = 'WI-'.str_pad((string) $injury->id, 4, '0', STR_PAD_LEFT);
+            $reference = $injury->reference_number ?? 'WI-'.str_pad((string) $injury->id, 4, '0', STR_PAD_LEFT);
 
             $incident = NotifiableIncident::create([
                 'incident_type' => 'serious_harm',

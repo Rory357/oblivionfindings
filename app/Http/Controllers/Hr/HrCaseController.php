@@ -358,18 +358,9 @@ class HrCaseController extends Controller
             'linked_incident_ids.*' => ['integer'],
         ]);
 
-        // Generate a unique case number
-        $lastCase = HrCase::where('tenant_id', $tenantId)
-            ->orderByDesc('id')
-            ->first();
-
-        $nextNumber = $lastCase
-            ? ((int) str_replace('HR-', '', $lastCase->case_number ?? 'HR-0')) + 1
-            : 1;
-
         HrCase::create([
             'tenant_id' => $tenantId,
-            'case_number' => 'HR-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT),
+            'case_number' => app(\App\Services\References\ReferenceNumberGenerator::class)->nextGlobal('HR', 5),
             'status' => 'open',
             'reported_by' => $user->id,
             'opened_at' => now(),

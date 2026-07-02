@@ -152,7 +152,7 @@ class MedicationAuditEventController extends Controller
             'status' => 'reported',
         ]);
 
-        return back()->with('success', 'Flagged for investigation — error ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT).' opened.');
+        return back()->with('success', 'Flagged for investigation — error '.($error->reference_number ?? 'ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT)).' opened.');
     }
 
     private function resolveModel(string $id): ?Model

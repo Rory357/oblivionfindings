@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class FleetIncident extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
+    use Concerns\HasReferenceNumber;
+
+    public const REFERENCE_PREFIX = 'FLT';
 
     /** Land Transport Act 1998 s22 — report an injury/fatal crash to Police within 24 hours. */
     public const POLICE_REPORT_WINDOW_HOURS = 24;
@@ -30,6 +33,7 @@ class FleetIncident extends Model
     public const INJURY_SEVERITIES = ['none', 'first_aid', 'medical', 'hospitalisation', 'death'];
 
     protected $fillable = [
+        'reference_number',
         'tenant_id',
         'asset_id',
         'reported_by_user_id',
@@ -350,7 +354,10 @@ class FleetIncident extends Model
 
     public function reference(): string
     {
-        return 'FI-'.str_pad((string) $this->getKey(), 4, '0', STR_PAD_LEFT);
+        // Central ticket number since 2026-07; FI-<id> only for rows that
+        // somehow predate the reference_number backfill.
+        return $this->reference_number
+            ?? 'FI-'.str_pad((string) $this->getKey(), 4, '0', STR_PAD_LEFT);
     }
 
     public function isEquipment(): bool

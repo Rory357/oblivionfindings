@@ -1,14 +1,10 @@
+/* Daily / communication note wizard — built on the shared WizardShell chrome
+ * (the Add Client modal contract): 248px stepper rail, "Step x of y" header,
+ * 3px progress strip and muted footer band. The flow, fields, validation and
+ * submit payload are unchanged from the bespoke dialog it replaces. */
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +16,11 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    WizardShell,
+    WizardStepPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
 import {
     defaultDailyNoteValues,
@@ -32,7 +33,10 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    ClipboardCheck,
     FileCheck2,
+    FileText,
+    LayoutGrid,
     MessageSquare,
     Save,
 } from 'lucide-react';
@@ -53,7 +57,26 @@ type DailyNoteWizardProps = {
     onSubmitted?: () => void;
 };
 
-const steps = ['Category', 'Details', 'Review'];
+const STEPS: WizardStep[] = [
+    {
+        key: 'category',
+        label: 'Category',
+        blurb: 'What kind of note',
+        icon: LayoutGrid,
+    },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'What happened & when',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Check, flag & save',
+        icon: ClipboardCheck,
+    },
+];
 
 const splitTags = (value: string) =>
     value
@@ -180,614 +203,636 @@ export function DailyNoteWizard({
         });
     };
 
+    const footerStart = (
+        <div className="flex gap-2">
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+            >
+                Cancel
+            </Button>
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => submit(true)}
+                disabled={!form.data.body.trim() || processing}
+            >
+                <Save className="mr-2 h-4 w-4" />
+                Save Draft
+            </Button>
+        </div>
+    );
+
+    const footerEnd = (
+        <>
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep((current) => current - 1)}
+                disabled={step === 0}
+            >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+            </Button>
+            {step < 2 ? (
+                <Button
+                    type="button"
+                    onClick={() => setStep((current) => current + 1)}
+                    disabled={!canContinue}
+                    className="min-h-11"
+                    data-test="daily-note-next"
+                >
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+            ) : (
+                <Button
+                    type="button"
+                    onClick={() => submit(false)}
+                    disabled={!form.data.body.trim() || processing}
+                    className="min-h-11"
+                    data-test="daily-note-submit"
+                >
+                    <Check className="mr-2 h-4 w-4" />
+                    Save Note
+                </Button>
+            )}
+        </>
+    );
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className="max-h-[92vh] overflow-y-auto sm:max-w-3xl"
+        <WizardShell
+            open={open}
+            onClose={() => onOpenChange(false)}
+            title={title}
+            description="Use the steps to capture enough context for the next worker and for review later."
+            railIcon={isCommunication ? MessageSquare : FileCheck2}
+            railTitle={title}
+            railSub={
+                isCommunication
+                    ? 'Family & external contact'
+                    : 'Shift record for this client'
+            }
+            steps={STEPS}
+            stepIndex={step}
+            onStepClick={(index) => {
+                // The bespoke dialog only allowed backwards travel (via Back);
+                // rail clicks keep that contract so Next-gating is never skipped.
+                if (index < step) setStep(index);
+            }}
+            footerStart={footerStart}
+            footerEnd={footerEnd}
+        >
+            <div
                 data-test={
                     isCommunication
                         ? 'client-communication-note-dialog'
                         : 'client-daily-note-dialog'
                 }
             >
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        {isCommunication ? (
-                            <MessageSquare className="h-5 w-5 text-primary" />
-                        ) : (
-                            <FileCheck2 className="h-5 w-5 text-primary" />
-                        )}
-                        {title}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Use the steps to capture enough context for the next
-                        worker and for review later.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="flex flex-wrap gap-2">
-                    {steps.map((label, index) => (
-                        <span
-                            key={label}
-                            className={cn(
-                                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium',
-                                index === step
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : index < step
-                                      ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                      : 'text-muted-foreground',
-                            )}
-                        >
-                            {index < step ? (
-                                <Check className="h-3.5 w-3.5" />
-                            ) : (
-                                <span>{index + 1}</span>
-                            )}
-                            {label}
-                        </span>
-                    ))}
-                </div>
-
                 {step === 0 ? (
-                    <div
-                        className="space-y-4"
-                        data-test="daily-note-step-category"
-                    >
-                        {!isCommunication ? (
-                            <div className="space-y-2">
-                                <Label>Note type</Label>
-                                <div className="grid gap-2 sm:grid-cols-3">
-                                    {(
-                                        [
+                    <WizardStepPane>
+                        <div
+                            className="space-y-4"
+                            data-test="daily-note-step-category"
+                        >
+                            {!isCommunication ? (
+                                <div className="space-y-2">
+                                    <Label>Note type</Label>
+                                    <div className="grid gap-2 sm:grid-cols-3">
+                                        {(
                                             [
-                                                'daily_note',
-                                                'Daily note',
-                                                'What happened on shift',
-                                            ],
-                                            [
-                                                'progress_note',
-                                                'Progress note',
-                                                'Movement on a goal or plan',
-                                            ],
-                                            [
-                                                'handover',
-                                                'Handover',
-                                                'Brief the next shift',
-                                            ],
-                                        ] as const
-                                    ).map(([key, label, desc]) => {
-                                        const active = noteType === key;
-                                        return (
-                                            // eslint-disable-next-line no-restricted-syntax -- selector tile card, not a standard button
-                                            <button
-                                                key={key}
-                                                type="button"
-                                                aria-pressed={active}
-                                                onClick={() =>
-                                                    setNoteType(key)
-                                                }
-                                                data-test={`daily-note-type-${key}`}
-                                                className={cn(
-                                                    'flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all hover:border-primary/50',
-                                                    active
-                                                        ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                                        : 'border-border bg-card/50',
-                                                )}
-                                            >
-                                                <span className="text-sm font-semibold">
-                                                    {label}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {desc}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
+                                                [
+                                                    'daily_note',
+                                                    'Daily note',
+                                                    'What happened on shift',
+                                                ],
+                                                [
+                                                    'progress_note',
+                                                    'Progress note',
+                                                    'Movement on a goal or plan',
+                                                ],
+                                                [
+                                                    'handover',
+                                                    'Handover',
+                                                    'Brief the next shift',
+                                                ],
+                                            ] as const
+                                        ).map(([key, label, desc]) => {
+                                            const active = noteType === key;
+                                            return (
+                                                // eslint-disable-next-line no-restricted-syntax -- selector tile card, not a standard button
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    aria-pressed={active}
+                                                    onClick={() =>
+                                                        setNoteType(key)
+                                                    }
+                                                    data-test={`daily-note-type-${key}`}
+                                                    className={cn(
+                                                        'flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all hover:border-primary/50',
+                                                        active
+                                                            ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                                            : 'border-border bg-card/50',
+                                                    )}
+                                                >
+                                                    <span className="text-sm font-semibold">
+                                                        {label}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {desc}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        ) : null}
-                        <NoteCategoryPicker
-                            value={form.data.category}
-                            onChange={(value: NoteCategoryKey) =>
-                                update('category', value)
-                            }
-                        />
-                    </div>
+                            ) : null}
+                            <NoteCategoryPicker
+                                value={form.data.category}
+                                onChange={(value: NoteCategoryKey) =>
+                                    update('category', value)
+                                }
+                            />
+                        </div>
+                    </WizardStepPane>
                 ) : null}
 
                 {step === 1 ? (
-                    <div
-                        className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
-                        data-test="daily-note-step-details"
-                    >
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-subject">
-                                    Short heading
-                                </Label>
-                                <Input
-                                    id="daily-note-subject"
-                                    value={form.data.subject}
-                                    onChange={(event) =>
-                                        update('subject', event.target.value)
-                                    }
-                                    placeholder="Optional"
-                                    className="min-h-11"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-body">
-                                    What happened?
-                                </Label>
-                                <Textarea
-                                    id="daily-note-body"
-                                    value={form.data.body}
-                                    onChange={(event) =>
-                                        update('body', event.target.value)
-                                    }
-                                    className="min-h-44"
-                                    autoFocus
-                                    data-test="daily-note-body"
-                                />
-                            </div>
-
-                            {showGoalFields ? (
+                    <WizardStepPane>
+                        <div
+                            className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
+                            data-test="daily-note-step-details"
+                        >
+                            <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="daily-note-goal">
-                                        Related goal
+                                    <Label htmlFor="daily-note-subject">
+                                        Short heading
                                     </Label>
-                                    {goalOptions.length > 0 ? (
+                                    <Input
+                                        id="daily-note-subject"
+                                        value={form.data.subject}
+                                        onChange={(event) =>
+                                            update(
+                                                'subject',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Optional"
+                                        className="min-h-11"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="daily-note-body">
+                                        What happened?
+                                    </Label>
+                                    <Textarea
+                                        id="daily-note-body"
+                                        value={form.data.body}
+                                        onChange={(event) =>
+                                            update('body', event.target.value)
+                                        }
+                                        className="min-h-44"
+                                        autoFocus
+                                        data-test="daily-note-body"
+                                    />
+                                </div>
+
+                                {showGoalFields ? (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="daily-note-goal">
+                                            Related goal
+                                        </Label>
+                                        {goalOptions.length > 0 ? (
+                                            <Select
+                                                value={form.data.goal}
+                                                onValueChange={(value) =>
+                                                    update('goal', value)
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    id="daily-note-goal"
+                                                    className="min-h-11"
+                                                >
+                                                    <SelectValue placeholder="Choose goal" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {goalOptions.map(
+                                                        (goal) => (
+                                                            <SelectItem
+                                                                key={String(
+                                                                    goal.id ??
+                                                                        goal.label,
+                                                                )}
+                                                                value={
+                                                                    goal.label
+                                                                }
+                                                            >
+                                                                {goal.label}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <Input
+                                                id="daily-note-goal"
+                                                value={form.data.goal}
+                                                onChange={(event) =>
+                                                    update(
+                                                        'goal',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="min-h-11"
+                                            />
+                                        )}
+                                    </div>
+                                ) : null}
+
+                                {isCommunication ? (
+                                    <div className="grid gap-3 sm:grid-cols-3">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="daily-note-contact">
+                                                Contact
+                                            </Label>
+                                            <Input
+                                                id="daily-note-contact"
+                                                value={
+                                                    form.data.contact_person
+                                                }
+                                                onChange={(event) =>
+                                                    update(
+                                                        'contact_person',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="min-h-11"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="daily-note-relationship">
+                                                Relationship
+                                            </Label>
+                                            <Input
+                                                id="daily-note-relationship"
+                                                value={
+                                                    form.data
+                                                        .contact_relationship
+                                                }
+                                                onChange={(event) =>
+                                                    update(
+                                                        'contact_relationship',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="min-h-11"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="daily-note-method">
+                                                Method
+                                            </Label>
+                                            <Select
+                                                value={
+                                                    form.data.contact_method
+                                                }
+                                                onValueChange={(value) =>
+                                                    update(
+                                                        'contact_method',
+                                                        value,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    id="daily-note-method"
+                                                    className="min-h-11"
+                                                >
+                                                    <SelectValue placeholder="Choose" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="phone">
+                                                        Phone
+                                                    </SelectItem>
+                                                    <SelectItem value="email">
+                                                        Email
+                                                    </SelectItem>
+                                                    <SelectItem value="portal">
+                                                        Portal
+                                                    </SelectItem>
+                                                    <SelectItem value="in_person">
+                                                        In person
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="daily-note-when">
+                                        When
+                                    </Label>
+                                    <Input
+                                        id="daily-note-when"
+                                        type="datetime-local"
+                                        value={form.data.occurred_at}
+                                        onChange={(event) =>
+                                            update(
+                                                'occurred_at',
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="min-h-11"
+                                    />
+                                </div>
+
+                                {shiftOptions.length > 0 ? (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="daily-note-shift">
+                                            Shift
+                                        </Label>
                                         <Select
-                                            value={form.data.goal}
+                                            value={form.data.shift_id}
                                             onValueChange={(value) =>
-                                                update('goal', value)
+                                                update('shift_id', value)
                                             }
                                         >
                                             <SelectTrigger
-                                                id="daily-note-goal"
+                                                id="daily-note-shift"
                                                 className="min-h-11"
                                             >
-                                                <SelectValue placeholder="Choose goal" />
+                                                <SelectValue placeholder="Link shift" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {goalOptions.map((goal) => (
+                                                {shiftOptions.map((shift) => (
                                                     <SelectItem
-                                                        key={String(
-                                                            goal.id ??
-                                                                goal.label,
+                                                        key={shift.id}
+                                                        value={String(
+                                                            shift.id,
                                                         )}
-                                                        value={goal.label}
                                                     >
-                                                        {goal.label}
+                                                        {shift.label}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    ) : (
-                                        <Input
-                                            id="daily-note-goal"
-                                            value={form.data.goal}
-                                            onChange={(event) =>
-                                                update(
-                                                    'goal',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className="min-h-11"
-                                        />
-                                    )}
-                                </div>
-                            ) : null}
+                                    </div>
+                                ) : null}
 
-                            {isCommunication ? (
-                                <div className="grid gap-3 sm:grid-cols-3">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="daily-note-contact">
-                                            Contact
-                                        </Label>
-                                        <Input
-                                            id="daily-note-contact"
-                                            value={form.data.contact_person}
-                                            onChange={(event) =>
-                                                update(
-                                                    'contact_person',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className="min-h-11"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="daily-note-relationship">
-                                            Relationship
-                                        </Label>
-                                        <Input
-                                            id="daily-note-relationship"
-                                            value={
-                                                form.data.contact_relationship
-                                            }
-                                            onChange={(event) =>
-                                                update(
-                                                    'contact_relationship',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className="min-h-11"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="daily-note-method">
-                                            Method
-                                        </Label>
-                                        <Select
-                                            value={form.data.contact_method}
-                                            onValueChange={(value) =>
-                                                update('contact_method', value)
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                id="daily-note-method"
+                                {showMoodFields ? (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="daily-note-mood">
+                                                Mood rating
+                                            </Label>
+                                            <Input
+                                                id="daily-note-mood"
+                                                type="number"
+                                                min="1"
+                                                max="10"
+                                                value={form.data.mood_rating}
+                                                onChange={(event) =>
+                                                    update(
+                                                        'mood_rating',
+                                                        event.target.value
+                                                            ? Number(
+                                                                  event.target
+                                                                      .value,
+                                                              )
+                                                            : '',
+                                                    )
+                                                }
                                                 className="min-h-11"
-                                            >
-                                                <SelectValue placeholder="Choose" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="phone">
-                                                    Phone
-                                                </SelectItem>
-                                                <SelectItem value="email">
-                                                    Email
-                                                </SelectItem>
-                                                <SelectItem value="portal">
-                                                    Portal
-                                                </SelectItem>
-                                                <SelectItem value="in_person">
-                                                    In person
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
+                                            />
+                                        </div>
 
-                        <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-when">When</Label>
-                                <Input
-                                    id="daily-note-when"
-                                    type="datetime-local"
-                                    value={form.data.occurred_at}
-                                    onChange={(event) =>
-                                        update(
-                                            'occurred_at',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className="min-h-11"
-                                />
-                            </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="daily-note-tags">
+                                                Behaviour tags
+                                            </Label>
+                                            <Input
+                                                id="daily-note-tags"
+                                                value={tagText}
+                                                onChange={(event) =>
+                                                    setTagText(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Comma separated"
+                                                className="min-h-11"
+                                            />
+                                        </div>
+                                    </>
+                                ) : null}
 
-                            {shiftOptions.length > 0 ? (
-                                <div className="space-y-2">
-                                    <Label htmlFor="daily-note-shift">
-                                        Shift
-                                    </Label>
-                                    <Select
-                                        value={form.data.shift_id}
-                                        onValueChange={(value) =>
-                                            update('shift_id', value)
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="daily-note-shift"
-                                            className="min-h-11"
-                                        >
-                                            <SelectValue placeholder="Link shift" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {shiftOptions.map((shift) => (
-                                                <SelectItem
-                                                    key={shift.id}
-                                                    value={String(shift.id)}
-                                                >
-                                                    {shift.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            ) : null}
-
-                            {showMoodFields ? (
-                                <>
+                                {showConcernFields ? (
                                     <div className="space-y-2">
-                                        <Label htmlFor="daily-note-mood">
-                                            Mood rating
+                                        <Label htmlFor="daily-note-concerns">
+                                            Concern flags
                                         </Label>
                                         <Input
-                                            id="daily-note-mood"
-                                            type="number"
-                                            min="1"
-                                            max="10"
-                                            value={form.data.mood_rating}
+                                            id="daily-note-concerns"
+                                            value={concernText}
                                             onChange={(event) =>
-                                                update(
-                                                    'mood_rating',
-                                                    event.target.value
-                                                        ? Number(
-                                                              event.target
-                                                                  .value,
-                                                          )
-                                                        : '',
+                                                setConcernText(
+                                                    event.target.value,
                                                 )
-                                            }
-                                            className="min-h-11"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="daily-note-tags">
-                                            Behaviour tags
-                                        </Label>
-                                        <Input
-                                            id="daily-note-tags"
-                                            value={tagText}
-                                            onChange={(event) =>
-                                                setTagText(event.target.value)
                                             }
                                             placeholder="Comma separated"
                                             className="min-h-11"
                                         />
                                     </div>
-                                </>
-                            ) : null}
+                                ) : null}
 
-                            {showConcernFields ? (
                                 <div className="space-y-2">
-                                    <Label htmlFor="daily-note-concerns">
-                                        Concern flags
+                                    <Label htmlFor="daily-note-attachments">
+                                        Attachments
                                     </Label>
                                     <Input
-                                        id="daily-note-concerns"
-                                        value={concernText}
-                                        onChange={(event) =>
-                                            setConcernText(event.target.value)
-                                        }
-                                        placeholder="Comma separated"
+                                        id="daily-note-attachments"
+                                        type="file"
+                                        multiple
                                         className="min-h-11"
+                                        onChange={(event) =>
+                                            update(
+                                                'attachments',
+                                                Array.from(
+                                                    event.target.files ?? [],
+                                                ).map((file) => ({
+                                                    name: file.name,
+                                                    size: file.size,
+                                                })),
+                                            )
+                                        }
                                     />
+                                    {form.data.attachments.length > 0 ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            {form.data.attachments.length} file
+                                            {form.data.attachments.length === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            attached
+                                        </p>
+                                    ) : null}
                                 </div>
-                            ) : null}
 
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-attachments">
-                                    Attachments
-                                </Label>
-                                <Input
-                                    id="daily-note-attachments"
-                                    type="file"
-                                    multiple
-                                    className="min-h-11"
-                                    onChange={(event) =>
-                                        update(
-                                            'attachments',
-                                            Array.from(
-                                                event.target.files ?? [],
-                                            ).map((file) => ({
-                                                name: file.name,
-                                                size: file.size,
-                                            })),
-                                        )
-                                    }
-                                />
-                                {form.data.attachments.length > 0 ? (
-                                    <p className="text-xs text-muted-foreground">
-                                        {form.data.attachments.length} file
-                                        {form.data.attachments.length === 1
-                                            ? ''
-                                            : 's'}{' '}
-                                        attached
-                                    </p>
-                                ) : null}
+                                <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
+                                    <span>Show on timeline</span>
+                                    <Switch
+                                        checked={form.data.appears_on_timeline}
+                                        onCheckedChange={(checked) =>
+                                            update(
+                                                'appears_on_timeline',
+                                                checked,
+                                            )
+                                        }
+                                    />
+                                </label>
                             </div>
-
-                            <label className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
-                                <span>Show on timeline</span>
-                                <Switch
-                                    checked={form.data.appears_on_timeline}
-                                    onCheckedChange={(checked) =>
-                                        update('appears_on_timeline', checked)
-                                    }
-                                />
-                            </label>
                         </div>
-                    </div>
+                    </WizardStepPane>
                 ) : null}
 
                 {step === 2 ? (
-                    <div
-                        className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
-                        data-test="daily-note-step-review"
-                    >
-                        <div className="space-y-4 rounded-lg border p-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="secondary">
-                                    {selectedCategory?.label ?? 'Daily note'}
-                                </Badge>
-                                {form.data.subject ? (
-                                    <span className="text-sm font-medium">
-                                        {form.data.subject}
-                                    </span>
+                    <WizardStepPane>
+                        <div
+                            className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
+                            data-test="daily-note-step-review"
+                        >
+                            <div className="space-y-4 rounded-lg border p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge variant="secondary">
+                                        {selectedCategory?.label ??
+                                            'Daily note'}
+                                    </Badge>
+                                    {form.data.subject ? (
+                                        <span className="text-sm font-medium">
+                                            {form.data.subject}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <p className="text-sm leading-6 whitespace-pre-wrap">
+                                    {form.data.body ||
+                                        'No note body has been entered yet.'}
+                                </p>
+                                {tagText || concernText ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {splitTags(tagText).map((tag) => (
+                                            <Badge key={tag} variant="outline">
+                                                {tag}
+                                            </Badge>
+                                        ))}
+                                        {splitTags(concernText).map((flag) => (
+                                            <Badge
+                                                key={flag}
+                                                className="bg-status-warning-bg text-status-warning"
+                                            >
+                                                {flag}
+                                            </Badge>
+                                        ))}
+                                    </div>
                                 ) : null}
                             </div>
-                            <p className="text-sm leading-6 whitespace-pre-wrap">
-                                {form.data.body ||
-                                    'No note body has been entered yet.'}
-                            </p>
-                            {tagText || concernText ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {splitTags(tagText).map((tag) => (
-                                        <Badge key={tag} variant="outline">
-                                            {tag}
-                                        </Badge>
-                                    ))}
-                                    {splitTags(concernText).map((flag) => (
-                                        <Badge
-                                            key={flag}
-                                            className="bg-status-warning-bg text-status-warning"
-                                        >
-                                            {flag}
-                                        </Badge>
-                                    ))}
+
+                            <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                                <label className="frontline-focus flex min-h-11 items-start gap-3 rounded-lg border bg-background p-3">
+                                    <Checkbox
+                                        checked={form.data.is_flagged}
+                                        onCheckedChange={(checked) =>
+                                            update(
+                                                'is_flagged',
+                                                checked === true,
+                                            )
+                                        }
+                                    />
+                                    <span>
+                                        <span className="flex items-center gap-2 text-sm font-medium">
+                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                            Needs review
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            Send this to the review queue.
+                                        </span>
+                                    </span>
+                                </label>
+
+                                <label className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
+                                    <span>Visible to family</span>
+                                    <Switch
+                                        checked={
+                                            form.data.visibility === 'portal'
+                                        }
+                                        onCheckedChange={(checked) =>
+                                            update(
+                                                'visibility',
+                                                checked
+                                                    ? 'portal'
+                                                    : 'internal',
+                                            )
+                                        }
+                                    />
+                                </label>
+
+                                {form.data.is_flagged ? (
+                                    <Textarea
+                                        value={form.data.flagged_reason}
+                                        onChange={(event) =>
+                                            update(
+                                                'flagged_reason',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Reason for review"
+                                        className="min-h-20"
+                                    />
+                                ) : null}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="daily-note-follow-up">
+                                        Follow-up action
+                                    </Label>
+                                    <Textarea
+                                        id="daily-note-follow-up"
+                                        value={form.data.follow_up_action}
+                                        onChange={(event) =>
+                                            update(
+                                                'follow_up_action',
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="min-h-20"
+                                        placeholder="Optional"
+                                    />
                                 </div>
-                            ) : null}
-                        </div>
 
-                        <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
-                            <label className="frontline-focus flex min-h-11 items-start gap-3 rounded-lg border bg-background p-3">
-                                <Checkbox
-                                    checked={form.data.is_flagged}
-                                    onCheckedChange={(checked) =>
-                                        update('is_flagged', checked === true)
-                                    }
-                                />
-                                <span>
-                                    <span className="flex items-center gap-2 text-sm font-medium">
-                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                        Needs review
-                                    </span>
-                                    <span className="block text-xs text-muted-foreground">
-                                        Send this to the review queue.
-                                    </span>
-                                </span>
-                            </label>
-
-                            <label className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm">
-                                <span>Visible to family</span>
-                                <Switch
-                                    checked={form.data.visibility === 'portal'}
-                                    onCheckedChange={(checked) =>
-                                        update(
-                                            'visibility',
-                                            checked ? 'portal' : 'internal',
-                                        )
-                                    }
-                                />
-                            </label>
-
-                            {form.data.is_flagged ? (
-                                <Textarea
-                                    value={form.data.flagged_reason}
-                                    onChange={(event) =>
-                                        update(
-                                            'flagged_reason',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="Reason for review"
-                                    className="min-h-20"
-                                />
-                            ) : null}
-
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-follow-up">
-                                    Follow-up action
-                                </Label>
-                                <Textarea
-                                    id="daily-note-follow-up"
-                                    value={form.data.follow_up_action}
-                                    onChange={(event) =>
-                                        update(
-                                            'follow_up_action',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className="min-h-20"
-                                    placeholder="Optional"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="daily-note-due">
-                                    Follow-up due
-                                </Label>
-                                <Input
-                                    id="daily-note-due"
-                                    type="datetime-local"
-                                    value={form.data.follow_up_due_at}
-                                    onChange={(event) =>
-                                        update(
-                                            'follow_up_due_at',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className="min-h-11"
-                                />
+                                <div className="space-y-2">
+                                    <Label htmlFor="daily-note-due">
+                                        Follow-up due
+                                    </Label>
+                                    <Input
+                                        id="daily-note-due"
+                                        type="datetime-local"
+                                        value={form.data.follow_up_due_at}
+                                        onChange={(event) =>
+                                            update(
+                                                'follow_up_due_at',
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="min-h-11"
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </WizardStepPane>
                 ) : null}
-
-                <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                    <div className="flex gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => submit(true)}
-                            disabled={!form.data.body.trim() || processing}
-                        >
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Draft
-                        </Button>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setStep((current) => current - 1)}
-                            disabled={step === 0}
-                        >
-                            <ChevronLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                        {step < 2 ? (
-                            <Button
-                                type="button"
-                                onClick={() =>
-                                    setStep((current) => current + 1)
-                                }
-                                disabled={!canContinue}
-                                className="min-h-11"
-                                data-test="daily-note-next"
-                            >
-                                Next
-                                <ChevronRight className="ml-2 h-4 w-4" />
-                            </Button>
-                        ) : (
-                            <Button
-                                type="button"
-                                onClick={() => submit(false)}
-                                disabled={!form.data.body.trim() || processing}
-                                className="min-h-11"
-                                data-test="daily-note-submit"
-                            >
-                                <Check className="mr-2 h-4 w-4" />
-                                Save Note
-                            </Button>
-                        )}
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </div>
+        </WizardShell>
     );
 }

@@ -194,7 +194,7 @@ export function FleetIncidentReportDialog({
     formOptions: FormOptions;
     onOpenIncident?: (id: number) => void;
 }) {
-    const page = usePage().props as { flash?: { created_fleet_incident_id?: number; error?: string } };
+    const page = usePage().props as { flash?: { created_fleet_incident_id?: number; created_fleet_incident_reference?: string; error?: string } };
     const [stepIndex, setStepIndex] = useState(0);
     const [submitted, setSubmitted] = useState(false);
 
@@ -329,6 +329,7 @@ export function FleetIncidentReportDialog({
     };
 
     const newId = page.flash?.created_fleet_incident_id;
+    const newReference = page.flash?.created_fleet_incident_reference;
     const success = submitted ? (
         <WizardSuccessPane
             title="Fleet incident reported"
@@ -338,7 +339,7 @@ export function FleetIncidentReportDialog({
                     {newId ? (
                         <>
                             {' '}
-                            Reference <span className="font-semibold">FI-{String(newId).padStart(4, '0')}</span>.
+                            Reference <span className="font-semibold">{newReference ?? `FI-${String(newId).padStart(4, '0')}`}</span>.
                         </>
                     ) : null}
                 </>

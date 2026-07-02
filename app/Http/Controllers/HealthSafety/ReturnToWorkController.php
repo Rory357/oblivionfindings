@@ -90,7 +90,7 @@ class ReturnToWorkController extends Controller
             $this->applyTab($this->scopedBase($request), $tab),
             $request
         )
-            ->with(['user:id,name', 'site:id,name'])
+            ->with(['user:id,name', 'site:id,name', 'relatedIncident:id,reference_number'])
             ->withCount(['returnToWorkPlans', 'capacityAssessments', 'attachments'])
             ->orderByDesc('injury_date')
             ->paginate(25)
@@ -250,16 +250,16 @@ class ReturnToWorkController extends Controller
         };
     }
 
-    private function reference(int $id): string
+    private function reference(WorkplaceInjury $injury): string
     {
-        return 'WI-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT);
+        return $injury->reference_number ?? 'WI-'.str_pad((string) $injury->id, 4, '0', STR_PAD_LEFT);
     }
 
     private function shapeRow(WorkplaceInjury $i): array
     {
         return [
             'id' => $i->id,
-            'reference' => $this->reference($i->id),
+            'reference' => $this->reference($i),
             'status' => $i->status,
             'severity' => $i->severity,
             'injury_type' => $i->injury_type,
@@ -271,6 +271,7 @@ class ReturnToWorkController extends Controller
             'acc_claim_lodged' => (bool) $i->acc_claim_lodged,
             'acc_claim_number' => $i->acc_claim_number,
             'related_incident_id' => $i->related_incident_id,
+            'related_incident_ref' => $i->relatedIncident?->reference_number,
             'worker' => $i->user ? ['id' => $i->user->id, 'name' => $i->user->name] : null,
             'site' => $i->site ? ['id' => $i->site->id, 'name' => $i->site->name] : null,
             'rtw_count' => (int) ($i->return_to_work_plans_count ?? 0),
@@ -285,10 +286,10 @@ class ReturnToWorkController extends Controller
         return ClientIncident::query()
             ->latest('occurred_at')
             ->limit(100)
-            ->get(['id', 'type', 'title', 'occurred_at'])
+            ->get(['id', 'reference_number', 'type', 'title', 'occurred_at'])
             ->map(fn (ClientIncident $c) => [
                 'id' => $c->id,
-                'label' => 'INC-'.str_pad((string) $c->id, 4, '0', STR_PAD_LEFT),
+                'label' => $c->reference_number ?? 'INC-'.str_pad((string) $c->id, 4, '0', STR_PAD_LEFT),
                 'title' => $c->title ?: ucfirst(str_replace('_', ' ', (string) $c->type)),
                 'occurred_at' => optional($c->occurred_at)->toIso8601String(),
             ]);
@@ -302,7 +303,7 @@ class ReturnToWorkController extends Controller
     {
         $injury->load([
             'user:id,name', 'site:id,name',
-            'relatedIncident:id,type,title,occurred_at',
+            'relatedIncident:id,reference_number,type,title,occurred_at',
             'returnToWorkPlans' => fn ($q) => $q->with(['worker:id,name', 'manager:id,name', 'modifiedDuties.user:id,name'])->orderByDesc('created_at'),
             'capacityAssessments' => fn ($q) => $q->with('user:id,name')->orderByDesc('assessment_date'),
             'attachments' => fn ($q) => $q->with('uploader:id,name')->orderByDesc('created_at'),
@@ -310,7 +311,7 @@ class ReturnToWorkController extends Controller
 
         return [
             'id' => $injury->id,
-            'reference' => $this->reference($injury->id),
+            'reference' => $this->reference($injury),
             'status' => $injury->status,
             'severity' => $injury->severity,
             'injury_type' => $injury->injury_type,
@@ -332,7 +333,7 @@ class ReturnToWorkController extends Controller
             'site' => $injury->site ? ['id' => $injury->site->id, 'name' => $injury->site->name] : null,
             'related_incident' => $injury->relatedIncident ? [
                 'id' => $injury->relatedIncident->id,
-                'label' => 'INC-'.str_pad((string) $injury->relatedIncident->id, 4, '0', STR_PAD_LEFT),
+                'label' => $injury->relatedIncident->reference_number ?? 'INC-'.str_pad((string) $injury->relatedIncident->id, 4, '0', STR_PAD_LEFT),
                 'title' => $injury->relatedIncident->title ?: ucfirst(str_replace('_', ' ', (string) $injury->relatedIncident->type)),
             ] : null,
             'rtw_plans' => $injury->returnToWorkPlans->map(fn (ReturnToWorkPlan $p) => [
@@ -537,7 +538,7 @@ class ReturnToWorkController extends Controller
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $i) {
                     $this->putCsv($out, [
-                        $this->reference($i->id),
+                        $this->reference($i),
                         $i->user?->name,
                         $i->site?->name,
                         optional($i->injury_date)->format('Y-m-d'),

@@ -1,16 +1,12 @@
-/* eslint-disable no-restricted-syntax -- The handover wizard mirrors the bespoke
- * Add-client modal surface (stepper rail + scroll-contained body + custom footer)
- * and intentionally uses styled native controls. Every colour is a semantic
- * design token, per docs/DESIGN_TOKENS.md. */
-/* New / Edit handover wizard — 4 steps modelled on the Add Client wizard, built
- * around the outgoing-shift → new-shift chain. */
+/* eslint-disable no-restricted-syntax -- Step bodies intentionally use styled
+ * native controls (selects, list-builder rows, mood/CD toggles). Every colour
+ * is a semantic design token, per docs/DESIGN_TOKENS.md. */
+/* New / Edit handover wizard — 4 steps built around the outgoing-shift →
+ * new-shift chain, on the shared WizardShell chrome (the Add Client modal
+ * contract): 248px stepper rail, "Step x of y" header, 3px progress strip and
+ * muted footer band. Flow, validation and submit payloads are unchanged. */
 import { startOfWeek } from '@/components/rostering';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -38,6 +34,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { FieldErr as FieldError, StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 
@@ -556,598 +553,488 @@ export function HandoverWizard({
         }
     };
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex h-[min(820px,92vh)] max-w-[min(96vw,1000px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1000px)] md:flex-row [&>button]:hidden">
-                <DialogTitle className="sr-only">
-                    {editing ? 'Edit handover' : 'New handover'}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                    A guided wizard to record a shift-to-shift handover.
-                </DialogDescription>
+    const footerStart =
+        stepIndex > 0 ? (
+            <Button variant="ghost" onClick={goBack}>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Back
+            </Button>
+        ) : null;
 
-                {/* Stepper rail */}
-                <aside className="hidden w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
-                    <div className="mb-4 flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                            {editing ? (
-                                <FileText className="h-4.5 w-4.5" />
-                            ) : (
-                                <ArrowLeftRight className="h-4.5 w-4.5" />
-                            )}
-                        </span>
-                        <div className="min-w-0">
-                            <div className="text-sm font-bold">
-                                {editing ? 'Edit handover' : 'New handover'}
-                            </div>
-                            <div className="truncate text-[11.5px] text-muted-foreground">
-                                {editing
-                                    ? `${clientName(editing.client)} · update`
-                                    : 'Shift → shift'}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-1">
-                        {WIZ_STEPS.map((s, i) => {
-                            const Icon = s.icon;
-                            const active = i === stepIndex;
-                            const done = i < stepIndex;
-                            return (
-                                <button
-                                    key={s.key}
-                                    type="button"
-                                    onClick={() => setStepIndex(i)}
-                                    className={cn(
-                                        'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
-                                        active
-                                            ? 'bg-primary/10'
-                                            : 'hover:bg-accent',
-                                    )}
-                                >
-                                    <span
-                                        className={cn(
-                                            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                                            active
-                                                ? 'bg-primary text-primary-foreground'
-                                                : done
-                                                  ? 'bg-status-success-bg text-status-success'
-                                                  : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        {done ? (
-                                            <Check className="h-3.5 w-3.5" />
-                                        ) : (
-                                            <Icon className="h-3.5 w-3.5" />
-                                        )}
-                                    </span>
-                                    <span className="min-w-0">
-                                        <span className="block text-[13px] font-semibold leading-tight">
-                                            {s.label}
-                                        </span>
-                                        <span className="block text-[11px] text-muted-foreground">
-                                            {s.blurb}
-                                        </span>
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="mt-3 rounded-lg border border-border bg-card p-3">
-                        <div className="flex items-center justify-between text-[11.5px] font-semibold">
-                            <span>Handover readiness</span>
-                            <span className="tabular-nums">{pct}%</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                            <div
-                                className="h-full rounded-full bg-primary transition-all"
-                                style={{ width: `${pct}%` }}
-                            />
-                        </div>
-                    </div>
-                </aside>
-
-                {/* Main panel */}
-                <div className="flex min-w-0 flex-1 flex-col">
-                    <header className="flex items-center justify-between border-b border-border px-5 py-3">
-                        <div className="text-[12.5px] text-muted-foreground">
-                            Step {stepIndex + 1} of {WIZ_STEPS.length} ·{' '}
-                            <b className="text-foreground">{cur.label}</b>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => onOpenChange(false)}
-                            aria-label="Close"
-                            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+    const footerEnd = (
+        <>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+            </Button>
+            {cur.key === 'review' ? (
+                <>
+                    {!editing || editing.status === 'draft' ? (
+                        <Button
+                            variant="secondary"
+                            onClick={() => submit(true)}
+                            disabled={submitting}
                         >
-                            <X className="h-4.5 w-4.5" />
-                        </button>
-                    </header>
-                    <div className="h-[3px] shrink-0 bg-muted">
-                        <div
-                            className="h-full bg-primary transition-all"
-                            style={{
-                                width: `${((stepIndex + 1) / WIZ_STEPS.length) * 100}%`,
-                            }}
+                            Save as draft
+                        </Button>
+                    ) : null}
+                    <Button onClick={() => submit(false)} disabled={submitting}>
+                        {submitting ? (
+                            <>
+                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                Saving…
+                            </>
+                        ) : editing ? (
+                            <>
+                                <Check className="mr-1.5 h-4 w-4" />
+                                Save changes
+                            </>
+                        ) : (
+                            <>
+                                <Send className="mr-1.5 h-4 w-4" />
+                                Submit handover
+                            </>
+                        )}
+                    </Button>
+                </>
+            ) : (
+                <Button onClick={goNext}>
+                    Continue
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+            )}
+        </>
+    );
+
+    return (
+        <WizardShell
+            open={open}
+            onClose={() => onOpenChange(false)}
+            title={editing ? 'Edit handover' : 'New handover'}
+            description="A guided wizard to record a shift-to-shift handover."
+            railIcon={editing ? FileText : ArrowLeftRight}
+            railTitle={editing ? 'Edit handover' : 'New handover'}
+            railSub={
+                editing ? `${clientName(editing.client)} · update` : 'Shift → shift'
+            }
+            steps={WIZ_STEPS}
+            stepIndex={stepIndex}
+            onStepClick={setStepIndex}
+            pct={pct}
+            pctLabel="Handover readiness"
+            maxWidth="min(96vw, 1000px)"
+            maxHeight="min(92vh, 820px)"
+            footerStart={footerStart}
+            footerEnd={footerEnd}
+        >
+            {cur.key === 'shift' ? (
+                <WizardStepPane>
+                    <div className="space-y-4">
+                        <StepHead
+                            icon={ArrowLeftRight}
+                            title="Set up the shift handover"
+                            blurb="Pick the client, the outgoing shift being handed over, then the new shift that takes over."
                         />
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto px-5 py-5">
-                        {cur.key === 'shift' ? (
-                            <div className="space-y-4">
-                                <StepHead
-                                    icon={ArrowLeftRight}
-                                    title="Set up the shift handover"
-                                    blurb="Pick the client, the outgoing shift being handed over, then the new shift that takes over."
-                                />
-                                <div className="space-y-1.5">
-                                    <label className="text-[13px] font-semibold">
-                                        Client
-                                        <span className="text-status-critical">
-                                            {' '}
-                                            *
-                                        </span>
-                                    </label>
-                                    <select
-                                        className={cn(
-                                            SELECT_CLASS,
-                                            errors.client_id && BAD_CLASS,
-                                        )}
-                                        value={f.client_id}
-                                        disabled={!!editing}
-                                        onChange={(e) =>
-                                            setF((p) => ({
-                                                ...p,
-                                                client_id: e.target.value,
-                                                outgoing_shift: '',
-                                                incoming_shift: '',
-                                            }))
-                                        }
-                                    >
-                                        <option value="">
-                                            Select a client…
-                                        </option>
-                                        {catalogue.clients.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {clientName(c)}
-                                                {siteName(c.site_id)
-                                                    ? ` · ${siteName(c.site_id)}`
-                                                    : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.client_id ? (
-                                        <FieldError>
-                                            {errors.client_id}
-                                        </FieldError>
-                                    ) : null}
-                                </div>
-
-                                {!editing ? (
-                                    <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-accent/60 px-3.5 py-3 text-[12.5px]">
-                                        <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                        <div>
-                                            Can't find the person?{' '}
-                                            <button
-                                                type="button"
-                                                onClick={onAddClient}
-                                                className="font-semibold text-primary underline underline-offset-2"
-                                            >
-                                                Add a client
-                                            </button>{' '}
-                                            — they'll be created and selected
-                                            here without leaving this handover.
-                                        </div>
-                                    </div>
-                                ) : null}
-
-                                {client ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
-                                            <Home className="h-3 w-3" />
-                                            {siteName(client.site_id) ||
-                                                'No house'}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
-                                            <MapPin className="h-3 w-3" />
-                                            Supported living
-                                        </span>
-                                    </div>
-                                ) : null}
-
-                                <SubHead n={1} text="Outgoing shift — being handed over" />
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[13px] font-semibold">
-                                            Outgoing shift
-                                            <span className="text-status-critical">
-                                                {' '}
-                                                *
-                                            </span>
-                                        </label>
-                                        <ShiftSelect
-                                            shifts={outgoingShifts}
-                                            value={f.outgoing_shift}
-                                            onChange={pickOutgoingShift}
-                                            disabled={!f.client_id || !!editing}
-                                            bad={!!errors.outgoing_shift}
-                                            placeholder={
-                                                f.client_id
-                                                    ? 'Select the shift ending…'
-                                                    : 'Choose a client first'
-                                            }
-                                        />
-                                        {errors.outgoing_shift ? (
-                                            <FieldError>
-                                                {errors.outgoing_shift}
-                                            </FieldError>
-                                        ) : null}
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[13px] font-semibold">
-                                            Outgoing support worker
-                                        </label>
-                                        <DerivedWorker
-                                            muted={!outgoingWorkerName}
-                                        >
-                                            {!f.outgoing_shift
-                                                ? 'Select the outgoing shift first'
-                                                : outgoingWorkerName
-                                                  ? `${outgoingWorkerName}${outgoingShiftOpen ? ' · you (open shift)' : ''}`
-                                                  : '—'}
-                                        </DerivedWorker>
-                                    </div>
-                                </div>
-
-                                {oSh ? (
-                                    <ShiftChain
-                                        oSh={oSh}
-                                        nSh={nSh ?? null}
-                                        leaveOpen={f.leave_open}
-                                    />
-                                ) : null}
-
-                                <SubHead n={2} text="New shift — taking over" />
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[13px] font-semibold">
-                                            New (incoming) shift
-                                        </label>
-                                        <ShiftSelect
-                                            shifts={incomingShifts}
-                                            value={f.incoming_shift}
-                                            onChange={pickIncomingShift}
-                                            disabled={
-                                                f.leave_open ||
-                                                !f.outgoing_shift
-                                            }
-                                            bad={!!errors.incoming_shift}
-                                            suggestId={suggestNextId}
-                                            placeholder={
-                                                f.leave_open
-                                                    ? 'Open — no incoming shift'
-                                                    : !f.outgoing_shift
-                                                      ? 'Pick the outgoing shift first'
-                                                      : 'Next shift (auto-suggested)'
-                                            }
-                                        />
-                                        <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium">
-                                            <input
-                                                type="checkbox"
-                                                checked={f.leave_open}
-                                                onChange={(e) => {
-                                                    const open =
-                                                        e.target.checked;
-                                                    const nextId = open
-                                                        ? ''
-                                                        : nextShiftIdAfter(
-                                                              catalogue.shifts,
-                                                              f.client_id,
-                                                              f.outgoing_shift,
-                                                          ) || '';
-                                                    setF((p) => ({
-                                                        ...p,
-                                                        leave_open: open,
-                                                        incoming_shift: nextId,
-                                                        incoming: open
-                                                            ? ''
-                                                            : incomingWorkerFor(
-                                                                  nextId,
-                                                              ),
-                                                    }));
-                                                }}
-                                                className="h-4 w-4 accent-primary"
-                                            />
-                                            Leave the new shift open (needs
-                                            cover)
-                                        </label>
-                                        {errors.incoming_shift ? (
-                                            <FieldError>
-                                                {errors.incoming_shift}
-                                            </FieldError>
-                                        ) : null}
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[13px] font-semibold">
-                                            Incoming support worker
-                                        </label>
-                                        <DerivedWorker
-                                            muted={
-                                                !incomingWorkerName ||
-                                                f.leave_open
-                                            }
-                                        >
-                                            {f.leave_open
-                                                ? 'Open — needs cover'
-                                                : !f.incoming_shift
-                                                  ? 'Pick the new shift first'
-                                                  : incomingWorkerName
-                                                    ? incomingWorkerName
-                                                    : 'Unassigned — set on the roster'}
-                                        </DerivedWorker>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {cur.key === 'narrative' ? (
-                            <div className="space-y-4">
-                                <StepHead
-                                    icon={FileText}
-                                    title="How did the shift go?"
-                                    blurb="A clear narrative the incoming worker can read in under a minute."
-                                />
-                                <div className="space-y-1.5">
-                                    <label className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
-                                        Handover narrative
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                        <span className="text-[11.5px] font-normal text-muted-foreground">
-                                            mood, sleep, meals, activities,
-                                            anything to watch
-                                        </span>
-                                    </label>
-                                    <textarea
-                                        className={cn(
-                                            'min-h-[180px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
-                                            errors.narrative && BAD_CLASS,
-                                        )}
-                                        placeholder="e.g. Settled day overall. Good appetite, joined the afternoon activity…"
-                                        value={f.narrative}
-                                        onChange={(e) =>
-                                            set('narrative', e.target.value)
-                                        }
-                                    />
-                                    <div className="flex items-center justify-between">
-                                        {errors.narrative ? (
-                                            <FieldError>
-                                                {errors.narrative}
-                                            </FieldError>
-                                        ) : (
-                                            <span className="text-[12px] text-muted-foreground">
-                                                Be specific and factual — this
-                                                is a clinical record.
-                                            </span>
-                                        )}
-                                        <span className="text-[12px] text-muted-foreground tabular-nums">
-                                            {f.narrative.length} chars
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[13px] font-semibold">
-                                        Client mood at end of shift
-                                    </label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {MOODS.map((m) => (
-                                            <button
-                                                key={m}
-                                                type="button"
-                                                onClick={() =>
-                                                    set(
-                                                        'mood',
-                                                        f.mood === m ? '' : m,
-                                                    )
-                                                }
-                                                className={cn(
-                                                    'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors',
-                                                    f.mood === m
-                                                        ? 'border-primary bg-accent text-foreground'
-                                                        : 'border-border bg-background text-muted-foreground hover:bg-accent',
-                                                )}
-                                            >
-                                                <span className="text-[15px] leading-none">
-                                                    {moodEmoji(m)}
-                                                </span>
-                                                {m}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {cur.key === 'lists' ? (
-                            <div className="space-y-4">
-                                <StepHead
-                                    icon={ListChecks}
-                                    title="What must the next shift action?"
-                                    blurb="Add discrete items — they appear as checklists for the incoming worker."
-                                />
-                                <div className="grid gap-4 lg:grid-cols-2">
-                                    <div className="space-y-2">
-                                        {medicationFocus && (
-                                            <ShiftMedSummary
-                                                snapshot={snapshot}
-                                                loading={snapLoading}
-                                                hasShift={!!f.outgoing_shift}
-                                                noShiftHint="Select the outgoing shift to load its live medication picture."
-                                                note={snapshot && snapshot.due.length > 0 ? 'Due meds were pre-filled into the list below — edit or remove as needed.' : undefined}
-                                            />
-                                        )}
-                                        {medicationFocus && (
-                                            <div className="rounded-xl border border-border bg-card p-3">
-                                                <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
-                                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical"><Pill className="h-3.5 w-3.5" /></span>
-                                                    Add from medication orders
-                                                </div>
-                                                <select
-                                                    className={SELECT_CLASS}
-                                                    value=""
-                                                    disabled={!client}
-                                                    onChange={(e) => {
-                                                        const name = e.target.value;
-                                                        if (name && !f.medications.includes(name)) set('medications', [...f.medications, name]);
-                                                    }}
-                                                >
-                                                    <option value="">{client ? 'Pulled from active medication orders…' : 'Select a client first'}</option>
-                                                    {(client?.medications ?? [])
-                                                        .filter((m) => !f.medications.includes(m.name))
-                                                        .map((m) => (
-                                                            <option key={m.id} value={m.name}>{m.name}</option>
-                                                        ))}
-                                                </select>
-                                            </div>
-                                        )}
-                                        <ListBuilder
-                                            icon={Pill}
-                                            tone="critical"
-                                            title="Medications due"
-                                            placeholder={medicationFocus ? 'Other / unscheduled medicine…' : 'e.g. Quetiapine 25mg — due 20:00'}
-                                            items={f.medications}
-                                            onChange={(v) => set('medications', v)}
-                                        />
-                                    </div>
-                                    <ListBuilder
-                                        icon={ShieldAlert}
-                                        tone="critical"
-                                        title="Incidents to note"
-                                        placeholder="e.g. 11:20 — brief escalation, resolved"
-                                        items={f.incidents}
-                                        onChange={(v) => set('incidents', v)}
-                                    />
-                                    <ListBuilder
-                                        icon={ListChecks}
-                                        tone="primary"
-                                        title="Follow-up items"
-                                        placeholder="e.g. Rebook physio for Thursday"
-                                        items={f.followups}
-                                        onChange={(v) => set('followups', v)}
-                                    />
-                                    <ListBuilder
-                                        icon={ClipboardCheck}
-                                        tone="warning"
-                                        title="Tasks pending"
-                                        placeholder="e.g. Restock bathroom consumables"
-                                        items={f.tasks}
-                                        onChange={(v) => set('tasks', v)}
-                                    />
-                                </div>
-                                {medicationFocus && (
-                                    <CdVerificationSection
-                                        result={f.cd_result}
-                                        witness={f.cd_witness}
-                                        notes={f.cd_notes}
-                                        cdDue={snapshot?.counts.cd_due ?? 0}
-                                        witnesses={catalogue.staff.filter((s) => String(s.id) !== f.outgoing)}
-                                        onResult={(v) => set('cd_result', v)}
-                                        onWitness={(v) => set('cd_witness', v)}
-                                        onNotes={(v) => set('cd_notes', v)}
-                                    />
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-semibold">
+                                Client
+                                <span className="text-status-critical">
+                                    {' '}
+                                    *
+                                </span>
+                            </label>
+                            <select
+                                className={cn(
+                                    SELECT_CLASS,
+                                    errors.client_id && BAD_CLASS,
                                 )}
-                            </div>
-                        ) : null}
-
-                        {cur.key === 'review' ? (
-                            <div className="space-y-4">
-                                <StepHead
-                                    icon={CheckCircle2}
-                                    title="Review the handover"
-                                    blurb="Confirm everything reads well, then submit to the incoming worker."
-                                />
-                                <ReviewBody
-                                    f={f}
-                                    catalogue={catalogue}
-                                    goTo={setStepIndex}
-                                />
-                            </div>
-                        ) : null}
-                    </div>
-
-                    {/* Footer */}
-                    <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
-                        <div>
-                            {stepIndex > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={goBack}
-                                    className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                    Back
-                                </button>
+                                value={f.client_id}
+                                disabled={!!editing}
+                                onChange={(e) =>
+                                    setF((p) => ({
+                                        ...p,
+                                        client_id: e.target.value,
+                                        outgoing_shift: '',
+                                        incoming_shift: '',
+                                    }))
+                                }
+                            >
+                                <option value="">
+                                    Select a client…
+                                </option>
+                                {catalogue.clients.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {clientName(c)}
+                                        {siteName(c.site_id)
+                                            ? ` · ${siteName(c.site_id)}`
+                                            : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.client_id ? (
+                                <FieldError>
+                                    {errors.client_id}
+                                </FieldError>
                             ) : null}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => onOpenChange(false)}
-                                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                            >
-                                Cancel
-                            </button>
-                            {cur.key === 'review' ? (
-                                <>
-                                    {!editing ||
-                                    editing.status === 'draft' ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => submit(true)}
-                                            disabled={submitting}
-                                            className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent disabled:opacity-60"
-                                        >
-                                            Save as draft
-                                        </button>
-                                    ) : null}
+
+                        {!editing ? (
+                            <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-accent/60 px-3.5 py-3 text-[12.5px]">
+                                <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                <div>
+                                    Can't find the person?{' '}
                                     <button
                                         type="button"
-                                        onClick={() => submit(false)}
-                                        disabled={submitting}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                        onClick={onAddClient}
+                                        className="font-semibold text-primary underline underline-offset-2"
                                     >
-                                        {submitting ? (
-                                            <>
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                Saving…
-                                            </>
-                                        ) : editing ? (
-                                            <>
-                                                <Check className="h-3.5 w-3.5" />
-                                                Save changes
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Send className="h-3.5 w-3.5" />
-                                                Submit handover
-                                            </>
-                                        )}
-                                    </button>
-                                </>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={goNext}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                        Add a client
+                                    </button>{' '}
+                                    — they'll be created and selected
+                                    here without leaving this handover.
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {client ? (
+                            <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
+                                    <Home className="h-3 w-3" />
+                                    {siteName(client.site_id) ||
+                                        'No house'}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
+                                    <MapPin className="h-3 w-3" />
+                                    Supported living
+                                </span>
+                            </div>
+                        ) : null}
+
+                        <SubHead n={1} text="Outgoing shift — being handed over" />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <label className="text-[13px] font-semibold">
+                                    Outgoing shift
+                                    <span className="text-status-critical">
+                                        {' '}
+                                        *
+                                    </span>
+                                </label>
+                                <ShiftSelect
+                                    shifts={outgoingShifts}
+                                    value={f.outgoing_shift}
+                                    onChange={pickOutgoingShift}
+                                    disabled={!f.client_id || !!editing}
+                                    bad={!!errors.outgoing_shift}
+                                    placeholder={
+                                        f.client_id
+                                            ? 'Select the shift ending…'
+                                            : 'Choose a client first'
+                                    }
+                                />
+                                {errors.outgoing_shift ? (
+                                    <FieldError>
+                                        {errors.outgoing_shift}
+                                    </FieldError>
+                                ) : null}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[13px] font-semibold">
+                                    Outgoing support worker
+                                </label>
+                                <DerivedWorker
+                                    muted={!outgoingWorkerName}
                                 >
-                                    Continue
-                                    <ChevronRight className="h-4 w-4" />
-                                </button>
-                            )}
+                                    {!f.outgoing_shift
+                                        ? 'Select the outgoing shift first'
+                                        : outgoingWorkerName
+                                          ? `${outgoingWorkerName}${outgoingShiftOpen ? ' · you (open shift)' : ''}`
+                                          : '—'}
+                                </DerivedWorker>
+                            </div>
                         </div>
-                    </footer>
-                </div>
-            </DialogContent>
-        </Dialog>
+
+                        {oSh ? (
+                            <ShiftChain
+                                oSh={oSh}
+                                nSh={nSh ?? null}
+                                leaveOpen={f.leave_open}
+                            />
+                        ) : null}
+
+                        <SubHead n={2} text="New shift — taking over" />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <label className="text-[13px] font-semibold">
+                                    New (incoming) shift
+                                </label>
+                                <ShiftSelect
+                                    shifts={incomingShifts}
+                                    value={f.incoming_shift}
+                                    onChange={pickIncomingShift}
+                                    disabled={
+                                        f.leave_open ||
+                                        !f.outgoing_shift
+                                    }
+                                    bad={!!errors.incoming_shift}
+                                    suggestId={suggestNextId}
+                                    placeholder={
+                                        f.leave_open
+                                            ? 'Open — no incoming shift'
+                                            : !f.outgoing_shift
+                                              ? 'Pick the outgoing shift first'
+                                              : 'Next shift (auto-suggested)'
+                                    }
+                                />
+                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium">
+                                    <input
+                                        type="checkbox"
+                                        checked={f.leave_open}
+                                        onChange={(e) => {
+                                            const open =
+                                                e.target.checked;
+                                            const nextId = open
+                                                ? ''
+                                                : nextShiftIdAfter(
+                                                      catalogue.shifts,
+                                                      f.client_id,
+                                                      f.outgoing_shift,
+                                                  ) || '';
+                                            setF((p) => ({
+                                                ...p,
+                                                leave_open: open,
+                                                incoming_shift: nextId,
+                                                incoming: open
+                                                    ? ''
+                                                    : incomingWorkerFor(
+                                                          nextId,
+                                                      ),
+                                            }));
+                                        }}
+                                        className="h-4 w-4 accent-primary"
+                                    />
+                                    Leave the new shift open (needs
+                                    cover)
+                                </label>
+                                {errors.incoming_shift ? (
+                                    <FieldError>
+                                        {errors.incoming_shift}
+                                    </FieldError>
+                                ) : null}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[13px] font-semibold">
+                                    Incoming support worker
+                                </label>
+                                <DerivedWorker
+                                    muted={
+                                        !incomingWorkerName ||
+                                        f.leave_open
+                                    }
+                                >
+                                    {f.leave_open
+                                        ? 'Open — needs cover'
+                                        : !f.incoming_shift
+                                          ? 'Pick the new shift first'
+                                          : incomingWorkerName
+                                            ? incomingWorkerName
+                                            : 'Unassigned — set on the roster'}
+                                </DerivedWorker>
+                            </div>
+                        </div>
+                    </div>
+                </WizardStepPane>
+            ) : null}
+
+            {cur.key === 'narrative' ? (
+                <WizardStepPane>
+                    <div className="space-y-4">
+                        <StepHead
+                            icon={FileText}
+                            title="How did the shift go?"
+                            blurb="A clear narrative the incoming worker can read in under a minute."
+                        />
+                        <div className="space-y-1.5">
+                            <label className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
+                                Handover narrative
+                                <span className="text-status-critical">
+                                    *
+                                </span>
+                                <span className="text-[11.5px] font-normal text-muted-foreground">
+                                    mood, sleep, meals, activities,
+                                    anything to watch
+                                </span>
+                            </label>
+                            <textarea
+                                className={cn(
+                                    'min-h-[180px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
+                                    errors.narrative && BAD_CLASS,
+                                )}
+                                placeholder="e.g. Settled day overall. Good appetite, joined the afternoon activity…"
+                                value={f.narrative}
+                                onChange={(e) =>
+                                    set('narrative', e.target.value)
+                                }
+                            />
+                            <div className="flex items-center justify-between">
+                                {errors.narrative ? (
+                                    <FieldError>
+                                        {errors.narrative}
+                                    </FieldError>
+                                ) : (
+                                    <span className="text-[12px] text-muted-foreground">
+                                        Be specific and factual — this
+                                        is a clinical record.
+                                    </span>
+                                )}
+                                <span className="text-[12px] text-muted-foreground tabular-nums">
+                                    {f.narrative.length} chars
+                                </span>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-semibold">
+                                Client mood at end of shift
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                                {MOODS.map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() =>
+                                            set(
+                                                'mood',
+                                                f.mood === m ? '' : m,
+                                            )
+                                        }
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors',
+                                            f.mood === m
+                                                ? 'border-primary bg-accent text-foreground'
+                                                : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                                        )}
+                                    >
+                                        <span className="text-[15px] leading-none">
+                                            {moodEmoji(m)}
+                                        </span>
+                                        {m}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </WizardStepPane>
+            ) : null}
+
+            {cur.key === 'lists' ? (
+                <WizardStepPane>
+                    <div className="space-y-4">
+                        <StepHead
+                            icon={ListChecks}
+                            title="What must the next shift action?"
+                            blurb="Add discrete items — they appear as checklists for the incoming worker."
+                        />
+                        <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="space-y-2">
+                                {medicationFocus && (
+                                    <ShiftMedSummary
+                                        snapshot={snapshot}
+                                        loading={snapLoading}
+                                        hasShift={!!f.outgoing_shift}
+                                        noShiftHint="Select the outgoing shift to load its live medication picture."
+                                        note={snapshot && snapshot.due.length > 0 ? 'Due meds were pre-filled into the list below — edit or remove as needed.' : undefined}
+                                    />
+                                )}
+                                {medicationFocus && (
+                                    <div className="rounded-xl border border-border bg-card p-3">
+                                        <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical"><Pill className="h-3.5 w-3.5" /></span>
+                                            Add from medication orders
+                                        </div>
+                                        <select
+                                            className={SELECT_CLASS}
+                                            value=""
+                                            disabled={!client}
+                                            onChange={(e) => {
+                                                const name = e.target.value;
+                                                if (name && !f.medications.includes(name)) set('medications', [...f.medications, name]);
+                                            }}
+                                        >
+                                            <option value="">{client ? 'Pulled from active medication orders…' : 'Select a client first'}</option>
+                                            {(client?.medications ?? [])
+                                                .filter((m) => !f.medications.includes(m.name))
+                                                .map((m) => (
+                                                    <option key={m.id} value={m.name}>{m.name}</option>
+                                                ))}
+                                        </select>
+                                    </div>
+                                )}
+                                <ListBuilder
+                                    icon={Pill}
+                                    tone="critical"
+                                    title="Medications due"
+                                    placeholder={medicationFocus ? 'Other / unscheduled medicine…' : 'e.g. Quetiapine 25mg — due 20:00'}
+                                    items={f.medications}
+                                    onChange={(v) => set('medications', v)}
+                                />
+                            </div>
+                            <ListBuilder
+                                icon={ShieldAlert}
+                                tone="critical"
+                                title="Incidents to note"
+                                placeholder="e.g. 11:20 — brief escalation, resolved"
+                                items={f.incidents}
+                                onChange={(v) => set('incidents', v)}
+                            />
+                            <ListBuilder
+                                icon={ListChecks}
+                                tone="primary"
+                                title="Follow-up items"
+                                placeholder="e.g. Rebook physio for Thursday"
+                                items={f.followups}
+                                onChange={(v) => set('followups', v)}
+                            />
+                            <ListBuilder
+                                icon={ClipboardCheck}
+                                tone="warning"
+                                title="Tasks pending"
+                                placeholder="e.g. Restock bathroom consumables"
+                                items={f.tasks}
+                                onChange={(v) => set('tasks', v)}
+                            />
+                        </div>
+                        {medicationFocus && (
+                            <CdVerificationSection
+                                result={f.cd_result}
+                                witness={f.cd_witness}
+                                notes={f.cd_notes}
+                                cdDue={snapshot?.counts.cd_due ?? 0}
+                                witnesses={catalogue.staff.filter((s) => String(s.id) !== f.outgoing)}
+                                onResult={(v) => set('cd_result', v)}
+                                onWitness={(v) => set('cd_witness', v)}
+                                onNotes={(v) => set('cd_notes', v)}
+                            />
+                        )}
+                    </div>
+                </WizardStepPane>
+            ) : null}
+
+            {cur.key === 'review' ? (
+                <WizardStepPane>
+                    <div className="space-y-4">
+                        <StepHead
+                            icon={CheckCircle2}
+                            title="Review the handover"
+                            blurb="Confirm everything reads well, then submit to the incoming worker."
+                        />
+                        <ReviewBody
+                            f={f}
+                            catalogue={catalogue}
+                            goTo={setStepIndex}
+                        />
+                    </div>
+                </WizardStepPane>
+            ) : null}
+        </WizardShell>
     );
 }
 

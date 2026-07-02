@@ -102,7 +102,7 @@ class SafeguardingConcernController extends Controller
         } else {
             $scope = $tabScopes[$tab] ?? $tabScopes['all'];
             $query = SafeguardingConcern::query()
-                ->with(['subject', 'assignedTo', 'site', 'latestRiskAssessment'])
+                ->with(['subject', 'assignedTo', 'site', 'latestRiskAssessment', 'relatedIncident:id,reference_number'])
                 ->withCount([
                     'externalReports',
                     'attachments',
@@ -605,6 +605,7 @@ class SafeguardingConcernController extends Controller
                 'action_overdue' => ($concern->overdue_actions_count ?? 0) > 0,
             ],
             'related_incident_id' => $concern->related_incident_id,
+            'related_incident_ref' => $concern->relatedIncident?->reference_number,
             // The active Control Room alert id is resolved (via the linked HsEvent) on the
             // detail payload only — see buildConcernDetail — to keep the list free of a
             // per-row HsEvent lookup. The row context menu jumps to it via the detail.
@@ -829,6 +830,7 @@ class SafeguardingConcernController extends Controller
             'subject', 'allegedPerpetrator', 'reportedBy', 'assignedTo', 'closedBy', 'triagedBy',
             'site', 'investigations.leadInvestigator', 'externalReports.reportedBy',
             'riskAssessments.assessor', 'actionPlans.assignedTo', 'alerts', 'attachments.uploader',
+            'relatedIncident:id,reference_number',
         ]);
 
         // Linked H&S event (read-only surface), resolved via the observer's idempotency key.
@@ -951,6 +953,7 @@ class SafeguardingConcernController extends Controller
                 ];
             })->values()->all(),
             'related_incident_id' => $concern->related_incident_id,
+            'related_incident_ref' => $concern->relatedIncident?->reference_number,
             'hs_event' => $hsEvent,
             'control_room_alert_id' => $controlRoomAlertId,
             'access_log' => $this->recentAccessLog($concern),

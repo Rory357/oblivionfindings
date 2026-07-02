@@ -12,8 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class RestraintEvent extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
+    use Concerns\HasReferenceNumber;
+
+    public const REFERENCE_PREFIX = 'RST';
 
     protected $fillable = [
+        'reference_number',
         'stay_id',
         'client_id',
         'behaviour_support_plan_id',
