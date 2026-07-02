@@ -17,6 +17,8 @@ abstract class TestCase extends BaseTestCase
 
     protected static bool $isolatedMysqlPrepared = false;
 
+    protected static bool $isolatedMysqlCleanupRegistered = false;
+
     protected static bool $mysqlClientPathConfigured = false;
 
     protected static bool $isolatedMysqlSchemaLoaded = false;
@@ -131,6 +133,14 @@ abstract class TestCase extends BaseTestCase
         $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
         $pdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $database));
 
+        // Backstop for processes killed before their shutdown handler ran:
+        // drop sibling databases whose owning PID is no longer alive.
+        $this->pruneStaleIsolatedDatabases($pdo, static::$testDatabaseBaseName, $database);
+
+        // Primary safeguard: drop this process's isolated database when the
+        // process exits, so it never leaks into the next run.
+        $this->registerIsolatedDatabaseCleanup($host, $port, $username, $password, $database);
+
         static::$isolatedMysqlSchemaLoaded = $this->loadSchemaDumpIntoTestingDatabase(
             host: $host,
             port: $port,
@@ -140,6 +150,148 @@ abstract class TestCase extends BaseTestCase
         );
 
         static::$isolatedMysqlPrepared = true;
+    }
+
+    /**
+     * Register a shutdown handler that drops this process's isolated database.
+     *
+     * The database name is per-process (suffixed with the PID / test token) and
+     * is recreated from scratch on the next run, so dropping it at exit costs
+     * nothing and stops hundreds of orphaned schemas piling up on the server.
+     */
+    protected function registerIsolatedDatabaseCleanup(
+        string $host,
+        string $port,
+        string $username,
+        string $password,
+        string $database,
+    ): void {
+        if (static::$isolatedMysqlCleanupRegistered) {
+            return;
+        }
+
+        static::$isolatedMysqlCleanupRegistered = true;
+
+        register_shutdown_function(static function () use ($host, $port, $username, $password, $database): void {
+            try {
+                $pdo = new PDO(
+                    sprintf('mysql:host=%s;port=%s', $host, $port),
+                    $username,
+                    $password,
+                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+                );
+
+                $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
+            } catch (\Throwable) {
+                // Best-effort teardown — never surface cleanup failures.
+            }
+        });
+    }
+
+    /**
+     * Drop orphaned sibling test databases left behind by crashed / killed
+     * processes. Only numeric (PID-suffixed) siblings whose owning process is
+     * no longer running are removed, so a concurrently running test process is
+     * never affected. If liveness can't be determined, nothing is pruned.
+     *
+     * Deliberately bounded (a handful of drops, capped wall-clock) so a large
+     * backlog drains gradually across successive runs instead of stalling any
+     * single bootstrap — each of these schemas is expensive to drop (hundreds
+     * of tables). The per-process shutdown handler is the primary cleanup; this
+     * is only a slow-drip backstop for processes that never got to run it.
+     */
+    protected function pruneStaleIsolatedDatabases(PDO $pdo, string $baseName, string $currentDatabase): void
+    {
+        $maxDrops = 5;
+        $deadline = microtime(true) + 10.0;
+        $dropped = 0;
+
+        try {
+            $alivePids = $this->runningProcessIds();
+
+            if ($alivePids === null) {
+                return;
+            }
+
+            $pattern = '/^'.preg_quote($baseName, '/').'_(\d+)$/';
+            $names = $pdo->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($names as $name) {
+                if ($dropped >= $maxDrops || microtime(true) >= $deadline) {
+                    break;
+                }
+
+                $name = (string) $name;
+
+                if ($name === $currentDatabase || $name === $baseName) {
+                    continue;
+                }
+
+                if (preg_match($pattern, $name, $matches) !== 1) {
+                    continue;
+                }
+
+                // Owning process still alive → leave it alone.
+                if (isset($alivePids[(int) $matches[1]])) {
+                    continue;
+                }
+
+                $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $name));
+                $dropped++;
+            }
+        } catch (\Throwable) {
+            // Pruning is a best-effort backstop; never break the test run.
+        }
+    }
+
+    /**
+     * Snapshot the set of currently running process IDs.
+     *
+     * @return array<int, true>|null  Map of alive PID => true, or null when the
+     *                                set can't be determined (caller must then
+     *                                fail safe and prune nothing).
+     */
+    protected function runningProcessIds(): ?array
+    {
+        $isWindows = PHP_OS_FAMILY === 'Windows';
+
+        try {
+            $process = $isWindows
+                ? new Process(['tasklist', '/NH', '/FO', 'CSV'])
+                : new Process(['ps', '-A', '-o', 'pid=']);
+            $process->setTimeout(30);
+            $process->run();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! $process->isSuccessful()) {
+            return null;
+        }
+
+        $pids = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $process->getOutput()) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            if ($isWindows) {
+                // CSV rows look like: "php.exe","12345","Console","1","50,000 K"
+                // Pass $escape explicitly ('') — the default is deprecated in PHP 8.4.
+                $fields = str_getcsv($line, ',', '"', '');
+                $pid = isset($fields[1]) ? (int) preg_replace('/\D+/', '', (string) $fields[1]) : 0;
+            } else {
+                $pid = (int) $line;
+            }
+
+            if ($pid > 0) {
+                $pids[$pid] = true;
+            }
+        }
+
+        return $pids === [] ? null : $pids;
     }
 
     /**
