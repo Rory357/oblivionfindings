@@ -280,7 +280,7 @@ export function InjuryWizardDialog({
             description="Capture a staff workplace injury for the register."
             railIcon={HeartPulse}
             railTitle={mode === 'edit' && injury ? 'Edit injury' : 'Record injury'}
-            railSub={mode === 'edit' && injury ? injuryReference(injury.id) : 'New workplace injury'}
+            railSub={mode === 'edit' && injury ? injuryReference(injury) : 'New workplace injury'}
             steps={STEPS}
             stepIndex={stepIndex}
             onStepClick={setStepIndex}

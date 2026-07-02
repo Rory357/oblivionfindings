@@ -160,7 +160,14 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
     // when the user clears or toggles them inside the 300ms window.
     const filtersRef = useRef(filters);
     filtersRef.current = filters;
-    const suppressDebounce = useRef(false);
+    // Last q we asked the server for (not just the last echo) — comparing
+    // against the echo alone either re-applies cleared filters or swallows
+    // the first keystroke after "Clear filters".
+    const lastSentQ = useRef(filters.q ?? '');
+
+    useEffect(() => {
+        lastSentQ.current = filters.q ?? '';
+    }, [filters.q]);
 
     const go = (next: Partial<Filters>) =>
         router.get('/tasks', buildParams({ ...filtersRef.current, ...next }), {
@@ -172,11 +179,8 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
     // Debounced search → shareable ?q= param.
     useEffect(() => {
         const t = setTimeout(() => {
-            if (suppressDebounce.current) {
-                suppressDebounce.current = false;
-                return;
-            }
-            if (search === (filtersRef.current.q ?? '')) return;
+            if (search === lastSentQ.current) return;
+            lastSentQ.current = search;
             go({ q: search || null });
         }, 300);
         return () => clearTimeout(t);
@@ -197,7 +201,18 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         filters.include_done
     );
     const clearFilters = () => {
-        suppressDebounce.current = true;
+        lastSentQ.current = '';
+        // The bare visit IS the cleared state — reflect it locally so a
+        // debounce firing before the server echo can't resurrect old filters.
+        filtersRef.current = {
+            sources: null,
+            severity: null,
+            bucket: null,
+            assigned: null,
+            overdue: false,
+            q: null,
+            include_done: false,
+        };
         setSearch('');
         router.get('/tasks', {}, { preserveState: true, preserveScroll: true, replace: true });
     };

@@ -62,8 +62,13 @@ return new class extends Migration
                 Schema::table($tableName, function (Blueprint $table) use ($tableName) {
                     $table->unique('reference_number', $tableName.'_reference_number_unique');
                 });
-            } catch (\Illuminate\Database\QueryException) {
-                // Unique index already exists from a previous partial run.
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Ignore ONLY "duplicate key name" (1061 — index already
+                // exists from a previous partial run); anything else must
+                // fail loudly rather than silently dropping the guard rail.
+                if ((int) ($e->errorInfo[1] ?? 0) !== 1061) {
+                    throw $e;
+                }
             }
 
             $this->backfill($tableName, $prefix);
@@ -80,16 +85,24 @@ return new class extends Migration
     public function down(): void
     {
         foreach (array_keys(self::NEW_REF_TABLES) as $tableName) {
-            if (Schema::hasTable($tableName) && Schema::hasColumn($tableName, 'reference_number')) {
-                Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                    try {
-                        $table->dropUnique($tableName.'_reference_number_unique');
-                    } catch (\Illuminate\Database\QueryException) {
-                        // Index missing (half-applied up()) — still drop the column.
-                    }
-                    $table->dropColumn('reference_number');
-                });
+            if (! Schema::hasTable($tableName) || ! Schema::hasColumn($tableName, 'reference_number')) {
+                continue;
             }
+
+            // Blueprint only QUEUES commands — the exception surfaces when
+            // Schema::table() executes them — so the index drop needs its
+            // own Schema::table call for the catch to actually work.
+            try {
+                Schema::table($tableName, function (Blueprint $table) use ($tableName) {
+                    $table->dropUnique($tableName.'_reference_number_unique');
+                });
+            } catch (\Illuminate\Database\QueryException) {
+                // Index missing (half-applied up()) — still drop the column.
+            }
+
+            Schema::table($tableName, function (Blueprint $table) {
+                $table->dropColumn('reference_number');
+            });
         }
     }
 
