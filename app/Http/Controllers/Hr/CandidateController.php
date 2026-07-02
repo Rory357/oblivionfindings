@@ -91,7 +91,9 @@ class CandidateController extends Controller
             'source_detail'  => ['nullable', 'string', 'max:255'],
             'notes'          => ['nullable', 'string', 'max:5000'],
             'tags'           => ['nullable', 'array'],
-            'tags.*'         => ['string', 'max:100'],
+            // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
+            // here and normalise below rather than failing the whole request.
+            'tags.*'         => ['nullable', 'string', 'max:100'],
 
             // Optional initial application fields
             'position_title'  => ['nullable', 'string', 'max:255'],
@@ -100,6 +102,8 @@ class CandidateController extends Controller
             'cover_letter'    => ['nullable', 'string', 'max:10000'],
             'cv'              => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
+
+        $validated['tags'] = $this->normaliseTags($validated['tags'] ?? null);
 
         $candidateData = Arr::only($validated, [
             'first_name',
@@ -426,8 +430,14 @@ class CandidateController extends Controller
             'source_detail'  => ['nullable', 'string', 'max:255'],
             'notes'          => ['nullable', 'string', 'max:5000'],
             'tags'           => ['nullable', 'array'],
-            'tags.*'         => ['string', 'max:100'],
+            // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
+            // here and normalise below rather than failing the whole request.
+            'tags.*'         => ['nullable', 'string', 'max:100'],
         ]);
+
+        if (array_key_exists('tags', $validated)) {
+            $validated['tags'] = $this->normaliseTags($validated['tags']);
+        }
 
         $validated['updated_by'] = $user->id;
         $candidate->update($validated);
@@ -450,16 +460,28 @@ class CandidateController extends Controller
             'tags.*' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $tags = collect($validated['tags'] ?? [])
+        $tags = $this->normaliseTags($validated['tags'] ?? null);
+
+        $candidate->update(['tags' => $tags, 'updated_by' => $user->id]);
+
+        return redirect()->back()->with('success', 'Tags updated.');
+    }
+
+    /**
+     * Trim, drop blanks (incl. null entries from ConvertEmptyStringsToNull), and
+     * dedupe a posted tag list into a clean, reindexed array.
+     *
+     * @param  array<int, string|null>|null  $tags
+     * @return array<int, string>
+     */
+    private function normaliseTags(?array $tags): array
+    {
+        return collect($tags ?? [])
             ->map(fn ($tag) => trim((string) $tag))
             ->filter()
             ->unique()
             ->values()
             ->all();
-
-        $candidate->update(['tags' => $tags, 'updated_by' => $user->id]);
-
-        return redirect()->back()->with('success', 'Tags updated.');
     }
 
     /** Rename (and thereby merge) a tag across every candidate that carries it. */
@@ -818,10 +840,14 @@ class CandidateController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
             'requisition_id' => ['nullable', 'integer', $requisitionRule],
             'tags' => ['nullable', 'array'],
-            'tags.*' => ['string', 'max:100'],
+            // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
+            // here and normalise below rather than failing the whole request.
+            'tags.*' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $validated['requisition_id'] ?? null, $validated['tags'] ?? null);
+        $tags = $this->normaliseTags($validated['tags'] ?? null);
+
+        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $validated['requisition_id'] ?? null, $tags ?: null);
 
         return redirect()->back()->with('success', "{$candidate->full_name} added to the talent pool.");
     }
