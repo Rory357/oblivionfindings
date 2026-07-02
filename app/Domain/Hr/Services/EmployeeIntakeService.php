@@ -6,6 +6,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
@@ -163,18 +165,149 @@ class EmployeeIntakeService
     }
 
     /**
-     * Generate the onboarding checklist once. Idempotent (skips if one exists)
-     * and fully best-effort: a missing template, mail outage, or any other
-     * failure is logged and swallowed so onboarding config can never block a
-     * hire.
+     * Re-hire a former employee onto their existing profile — the ONE door for
+     * bringing a leaver back (the row-menu "Reactivate" stays the light undo;
+     * this is the full welcome-back workflow).
+     *
+     * Archives the outgoing stint into `employment_history`, reactivates the
+     * profile onto the new engagement, restores the login (approved_at + RBAC
+     * role pivot), and re-runs the intake side-effects: an optional invite
+     * (same password-reset link as intake) and a FRESH onboarding checklist
+     * for the new stint.
+     *
+     * @param  array<string, mixed>  $attributes  new-engagement fields; `start_date` is required
      */
-    public function maybeGenerateOnboarding(HrEmployeeProfile $profile, int $actorId): void
+    public function rehire(
+        HrEmployeeProfile $profile,
+        array $attributes,
+        int $actorId,
+        bool $sendInvite = true,
+        bool $startOnboarding = true,
+    ): HrEmployeeProfile {
+        if ($profile->is_active) {
+            throw new \InvalidArgumentException('Only an inactive (former) employee profile can be re-hired.');
+        }
+        if (empty($attributes['start_date'])) {
+            throw new \InvalidArgumentException('A new start date is required to re-hire.');
+        }
+
+        $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
+
+        $profile = DB::transaction(function () use ($profile, $attributes, $actorId, $newStart) {
+            // 1. Archive the outgoing stint (append-only history).
+            $history = $profile->employment_history ?? [];
+            $history[] = [
+                'start_date' => $profile->start_date?->toDateString(),
+                'end_date' => $profile->end_date?->toDateString(),
+                'position_title' => $profile->position_title,
+                'position_role' => $profile->position_role,
+                'employment_type' => $profile->employment_type,
+                'archived_at' => now()->toIso8601String(),
+            ];
+
+            // 2. Reactivate onto the new engagement.
+            $profile->fill(Arr::only($attributes, [
+                'position_title',
+                'position_role',
+                'position_id',
+                'employment_type',
+                'contract_type',
+                'primary_site_id',
+                'hours_per_week',
+                'department',
+                'department_id',
+                'manager_user_id',
+                'probation_end_date',
+            ]));
+            $profile->forceFill([
+                'employment_history' => $history,
+                'is_active' => true,
+                'start_date' => $newStart->toDateString(),
+                'end_date' => null,
+                'termination_reason' => null,
+                'updated_by' => $actorId,
+            ])->save();
+
+            // 3. Restore login + RBAC role pivot (offboarding revokes approval).
+            $user = $profile->user;
+            if ($user) {
+                if (! $user->approved_at) {
+                    $user->forceFill([
+                        'approved_at' => now(),
+                        'approved_by' => $actorId,
+                    ])->save();
+                }
+
+                $roleName = $attributes['position_role'] ?? $profile->position_role ?? $user->role;
+                if ($roleName) {
+                    if (! $user->role) {
+                        $user->forceFill(['role' => $roleName])->save();
+                    }
+                    $role = Role::query()->where('name', $roleName)->first();
+                    if ($role) {
+                        $user->roles()->syncWithoutDetaching([$role->id]);
+                    }
+                }
+            }
+
+            return $profile;
+        });
+
+        // --- Best-effort side-effects (post-commit; never block the re-hire) ---
+
+        if ($startOnboarding) {
+            $this->maybeGenerateOnboarding($profile, $actorId, $newStart);
+        }
+
+        if ($sendInvite && $profile->user) {
+            try {
+                Password::broker()->sendResetLink(['email' => $profile->user->email]);
+            } catch (\Throwable $e) {
+                Log::warning('Re-hire invite failed.', [
+                    'email' => $profile->user->email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        try {
+            $this->webhooks->publish((int) $profile->tenant_id, 'employee.rehired', [
+                'employee_profile_id' => $profile->id,
+                'user_id' => $profile->user_id,
+                'start_date' => $newStart->toDateString(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('employee.rehired webhook publish failed.', [
+                'employee_profile_id' => $profile->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $profile;
+    }
+
+    /**
+     * Generate the onboarding checklist once. Idempotent and fully best-effort:
+     * a missing template, mail outage, or any other failure is logged and
+     * swallowed so onboarding config can never block a hire.
+     *
+     * First hire ($stintStart null): skips if ANY checklist ever existed.
+     * Re-hire ($stintStart given): a fresh checklist is generated for the new
+     * stint — skipped only when one already belongs to this stint (started on
+     * or after the new start date) or an open one (pending / in progress) is
+     * still live.
+     */
+    public function maybeGenerateOnboarding(HrEmployeeProfile $profile, int $actorId, ?Carbon $stintStart = null): void
     {
         try {
-            $alreadyHasChecklist = HrOnboardingChecklist::query()
+            $blocking = HrOnboardingChecklist::query()
                 ->where('employee_profile_id', $profile->id)
+                ->when($stintStart !== null, fn ($query) => $query->where(function ($inner) use ($stintStart) {
+                    $inner->where('started_at', '>=', $stintStart->copy()->startOfDay())
+                        ->orWhereIn('status', ['pending', 'in_progress']);
+                }))
                 ->exists();
-            if ($alreadyHasChecklist) {
+            if ($blocking) {
                 return;
             }
 

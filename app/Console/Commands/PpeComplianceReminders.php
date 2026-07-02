@@ -54,7 +54,15 @@ class PpeComplianceReminders extends Command
 
         $workersNotified = 0;
         if ($perWorker !== []) {
-            foreach (User::query()->whereIn('id', array_keys($perWorker))->get() as $worker) {
+            // Skip leavers: login revoked (approved_at null) or an inactive
+            // employee profile means no nudge — their allocations are handled
+            // by offboarding asset recovery, not reminders.
+            $recipients = User::query()
+                ->whereIn('id', array_keys($perWorker))
+                ->whereNotNull('approved_at')
+                ->whereDoesntHave('hrEmployeeProfile', fn ($p) => $p->where('is_active', false))
+                ->get();
+            foreach ($recipients as $worker) {
                 $worker->notify(new PpeComplianceDueNotification('worker', $perWorker[$worker->id]));
                 $workersNotified++;
             }
@@ -72,6 +80,8 @@ class PpeComplianceReminders extends Command
             $counts = ['inspections_overdue' => $inspectionsOverdue, 'expiring' => $expiring, 'condemned' => $condemned];
             $managers = User::query()
                 ->whereHas('roles', fn ($q) => $q->whereHas('permissions', fn ($p) => $p->where('key', 'hazards.manage')))
+                ->whereNotNull('approved_at')
+                ->whereDoesntHave('hrEmployeeProfile', fn ($p) => $p->where('is_active', false))
                 ->get();
             foreach ($managers as $manager) {
                 $manager->notify(new PpeComplianceDueNotification('manager', $counts));

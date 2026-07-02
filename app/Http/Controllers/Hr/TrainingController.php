@@ -678,7 +678,15 @@ class TrainingController extends Controller
 
     private function wizardLookups(int $tenantId, array $staffUserIds): array
     {
+        // Enrolment picker — former staff (inactive employee profile) are
+        // excluded; users without a profile (e.g. admins) remain eligible.
+        $excludeLeavers = fn ($q) => $q->whereDoesntHave(
+            'hrEmployeeProfile',
+            fn ($p) => $p->where('is_active', false),
+        );
+
         $staff = User::whereIn('id', $staffUserIds ?: [0])
+            ->tap($excludeLeavers)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
@@ -686,7 +694,9 @@ class TrainingController extends Controller
 
         if ($staff->isEmpty()) {
             // Users are tenanted by organization_id (no users.tenant_id column).
-            $staff = User::where('organization_id', $tenantId)->orderBy('name')->get(['id', 'name'])
+            $staff = User::where('organization_id', $tenantId)
+                ->tap($excludeLeavers)
+                ->orderBy('name')->get(['id', 'name'])
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values();
         }
 

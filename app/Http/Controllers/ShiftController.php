@@ -177,6 +177,9 @@ class ShiftController extends Controller
             $auth,
             $this->shiftStaffBypassPermissions(),
         )
+            // Assignment picker only (historical shifts render from $rows above):
+            // former staff — inactive employee profile — can't be given new shifts.
+            ->whereDoesntHave('hrEmployeeProfile', fn ($p) => $p->where('is_active', false))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 

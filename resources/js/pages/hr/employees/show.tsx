@@ -1,4 +1,9 @@
 import { PhotoUploadButton } from '@/components/hr';
+import {
+    RehireWizard,
+    type EmploymentStint,
+    type RehireTarget,
+} from '@/components/hr/rehire-wizard';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +19,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    Archive,
     Award,
     BookOpen,
     Briefcase,
@@ -41,6 +47,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -65,6 +72,7 @@ interface Profile {
     id: number;
     employee_number: string | null;
     position_title: string;
+    position_role: string | null;
     employment_type: string;
     contract_type: string | null;
     department: string | null;
@@ -74,6 +82,7 @@ interface Profile {
     end_date: string | null;
     probation_end_date: string | null;
     hours_per_week: number | null;
+    employment_history: EmploymentStint[];
     pay_rate: number | null;
     pay_frequency: string | null;
     bio: string | null;
@@ -305,6 +314,7 @@ interface Props {
     assetAssignments: AssetAssignment[];
     policyAttestations: PolicyAttestation[];
     safeWorkProcedures?: ApplicableProcedure[];
+    rehireSites?: Array<{ id: number; name: string }>;
     can: { manage: boolean; viewSensitive: boolean };
 }
 
@@ -572,8 +582,22 @@ export default function EmployeeShow({
     assetAssignments = [],
     policyAttestations = [],
     safeWorkProcedures = [],
+    rehireSites = [],
     can,
 }: Props) {
+    const [rehireOpen, setRehireOpen] = useState(false);
+    const rehireTarget: RehireTarget = {
+        profileId: p.id,
+        name: p.user.name,
+        startDate: p.start_date,
+        endDate: p.end_date,
+        positionTitle: p.position_title,
+        positionRole: p.position_role,
+        employmentType: p.employment_type,
+        hoursPerWeek: p.hours_per_week,
+        primarySiteId: p.primary_site?.id ?? null,
+        employmentHistory: p.employment_history ?? [],
+    };
     const breadcrumbs = [
         ...baseBreadcrumbs,
         { title: p.user.name, href: `/hr/people/${p.id}` },
@@ -694,6 +718,55 @@ export default function EmployeeShow({
                         />
                     );
                 })()}
+
+                {/* ============================================================ */}
+                {/*  FORMER-EMPLOYEE BANNER                                       */}
+                {/* ============================================================ */}
+                {!p.is_active ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3.5">
+                        <div className="flex min-w-0 items-start gap-3">
+                            <span className="mt-0.5 shrink-0 rounded-lg bg-status-warning/15 p-1.5 text-status-warning">
+                                <Archive className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-foreground">
+                                    Former employee
+                                    {p.end_date
+                                        ? ` — left ${formatDate(p.end_date)}`
+                                        : ''}
+                                    . Records are retained for compliance (NZ
+                                    employment records: 7 years).
+                                </p>
+                                {p.employment_history &&
+                                p.employment_history.length > 0 ? (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        Previous{' '}
+                                        {p.employment_history.length === 1
+                                            ? 'stint'
+                                            : 'stints'}
+                                        :{' '}
+                                        {p.employment_history
+                                            .map(
+                                                (s) =>
+                                                    `${s.position_title || 'Employee'} (${formatDate(s.start_date)} – ${formatDate(s.end_date)})`,
+                                            )
+                                            .join(' · ')}
+                                    </p>
+                                ) : null}
+                            </div>
+                        </div>
+                        {can.manage ? (
+                            <Button
+                                size="sm"
+                                onClick={() => setRehireOpen(true)}
+                                className="gap-1.5"
+                            >
+                                <UserCheck className="h-3.5 w-3.5" />
+                                Re-hire
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 {/* ============================================================ */}
                 {/*  TABS                                                         */}
@@ -3023,6 +3096,14 @@ export default function EmployeeShow({
                     </TabsContent>
                 </Tabs>
             </div>
+
+            {can.manage && !p.is_active && rehireOpen ? (
+                <RehireWizard
+                    target={rehireTarget}
+                    sites={rehireSites}
+                    onClose={() => setRehireOpen(false)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

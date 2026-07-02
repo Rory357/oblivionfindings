@@ -35,7 +35,7 @@ class SendOnboardingRemindersCommand extends Command
                 ->whereDate('due_date', '<', $today->toDateString())
                 ->orWhereDate('due_date', '=', $dueSoon))
             ->whereHas('checklist', fn ($q) => $q->whereIn('status', ['pending', 'in_progress']))
-            ->with('assignedTo')
+            ->with('assignedTo.hrEmployeeProfile:id,user_id,is_active')
             ->get();
 
         $sent = 0;
@@ -43,6 +43,12 @@ class SendOnboardingRemindersCommand extends Command
         foreach ($tasks as $task) {
             $assignee = $task->assignedTo;
             if (! $assignee instanceof User) {
+                continue;
+            }
+
+            // Skip leavers — a revoked login (approved_at null) or an inactive
+            // employee profile means the assignee can't action the nudge.
+            if ($assignee->approved_at === null || $assignee->hrEmployeeProfile?->is_active === false) {
                 continue;
             }
 

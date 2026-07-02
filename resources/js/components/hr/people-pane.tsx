@@ -69,6 +69,18 @@ export interface PeopleRow {
     department: string | null;
     is_active: boolean;
     start_date: string | null;
+    // Re-hire wizard prefill — only sent for former employees.
+    end_date?: string | null;
+    position_role?: string | null;
+    hours_per_week?: number | null;
+    employment_history?: Array<{
+        start_date: string | null;
+        end_date: string | null;
+        position_title: string | null;
+        position_role: string | null;
+        employment_type: string | null;
+        archived_at?: string | null;
+    }> | null;
     preferred_name?: string | null;
     profile_photo_path?: string | null;
     user: { id: number; name: string; email: string };
@@ -188,6 +200,7 @@ export function PeoplePane({
     managers = [],
     canManage,
     onAdd,
+    onRehire,
 }: {
     profiles: PaginatedPeople;
     filters: PeopleFilters;
@@ -196,6 +209,7 @@ export function PeoplePane({
     managers?: Array<{ value: string; label: string }>;
     canManage: boolean;
     onAdd?: () => void;
+    onRehire?: (row: PeopleRow) => void;
 }) {
     const [search, setSearch] = useState(filters.q ?? '');
     const [cols, setCols] = useState<Record<ColKey, boolean>>(DEFAULT_COLS);
@@ -377,10 +391,19 @@ export function PeoplePane({
                         onClick: () => setActive(row, false),
                     });
                 } else {
+                    if (onRehire) {
+                        items.push({
+                            icon: <UserPlus className="h-4 w-4" />,
+                            label: 'Re-hire…',
+                            tone: 'primary',
+                            onClick: () => onRehire(row),
+                        });
+                    }
+                    // Light undo for an accidental deactivation — the full
+                    // welcome-back workflow is the Re-hire wizard above.
                     items.push({
                         icon: <UserCheck className="h-4 w-4" />,
                         label: 'Reactivate',
-                        tone: 'primary',
                         onClick: () => setActive(row, true),
                     });
                 }

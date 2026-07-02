@@ -147,6 +147,16 @@ class EmployeeProfileController extends Controller
                     'department' => $profile?->department,
                     'is_active' => $profile ? (bool) $profile->is_active : true,
                     'start_date' => $profile?->start_date?->toDateString(),
+                    // Re-hire wizard prefill — only meaningful (and only sent)
+                    // for former employees.
+                    'end_date' => $profile && ! $profile->is_active ? $profile->end_date?->toDateString() : null,
+                    'position_role' => $profile && ! $profile->is_active ? $profile->position_role : null,
+                    'hours_per_week' => $profile && ! $profile->is_active && $profile->hours_per_week !== null
+                        ? (float) $profile->hours_per_week
+                        : null,
+                    'employment_history' => $profile && ! $profile->is_active
+                        ? ($profile->employment_history ?? [])
+                        : null,
                     // Directory-tab card fields (single source — the standalone directory is folded in).
                     'preferred_name' => $profile?->preferred_name,
                     'profile_photo_path' => $profile?->profile_photo_path,
@@ -547,6 +557,51 @@ class EmployeeProfileController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
+    /*  rehire — full welcome-back workflow for a former employee           */
+    /* ------------------------------------------------------------------ */
+
+    public function rehire(Request $request, HrEmployeeProfile $profile, EmployeeIntakeService $intake)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
+
+        if ($profile->is_active) {
+            return back()->with('error', "{$profile->user?->name} is already active — nothing to re-hire.");
+        }
+
+        $data = $request->validate([
+            'start_date' => ['required', 'date'],
+            'position_title' => ['nullable', 'string', 'max:255'],
+            'position_role' => ['nullable', 'string', 'max:255'],
+            'employment_type' => ['nullable', 'string', 'in:full_time,part_time,casual,fixed_term,contractor,permanent'],
+            'primary_site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'hours_per_week' => ['nullable', 'numeric', 'min:0', 'max:168'],
+            'send_invite' => ['nullable', 'boolean'],
+            'start_onboarding' => ['nullable', 'boolean'],
+        ]);
+
+        $attributes = collect($data)
+            ->only(['start_date', 'position_title', 'position_role', 'employment_type', 'primary_site_id', 'hours_per_week'])
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->all();
+
+        try {
+            $profile = $intake->rehire(
+                $profile,
+                $attributes,
+                $user->id,
+                sendInvite: $request->boolean('send_invite', true),
+                startOnboarding: $request->boolean('start_onboarding', true),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "{$profile->user?->name} has been re-hired — welcome back!");
+    }
+
+    /* ------------------------------------------------------------------ */
     /*  bulkAction — multi-select bulk operations from the People table     */
     /* ------------------------------------------------------------------ */
 
@@ -834,6 +889,7 @@ class EmployeeProfileController extends Controller
                 'id' => $profile->id,
                 'employee_number' => $profile->employee_number,
                 'position_title' => $profile->position_title,
+                'position_role' => $profile->position_role,
                 'employment_type' => $profile->employment_type,
                 'contract_type' => $profile->contract_type,
                 'department' => $profile->departmentRelation?->name ?? $profile->department,
@@ -843,6 +899,7 @@ class EmployeeProfileController extends Controller
                 'end_date' => $profile->end_date?->toDateString(),
                 'probation_end_date' => $profile->probation_end_date?->toDateString(),
                 'hours_per_week' => $profile->hours_per_week,
+                'employment_history' => $profile->employment_history ?? [],
                 'pay_rate' => $user->canDo('hr.employees.viewFinancial') ? $profile->hourly_rate : null,
                 'pay_frequency' => $user->canDo('hr.employees.viewFinancial') ? $profile->pay_frequency : null,
                 'bio' => $profile->bio,
@@ -890,6 +947,11 @@ class EmployeeProfileController extends Controller
             'assetAssignments' => $assetAssignments,
             'policyAttestations' => $policyAttestations,
             'safeWorkProcedures' => $this->employeeProcedures($user, $profile),
+            // Re-hire wizard site options — only needed when the viewer can
+            // manage AND the profile is a former employee.
+            'rehireSites' => $user->canDo('hr.employees.manage') && ! $profile->is_active
+                ? Site::orderBy('name')->get(['id', 'name'])
+                : [],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
                 'viewSensitive' => $user->canDo('hr.employees.viewRestricted'),

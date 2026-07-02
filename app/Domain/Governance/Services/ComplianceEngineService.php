@@ -177,11 +177,41 @@ class ComplianceEngineService
         foreach ($reminders as $reminder) {
             $obligation = $reminder->obligation;
 
-            // Send notification to owner
-            SendComplianceReminder::dispatch($reminder);
+            // Reminders resolve to specific users (owner / backup owner /
+            // final escalation recipient). Drop leavers — revoked login
+            // (approved_at null) or an inactive employee profile — so a
+            // departed owner never receives (or crashes) the send.
+            $recipientIds = array_values(array_filter(array_map(
+                'intval',
+                (array) ($reminder->notified_users ?? []),
+            )));
+            $eligibleIds = $recipientIds === [] ? [] : User::query()
+                ->whereIn('id', $recipientIds)
+                ->whereNotNull('approved_at')
+                ->whereDoesntHave('hrEmployeeProfile', fn ($q) => $q->where('is_active', false))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
 
-            $reminder->markSent();
-            $count++;
+            if ($eligibleIds === []) {
+                // Nobody left to notify — mark handled (no send, no crash) but
+                // still fall through to escalation so the backup / final
+                // recipient picks the obligation up.
+                $reminder->markSent();
+            } else {
+                if ($eligibleIds !== $recipientIds) {
+                    $reminder->update(['notified_users' => $eligibleIds]);
+                }
+
+                try {
+                    // Send notification to owner
+                    SendComplianceReminder::dispatch($reminder);
+                    $reminder->markSent();
+                    $count++;
+                } catch (\Throwable $e) {
+                    $reminder->markFailed($e->getMessage());
+                }
+            }
 
             // Escalate if overdue
             $maxLevel = GovernanceSetting::getInt('compliance.escalation.max_level', 3);

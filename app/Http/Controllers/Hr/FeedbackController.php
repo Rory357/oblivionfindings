@@ -79,7 +79,13 @@ class FeedbackController extends Controller
         $wizard = null;
         if ($canManage) {
             $wizard = [
-                'employees' => User::select('id', 'name')->orderBy('name')->get(),
+                // Exclude former staff (inactive employee profile) from the
+                // reviewer/employee pickers. Users without a profile at all
+                // (e.g. admins) remain selectable.
+                'employees' => User::select('id', 'name')
+                    ->whereDoesntHave('hrEmployeeProfile', fn ($p) => $p->where('is_active', false))
+                    ->orderBy('name')
+                    ->get(),
                 'reviewTypes' => FeedbackService::REVIEW_TYPES,
                 'templates' => HrFeedbackTemplate::forTenant($tenantId)
                     ->active()

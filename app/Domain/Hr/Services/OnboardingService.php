@@ -1072,14 +1072,20 @@ class OnboardingService
             return $profile->user_id;
         }
 
-        if ($assignedToRole === 'manager') {
-            return (clone $users)
-                ->where('role', 'team_lead')
-                ->value('id');
-        }
+        $roleName = $assignedToRole === 'manager' ? 'team_lead' : $assignedToRole;
 
-        return (clone $users)
-            ->where('role', $assignedToRole)
+        // Prefer an assignee who can actually action the task: login approved
+        // and not a former employee (inactive profile). Fall back to the plain
+        // role lookup so a template never silently loses its assignee when no
+        // "clean" candidate exists.
+        $eligibleId = (clone $users)
+            ->where('role', $roleName)
+            ->whereNotNull('approved_at')
+            ->whereDoesntHave('hrEmployeeProfile', fn ($q) => $q->where('is_active', false))
+            ->value('id');
+
+        return $eligibleId ?? (clone $users)
+            ->where('role', $roleName)
             ->value('id');
     }
 

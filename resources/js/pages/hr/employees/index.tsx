@@ -15,6 +15,7 @@ import {
     type PaginatedPeople,
     type PeopleFilters,
     PeoplePane,
+    type PeopleRow,
     type PaginatedDepartments,
     type PaginatedPositions,
     type PositionFilters,
@@ -26,6 +27,7 @@ import {
     type TriageRail,
     useHrTab,
 } from '@/components/hr';
+import { RehireWizard, type RehireTarget } from '@/components/hr/rehire-wizard';
 import { PageLayout } from '@/components/page';
 import {
     ShiftContextMenu,
@@ -120,6 +122,7 @@ export default function EmployeesIndex({
     );
     const [deptDialogOpen, setDeptDialogOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
+    const [rehireTarget, setRehireTarget] = useState<RehireTarget | null>(null);
     const [pins, setPins] = useState<string[]>([]);
     // '' = no explicit default chosen yet (so the star only shows once a user
     // sets one); the page still opens to People via useHrTab's default.
@@ -385,6 +388,26 @@ export default function EmployeesIndex({
                         managers={formData?.managers ?? []}
                         canManage={can.manage}
                         onAdd={formData ? () => setAddOpen(true) : undefined}
+                        onRehire={
+                            can.manage
+                                ? (row: PeopleRow) => {
+                                      if (!row.profile_id) return;
+                                      setRehireTarget({
+                                          profileId: row.profile_id,
+                                          name: row.user.name,
+                                          startDate: row.start_date,
+                                          endDate: row.end_date ?? null,
+                                          positionTitle: row.position_title,
+                                          positionRole: row.position_role ?? null,
+                                          employmentType: row.employment_type,
+                                          hoursPerWeek: row.hours_per_week ?? null,
+                                          primarySiteId: row.primary_site?.id ?? null,
+                                          employmentHistory:
+                                              row.employment_history ?? [],
+                                      });
+                                  }
+                                : undefined
+                        }
                     />
                 )}
 
@@ -472,6 +495,16 @@ export default function EmployeesIndex({
                     managers={departmentManagers}
                     parentOptions={departmentParents}
                     siteOptions={sites}
+                />
+            ) : null}
+
+            {can.manage && rehireTarget ? (
+                // key remounts per target so useForm re-initialises from the row.
+                <RehireWizard
+                    key={rehireTarget.profileId}
+                    target={rehireTarget}
+                    sites={sites}
+                    onClose={() => setRehireTarget(null)}
                 />
             ) : null}
 
