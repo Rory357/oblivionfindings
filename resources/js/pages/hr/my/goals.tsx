@@ -45,6 +45,26 @@ interface Goal {
     manager: { id: number; name: string } | null;
 }
 
+interface ObjectiveKeyResult {
+    id: number;
+    title: string;
+    current_value: number | null;
+    target_value: number | null;
+    unit: string | null;
+}
+
+interface Objective {
+    id: number;
+    title: string;
+    status: string;
+    confidence: 'on_track' | 'at_risk' | 'off_track';
+    progress_percentage: number;
+    due_date: string | null;
+    last_checkin_at: string | null;
+    cycle: string | null;
+    key_results: ObjectiveKeyResult[];
+}
+
 interface Props {
     myHr: MyHrShellData;
     goals: {
@@ -53,6 +73,7 @@ interface Props {
         current_page: number;
         last_page: number;
     };
+    objectives: Objective[];
 }
 
 const statusConfig: Record<string, { className: string; label: string }> = {
@@ -89,6 +110,232 @@ const categoryConfig: Record<string, string> = {
     compliance: 'bg-status-critical-bg text-status-critical',
     capability: 'bg-status-info-bg text-status-info',
 };
+
+const confidenceConfig: Record<string, { className: string; label: string }> = {
+    on_track: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success-bg',
+        label: 'On track',
+    },
+    at_risk: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
+        label: 'At risk',
+    },
+    off_track: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
+        label: 'Off track',
+    },
+};
+
+function ObjectiveCard({ objective }: { objective: Objective }) {
+    const [checkingIn, setCheckingIn] = useState(false);
+    const hasKeyResults = objective.key_results.length > 0;
+    const form = useForm<{
+        confidence: string;
+        comment: string;
+        manual_progress: number;
+        key_results: Array<{ id: number; current_value: number }>;
+    }>({
+        confidence: objective.confidence,
+        comment: '',
+        manual_progress: objective.progress_percentage,
+        key_results: objective.key_results.map((kr) => ({
+            id: kr.id,
+            current_value: kr.current_value ?? 0,
+        })),
+    });
+
+    const cc = confidenceConfig[objective.confidence] ?? confidenceConfig.on_track;
+
+    const submitCheckin = () => {
+        form.transform((data) => ({
+            confidence: data.confidence,
+            comment: data.comment || null,
+            ...(hasKeyResults
+                ? { key_results: data.key_results }
+                : { manual_progress: data.manual_progress }),
+        }));
+        form.post(`/hr/my/goals/${objective.id}/checkin`, {
+            preserveScroll: true,
+            onSuccess: () => setCheckingIn(false),
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <CardTitle className="truncate text-base">
+                            {objective.title}
+                        </CardTitle>
+                        <Badge variant="outline" className={cc.className}>
+                            {cc.label}
+                        </Badge>
+                        {objective.cycle && (
+                            <Badge
+                                variant="outline"
+                                className="bg-muted text-foreground"
+                            >
+                                {objective.cycle}
+                            </Badge>
+                        )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                            {objective.progress_percentage}%
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCheckingIn((v) => !v)}
+                        >
+                            Check in
+                        </Button>
+                    </div>
+                </div>
+                <div className="mt-2">
+                    <Progress
+                        value={objective.progress_percentage}
+                        className="h-2"
+                    />
+                </div>
+                <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
+                    {objective.due_date && (
+                        <span>Due: {objective.due_date}</span>
+                    )}
+                    {objective.last_checkin_at && (
+                        <span>Last check-in: {objective.last_checkin_at}</span>
+                    )}
+                </div>
+            </CardHeader>
+            {checkingIn && (
+                <CardContent className="space-y-4 border-t pt-4">
+                    {hasKeyResults ? (
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium">
+                                Key results
+                            </Label>
+                            {objective.key_results.map((kr, index) => (
+                                <div
+                                    key={kr.id}
+                                    className="flex items-center gap-3"
+                                >
+                                    <span className="min-w-0 flex-1 truncate text-sm">
+                                        {kr.title}
+                                    </span>
+                                    <Input
+                                        type="number"
+                                        className="w-28"
+                                        value={
+                                            form.data.key_results[index]
+                                                ?.current_value ?? 0
+                                        }
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'key_results',
+                                                form.data.key_results.map(
+                                                    (row, i) =>
+                                                        i === index
+                                                            ? {
+                                                                  ...row,
+                                                                  current_value:
+                                                                      parseFloat(
+                                                                          e
+                                                                              .target
+                                                                              .value,
+                                                                      ) || 0,
+                                                              }
+                                                            : row,
+                                                ),
+                                            )
+                                        }
+                                    />
+                                    <span className="w-24 text-xs text-muted-foreground">
+                                        of {kr.target_value ?? '—'}
+                                        {kr.unit ? ` ${kr.unit}` : ''}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div>
+                            <Label>Progress (%)</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={form.data.manual_progress}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'manual_progress',
+                                        parseInt(e.target.value) || 0,
+                                    )
+                                }
+                            />
+                        </div>
+                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <Label>Confidence</Label>
+                            <Select
+                                value={form.data.confidence}
+                                onValueChange={(val) =>
+                                    form.setData('confidence', val)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="on_track">
+                                        On track
+                                    </SelectItem>
+                                    <SelectItem value="at_risk">
+                                        At risk
+                                    </SelectItem>
+                                    <SelectItem value="off_track">
+                                        Off track
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div>
+                        <Label>Comment</Label>
+                        <Textarea
+                            value={form.data.comment}
+                            onChange={(e) =>
+                                form.setData('comment', e.target.value)
+                            }
+                            className="min-h-[60px]"
+                            placeholder="What changed since your last check-in?"
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            onClick={submitCheckin}
+                            disabled={form.processing}
+                        >
+                            Save check-in
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCheckingIn(false)}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </CardContent>
+            )}
+        </Card>
+    );
+}
 
 function GoalCard({ goal }: { goal: Goal }) {
     const [editing, setEditing] = useState(false);
@@ -335,9 +582,27 @@ function GoalCard({ goal }: { goal: Goal }) {
     );
 }
 
-export default function MyGoals({ myHr, goals }: Props) {
+export default function MyGoals({ myHr, goals, objectives = [] }: Props) {
     return (
         <MyHrShell active="goals" myHr={myHr} title="Goals · My HR">
+            {objectives.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-base font-semibold">
+                        My objectives (OKRs)
+                    </h2>
+                    {objectives.map((objective) => (
+                        <ObjectiveCard
+                            key={objective.id}
+                            objective={objective}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {(objectives.length > 0 || goals.data.length > 0) && (
+                <h2 className="text-base font-semibold">Development goals</h2>
+            )}
+
             {goals.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">

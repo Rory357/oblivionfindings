@@ -89,6 +89,10 @@ return [
 
     'expiry_reminder_days' => [90, 60, 30, 14, 7],
 
+    // Days after a policy version requiring attestation is published before
+    // staff who still haven't attested receive an overdue nudge.
+    'policy_attestation_overdue_days' => env('HR_POLICY_ATTESTATION_OVERDUE_DAYS', 7),
+
     /*
     |--------------------------------------------------------------------------
     | Employee Number Format

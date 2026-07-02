@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
+use App\Domain\Hr\Notifications\ExpenseRejectedNotification;
 use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
 use App\Domain\Hr\Notifications\GoalCompletedNotification;
 use App\Domain\Hr\Notifications\HrAssetAlertNotification;
@@ -214,6 +215,25 @@ class HrNotificationService
                 $employee->notify(new ExpenseApprovedNotification($claim));
             } catch (\Throwable $e) {
                 Log::warning('Failed to send expense approved notification', [
+                    'claim_id' => $claim->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Notify the employee that their expense claim was rejected (with reason).
+     */
+    public function notifyExpenseRejected(HrExpenseClaim $claim): void
+    {
+        $employee = $claim->user ?? User::find($claim->user_id);
+
+        if ($employee) {
+            try {
+                $employee->notify(new ExpenseRejectedNotification($claim));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send expense rejected notification', [
                     'claim_id' => $claim->id,
                     'error' => $e->getMessage(),
                 ]);

@@ -326,7 +326,12 @@ class EngagementService
         $survey->delete();
     }
 
-    public function closeSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
+    /**
+     * Close a published survey. $actor is null when the system auto-closes a
+     * survey whose ends_at has passed (SendWellbeingRemindersJob) — the same
+     * transition, just not attributed to a user.
+     */
+    public function closeSurvey(HrEngagementSurvey $survey, ?User $actor = null): HrEngagementSurvey
     {
         if ($survey->status !== 'published') {
             throw new \InvalidArgumentException('Only published surveys can be closed.');
@@ -335,7 +340,7 @@ class EngagementService
         $survey->update([
             'status' => 'closed',
             'closed_at' => now(),
-            'updated_by' => $actor->id,
+            'updated_by' => $actor?->id,
         ]);
 
         return $survey->fresh();

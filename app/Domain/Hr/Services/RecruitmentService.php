@@ -263,6 +263,7 @@ class RecruitmentService
             // Recruitment-specific follow-through (candidate lifecycle + docs).
             $this->advanceStage($candidate, 'hired', $convertedBy);
             $offer->application()->update(['status' => 'hired']);
+            $this->maybeCloseFilledRequisition($offer, $convertedBy);
             $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
 
             // The work email/login is now provisioned — record it on the offer so
@@ -274,6 +275,32 @@ class RecruitmentService
 
             return $profile->fresh();
         });
+    }
+
+    /**
+     * Auto-close a requisition once every opening is filled. Only fires from
+     * still-open states (draft/published/paused) — a manually closed or
+     * approval-pending requisition is left alone. Declines deliberately do NOT
+     * reopen or decrement anything: the seat simply remains open.
+     */
+    protected function maybeCloseFilledRequisition(HrOffer $offer, int $actorId): void
+    {
+        $requisition = $offer->application?->requisition;
+        if (! $requisition || ! in_array($requisition->status, ['draft', 'published', 'paused'], true)) {
+            return;
+        }
+
+        $hired = HrApplication::query()
+            ->where('requisition_id', $requisition->id)
+            ->where('status', 'hired')
+            ->count();
+
+        if ($hired >= max(1, (int) $requisition->openings)) {
+            $requisition->update([
+                'status' => 'closed',
+                'updated_by' => $actorId,
+            ]);
+        }
     }
 
     /**

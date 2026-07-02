@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { router } from '@inertiajs/react';
-import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type ExpenseClaim = {
@@ -341,6 +341,9 @@ export default function MyExpenses({ myHr, claims, categories }: Props) {
                                     <th className="px-4 py-3 text-left font-medium">
                                         Submitted
                                     </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -376,13 +379,39 @@ export default function MyExpenses({ myHr, claims, categories }: Props) {
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {claim.submitted_at || '-'}
                                             </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {(claim.status === 'draft' ||
+                                                    claim.status ===
+                                                        'rejected') && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            router.post(
+                                                                `/hr/my/expenses/${claim.id}/submit`,
+                                                                {},
+                                                                {
+                                                                    preserveScroll:
+                                                                        true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        <Send className="mr-1 h-3.5 w-3.5" />
+                                                        {claim.status ===
+                                                        'rejected'
+                                                            ? 'Resubmit'
+                                                            : 'Submit'}
+                                                    </Button>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })}
                                 {claims.data.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={5}
+                                            colSpan={6}
                                             className="px-4 py-8 text-center text-muted-foreground"
                                         >
                                             No expense claims found.

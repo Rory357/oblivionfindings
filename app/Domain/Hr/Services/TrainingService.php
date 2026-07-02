@@ -7,11 +7,17 @@ use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrOnboardingTask;
+use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\TrainingAssignedNotification;
 use App\Models\StaffTrainingRecord;
 use App\Models\TrainingCourse;
+use App\Models\User;
 use Illuminate\Support\Carbon as SupportCarbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TrainingService
 {
@@ -167,7 +173,7 @@ class TrainingService
      */
     public function completeEnrollment(HrCourseEnrollment $enrollment, array $data = []): HrCourseEnrollment
     {
-        return DB::transaction(function () use ($enrollment, $data) {
+        $completed = DB::transaction(function () use ($enrollment, $data) {
             $completedAt = isset($data['completed_at'])
                 ? SupportCarbon::parse($data['completed_at'])
                 : now();
@@ -185,6 +191,122 @@ class TrainingService
             $this->closeAssignmentFor($freshEnrollment, $data['score'] ?? null);
 
             return $freshEnrollment;
+        });
+
+        // Cross-loop (best-effort, after commit): completing an induction
+        // course ticks off the matching pending onboarding task so the
+        // new-hire checklist stays in sync automatically.
+        $this->completeLinkedOnboardingTask($completed);
+
+        return $completed;
+    }
+
+    /**
+     * Auto-complete the pending induction onboarding task that maps to this
+     * enrollment's course, mirroring ExitInterviewController's exit-interview
+     * seam. The linkage is resolved from the checklist's source template: an
+     * induction task def carrying `course_code` maps by code to its cloned
+     * task (matched by title); otherwise a title match against the course is
+     * used. Tasks blocked by dependency or sign-off rules (LogicException)
+     * are left for manual completion. Never throws.
+     */
+    private function completeLinkedOnboardingTask(HrCourseEnrollment $enrollment): void
+    {
+        try {
+            $enrollment->loadMissing('course');
+            $course = $enrollment->course;
+            if (! $course || ! $enrollment->user_id) {
+                return;
+            }
+
+            $profileIds = HrEmployeeProfile::query()
+                ->where('tenant_id', $enrollment->tenant_id)
+                ->where('user_id', $enrollment->user_id)
+                ->pluck('id');
+            if ($profileIds->isEmpty()) {
+                return;
+            }
+
+            $checklists = HrOnboardingChecklist::query()
+                ->where('tenant_id', $enrollment->tenant_id)
+                ->whereIn('employee_profile_id', $profileIds)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->with(['tasks' => fn ($q) => $q->orderBy('sort_order')])
+                ->get();
+
+            foreach ($checklists as $checklist) {
+                $task = $this->matchInductionTask($checklist, $course);
+                if (! $task) {
+                    continue;
+                }
+
+                $code = $course->code ?: $course->title;
+
+                try {
+                    app(OnboardingService::class)->completeTask($task, $enrollment->user_id, [
+                        'notes' => trim(($task->notes ? $task->notes."\n" : '')."Auto-completed: course {$code} completed."),
+                    ]);
+                } catch (\LogicException) {
+                    // Dependencies or sign-off requirements block auto-completion —
+                    // leave the task for the checklist owner to complete manually.
+                }
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to auto-complete linked onboarding induction task', [
+                'enrollment_id' => $enrollment->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Find the pending induction task on a checklist that corresponds to the
+     * given course: template `course_code` mapping first, then a title match.
+     */
+    private function matchInductionTask(HrOnboardingChecklist $checklist, HrCourse $course): ?HrOnboardingTask
+    {
+        $candidates = $checklist->tasks
+            ->filter(fn (HrOnboardingTask $t) => $t->category === 'induction' && $t->status !== 'completed')
+            ->values();
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        // Preferred: the source template's induction task defs carry an explicit
+        // course_code; a cloned task shares the def's title.
+        if ($course->code && str_contains((string) $checklist->template_key, ':')) {
+            [$role, $siteType] = explode(':', (string) $checklist->template_key, 2);
+            $template = HrOnboardingTemplate::query()
+                ->where('tenant_id', $checklist->tenant_id)
+                ->where('role', $role)
+                ->where('site_type', $siteType)
+                ->first();
+
+            $codedTitles = collect($template?->tasks ?? [])
+                ->filter(fn ($def) => ($def['category'] ?? null) === 'induction'
+                    && ($def['course_code'] ?? null) === $course->code)
+                ->pluck('title')
+                ->filter()
+                ->map(fn ($t) => mb_strtolower((string) $t));
+
+            if ($codedTitles->isNotEmpty()) {
+                $byCode = $candidates->first(fn (HrOnboardingTask $t) => $codedTitles->contains(mb_strtolower($t->title)));
+                if ($byCode) {
+                    return $byCode;
+                }
+            }
+        }
+
+        // Fallback: a task whose title references the course (either direction).
+        $courseTitle = mb_strtolower($course->title);
+
+        return $candidates->first(function (HrOnboardingTask $t) use ($courseTitle, $course) {
+            $taskTitle = mb_strtolower($t->title);
+
+            return str_contains($taskTitle, $courseTitle)
+                || str_contains($courseTitle, $taskTitle)
+                || ($course->code && str_contains($taskTitle, mb_strtolower($course->code)));
         });
     }
 
@@ -336,7 +458,10 @@ class TrainingService
         $dueAt = $form['due_at'] ?? null;
         $sessionId = $form['session_id'] ?? null;
 
-        return DB::transaction(function () use ($tenantId, $userIds, $courseIds, $source, $dueAt, $sessionId, $assignedBy, $form) {
+        /** @var array<int, HrCourseAssignment> $written */
+        $written = [];
+
+        $count = DB::transaction(function () use ($tenantId, $userIds, $courseIds, $source, $dueAt, $sessionId, $assignedBy, $form, &$written) {
             $count = 0;
             foreach ($courseIds as $courseId) {
                 foreach ($userIds as $userId) {
@@ -353,7 +478,7 @@ class TrainingService
                         continue;
                     }
 
-                    HrCourseAssignment::updateOrCreate(
+                    $written[] = HrCourseAssignment::updateOrCreate(
                         ['tenant_id' => $tenantId, 'user_id' => $userId, 'hr_course_id' => $courseId],
                         [
                             'session_id' => $sessionId,
@@ -371,6 +496,54 @@ class TrainingService
 
             return $count;
         });
+
+        // After commit: tell each assignee about their new requirement.
+        // Best-effort — a notification hiccup never rolls back the assignment.
+        $this->notifyAssignees($written);
+
+        return $count;
+    }
+
+    /**
+     * Send TrainingAssignedNotification (mail + database) to the employee on
+     * each freshly created/updated assignment row.
+     *
+     * @param  array<int, HrCourseAssignment>  $assignments
+     */
+    private function notifyAssignees(array $assignments): void
+    {
+        if ($assignments === []) {
+            return;
+        }
+
+        $courses = HrCourse::query()
+            ->whereIn('id', collect($assignments)->pluck('hr_course_id')->unique()->all())
+            ->pluck('title', 'id');
+        $users = User::query()
+            ->whereIn('id', collect($assignments)->pluck('user_id')->unique()->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($assignments as $assignment) {
+            $user = $users->get($assignment->user_id);
+            if (! $user) {
+                continue;
+            }
+
+            try {
+                $user->notify(new TrainingAssignedNotification([
+                    'assignment_id' => $assignment->id,
+                    'course_title' => $courses->get($assignment->hr_course_id) ?? 'Training course',
+                    'due_at' => $assignment->due_at?->toDateString(),
+                ]));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send training assigned notification', [
+                    'assignment_id' => $assignment->id,
+                    'user_id' => $assignment->user_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function remindAssignment(HrCourseAssignment $assignment): void

@@ -176,7 +176,35 @@ export default function HrCasesIndex({
     severities,
 }: Props) {
     // Open the New-case wizard on mount when deep-linked via ?new (the old
-    // GET /hr/cases/create route redirects here with that param).
+    // GET /hr/cases/create route redirects here with that param). Optional
+    // safe prefill params: ?employee={user_id} preselects the subject (only
+    // when it matches a real staff option) and ?source_pip={id} seeds the
+    // description for PIP escalations.
+    const [wizardPrefill] = useState<{
+        user_id?: string;
+        case_type?: string;
+        description?: string;
+    } | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('new')) return null;
+
+        const employee = params.get('employee');
+        const sourcePip = params.get('source_pip');
+        const employeeId =
+            employee && /^\d+$/.test(employee) && staff.some((s) => String(s.id) === employee)
+                ? employee
+                : undefined;
+        const pipId = sourcePip && /^\d+$/.test(sourcePip) ? sourcePip : undefined;
+
+        return {
+            user_id: employeeId,
+            case_type: pipId ? 'disciplinary' : undefined,
+            description: pipId
+                ? `Escalated from unsuccessful PIP #${pipId}.`
+                : undefined,
+        };
+    });
     const [wizardOpen, setWizardOpen] = useState(
         () =>
             typeof window !== 'undefined' &&
@@ -611,6 +639,7 @@ export default function HrCasesIndex({
                     caseTypes={caseTypes}
                     severities={severities}
                     onClose={() => setWizardOpen(false)}
+                    initial={wizardPrefill ?? undefined}
                 />
             ) : null}
         </AppLayout>

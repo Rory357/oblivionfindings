@@ -69,6 +69,8 @@ interface AttentionItem {
     badge: string;
     cta: string;
     go: string;
+    /** Absolute path CTA target (e.g. a PIP detail page); falls back to the `/hr/my/{go}` tab. */
+    href?: string;
 }
 
 interface LeaveBalanceItem {
@@ -449,7 +451,7 @@ export default function MyHrIndex({
                 {
                     icon: <MessagesSquare className="h-4 w-4" />,
                     label: 'View details',
-                    onClick: () => router.visit(`/hr/my/${a.go}`),
+                    onClick: () => router.visit(a.href ?? `/hr/my/${a.go}`),
                 },
                 {
                     icon: <CheckCircle2 className="h-4 w-4" />,
@@ -705,7 +707,7 @@ export default function MyHrIndex({
                                             </StatusBadge>
                                             <button
                                                 type="button"
-                                                onClick={() => router.visit(`/hr/my/${a.go}`)}
+                                                onClick={() => router.visit(a.href ?? `/hr/my/${a.go}`)}
                                                 className="shrink-0 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-accent"
                                             >
                                                 {a.cta}

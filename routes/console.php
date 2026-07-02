@@ -26,6 +26,8 @@ use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendAssetRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
+use App\Domain\Hr\Jobs\SendOfferExpiryRemindersJob;
+use App\Domain\Hr\Jobs\SendPipRemindersJob;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
@@ -673,4 +675,30 @@ app(Schedule::class)
     ->job(new SyncResourceCalendarsJob)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+// Recruitment & PIP negative-path reminders
+
+// Offer expiry sweep: remind unanswered candidates (+ hiring manager) as the
+// portal window closes, and flag offers that lapsed unanswered: daily 08:30 NZ
+app(Schedule::class)
+    ->job(new SendOfferExpiryRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
+// PIP lifecycle sweep: overdue milestones + plans ending within 7 days that
+// still need an outcome recorded: daily 08:30 NZ
+app(Schedule::class)
+    ->job(new SendPipRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
+// ── Wellbeing & engagement sweep (audit fixes 2026-07-02) ──────────────────
+
+// Auto-close published engagement surveys past their end date + one-time
+// follow-up reminders for due wellbeing check-ins: daily at 08:00 NZ
+app(Schedule::class)
+    ->job(new \App\Domain\Hr\Jobs\SendWellbeingRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00')
     ->withoutOverlapping();

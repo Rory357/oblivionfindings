@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrPolicyVersion;
+use App\Domain\Hr\Notifications\PolicyAttestationRequiredNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PolicyController extends Controller
@@ -206,7 +209,7 @@ class PolicyController extends Controller
         ]);
 
         // Create the first version automatically
-        HrPolicyVersion::create([
+        $version = HrPolicyVersion::create([
             'policy_id' => $policy->id,
             'version_number' => 1,
             'content_summary' => $data['content_summary'] ?? '',
@@ -215,6 +218,10 @@ class PolicyController extends Controller
             'is_current' => true,
             'published_by' => $user->id,
         ]);
+
+        // Attestation awareness: publishing a version that requires attestation
+        // tells affected staff straight away (best-effort, queued).
+        $this->notifyAttestationRequired($policy, $version, $tenantId);
 
         return redirect()->route('hr.policies.index')->with('success', 'Policy created successfully.');
     }
@@ -283,7 +290,7 @@ class PolicyController extends Controller
         // Mark all existing versions as not current
         $policy->versions()->update(['is_current' => false]);
 
-        HrPolicyVersion::create([
+        $version = HrPolicyVersion::create([
             'policy_id' => $policy->id,
             'version_number' => $latestVersion + 1,
             'content_summary' => $data['content_summary'] ?? '',
@@ -293,7 +300,52 @@ class PolicyController extends Controller
             'published_by' => $user->id,
         ]);
 
+        // Attestation awareness: a new current version resets everyone's
+        // attestation — tell affected staff (best-effort, queued).
+        $this->notifyAttestationRequired($policy, $version, $tenantId);
+
         return redirect()->back()->with('success', 'New policy version published.');
+    }
+
+    /**
+     * Notify every active staff member that a freshly published policy version
+     * requires their attestation. Best-effort per recipient — a notification
+     * hiccup never blocks the publish. No-op unless the policy is active and
+     * flagged requires_attestation.
+     */
+    private function notifyAttestationRequired(HrPolicy $policy, HrPolicyVersion $version, int $tenantId): void
+    {
+        if (! $policy->requires_attestation || ! $policy->is_active) {
+            return;
+        }
+
+        $staff = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->with('user:id,name,email')
+            ->get()
+            ->pluck('user')
+            ->filter()
+            ->unique('id');
+
+        foreach ($staff as $member) {
+            try {
+                $member->notify(new PolicyAttestationRequiredNotification([
+                    'policy_id' => $policy->id,
+                    'policy_version_id' => $version->id,
+                    'policy_title' => $policy->title,
+                    'version_number' => (int) $version->version_number,
+                    'kind' => 'published',
+                ]));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send policy attestation required notification', [
+                    'policy_id' => $policy->id,
+                    'user_id' => $member->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

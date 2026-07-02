@@ -253,6 +253,10 @@ class HandleInertiaRequests extends Middleware
                 // The Injury record wizard reads this so its success pane can open
                 // the newly-recorded injury straight on its RTW section.
                 'created_injury_id' => session('created_injury_id'),
+                // A disciplinary dismissal outcome flashes this next-step payload
+                // ({label, url, employee_name}) so the case page can offer an
+                // explicit "Start offboarding" CTA (never auto-created).
+                'offboarding_cta' => session('offboarding_cta'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

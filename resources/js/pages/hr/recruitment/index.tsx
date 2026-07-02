@@ -32,6 +32,7 @@ import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog';
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
+import { BulkRejectDialog } from '@/components/hr/recruitment/bulk-reject-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
@@ -194,6 +195,7 @@ export default function RecruitmentHub(props: Props) {
     const [dupOnly, setDupOnly] = useState(false);
     const [selected, setSelected] = useState<number[]>([]);
     const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+    const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
     const [manageTagsOpen, setManageTagsOpen] = useState(false);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [moreOpen, setMoreOpen] = useState(false);
@@ -273,7 +275,7 @@ export default function RecruitmentHub(props: Props) {
         );
     };
 
-    const bulkAction = (action: 'advance' | 'reject' | 'pool') => {
+    const bulkAction = (action: 'advance' | 'pool') => {
         if (selected.length === 0) return;
         router.post(
             '/hr/recruitment/applications/bulk',
@@ -483,7 +485,7 @@ export default function RecruitmentHub(props: Props) {
                                 onOpen={(c) => setSheetId(c.id)}
                                 onCtx={openCandidateCtx}
                                 onBulkAdvance={() => bulkAction('advance')}
-                                onBulkReject={() => bulkAction('reject')}
+                                onBulkReject={() => setBulkRejectOpen(true)}
                                 onBulkPool={() => bulkAction('pool')}
                                 onBulkEmail={() => setBulkEmailOpen(true)}
                                 onBulkTag={bulkTag}
@@ -607,6 +609,7 @@ export default function RecruitmentHub(props: Props) {
             {kitDialog ? <KitDialog open onClose={() => setKitDialog(null)} kit={kitDialog.kit} /> : null}
             {scoreTarget ? <ScoreDialog open onClose={() => setScoreTarget(null)} interview={scoreTarget} /> : null}
             <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} templates={email_templates} canManage={can.manage} />
+            <BulkRejectDialog open={bulkRejectOpen} onClose={() => setBulkRejectOpen(false)} candidateIds={selected} onDone={() => setSelected([])} />
             <TagManagerDialog open={manageTagsOpen} onClose={() => setManageTagsOpen(false)} tags={support.tags} canManage={can.manage} />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>

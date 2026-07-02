@@ -18,6 +18,7 @@ use App\Domain\Hr\Notifications\CandidateHiredNotification;
 use App\Domain\Hr\Notifications\CandidateMessageNotification;
 use App\Domain\Hr\Notifications\NewHireWelcomeNotification;
 use App\Domain\Hr\Notifications\OfferApprovalNotification;
+use App\Domain\Hr\Notifications\OfferDeclinedNotification;
 use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
@@ -625,6 +626,9 @@ class CandidateController extends Controller
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
             'reason' => ['nullable', 'string', 'max:2000'],
             'tag' => ['required_if:action,tag,untag', 'nullable', 'string', 'max:100'],
+            // Opt-in only, mirroring the single reject — never default-on.
+            'send_decline_email' => ['nullable', 'boolean'],
+            'decline_message' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $tag = trim((string) ($validated['tag'] ?? ''));
@@ -662,10 +666,30 @@ class CandidateController extends Controller
                     }
                     $candidate->update(['tags' => $tags->values()->all(), 'updated_by' => $user->id]);
                 } else {
+                    // Grab the live application before it flips to rejected — the
+                    // decline email references the position it was for.
+                    $rejectedApplication = $candidate->applications()
+                        ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
+                        ->latest('id')
+                        ->first();
+
                     $candidate->update(['status' => 'rejected', 'current_stage_entered_at' => now(), 'updated_by' => $user->id]);
                     $candidate->applications()
                         ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
                         ->update(['status' => 'rejected', 'rejection_reason' => $validated['reason'] ?? null]);
+
+                    if (
+                        $request->boolean('send_decline_email')
+                        && $candidate->personal_email
+                        && $rejectedApplication
+                    ) {
+                        try {
+                            Notification::route('mail', $candidate->personal_email)
+                                ->notify(new RejectionNotification($candidate, $rejectedApplication, $validated['decline_message'] ?? null));
+                        } catch (\Throwable $exception) {
+                            report($exception);
+                        }
+                    }
                 }
                 $done++;
             } catch (\Throwable $exception) {
@@ -1614,6 +1638,12 @@ class CandidateController extends Controller
         // convert failure never swallows the ack).
         $this->ackOfferResponse($offer, $application->candidate, (string) $offer->response);
 
+        // A decline/withdrawal must never die silently — the hiring manager
+        // needs to know the seat is still open. Best-effort.
+        if (in_array($offer->response, ['declined', 'withdrawn'], true)) {
+            $this->notifyHiringManagerOfDecline($offer, $application);
+        }
+
         // Accepting an offer flows straight into employment + onboarding — but
         // minting a login is a segregation-of-duties step. Only auto-convert when
         // the actor also holds hr.employees.manage; otherwise the acceptance is
@@ -1719,6 +1749,42 @@ class CandidateController extends Controller
             $manager = $requisition?->hiringManager;
             if ($manager) {
                 $manager->notify(new CandidateHiredNotification($candidate, $requisition));
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * Best-effort notification to the requisition's hiring manager (plus the
+     * offer's author, deduped) when a candidate declines or withdraws from an
+     * offer — the acceptance path already notifies via CandidateHiredNotification.
+     */
+    private function notifyHiringManagerOfDecline(HrOffer $offer, HrApplication $application): void
+    {
+        try {
+            $candidate = $application->candidate;
+            if (! $candidate) {
+                return;
+            }
+
+            $requisition = $application->requisition()->with('hiringManager')->first();
+            $reason = $offer->response === 'withdrawn' ? 'withdrawn' : 'declined';
+            $declineReason = $reason === 'declined' ? ($offer->response_notes ?: null) : null;
+
+            $recipients = collect([
+                $requisition?->hiringManager,
+                $offer->created_by ? \App\Models\User::find($offer->created_by) : null,
+            ])->filter()->unique('id');
+
+            foreach ($recipients as $recipient) {
+                $recipient->notify(new OfferDeclinedNotification(
+                    $offer,
+                    $candidate,
+                    $reason,
+                    $declineReason,
+                    $requisition?->title,
+                ));
             }
         } catch (\Throwable $exception) {
             report($exception);

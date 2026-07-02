@@ -67,6 +67,7 @@ class HrCaseController extends Controller
 
         $cases = HrCase::forTenant($tenantId)
             ->with(['subject:id,name', 'assignedTo:id,name'])
+            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('case_type'), fn ($q, $type) => $q->where('case_type', $type))
             ->when($request->query('severity'), fn ($q, $sev) => $q->where('severity', $sev))
@@ -131,6 +132,7 @@ class HrCaseController extends Controller
 
         $openCasesQuery = HrCase::query()
             ->forTenant($tenantId)
+            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
             ->whereNotIn('status', ['closed', 'resolved']);
 
         $activeDisciplinaryQuery = \App\Domain\Hr\Models\HrDisciplinaryAction::query()
@@ -237,6 +239,7 @@ class HrCaseController extends Controller
         abort_unless($user && $user->canDo('hr.cases.view'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $case->tenant_id);
+        abort_unless($this->canViewCase($user, $case), 403);
 
         $case->load([
             'subject:id,name,email',
@@ -460,6 +463,53 @@ class HrCaseController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'HR case closed.');
+    }
+
+    /**
+     * Confidential-case visibility: when a case is flagged is_confidential only
+     * the creator, the reporter, the assigned owner, users on the access_list,
+     * or a case manager (hr.cases.manage — the strongest existing HR-cases
+     * permission) may see it. Non-confidential cases are unrestricted.
+     */
+    protected function canViewCase(User $viewer, HrCase $case): bool
+    {
+        if (! $case->is_confidential) {
+            return true;
+        }
+
+        if ($viewer->canDo('hr.cases.manage')) {
+            return true;
+        }
+
+        $allowedIds = collect([$case->created_by, $case->reported_by, $case->assigned_to])
+            ->merge($case->access_list ?? [])
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id);
+
+        return $allowedIds->contains((int) $viewer->id);
+    }
+
+    /**
+     * Query-side twin of {@see canViewCase} for lists/search: hides confidential
+     * cases the viewer is not the creator/reporter/owner of, not on the
+     * access_list of, and cannot manage.
+     */
+    protected function applyCaseVisibilityScope($query, User $viewer)
+    {
+        if ($viewer->canDo('hr.cases.manage')) {
+            return $query;
+        }
+
+        return $query->where(function ($inner) use ($viewer) {
+            $inner->where('is_confidential', false)
+                ->orWhereNull('is_confidential')
+                ->orWhere('created_by', $viewer->id)
+                ->orWhere('reported_by', $viewer->id)
+                ->orWhere('assigned_to', $viewer->id)
+                // access_list entries may be stored as ints or strings.
+                ->orWhereJsonContains('access_list', $viewer->id)
+                ->orWhereJsonContains('access_list', (string) $viewer->id);
+        });
     }
 
     protected function normalizeCaseEventVisibility(?string $visibility): string

@@ -6,10 +6,12 @@ use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrAssetMaintenanceLog;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\AssetAssignedNotification;
 use App\Models\Asset;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AssetService
@@ -24,7 +26,7 @@ class AssetService
             throw new \LogicException("Asset '{$asset->asset_tag}' is not available for assignment (current status: {$asset->status}).");
         }
 
-        return DB::transaction(function () use ($asset, $profile, $data) {
+        $assignment = DB::transaction(function () use ($asset, $profile, $data) {
             $assignment = HrAssetAssignment::create([
                 'tenant_id' => $asset->tenant_id,
                 'asset_id' => $asset->id,
@@ -43,6 +45,23 @@ class AssetService
 
             return $assignment;
         });
+
+        // Best-effort: tell the employee their new asset is on record — a
+        // notification failure must never roll back or block the handover.
+        try {
+            $employee = $profile->user ?? $profile->user()->first();
+            if ($employee) {
+                $employee->notify(new AssetAssignedNotification($assignment->loadMissing('asset')));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send asset assigned notification', [
+                'assignment_id' => $assignment->id,
+                'asset_id' => $asset->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $assignment;
     }
 
     /**

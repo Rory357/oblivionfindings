@@ -85,14 +85,16 @@ class ExpenseService
     }
 
     /**
-     * Submit a draft claim for approval.
+     * Submit a draft claim for approval. A rejected claim may be resubmitted —
+     * the prior decision (rejection reason + reviewer stamp) is cleared so it
+     * re-enters the approval queue cleanly.
      *
      *
-     * @throws \LogicException If claim is not a draft or has no items
+     * @throws \LogicException If claim is not draft/rejected or has no items
      */
     public function submitClaim(HrExpenseClaim $claim): HrExpenseClaim
     {
-        if ($claim->status !== 'draft') {
+        if (! in_array($claim->status, ['draft', 'rejected'], true)) {
             throw new \LogicException("Cannot submit a '{$claim->status}' claim.");
         }
 
@@ -103,6 +105,9 @@ class ExpenseService
         $claim->update([
             'status' => 'submitted',
             'submitted_at' => now(),
+            'rejection_reason' => null,
+            'approved_by' => null,
+            'approved_at' => null,
         ]);
 
         $claim = $claim->fresh();
@@ -158,7 +163,7 @@ class ExpenseService
             throw new \LogicException("Cannot reject a '{$claim->status}' claim.");
         }
 
-        return DB::transaction(function () use ($claim, $reviewer, $reason) {
+        $result = DB::transaction(function () use ($claim, $reviewer, $reason) {
             $claim->update([
                 'status' => 'rejected',
                 'approved_by' => $reviewer->id,
@@ -168,6 +173,12 @@ class ExpenseService
 
             return $claim->fresh();
         });
+
+        // Tell the claimant why (best-effort inside the service — mirrors the
+        // approve path's notifyExpenseApproved).
+        app(HrNotificationService::class)->notifyExpenseRejected($result);
+
+        return $result;
     }
 
     /**

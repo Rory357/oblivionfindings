@@ -116,6 +116,15 @@ export default function OffboardingIndex({
             new URLSearchParams(window.location.search).has('new'),
     );
 
+    // `?employee={profile_id}` (e.g. from the disciplinary dismissal CTA)
+    // preselects the leaver in the wizard.
+    const [initialEmployeeProfileId] = useState(() =>
+        typeof window !== 'undefined'
+            ? (new URLSearchParams(window.location.search).get('employee') ??
+              '')
+            : '',
+    );
+
     function applyFilter(key: string, value: string | null) {
         router.get(
             '/hr/offboarding',
@@ -387,6 +396,7 @@ export default function OffboardingIndex({
                         departureReasons={departureReasons}
                         interviewers={interviewers}
                         defaultEndDate={defaultEndDate}
+                        initialEmployeeProfileId={initialEmployeeProfileId}
                     />
                 )}
             </PageLayout>

@@ -4,9 +4,12 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
+use App\Domain\Hr\Notifications\SignatureRequestedNotification;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ESignatureService
@@ -122,6 +125,35 @@ class ESignatureService
                 'sent_at' => now(),
             ]);
         });
+
+        // After commit: tell each signer a document is waiting for them.
+        // Best-effort — a notification hiccup never rolls back the requests.
+        $signers = User::query()
+            ->whereIn('id', collect($signatures)->pluck('signer_user_id')->unique()->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($signatures as $signature) {
+            $signer = $signers->get($signature->signer_user_id);
+            if (! $signer) {
+                continue;
+            }
+
+            try {
+                $signer->notify(new SignatureRequestedNotification([
+                    'signature_id' => $signature->id,
+                    'document_title' => $document->title ?? 'a document',
+                    'due_at' => $signature->due_at?->toDateString(),
+                    'message' => $message,
+                ]));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send signature requested notification', [
+                    'signature_id' => $signature->id,
+                    'signer_user_id' => $signature->signer_user_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return $signatures;
     }

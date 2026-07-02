@@ -41,8 +41,30 @@ interface ComplianceStatus {
     };
 }
 
+interface TrainingAssignment {
+    id: number;
+    course_title: string;
+    course_category: string | null;
+    delivery_method: string | null;
+    due_date: string | null;
+    status: string;
+    overdue: boolean;
+    assigned_at: string | null;
+}
+
+interface TrainingEnrolment {
+    id: number;
+    course_title: string;
+    course_category: string | null;
+    delivery_method: string | null;
+    session_date: string | null;
+    enrolled_at: string | null;
+}
+
 interface Props {
     myHr: MyHrShellData;
+    assignments: TrainingAssignment[];
+    enrolments: TrainingEnrolment[];
     complianceStatuses: ComplianceStatus[];
     can: { viewCatalog: boolean };
 }
@@ -105,7 +127,13 @@ function formatCategory(cat: string): string {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MyTraining({ myHr, complianceStatuses, can }: Props) {
+export default function MyTraining({
+    myHr,
+    assignments = [],
+    enrolments = [],
+    complianceStatuses,
+    can,
+}: Props) {
     const [activeFilter, setActiveFilter] = useState<StatusKey | 'all'>('all');
 
     const summary = useMemo(() => {
@@ -154,6 +182,151 @@ export default function MyTraining({ myHr, complianceStatuses, can }: Props) {
                     </Link>
                 </div>
             ) : null}
+            {/* Active training — assigned courses + in-progress enrolments */}
+            {(assignments.length > 0 || enrolments.length > 0) && (
+                <div>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-base font-semibold">
+                            <BookOpen className="h-4 w-4" />
+                            My training to complete
+                        </h2>
+                        <p className="text-xs text-muted-foreground">
+                            {assignments.length + enrolments.length} item
+                            {assignments.length + enrolments.length !== 1
+                                ? 's'
+                                : ''}
+                        </p>
+                    </div>
+                    <div className="space-y-3">
+                        {assignments.map((a) => (
+                            <Card
+                                key={`assignment-${a.id}`}
+                                className="overflow-hidden transition-all hover:shadow-sm"
+                            >
+                                <div
+                                    className="h-0.5"
+                                    style={{
+                                        backgroundColor: a.overdue
+                                            ? '#ef4444'
+                                            : '#0ea5e9',
+                                    }}
+                                />
+                                <CardContent className="p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-semibold">
+                                                {a.course_title}
+                                            </h3>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                {a.course_category && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Filter className="h-3 w-3" />
+                                                        {formatCategory(
+                                                            a.course_category,
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {a.assigned_at && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" />
+                                                        Assigned{' '}
+                                                        {formatDate(
+                                                            a.assigned_at,
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {a.due_date && (
+                                                    <span
+                                                        className={`flex items-center gap-1 ${
+                                                            a.overdue
+                                                                ? 'font-medium text-status-critical'
+                                                                : ''
+                                                        }`}
+                                                    >
+                                                        <Calendar className="h-3 w-3" />
+                                                        {a.overdue
+                                                            ? `Was due ${formatDate(a.due_date)}`
+                                                            : `Due ${formatDate(a.due_date)}`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                a.overdue
+                                                    ? 'shrink-0 border-status-critical/30 bg-status-critical-bg text-status-critical'
+                                                    : 'shrink-0 border-status-info/30 bg-status-info-bg text-status-info'
+                                            }
+                                        >
+                                            {a.overdue
+                                                ? 'Overdue'
+                                                : a.status === 'in_progress'
+                                                  ? 'In progress'
+                                                  : 'Assigned'}
+                                        </Badge>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                        {enrolments.map((e) => (
+                            <Card
+                                key={`enrolment-${e.id}`}
+                                className="overflow-hidden transition-all hover:shadow-sm"
+                            >
+                                <div
+                                    className="h-0.5"
+                                    style={{ backgroundColor: '#8b5cf6' }}
+                                />
+                                <CardContent className="p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-semibold">
+                                                {e.course_title}
+                                            </h3>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                {e.course_category && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Filter className="h-3 w-3" />
+                                                        {formatCategory(
+                                                            e.course_category,
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {e.enrolled_at && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" />
+                                                        Enrolled{' '}
+                                                        {formatDate(
+                                                            e.enrolled_at,
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {e.session_date && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        Session{' '}
+                                                        {formatDate(
+                                                            e.session_date,
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Badge
+                                            variant="outline"
+                                            className="shrink-0 border-primary/30 bg-primary/10 text-primary"
+                                        >
+                                            Enrolled
+                                        </Badge>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
                     <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50">

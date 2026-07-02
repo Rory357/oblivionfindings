@@ -31,6 +31,8 @@ interface Policy {
         attested_at: string;
     } | null;
     is_attested: boolean;
+    attest_by: string | null;
+    attest_overdue: boolean;
 }
 
 interface Props {
@@ -126,12 +128,41 @@ export default function MyPolicies({ myHr, policies }: Props) {
                                                         Attested
                                                     </Badge>
                                                 ) : (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning-foreground"
-                                                    >
-                                                        Pending
-                                                    </Badge>
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                policy.attest_overdue
+                                                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                                                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning-foreground'
+                                                            }
+                                                        >
+                                                            {policy.attest_overdue
+                                                                ? 'Overdue'
+                                                                : 'Pending'}
+                                                        </Badge>
+                                                        {policy.attest_by && (
+                                                            <span
+                                                                className={`text-xs ${
+                                                                    policy.attest_overdue
+                                                                        ? 'font-medium text-status-critical'
+                                                                        : 'text-muted-foreground'
+                                                                }`}
+                                                            >
+                                                                Attest by{' '}
+                                                                {new Date(
+                                                                    policy.attest_by,
+                                                                ).toLocaleDateString(
+                                                                    'en-NZ',
+                                                                    {
+                                                                        day: 'numeric',
+                                                                        month: 'short',
+                                                                        year: 'numeric',
+                                                                    },
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-right">

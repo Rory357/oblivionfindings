@@ -13,8 +13,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
-import { CheckCircle2, Clock, FileText, Paperclip, XCircle } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { CheckCircle2, Clock, FileText, FolderPlus, Paperclip, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 interface Milestone {
@@ -44,6 +44,8 @@ interface Pip {
     outcome: string | null;
     outcome_notes: string | null;
     completed_at: string | null;
+    employee_acknowledged: boolean;
+    employee_acknowledged_at: string | null;
     employee: { id: number; name: string };
     manager: { id: number; name: string };
     creator: { id: number; name: string } | null;
@@ -52,6 +54,7 @@ interface Pip {
 
 interface Props {
     pip: Pip;
+    viewer_is_subject?: boolean;
     can: { manage: boolean };
 }
 
@@ -80,16 +83,32 @@ const formatDate = (value?: string | null) => {
           });
 };
 
-export default function PipShow({ pip, can }: Props) {
+export default function PipShow({ pip, viewer_is_subject = false, can }: Props) {
     const [completing, setCompleting] = useState(false);
     const completeForm = useForm({ outcome: '', outcome_notes: '' });
+    const acknowledgeForm = useForm({});
 
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'HR', href: '/hr' },
-        { title: 'Performance', href: '/hr/performance' },
-        { title: 'PIPs', href: '/hr/performance/pips' },
-        { title: pip.title, href: `/hr/performance/pips/${pip.id}` },
-    ];
+    // A subject employee without the manage permission gets a read-only view
+    // anchored to My HR (the PIP register itself is manager-only).
+    const subjectOnly = viewer_is_subject && !can.manage;
+
+    const breadcrumbs: BreadcrumbItem[] = subjectOnly
+        ? [
+              { title: 'My HR', href: '/hr/my' },
+              { title: pip.title, href: `/hr/performance/pips/${pip.id}` },
+          ]
+        : [
+              { title: 'HR', href: '/hr' },
+              { title: 'Performance', href: '/hr/performance' },
+              { title: 'PIPs', href: '/hr/performance/pips' },
+              { title: pip.title, href: `/hr/performance/pips/${pip.id}` },
+          ];
+
+    const acknowledge = () => {
+        acknowledgeForm.post(`/hr/performance/pips/${pip.id}/acknowledge`, {
+            preserveScroll: true,
+        });
+    };
 
     const handleMilestoneUpdate = (milestoneId: number, status: string) => {
         router.put(
@@ -123,7 +142,7 @@ export default function PipShow({ pip, can }: Props) {
                 hero={
                     <PageHero category="hr"
                         variant="compact"
-                        backHref="/hr/performance/pips"
+                        backHref={subjectOnly ? '/hr/my' : '/hr/performance/pips'}
                         title={pip.title}
                         description={
                             <span className="flex items-center gap-2">
@@ -157,6 +176,35 @@ export default function PipShow({ pip, can }: Props) {
                     />
                 }
             >
+                {/* Subject acknowledgement banner */}
+                {viewer_is_subject && !pip.employee_acknowledged && pip.status !== 'cancelled' ? (
+                    <Card className="border-status-warning/40 bg-status-warning-bg">
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+                            <div className="text-sm">
+                                <div className="font-semibold">Please review and acknowledge this plan</div>
+                                <div className="text-muted-foreground">
+                                    Acknowledging confirms you have read the plan — not that you agree with everything in it. You are welcome to involve a support person or representative at any stage.
+                                </div>
+                            </div>
+                            <Button size="sm" onClick={acknowledge} disabled={acknowledgeForm.processing}>
+                                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                Acknowledge plan
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : null}
+                {viewer_is_subject && pip.employee_acknowledged ? (
+                    <Card className="border-status-success/40 bg-status-success-bg">
+                        <CardContent className="flex items-center gap-2 py-3 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-status-success" />
+                            <span>
+                                You acknowledged this plan
+                                {pip.employee_acknowledged_at ? ` on ${formatDate(pip.employee_acknowledged_at)}` : ''}.
+                            </span>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 {/* Overview */}
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
@@ -251,6 +299,26 @@ export default function PipShow({ pip, can }: Props) {
                                         <p className="mt-2 text-sm text-foreground">
                                             {pip.outcome_notes}
                                         </p>
+                                    )}
+                                    {pip.outcome === 'unsuccessful' && can.manage && (
+                                        <div className="mt-3 border-t pt-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                If formal action is the considered next step, open a disciplinary case — it is never created automatically.
+                                            </p>
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="outline"
+                                                className="mt-2 text-status-critical"
+                                            >
+                                                <Link
+                                                    href={`/hr/cases?new=1&employee=${pip.employee.id}&source_pip=${pip.id}`}
+                                                >
+                                                    <FolderPlus className="mr-1.5 h-4 w-4" />
+                                                    Open disciplinary case
+                                                </Link>
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -398,6 +466,7 @@ export default function PipShow({ pip, can }: Props) {
                                                             pip.status !==
                                                                 'completed'
                                                         }
+                                                        canView={can.manage}
                                                     />
                                                 </div>
                                                 {can.manage &&
@@ -454,9 +523,12 @@ export default function PipShow({ pip, can }: Props) {
 function MilestoneEvidence({
     milestone,
     canManage,
+    canView,
 }: {
     milestone: Milestone;
     canManage: boolean;
+    /** Evidence downloads are gated by hr.performance.view — subjects see status only. */
+    canView: boolean;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
@@ -478,7 +550,7 @@ function MilestoneEvidence({
 
     return (
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            {milestone.evidence_path ? (
+            {milestone.evidence_path && canView ? (
                 <a
                     href={`/hr/performance/pips/milestones/${milestone.id}/evidence`}
                     target="_blank"
@@ -488,11 +560,14 @@ function MilestoneEvidence({
                     <FileText className="h-3.5 w-3.5" />
                     View evidence
                 </a>
+            ) : milestone.evidence_path ? (
+                <span className="text-muted-foreground">Evidence on file</span>
             ) : (
                 <span className="text-muted-foreground">No evidence attached</span>
             )}
             {canManage && (
                 <>
+                    {/* eslint-disable-next-line no-restricted-syntax -- compact chip-style upload trigger */}
                     <button
                         type="button"
                         onClick={() => inputRef.current?.click()}

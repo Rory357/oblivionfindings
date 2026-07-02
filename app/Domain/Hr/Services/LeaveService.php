@@ -16,7 +16,6 @@ use App\Models\StaffTimeOff;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -382,7 +381,10 @@ class LeaveService
                 notes: $reason,
             );
 
-            $this->notifyUserOfDecision($request, 'declined', $reason);
+            // Real mail + database notification (includes the decline reason via
+            // the just-written review_notes) — mirrors the approve path's
+            // LeaveApprovedNotification instead of a database-only stub.
+            app(HrNotificationService::class)->notifyLeaveDeclined($request->fresh(['reviewer', 'user']));
 
             return $request->fresh();
         });
@@ -1375,44 +1377,4 @@ class LeaveService
         ]);
     }
 
-    protected function notifyUserOfDecision(HrLeaveRequest $request, string $decision, ?string $reason = null): void
-    {
-        $user = $request->user;
-        if (! $user) {
-            return;
-        }
-
-        $payload = [
-            'type' => "leave_{$decision}",
-            'leave_request_id' => $request->id,
-            'leave_type' => $request->leave_type,
-            'starts_at' => optional($request->starts_at)->toIso8601String(),
-            'ends_at' => optional($request->ends_at)->toIso8601String(),
-            'reason' => $reason,
-            'action_url' => "/hr/leave/{$request->id}",
-        ];
-
-        try {
-            $user->notify(new class($payload) extends Notification
-            {
-                public function __construct(private readonly array $payload) {}
-
-                public function via(object $notifiable): array
-                {
-                    return ['database'];
-                }
-
-                public function toArray(object $notifiable): array
-                {
-                    return $this->payload;
-                }
-            });
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to send leave decision notification', [
-                'leave_request_id' => $request->id,
-                'decision' => $decision,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-    }
 }

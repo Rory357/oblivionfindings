@@ -20,12 +20,14 @@ class HrWellbeingCheckin extends Model
         'notes',
         'mood',
         'follow_up_date',
+        'follow_up_reminder_sent_at',
         'is_private',
         'acknowledged_at',
     ];
 
     protected $casts = [
         'follow_up_date' => 'date',
+        'follow_up_reminder_sent_at' => 'datetime',
         'is_private' => 'boolean',
         'acknowledged_at' => 'datetime',
     ];

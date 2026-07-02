@@ -78,6 +78,7 @@ export function OffboardingWizardDialog({
     departureReasons,
     interviewers,
     defaultEndDate,
+    initialEmployeeProfileId = '',
 }: {
     open: boolean;
     onClose: () => void;
@@ -86,8 +87,14 @@ export function OffboardingWizardDialog({
     departureReasons: DepartureReason[];
     interviewers: OffboardingInterviewer[];
     defaultEndDate: string;
+    /** Preselect a leaver (from `?employee={profile_id}` deep links). */
+    initialEmployeeProfileId?: string;
 }) {
     const wizard = useWizard(STEPS.length);
+    // Only honour the prefill when it matches an offboardable employee.
+    const prefilledEmployee = employees.find(
+        (e) => String(e.id) === initialEmployeeProfileId,
+    );
     const form = useForm<{
         employee_profile_id: string;
         end_date: string;
@@ -96,8 +103,10 @@ export function OffboardingWizardDialog({
         interviewer_user_id: string;
         interview_date: string;
     }>({
-        employee_profile_id: '',
-        end_date: defaultEndDate,
+        employee_profile_id: prefilledEmployee
+            ? String(prefilledEmployee.id)
+            : '',
+        end_date: prefilledEmployee?.end_date || defaultEndDate,
         schedule_exit_interview: false,
         departure_reason: '',
         interviewer_user_id: '',

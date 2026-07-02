@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalCycle;
 use App\Domain\Hr\Services\CycleService;
 use App\Http\Controllers\Controller;
@@ -92,7 +93,33 @@ class GoalCycleController extends Controller
 
         $cycle->update(['status' => 'closed']);
 
-        return redirect()->back()->with('success', "Cycle “{$cycle->name}” closed.");
+        // Close-out: objectives that reached 100% are auto-completed; anything
+        // else is left untouched for the existing rollover flow.
+        $autoCompleted = 0;
+        HrGoal::query()
+            ->forTenant($cycle->tenant_id)
+            ->where('cycle_id', $cycle->id)
+            ->where('status', 'active')
+            ->where('progress_percentage', '>=', 100)
+            ->get()
+            ->each(function (HrGoal $goal) use (&$autoCompleted) {
+                $goal->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+                $autoCompleted++;
+            });
+
+        $remainOpen = HrGoal::query()
+            ->forTenant($cycle->tenant_id)
+            ->where('cycle_id', $cycle->id)
+            ->where('status', 'active')
+            ->count();
+
+        return redirect()->back()->with(
+            'success',
+            "Cycle “{$cycle->name}” closed — {$autoCompleted} objective(s) auto-completed, {$remainOpen} remain open for rollover.",
+        );
     }
 
     /** Clone selected objectives from this cycle into another. */

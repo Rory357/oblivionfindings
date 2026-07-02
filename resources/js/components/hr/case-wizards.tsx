@@ -176,6 +176,7 @@ function StaffPickList({
                 {filtered.map((s) => {
                     const active = String(s.id) === value;
                     return (
+                        // eslint-disable-next-line no-restricted-syntax -- selector card, not a form button
                         <button
                             key={s.id}
                             type="button"
@@ -241,21 +242,28 @@ export function NewCaseWizard({
     caseTypes,
     severities,
     onClose,
+    initial,
 }: {
     staff: CaseStaffOption[];
     caseTypes: CaseOption[];
     severities: CaseOption[];
     onClose: () => void;
+    /** Optional safe prefill (e.g. escalating from an unsuccessful PIP). */
+    initial?: {
+        user_id?: string;
+        case_type?: string;
+        description?: string;
+    };
 }) {
     const wizard = useWizard(NEW_CASE_STEPS.length);
     const [done, setDone] = useState(false);
 
     const form = useForm({
-        user_id: '',
-        case_type: '',
+        user_id: initial?.user_id ?? '',
+        case_type: initial?.case_type ?? '',
         severity: '',
         title: '',
-        description: '',
+        description: initial?.description ?? '',
         assigned_to: '',
         is_confidential: false as boolean,
     });

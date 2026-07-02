@@ -27,11 +27,13 @@ class HrPipMilestone extends Model
         'reviewer_notes',
         'reviewed_by',
         'reviewed_at',
+        'overdue_reminder_sent_at',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'reviewed_at' => 'datetime',
+        'overdue_reminder_sent_at' => 'datetime',
         'sort_order' => 'integer',
     ];
 

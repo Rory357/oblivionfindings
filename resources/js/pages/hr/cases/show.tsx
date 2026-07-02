@@ -37,6 +37,7 @@ import {
     Clock,
     Plus,
     User,
+    UserMinus,
     XCircle,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -240,7 +241,20 @@ export default function HrCaseShow({
         { title: hrCase.case_number, href: `/hr/cases/${hrCase.id}` },
     ];
 
-    const page = usePage<{ errors?: Record<string, string | string[]> }>();
+    const page = usePage<{
+        errors?: Record<string, string | string[]>;
+        flash?: {
+            offboarding_cta?: {
+                label: string;
+                url: string;
+                employee_name?: string | null;
+            } | null;
+        };
+    }>();
+
+    // Dismissal outcome → explicit "Start offboarding" next step (flashed by
+    // DisciplinaryController; nothing is auto-created).
+    const offboardingCta = page.props?.flash?.offboarding_cta ?? null;
 
     const isClosed = ['closed', 'resolved'].includes(hrCase.status);
     const disciplinaryActions =
@@ -377,6 +391,32 @@ export default function HrCaseShow({
                     />
                 }
             >
+                {offboardingCta ? (
+                    <Card className="border-status-warning/40 bg-status-warning-bg/40">
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+                            <div className="flex items-center gap-2 text-sm">
+                                <UserMinus className="h-4 w-4 shrink-0 text-status-warning" />
+                                <span>
+                                    Dismissal outcome recorded
+                                    {offboardingCta.employee_name
+                                        ? ` for ${offboardingCta.employee_name}`
+                                        : ''}
+                                    . Next step: start the offboarding
+                                    checklist.
+                                </span>
+                            </div>
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    router.visit(offboardingCta.url)
+                                }
+                            >
+                                {offboardingCta.label}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 {goodFaithError || stageError ? (
                     <Card className="border-status-critical/30 bg-status-critical-bg">
                         <CardContent className="py-3 text-sm text-status-critical">

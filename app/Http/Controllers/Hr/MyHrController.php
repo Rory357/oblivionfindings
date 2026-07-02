@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrAnnouncement;
+use App\Domain\Hr\Models\HrCourseAssignment;
+use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -20,6 +23,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
+use App\Domain\Hr\Services\CycleService;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\ExpenseService;
@@ -466,6 +470,26 @@ class MyHrController extends Controller
         return redirect()->route('hr.my.expenses')->with('success', 'Expense claim created.');
     }
 
+    /**
+     * Send my own draft claim for approval — or resubmit one that was
+     * rejected (the service clears the prior decision). Owner-gated.
+     */
+    public function submitExpenseClaim(Request $request, HrExpenseClaim $expenseClaim)
+    {
+        $user = $request->user();
+        abort_unless($expenseClaim->user_id === $user->id, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $expenseClaim->tenant_id);
+
+        try {
+            $this->expenseService->submitClaim($expenseClaim);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Expense claim submitted for approval.');
+    }
+
     public function cancelLeave(Request $request, HrLeaveRequest $leaveRequest)
     {
         $user = $request->user();
@@ -485,6 +509,46 @@ class MyHrController extends Controller
     {
         $user = $request->user();
         $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        // Active course assignments (my to-do list): everything not yet
+        // completed or waived, soonest due first, with an explicit overdue flag.
+        $assignments = HrCourseAssignment::forTenant($tenantId)
+            ->where('user_id', $user->id)
+            ->whereNotIn('status', ['completed', 'waived'])
+            ->with('course:id,title,code,category,delivery_method,duration_hours')
+            ->orderByRaw('due_at IS NULL, due_at')
+            ->get()
+            ->map(fn (HrCourseAssignment $a) => [
+                'id' => $a->id,
+                'course_title' => $a->course?->title ?? 'Training course',
+                'course_category' => $a->course?->category,
+                'delivery_method' => $a->course?->delivery_method,
+                'due_date' => $a->due_at?->toDateString(),
+                'status' => $a->effectiveStatus(),
+                'overdue' => $a->effectiveStatus() === 'overdue',
+                'assigned_at' => $a->assigned_at?->toDateString(),
+            ])
+            ->values();
+
+        // In-progress enrolments not already represented by an active assignment
+        // (assignments carry the due date, so they win the card).
+        $assignedCourseTitles = $assignments->pluck('course_title')->all();
+        $enrolments = HrCourseEnrollment::forTenant($tenantId)
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['enrolled', 'in_progress'])
+            ->with(['course:id,title,category,delivery_method', 'session:id,session_date'])
+            ->orderBy('enrolled_at')
+            ->get()
+            ->map(fn (HrCourseEnrollment $e) => [
+                'id' => $e->id,
+                'course_title' => $e->course?->title ?? 'Training course',
+                'course_category' => $e->course?->category,
+                'delivery_method' => $e->course?->delivery_method,
+                'session_date' => $e->session?->session_date?->toDateString(),
+                'enrolled_at' => $e->enrolled_at?->toDateString(),
+            ])
+            ->reject(fn (array $e) => in_array($e['course_title'], $assignedCourseTitles, true))
+            ->values();
 
         $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
             ->where('user_id', $user->id)
@@ -524,6 +588,8 @@ class MyHrController extends Controller
 
         return Inertia::render('hr/my/training', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
+            'assignments' => $assignments,
+            'enrolments' => $enrolments,
             'complianceStatuses' => $complianceStatuses,
             'can' => [
                 // Only surface the LMS catalog link to users who can open it
@@ -538,21 +604,54 @@ class MyHrController extends Controller
         $user = $request->user();
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        $attestByDays = (int) config('hr.policy_attestation_overdue_days', 7);
+
         $policies = HrPolicy::active()
             ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->with(['versions' => fn ($q) => $q->where('is_current', true)])
             ->orderBy('title')
             ->get()
-            ->map(function ($policy) use ($user, $tenantId) {
+            ->map(function ($policy) use ($user, $tenantId, $attestByDays) {
                 $attestation = HrPolicyAttestation::where('policy_id', $policy->id)
                     ->where('tenant_id', $tenantId)
                     ->where('user_id', $user->id)
                     ->orderByDesc('attested_at')
                     ->first();
 
+                $currentVersion = $policy->versions->first();
+
+                // Attested only counts against the CURRENT version — a new
+                // version resets it (legacy rows with no version stamp pass).
+                $attestedCurrent = $attestation !== null
+                    && ($attestation->policy_version_id === null
+                        || ! $currentVersion
+                        || (int) $attestation->policy_version_id === (int) $currentVersion->id);
+
+                // Periodic re-attestation: due again once the configured
+                // frequency has elapsed since the last attestation.
+                $reattestDueAt = null;
+                if ($attestedCurrent && $policy->attestation_frequency_months && $attestation?->attested_at) {
+                    $reattestDueAt = $attestation->attested_at->copy()->addMonths((int) $policy->attestation_frequency_months);
+                    if ($reattestDueAt->isPast()) {
+                        $attestedCurrent = false;
+                    }
+                }
+
+                // "Attest by" for pending items: version publish date + grace
+                // window (matches the reminder job), or the lapsed re-attest date.
+                $attestBy = null;
+                if (! $attestedCurrent) {
+                    $publishedAt = $currentVersion?->effective_from ?? $currentVersion?->created_at;
+                    $attestBy = $reattestDueAt?->isPast()
+                        ? $reattestDueAt
+                        : $publishedAt?->copy()->addDays($attestByDays);
+                }
+
                 $policy->my_attestation = $attestation;
-                $policy->is_attested = $attestation !== null;
+                $policy->is_attested = $attestedCurrent;
+                $policy->attest_by = $attestBy?->toDateString();
+                $policy->attest_overdue = $attestBy !== null && $attestBy->isPast();
 
                 return $policy;
             });
@@ -846,9 +945,44 @@ class MyHrController extends Controller
             ] : null,
         ]);
 
+        // My OKR objectives (HrGoal, owned by me, scoped to the current cycle
+        // when one exists) with progress/RAG + the check-in affordance.
+        $currentCycle = app(CycleService::class)->currentCycle($tenantId);
+        $objectives = HrGoal::forTenant($tenantId)
+            ->where('user_id', $user->id)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->when($currentCycle, fn ($q) => $q->where(
+                fn ($qq) => $qq->where('cycle_id', $currentCycle->id)->orWhereNull('cycle_id'),
+            ))
+            ->with([
+                'cycle:id,name',
+                'keyResults:id,goal_id,title,current_value,target_value,unit,confidence',
+            ])
+            ->orderBy('due_date')
+            ->get()
+            ->map(fn (HrGoal $g) => [
+                'id' => $g->id,
+                'title' => $g->title,
+                'status' => $g->status,
+                'confidence' => $g->confidence ?? 'on_track',
+                'progress_percentage' => (int) $g->progress_percentage,
+                'due_date' => $g->due_date?->toDateString(),
+                'last_checkin_at' => $g->last_checkin_at?->toDateString(),
+                'cycle' => $g->cycle?->name,
+                'key_results' => $g->keyResults->map(fn ($kr) => [
+                    'id' => $kr->id,
+                    'title' => $kr->title,
+                    'current_value' => $kr->current_value !== null ? (float) $kr->current_value : null,
+                    'target_value' => $kr->target_value !== null ? (float) $kr->target_value : null,
+                    'unit' => $kr->unit,
+                ])->values(),
+            ])
+            ->values();
+
         return Inertia::render('hr/my/goals', [
             'myHr' => $this->myHrShellProps($user, $tenantId),
             'goals' => $goals,
+            'objectives' => $objectives,
         ]);
     }
 

@@ -347,8 +347,13 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
         'is_active' => true,
     ]);
 
+    // hr_cases.is_confidential defaults to true, so grant the observer explicit
+    // access via the access_list; the participant already qualifies as
+    // assigned_to. This keeps the timeline event-visibility assertions running
+    // under the confidential-case access gate.
     $case->update([
         'assigned_to' => $participant->id,
+        'access_list' => [$observer->id],
         'updated_by' => $this->hr->id,
     ]);
 

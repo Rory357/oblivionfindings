@@ -144,6 +144,9 @@ class TimesheetApprovalService
                 }
 
                 $this->assertNotPayrollLinked($locked, 'returned after export preparation');
+                // Status downgrade inside a locked/exported payroll period would
+                // let the row be re-edited after payroll figures were frozen.
+                $this->assertNotLockedByPayroll($locked, 'returned');
                 $this->reconciliation->assertWorkflowAllowed($locked, 'returned');
 
                 $locked->forceFill([
@@ -182,6 +185,9 @@ class TimesheetApprovalService
                 }
 
                 $this->assertNotPayrollLinked($locked, 'rejected after export preparation');
+                // Same payroll-period freeze as returnForChanges: a rejection is
+                // a status change on a work_date payroll has already locked.
+                $this->assertNotLockedByPayroll($locked, 'rejected');
                 $this->reconciliation->assertWorkflowAllowed($locked, 'rejected');
 
                 $locked->forceFill([
@@ -276,6 +282,12 @@ class TimesheetApprovalService
         if ($timesheet->linkedShiftIsCancelled()) {
             abort(422, 'Timesheets linked to cancelled shifts cannot be approved.');
         }
+
+        // Approving into a locked/exported payroll period would create an
+        // approved timesheet the (already frozen) run never picked up — the
+        // hours would silently never be paid. Block it like every other
+        // in-period status mutation.
+        $this->assertNotLockedByPayroll($timesheet, 'approved');
 
         $this->reconciliation->assertWorkflowAllowed($timesheet, 'approved');
     }

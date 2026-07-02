@@ -8,6 +8,7 @@ use App\Http\Requests\Hr\StoreDisciplinaryActionRequest;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -218,6 +219,16 @@ class DisciplinaryController extends Controller
             );
         }
 
+        // Dismissal outcome → surface an explicit "Start offboarding" next step
+        // (never auto-create the checklist).
+        if ($currentOutcome !== '' && $currentOutcome !== $previousOutcome) {
+            if ($cta = $this->offboardingCtaFor($action)) {
+                return redirect()->back()
+                    ->with('success', 'Disciplinary action updated. Outcome is dismissal — start offboarding when ready.')
+                    ->with('offboarding_cta', $cta);
+            }
+        }
+
         return redirect()->back()->with('success', 'Disciplinary action updated.');
     }
 
@@ -276,7 +287,49 @@ class DisciplinaryController extends Controller
                 . '.'
         );
 
+        // Advancing a dismissal into an outcome stage → same explicit
+        // "Start offboarding" next step as recording the outcome.
+        if (in_array($nextStage, $outcomeStages, true) && ($cta = $this->offboardingCtaFor($action))) {
+            return redirect()->back()
+                ->with('success', "Disciplinary action advanced to: {$nextStage}. Outcome is dismissal — start offboarding when ready.")
+                ->with('offboarding_cta', $cta);
+        }
+
         return redirect()->back()->with('success', "Disciplinary action advanced to: {$nextStage}.");
+    }
+
+    /**
+     * Build the "Start offboarding" next-step payload when this action's
+     * outcome indicates dismissal. Vocabulary: `action_type` carries the
+     * canonical 'dismissal' value (ACTION_TYPE_OPTIONS); the free-text
+     * `outcome` is checked for "dismiss" as a fallback for 'other' types.
+     * Returns null when not a dismissal or the employee has no HR profile.
+     *
+     * @return array{label: string, url: string, employee_name: ?string}|null
+     */
+    protected function offboardingCtaFor(HrDisciplinaryAction $action): ?array
+    {
+        $isDismissal = $action->action_type === 'dismissal'
+            || str_contains(mb_strtolower((string) $action->outcome), 'dismiss');
+
+        if (! $isDismissal || ! $action->employee_user_id) {
+            return null;
+        }
+
+        $profileId = HrEmployeeProfile::query()
+            ->where('tenant_id', $action->tenant_id)
+            ->where('user_id', $action->employee_user_id)
+            ->value('id');
+
+        if (! $profileId) {
+            return null;
+        }
+
+        return [
+            'label' => 'Start offboarding',
+            'url' => "/hr/offboarding?new=1&employee={$profileId}",
+            'employee_name' => $action->employee?->name,
+        ];
     }
 
     /**

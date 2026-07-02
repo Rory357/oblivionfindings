@@ -89,6 +89,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::delete('/leave/{leaveRequest}', [MyHrController::class, 'cancelLeave'])->name('leave.cancel');
         Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
         Route::post('/expenses', [MyHrController::class, 'submitExpense'])->name('expenses.store');
+        Route::post('/expenses/{expenseClaim}/submit', [MyHrController::class, 'submitExpenseClaim'])->name('expenses.submit');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
         Route::get('/policies', [MyHrController::class, 'policies'])->name('policies');
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
@@ -99,6 +100,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::put('/reviews/{review}', [MyHrController::class, 'updateReview'])->name('reviews.update');
         Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');
         Route::put('/goals/{goal}', [MyHrController::class, 'updateGoal'])->name('goals.update');
+        // Self-service OKR check-in: reuses the hub's unified check-in endpoint
+        // logic; GoalController::checkin itself gates to owner-or-manager, so no
+        // hr.performance.view grant is needed to check in on your own objective.
+        Route::post('/goals/{goal}/checkin', [GoalController::class, 'checkin'])->name('goals.checkin');
         Route::get('/surveys', [MyHrController::class, 'surveys'])->name('surveys');
         Route::post('/surveys/{survey}', [MyHrController::class, 'submitSurvey'])->name('surveys.submit');
 
@@ -822,10 +827,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/', [ExpenseController::class, 'index'])->name('index');
         Route::get('/{expenseClaim}/items/{item}/receipt', [ExpenseController::class, 'downloadReceipt'])->name('receipt');
 
+        // Submit/resubmit: the controller gates to owner-or-manager, so a
+        // claimant may (re)submit their own claim without hr.expenses.manage
+        // (e.g. resubmitting after a rejection).
+        Route::post('/{expenseClaim}/submit', [ExpenseController::class, 'submit'])->name('submit');
+
         Route::middleware('permission:hr.expenses.manage')->group(function () {
             Route::get('/create', [ExpenseController::class, 'create'])->name('create');
             Route::post('/', [ExpenseController::class, 'store'])->name('store');
-            Route::post('/{expenseClaim}/submit', [ExpenseController::class, 'submit'])->name('submit');
         });
 
         Route::middleware('permission:hr.expenses.approve')->group(function () {
@@ -909,10 +918,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
         });
 
-        // Employee acknowledges their PIP
-        Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/milestones/{milestone}/evidence', [PipController::class, 'downloadMilestoneEvidence'])->name('milestones.evidence.show');
+    });
 
+    // PIP detail + acknowledge sit OUTSIDE the hr.performance.view gate: the
+    // subject employee must be able to read and acknowledge their own plan
+    // (NZ good-faith process). The controller enforces subject-or-manage access.
+    Route::prefix('performance/pips')->name('pips.')->group(function () {
+        Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{pip}', [PipController::class, 'show'])->name('show');
     });
 

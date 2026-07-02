@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
@@ -511,6 +512,31 @@ trait BuildsMyHrOverview
     private function overviewAttention(User $user, int $tenantId, Carbon $now): array
     {
         $items = [];
+
+        // 0. An active improvement plan waiting on the employee's acknowledgement.
+        //    The subject can open their own plan read-only (PipController::show).
+        $pip = HrPerformanceImprovementPlan::query()
+            // Legacy plans were stored with a NULL tenant (users carry no
+            // tenant_id column) — match those too so they still surface.
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('employee_user_id', $user->id)
+            ->whereIn('status', ['active', 'in_progress'])
+            ->where('employee_acknowledged', false)
+            ->orderBy('start_date')
+            ->first(['id', 'title', 'start_date', 'end_date']);
+        if ($pip) {
+            $items[] = [
+                'id' => 'pip',
+                'tone' => 'critical',
+                'icon' => 'alert',
+                'label' => 'Review & acknowledge your support plan: '.$pip->title,
+                'meta' => 'Your manager has set out expectations and support — please read and acknowledge it',
+                'badge' => 'Acknowledge',
+                'cta' => 'Review',
+                'go' => 'overview',
+                'href' => "/hr/performance/pips/{$pip->id}",
+            ];
+        }
 
         // 1. Documents awaiting signature.
         $pendingSigs = HrDocumentSignature::forSigner($user->id)

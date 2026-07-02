@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPipMilestone;
+use App\Domain\Hr\Notifications\PipCreatedNotification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +16,7 @@ use Inertia\Inertia;
 
 class PipController extends Controller
 {
-    use ServesPrivateAttachments;
+    use ResolvesHrTenant, ServesPrivateAttachments;
 
     /**
      * List PIPs with optional status filter.
@@ -120,9 +122,14 @@ class PipController extends Controller
             $reason .= "\n\nCreated from performance review #{$data['source_review_id']}.";
         }
 
-        DB::transaction(function () use ($user, $data, $reason) {
+        // users carry no tenant_id column — resolve via the shared HR helper
+        // (organization_id → profile → fallback) so the plan is never orphaned
+        // with a NULL tenant.
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $pip = DB::transaction(function () use ($user, $data, $reason, $tenantId) {
             $pip = HrPerformanceImprovementPlan::create([
-                'tenant_id' => $user->tenant_id,
+                'tenant_id' => $tenantId,
                 'employee_user_id' => $data['employee_user_id'],
                 'manager_user_id' => $user->id,
                 'title' => $data['title'],
@@ -148,13 +155,28 @@ class PipController extends Controller
                     ]);
                 }
             }
+
+            return $pip;
         });
+
+        // Best-effort after commit: the subject employee is asked to review &
+        // acknowledge; the plan manager gets a confirmation copy.
+        try {
+            $managerName = $user->name;
+            $employee = User::find($pip->employee_user_id);
+            $employee?->notify(new PipCreatedNotification($pip, $managerName, forSubject: true));
+            if ($employee === null || (int) $employee->id !== (int) $user->id) {
+                $user->notify(new PipCreatedNotification($pip, $managerName, forSubject: false));
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         if ($stay) {
             return redirect()->back()->with('success', 'Performance Improvement Plan created.');
         }
 
-        return redirect()->route('hr.performance.pips.index')->with('success', 'Performance Improvement Plan created.');
+        return redirect()->route('hr.pips.index')->with('success', 'Performance Improvement Plan created.');
     }
 
     /**
@@ -163,12 +185,17 @@ class PipController extends Controller
     public function show(Request $request, HrPerformanceImprovementPlan $pip)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        // The subject employee may read their own plan (NZ good-faith process:
+        // they are asked to review & acknowledge it); everyone else needs the
+        // performance-manage permission.
+        $isSubject = $user && (int) $pip->employee_user_id === (int) $user->id;
+        abort_unless($user && ($isSubject || $user->canDo('hr.performance.manage')), 403);
 
         $pip->load(['employee:id,name', 'manager:id,name', 'creator:id,name', 'milestones.reviewer:id,name']);
 
         return Inertia::render('hr/performance/pips/show', [
             'pip' => $pip,
+            'viewer_is_subject' => $isSubject,
             'can' => [
                 'manage' => $user->canDo('hr.performance.manage'),
             ],
@@ -368,6 +395,19 @@ class PipController extends Controller
             'completed_at' => now(),
             'updated_by' => $user->id,
         ]);
+
+        // An unsuccessful outcome needs a deliberate next step — surface the
+        // disciplinary-case CTA but never auto-create the case (NZ fair-process
+        // requirement: escalation is a considered human decision).
+        if ($data['outcome'] === 'unsuccessful') {
+            return redirect()
+                ->back()
+                ->with('success', 'PIP completed with an unsuccessful outcome. If formal action is the next step, open a disciplinary case so it is handled through the proper process.')
+                ->with('next', [
+                    'action' => 'open_disciplinary_case',
+                    'url' => "/hr/cases?new=1&employee={$pip->employee_user_id}&source_pip={$pip->id}",
+                ]);
+        }
 
         return redirect()->back()->with('success', 'PIP completed.');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrDocumentSignature extends Model
 {
-    use HasFactory;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',

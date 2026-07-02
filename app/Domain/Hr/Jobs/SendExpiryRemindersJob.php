@@ -5,9 +5,12 @@ namespace App\Domain\Hr\Jobs;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPolicy;
+use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\DocumentExpiryNotification;
+use App\Domain\Hr\Notifications\PolicyAttestationRequiredNotification;
 use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\VisaExpiryNotification;
 use App\Models\User;
@@ -97,6 +100,95 @@ class SendExpiryRemindersJob implements ShouldQueue
         $this->sendVisaExpiryReminders($reminderDays);
         $this->sendDocumentExpiryReminders((int) max($reminderDays));
         $this->sendSignatureDueReminders();
+        $this->sendAttestationOverdueReminders();
+    }
+
+    /**
+     * Policy-attestation sweep: staff who still haven't attested the current
+     * version of an active attestation-required policy, N days (default 7,
+     * config hr.policy_attestation_overdue_days) after that version was
+     * published, get a nudge. Deduped via the notifications table so each
+     * user receives at most one reminder per policy version.
+     */
+    private function sendAttestationOverdueReminders(): void
+    {
+        $overdueDays = (int) config('hr.policy_attestation_overdue_days', 7);
+        $cutoff = now()->subDays($overdueDays);
+        $sentCount = 0;
+
+        $policies = HrPolicy::query()
+            ->active()
+            ->where('requires_attestation', true)
+            ->when($this->tenantId !== null, fn ($q) => $q->where('tenant_id', $this->tenantId))
+            ->with('currentVersion')
+            ->get();
+
+        foreach ($policies as $policy) {
+            $version = $policy->currentVersion;
+            if (! $version) {
+                continue;
+            }
+
+            // Only nudge once the version has been out for the grace window.
+            $publishedAt = $version->effective_from ?? $version->created_at;
+            if (! $publishedAt || $publishedAt->gt($cutoff)) {
+                continue;
+            }
+
+            // Attested = a recorded attestation for this version (legacy rows
+            // with no version stamp count too, to avoid false nags).
+            $attestedUserIds = HrPolicyAttestation::query()
+                ->where('policy_id', $policy->id)
+                ->where(fn ($q) => $q->where('policy_version_id', $version->id)->orWhereNull('policy_version_id'))
+                ->pluck('user_id')
+                ->unique();
+
+            $pendingStaff = HrEmployeeProfile::query()
+                ->where('tenant_id', $policy->tenant_id)
+                ->where('is_active', true)
+                ->whereNotNull('user_id')
+                ->whereNotIn('user_id', $attestedUserIds->all())
+                ->with('user:id,name,email')
+                ->get()
+                ->pluck('user')
+                ->filter()
+                ->unique('id');
+
+            foreach ($pendingStaff as $member) {
+                // One nudge per policy-version per user, ever.
+                $alreadyNudged = $member->notifications()
+                    ->where('type', PolicyAttestationRequiredNotification::class)
+                    ->where('data->policy_version_id', $version->id)
+                    ->where('data->kind', 'reminder')
+                    ->exists();
+
+                if ($alreadyNudged) {
+                    continue;
+                }
+
+                try {
+                    $member->notify(new PolicyAttestationRequiredNotification([
+                        'policy_id' => $policy->id,
+                        'policy_version_id' => $version->id,
+                        'policy_title' => $policy->title,
+                        'version_number' => (int) $version->version_number,
+                        'kind' => 'reminder',
+                    ]));
+                    $sentCount++;
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send policy attestation reminder', [
+                        'policy_id' => $policy->id,
+                        'user_id' => $member->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        Log::info('SendExpiryRemindersJob: Policy attestation reminder check completed.', [
+            'tenant_id' => $this->tenantId,
+            'sent' => $sentCount,
+        ]);
     }
 
     /**

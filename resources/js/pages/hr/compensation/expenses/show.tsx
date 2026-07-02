@@ -138,7 +138,8 @@ export default function ExpenseShow({ claim, can }: Props) {
                         }
                         actions={
                             <>
-                                {claim.status === 'draft' && (
+                                {(claim.status === 'draft' ||
+                                    claim.status === 'rejected') && (
                                     <Button
                                         size="sm"
                                         onClick={() =>
@@ -148,7 +149,9 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         }
                                     >
                                         <Send className="mr-1.5 h-3.5 w-3.5" />
-                                        Submit
+                                        {claim.status === 'rejected'
+                                            ? 'Resubmit'
+                                            : 'Submit'}
                                     </Button>
                                 )}
                                 {can.approve && (

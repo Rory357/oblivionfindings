@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayRateRule;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
@@ -39,6 +40,8 @@ class PayrollExportService
             'sleepover_count' => 'Sleepover Count',
             'on_call_hours' => 'On Call Hours',
             'public_holiday_hours' => 'Public Holiday Hours',
+            'leave_hours' => 'Leave Hours',
+            'leave_pay' => 'Leave Pay',
             'mileage_km' => 'Mileage (KM)',
             'base_hourly_rate' => 'Base Hourly Rate',
             'overtime_multiplier' => 'Overtime Multiplier',
@@ -105,6 +108,8 @@ class PayrollExportService
                     'on_call_hours' => $aggregated['on_call_hours'],
                     'mileage_km' => $aggregated['mileage_km'],
                     'public_holiday_hours' => $aggregated['public_holiday_hours'],
+                    'leave_hours' => $aggregated['leave_hours'] ?? 0,
+                    'leave_pay' => $aggregated['leave_pay'] ?? 0,
                     'gross_pay' => $aggregated['gross_pay'],
                     'allowances' => $aggregated['allowances'],
                     'rate_breakdown' => $aggregated['rate_breakdown'],
@@ -336,6 +341,11 @@ class PayrollExportService
         $grouped = $timesheets->groupBy('user_id');
         $results = [];
 
+        // Approved PAID leave overlapping the period, keyed by user — consumed
+        // per-user inside the loop; whatever remains afterwards belongs to
+        // employees with leave but no timesheets in the period.
+        $leaveByUser = $this->approvedLeaveHoursByUser($tenantId, $periodStart, $periodEnd);
+
         foreach ($grouped as $userId => $userTimesheets) {
             $profile = HrEmployeeProfile::query()
                 ->where('user_id', $userId)
@@ -428,7 +438,13 @@ class PayrollExportService
                     : null
             );
 
-            $grossPay = round($regularPay + $overtimePay + $holidayLoading + $sleepoverPay + $onCallPay, 2);
+            // Approved paid leave for this user in the period — additive on top
+            // of worked-time pay, valued at the employee's base hourly rate.
+            $leaveHours = round((float) ($leaveByUser[$userId]['hours'] ?? 0), 2);
+            $leavePay = round($leaveHours * $baseRate, 2);
+            unset($leaveByUser[$userId]);
+
+            $grossPay = round($regularPay + $overtimePay + $holidayLoading + $sleepoverPay + $onCallPay + $leavePay, 2);
             $bucketLines = collect($ruleBuckets)
                 ->map(function (array $bucket) {
                     return [
@@ -460,6 +476,8 @@ class PayrollExportService
                 'on_call_hours' => round($onCallHours, 2),
                 'mileage_km' => round($mileageKm, 2),
                 'public_holiday_hours' => round($publicHolidayHours, 2),
+                'leave_hours' => $leaveHours,
+                'leave_pay' => $leavePay,
                 'overtime_multiplier' => round($dominantRates['overtime_multiplier'], 2),
                 'public_holiday_multiplier' => round($dominantRates['public_holiday_multiplier'], 2),
                 'sleepover_rate' => round($dominantRates['sleepover_rate'], 2),
@@ -474,13 +492,126 @@ class PayrollExportService
                     'holiday_loading' => round($holidayLoading, 2),
                     'sleepover_pay' => round($sleepoverPay, 2),
                     'on_call_pay' => round($onCallPay, 2),
+                    'leave_pay' => $leavePay,
                     'overtime_threshold_daily_hours' => $overtimeThreshold,
                     'line_items' => $bucketLines,
                 ],
             ];
         }
 
+        // Employees with approved paid leave but no timesheets in the period
+        // still need a run item so their leave is paid.
+        foreach ($leaveByUser as $userId => $leave) {
+            $leaveHours = round((float) ($leave['hours'] ?? 0), 2);
+            if ($leaveHours <= 0) {
+                continue;
+            }
+
+            $profile = HrEmployeeProfile::query()
+                ->where('user_id', $userId)
+                ->first();
+
+            $baseRate = (float) ($profile?->hourly_rate ?: 0);
+            $leavePay = round($leaveHours * $baseRate, 2);
+            $defaultRates = $this->resolveRateInputs(null);
+
+            $results[$userId] = [
+                'timesheet_ids' => [],
+                'base_hourly_rate' => round($baseRate, 2),
+                'regular_hours' => 0.0,
+                'overtime_hours' => 0.0,
+                'sleepover_count' => 0,
+                'on_call_hours' => 0.0,
+                'mileage_km' => 0.0,
+                'public_holiday_hours' => 0.0,
+                'leave_hours' => $leaveHours,
+                'leave_pay' => $leavePay,
+                'overtime_multiplier' => round($defaultRates['overtime_multiplier'], 2),
+                'public_holiday_multiplier' => round($defaultRates['public_holiday_multiplier'], 2),
+                'sleepover_rate' => round($defaultRates['sleepover_rate'], 2),
+                'on_call_rate' => round($defaultRates['on_call_rate'], 2),
+                'gross_pay' => $leavePay,
+                'allowances' => [],
+                'rate_breakdown' => [
+                    'rule_id' => null,
+                    'rule_name' => 'Default rates',
+                    'regular_pay' => 0.0,
+                    'overtime_pay' => 0.0,
+                    'holiday_loading' => 0.0,
+                    'sleepover_pay' => 0.0,
+                    'on_call_pay' => 0.0,
+                    'leave_pay' => $leavePay,
+                    'overtime_threshold_daily_hours' => (float) config('hr.payroll.overtime_daily_hours', 8),
+                    'line_items' => [],
+                ],
+            ];
+        }
+
         return $results;
+    }
+
+    /**
+     * Sum approved PAID leave hours per user for leave requests overlapping the
+     * pay period. Multi-day requests are pro-rated by calendar days inside the
+     * period (hours_requested apportioned evenly across the request's days).
+     *
+     * Paid-leave rule: leave types are plain strings (LeaveService::LEAVE_TYPES)
+     * with no per-type "paid" flag anywhere in the schema, and the only type the
+     * system explicitly models as unpaid is 'unpaid' (zero default entitlement,
+     * named as such). Payroll therefore includes every approved leave type
+     * EXCEPT 'unpaid'.
+     *
+     * @return array<int, array{hours: float, request_ids: array<int, int>}>
+     */
+    protected function approvedLeaveHoursByUser(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+
+        // SQL prefilter on UTC dates is safe (UTC date <= local NZ date), the
+        // precise overlap is recomputed below on worker-timezone calendar days.
+        $requests = HrLeaveRequest::query()
+            ->approved()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->where('leave_type', '!=', 'unpaid')
+            ->whereDate('starts_at', '<=', $periodEnd->toDateString())
+            ->whereDate('ends_at', '>=', $periodStart->copy()->subDay()->toDateString())
+            ->get(['id', 'user_id', 'starts_at', 'ends_at', 'hours_requested', 'leave_type']);
+
+        $windowStart = Carbon::parse($periodStart->toDateString());
+        $windowEnd = Carbon::parse($periodEnd->toDateString());
+
+        $byUser = [];
+
+        foreach ($requests as $request) {
+            if (! $request->starts_at || ! $request->ends_at || (float) $request->hours_requested <= 0) {
+                continue;
+            }
+
+            $leaveStart = Carbon::parse($request->starts_at->copy()->timezone($timezone)->toDateString());
+            $leaveEnd = Carbon::parse($request->ends_at->copy()->timezone($timezone)->toDateString());
+
+            if ($leaveEnd->lessThan($leaveStart)) {
+                continue;
+            }
+
+            $totalDays = (int) $leaveStart->diffInDays($leaveEnd) + 1;
+
+            $overlapStart = $leaveStart->greaterThan($windowStart) ? $leaveStart : $windowStart;
+            $overlapEnd = $leaveEnd->lessThan($windowEnd) ? $leaveEnd : $windowEnd;
+
+            if ($overlapStart->greaterThan($overlapEnd)) {
+                continue;
+            }
+
+            $overlapDays = (int) $overlapStart->diffInDays($overlapEnd) + 1;
+            $hours = (float) $request->hours_requested * ($overlapDays / $totalDays);
+
+            $userId = (int) $request->user_id;
+            $byUser[$userId]['hours'] = ($byUser[$userId]['hours'] ?? 0.0) + $hours;
+            $byUser[$userId]['request_ids'][] = (int) $request->id;
+        }
+
+        return $byUser;
     }
 
     /**
@@ -612,7 +743,9 @@ class PayrollExportService
                 ->unique()
                 ->values();
 
-            if ($timesheetIds->isEmpty()) {
+            // Leave-only items (approved leave, no worked time in the period)
+            // legitimately carry no timesheets.
+            if ($timesheetIds->isEmpty() && (float) $item->leave_hours <= 0) {
                 $errors[] = "Run item #{$item->id} has no linked timesheets.";
             }
 
@@ -730,6 +863,8 @@ class PayrollExportService
                     'sleepover_count' => (int) $item->sleepover_count,
                     'on_call_hours' => (float) $item->on_call_hours,
                     'public_holiday_hours' => (float) $item->public_holiday_hours,
+                    'leave_hours' => (float) ($item->leave_hours ?? 0),
+                    'leave_pay' => (float) ($item->leave_pay ?? 0),
                     'mileage_km' => (float) $item->mileage_km,
                     'base_hourly_rate' => (float) $item->base_hourly_rate,
                     'overtime_multiplier' => (float) $item->overtime_multiplier,
@@ -760,6 +895,8 @@ class PayrollExportService
             ['header' => 'sleepover_count', 'source' => 'sleepover_count'],
             ['header' => 'on_call_hours', 'source' => 'on_call_hours'],
             ['header' => 'public_holiday_hours', 'source' => 'public_holiday_hours'],
+            ['header' => 'leave_hours', 'source' => 'leave_hours'],
+            ['header' => 'leave_pay', 'source' => 'leave_pay'],
             ['header' => 'mileage_km', 'source' => 'mileage_km'],
             ['header' => 'base_hourly_rate', 'source' => 'base_hourly_rate'],
             ['header' => 'gross_pay', 'source' => 'gross_pay'],

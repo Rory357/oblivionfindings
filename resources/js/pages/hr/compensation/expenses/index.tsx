@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, Eye, Plus, XCircle } from 'lucide-react';
+import { CheckCircle, Eye, Plus, Send, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 type ExpenseClaim = {
@@ -147,6 +147,20 @@ export default function ExpenseIndex({
         setBusyId(claim.id);
         router.post(
             `/hr/compensation/expenses/${claim.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setBusyId(null),
+            },
+        );
+    };
+
+    // Rejected claims can be resubmitted by their owner (or a manager) —
+    // the backend clears the prior decision and re-queues the claim.
+    const resubmit = (claim: ExpenseClaim) => {
+        setBusyId(claim.id);
+        router.post(
+            `/hr/compensation/expenses/${claim.id}/submit`,
             {},
             {
                 preserveScroll: true,
@@ -388,6 +402,20 @@ export default function ExpenseIndex({
                                                                 </Button>
                                                             </>
                                                         )}
+                                                    {claim.status ===
+                                                        'rejected' && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={busy}
+                                                            onClick={() =>
+                                                                resubmit(claim)
+                                                            }
+                                                        >
+                                                            <Send className="mr-1 h-3.5 w-3.5" />
+                                                            Resubmit
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
