@@ -445,7 +445,9 @@ class CandidateController extends Controller
 
         $validated = $request->validate([
             'tags' => ['nullable', 'array'],
-            'tags.*' => ['string', 'max:100'],
+            // Blank entries arrive as null (ConvertEmptyStringsToNull) — tolerate them
+            // here and drop them below, rather than failing the whole request.
+            'tags.*' => ['nullable', 'string', 'max:100'],
         ]);
 
         $tags = collect($validated['tags'] ?? [])
