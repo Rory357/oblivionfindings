@@ -676,3 +676,11 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
         animation: none !important;
     }
 }
+
+/* Dark-mode basemap. OpenStreetMap has no dark tile set, so leaflet-map.tsx
+   tags the dark tile layer with this class and we invert/tone the raster to a
+   dark cartography. Only the tile <img> pane is affected; markers, polylines
+   and geofences live in separate Leaflet panes and keep their true colours. */
+.leaflet-tiles-dark {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}

@@ -51,15 +51,16 @@ type LeafletMapProps = {
     onMapClick?: (latlng: { lat: number; lng: number }) => void;
 };
 
-const STREET_TILE_URL =
-    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+// OpenStreetMap's standard tile server — keyless and reliable. (The former
+// CARTO basemap CDN now returns 503 for keyless traffic.) OSM ships no dark
+// basemap, so dark mode reuses these tiles and darkens them via the
+// `leaflet-tiles-dark` CSS filter (see resources/css/app.css).
+const STREET_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const STREET_TILE_ATTRIBUTION =
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-const DARK_TILE_URL =
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const DARK_TILE_ATTRIBUTION =
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+const DARK_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const DARK_TILE_ATTRIBUTION = STREET_TILE_ATTRIBUTION;
 
 const SATELLITE_TILE_URL =
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -574,6 +575,7 @@ export default function LeafletMap({
                 const streetLayer = L.tileLayer(streetUrl, {
                     attribution: streetAttr,
                     maxZoom: 19,
+                    className: isDark ? 'leaflet-tiles-dark' : undefined,
                 });
                 const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, {
                     attribution: SATELLITE_TILE_ATTRIBUTION,
@@ -654,6 +656,7 @@ export default function LeafletMap({
         const streetLayer = L.tileLayer(streetUrl, {
             attribution: streetAttr,
             maxZoom: 19,
+            className: isDark ? 'leaflet-tiles-dark' : undefined,
         });
         const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, {
             attribution: SATELLITE_TILE_ATTRIBUTION,

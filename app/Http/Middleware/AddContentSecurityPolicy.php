@@ -26,7 +26,8 @@ use Symfony\Component\HttpFoundation\Response;
  *     only workable option for a component-driven SPA (style injection is far
  *     lower risk than script injection). fonts.bunny.net serves the web-font CSS.
  *   • font-src fonts.bunny.net — the Instrument Sans web font.
- *   • img-src data: blob: — data-URI icons and object-URL upload previews.
+ *   • img-src data: blob: — data-URI icons and object-URL upload previews;
+ *     tile.openstreetmap.org and server.arcgisonline.com serve Leaflet map tiles.
  *   • media-src 'self' — the in-app alert chime (/sounds/alert.mp3).
  *   • object-src 'none' / base-uri 'self' / frame-ancestors 'none' — kill the
  *     plugin, <base>-hijack and clickjacking classes outright.
@@ -81,7 +82,16 @@ class AddContentSecurityPolicy
             "script-src 'self' 'nonce-{$nonce}'",
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net",
             "font-src 'self' https://fonts.bunny.net data:",
-            "img-src 'self' data: blob:",
+            // Map tiles: OpenStreetMap (street/dark basemap) and Esri ArcGIS
+            // (satellite layer) are fetched as <img> by Leaflet.
+            'img-src '.implode(' ', [
+                "'self'",
+                'data:',
+                'blob:',
+                'https://tile.openstreetmap.org',
+                'https://*.tile.openstreetmap.org',
+                'https://server.arcgisonline.com',
+            ]),
             "media-src 'self'",
             "connect-src 'self'",
             "object-src 'none'",
