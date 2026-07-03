@@ -229,6 +229,7 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
     const suppressForm = useForm({
         suppress_med_admin_alerts: suppression.suppressed,
         reason: suppression.reason ?? '',
+        basis: '',
     });
 
     const submit = (e: React.FormEvent) => {
@@ -276,7 +277,20 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
                     />
                 </div>
                 {suppressForm.data.suppress_med_admin_alerts && (
-                    <div className="mt-3">
+                    <div className="mt-3 grid gap-3">
+                        <Field label="Basis" required error={suppressForm.errors.basis}>
+                            <SelectInput
+                                value={suppressForm.data.basis}
+                                onChange={(v) => suppressForm.setData('basis', v)}
+                                placeholder="Select the decision basis…"
+                                options={[
+                                    { value: 'capacity_assessment', label: 'Capacity assessment' },
+                                    { value: 'mdt_decision', label: 'MDT decision' },
+                                    { value: 'clinical_judgement', label: 'Clinical judgement' },
+                                    { value: 'client_preference', label: 'Client preference' },
+                                ]}
+                            />
+                        </Field>
                         <Field label="Reason" required error={suppressForm.errors.reason}>
                             <Input
                                 value={suppressForm.data.reason}
