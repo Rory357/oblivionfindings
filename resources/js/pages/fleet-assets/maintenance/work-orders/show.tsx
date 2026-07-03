@@ -78,7 +78,7 @@ export default function WorkOrderShow({ work_order }: Props) {
 
     const updateForm = useForm({
         status: wo.status ?? 'open',
-        notes: '',
+        notes: wo.notes ?? '',
         actual_cost: wo.actual_cost != null ? String(wo.actual_cost) : '',
     });
 
