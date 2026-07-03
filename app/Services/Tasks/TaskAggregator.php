@@ -2,10 +2,12 @@
 
 namespace App\Services\Tasks;
 
+use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * The company-wide work-item feed: unions open incidents, corrective
@@ -21,6 +23,16 @@ class TaskAggregator
 
     /** @var TaskProvider[] */
     private array $providers;
+
+    /**
+     * Per-request memo of each user's watched item-key set, keyed by user id.
+     * The aggregator is resolved fresh per request (no singleton binding), so
+     * this stays request-scoped and lets the index render, badge helper and
+     * the `following` filter share a single task_watchers read.
+     *
+     * @var array<int, array<string, true>>
+     */
+    private array $watchedMemo = [];
 
     /**
      * @param  TaskProvider[]|null  $providers  Defaults to the full registry.
@@ -61,6 +73,28 @@ class TaskAggregator
             new Providers\FirstAidFollowupProvider(),
             new Providers\RestraintReviewProvider(),
         ];
+    }
+
+    /**
+     * The user's watched item keys as a set ("{source}|{item_id}" => true).
+     * Memoised per request so the `following` filter, the `watching` stat and
+     * the badge helper all share ONE task_watchers read.
+     *
+     * @return array<string, true>
+     */
+    public function watchedKeysFor(User $user): array
+    {
+        if (isset($this->watchedMemo[$user->id])) {
+            return $this->watchedMemo[$user->id];
+        }
+
+        $keys = TaskWatcher::query()
+            ->where('user_id', $user->id)
+            ->get(['source', 'item_id'])
+            ->mapWithKeys(fn (TaskWatcher $w) => [$w->source.'|'.$w->item_id => true])
+            ->all();
+
+        return $this->watchedMemo[$user->id] = $keys;
     }
 
     /**
@@ -180,6 +214,7 @@ class TaskAggregator
         $open = array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE);
         $mine = array_filter($open, fn (TaskItem $i) => ($i->assignee['id'] ?? null) === $user->id);
         $weekAhead = now()->addDays(7);
+        $watched = $this->watchedKeysFor($user);
 
         return [
             'open' => count($open),
@@ -196,6 +231,10 @@ class TaskAggregator
             'critical' => count(array_filter($open, fn (TaskItem $i) => in_array($i->severity, ['critical', 'high'], true))),
             'mine' => count($mine),
             'myOverdue' => count(array_filter($mine, fn (TaskItem $i) => $i->isOverdue())),
+            'watching' => count(array_filter(
+                $open,
+                fn (TaskItem $i) => isset($watched[$i->source.'|'.Str::afterLast($i->id, '-')]),
+            )),
         ];
     }
 
@@ -266,6 +305,14 @@ class TaskAggregator
         if ($q !== '') {
             $haystack = strtolower(($item->ref ?? '').' '.$item->title.' '.($item->description ?? ''));
             if (! str_contains($haystack, strtolower($q))) {
+                return false;
+            }
+        }
+
+        // following=true: only items the user is watching (task_watchers).
+        if (! empty($filters['following'])) {
+            $key = $item->source.'|'.Str::afterLast($item->id, '-');
+            if (! isset($this->watchedKeysFor($user)[$key])) {
                 return false;
             }
         }

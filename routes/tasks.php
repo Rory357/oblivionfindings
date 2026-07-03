@@ -17,8 +17,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/tasks/detail', [AllTasksController::class, 'detail'])->name('tasks.detail');
     Route::get('/tasks/lookup', [AllTasksController::class, 'lookup'])->name('tasks.lookup');
     Route::get('/tasks/reports', [AllTasksController::class, 'reports'])->name('tasks.reports');
+    Route::get('/tasks/users', [AllTasksController::class, 'users'])->name('tasks.users');
     Route::post('/tasks/default-view', [AllTasksController::class, 'saveDefaultView'])->name('tasks.default-view');
     Route::post('/tasks/{source}/{id}/assign', [AllTasksController::class, 'assign'])
         ->whereNumber('id')
         ->name('tasks.assign');
+    Route::post('/tasks/{source}/{id}/watch', [AllTasksController::class, 'watch'])
+        ->whereNumber('id')
+        ->name('tasks.watch');
+    Route::post('/tasks/{source}/{id}/split', [AllTasksController::class, 'split'])
+        ->whereNumber('id')
+        ->name('tasks.split');
 });

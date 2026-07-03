@@ -3,15 +3,17 @@
 namespace App\Services\Tasks\Providers;
 
 use App\Models\Client;
+use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class SafeguardingConcernProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class SafeguardingConcernProvider implements TaskProvider, HasModelClass, AssignableTaskProvider, SplittableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -142,5 +144,69 @@ class SafeguardingConcernProvider implements TaskProvider, HasModelClass, Assign
                 restricted: $restricted,
             );
         })->all();
+    }
+
+    public function childLabel(): string
+    {
+        return 'action';
+    }
+
+    public function createChild(User $actor, int $id, array $data): ?string
+    {
+        // Mirror SafeguardingActionPlanController::store()'s write gate. The
+        // controller authorizes 'update'; the module's investigate permission
+        // is the key that governs opening action plans on a concern.
+        if (! $actor->canDo('safeguarding.investigate')) {
+            throw ValidationException::withMessages([
+                'title' => 'You do not have permission to add an action to this concern.',
+            ]);
+        }
+
+        $concern = SafeguardingConcern::query()->find($id);
+
+        if (! $concern) {
+            throw ValidationException::withMessages([
+                'title' => 'Safeguarding concern not found.',
+            ]);
+        }
+
+        // Re-apply the exact need-to-know redaction this provider enforces
+        // (parity with SafeguardingConcernController::isConcernRestricted()):
+        // a restricted viewer of a sensitive concern cannot see its subject and
+        // therefore must not be able to fork actions off it.
+        $restricted = $concern->is_sensitive
+            && ! $actor->can('viewSensitive', SafeguardingConcern::class)
+            && $concern->assigned_to_user_id !== $actor->id
+            && $concern->reported_by_user_id !== $actor->id;
+
+        if ($restricted) {
+            throw ValidationException::withMessages([
+                'title' => 'This concern is restricted — you cannot split it into an action.',
+            ]);
+        }
+
+        // Map the cross-cutting split shape onto the action-plan columns exactly
+        // as SafeguardingActionPlanController::store() writes them. The module
+        // has no separate free-text column beyond action_description, so the
+        // queue title (+ description) become the action description.
+        $title = trim((string) ($data['title'] ?? ''));
+        $description = trim((string) ($data['description'] ?? ''));
+        $actionDescription = $description !== '' ? $title."\n\n".$description : $title;
+
+        SafeguardingActionPlan::create([
+            'safeguarding_concern_id' => $concern->id,
+            'action_description' => $actionDescription,
+            'assigned_to_user_id' => $data['assignee_id'] ?? null,
+            'due_date' => $data['due_at'] ?? null,
+            'status' => 'pending',
+            // priority is an int column; the module defaults null → 3 on create.
+            'priority' => 3,
+            'created_by' => $actor->id,
+        ]);
+
+        // No module notification — the /tasks split controller sends the
+        // assignment FYI, and the module's own store() fires nothing anyway.
+
+        return "/safeguarding?concern={$concern->id}";
     }
 }

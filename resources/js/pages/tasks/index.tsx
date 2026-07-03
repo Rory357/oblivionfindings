@@ -76,6 +76,7 @@ interface Filters {
     due: 'week' | null;
     q: string | null;
     include_done: boolean;
+    following: boolean;
 }
 
 interface Stats {
@@ -88,6 +89,7 @@ interface Stats {
     critical: number;
     mine: number;
     myOverdue: number;
+    watching: number;
 }
 
 interface Pagination {
@@ -111,21 +113,27 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 /** Register views — the TabStrip below the hero owns these dimensions. */
-type TabKey = 'all' | 'mine' | 'overdue' | 'unassigned' | 'week' | 'high' | 'done';
+type TabKey = 'all' | 'mine' | 'following' | 'overdue' | 'unassigned' | 'week' | 'high' | 'done';
 
-/** Filter override applied when a tab is clicked (search + modules persist). */
+/** Filter override applied when a tab is clicked (search + modules persist).
+ *  Each entry is a full reset of every dimension the tabs own — including
+ *  `following` — so switching tabs never leaves a stray dimension behind. */
 const TAB_FILTERS: Record<TabKey, Partial<Filters>> = {
-    all: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false },
-    mine: { assigned: 'me', overdue: false, due: null, severity: null, bucket: null, include_done: false },
-    overdue: { assigned: null, overdue: true, due: null, severity: null, bucket: null, include_done: false },
-    unassigned: { assigned: 'unassigned', overdue: false, due: null, severity: null, bucket: null, include_done: false },
-    week: { assigned: null, overdue: false, due: 'week', severity: null, bucket: null, include_done: false },
-    high: { assigned: null, overdue: false, due: null, severity: ['critical', 'high'], bucket: null, include_done: false },
-    done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true },
+    all: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
+    mine: { assigned: 'me', overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
+    following: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false, following: true },
+    overdue: { assigned: null, overdue: true, due: null, severity: null, bucket: null, include_done: false, following: false },
+    unassigned: { assigned: 'unassigned', overdue: false, due: null, severity: null, bucket: null, include_done: false, following: false },
+    week: { assigned: null, overdue: false, due: 'week', severity: null, bucket: null, include_done: false, following: false },
+    high: { assigned: null, overdue: false, due: null, severity: ['critical', 'high'], bucket: null, include_done: false, following: false },
+    done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true, following: false },
 };
 
 function deriveTab(f: Filters): TabKey | 'none' {
     if (f.include_done && (f.bucket ?? []).join(',') === 'done') return 'done';
+    // Following is its own dimension — check it before assignment/overdue so a
+    // watched-items view isn't masked by whatever else is on the item.
+    if (f.following) return 'following';
     // Combined views (e.g. the "My overdue" hero tile: assigned=me&overdue=1)
     // match no single tab — highlight none rather than lie.
     if (f.overdue && f.assigned) return 'none';
@@ -158,6 +166,7 @@ function buildParams(f: Filters, page?: number): Record<string, string> {
     if (f.due) params.due = f.due;
     if (f.q) params.q = f.q;
     if (f.include_done) params.done = '1';
+    if (f.following) params.following = '1';
     if (page && page > 1) params.page = String(page);
     return params;
 }
@@ -227,6 +236,7 @@ export default function TasksIndex({
     const TABS: RosterTabItem[] = [
         { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: stats.open || undefined },
         { id: 'mine', label: 'Mine', icon: UserCheck, tone: 'info', badge: stats.mine || undefined },
+        { id: 'following', label: 'Following', icon: Eye, tone: 'info', badge: stats.watching || undefined },
         { id: 'overdue', label: 'Overdue', icon: Clock, tone: 'critical', badge: stats.overdue || undefined },
         { id: 'unassigned', label: 'Unassigned', icon: UserX, tone: 'warning', badge: stats.unassigned || undefined },
         { id: 'week', label: 'Due this week', icon: CalendarClock, tone: 'info', badge: stats.dueWeek || undefined },
@@ -259,6 +269,7 @@ export default function TasksIndex({
             due: null,
             q: null,
             include_done: false,
+            following: false,
         };
         setSearch('');
         router.get('/tasks', {}, { preserveState: true, preserveScroll: true, replace: true });

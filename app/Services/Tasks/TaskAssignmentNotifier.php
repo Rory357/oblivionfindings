@@ -2,6 +2,7 @@
 
 namespace App\Services\Tasks;
 
+use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -24,7 +25,9 @@ class TaskAssignmentNotifier
 
         $label = $item?->ref ?? ($item?->title ?? 'a task');
 
-        app(NotificationService::class)->notifyCrud(
+        $notifications = app(NotificationService::class);
+
+        $notifications->notifyCrud(
             actor: $actor,
             action: 'assigned',
             entityLabel: 'Task',
@@ -43,5 +46,34 @@ class TaskAssignmentNotifier
                 'include_entity_user' => false,
             ],
         );
+
+        // FYI the item's watchers of the reassignment — everyone "Following"
+        // except the actor and the new assignee (who got the ping above). One
+        // fan-out call for the whole watcher set.
+        $watcherIds = TaskWatcher::query()
+            ->where('source', $provider->sourceKey())
+            ->where('item_id', $id)
+            ->whereNotIn('user_id', array_filter([$actor->id, $assigneeId]))
+            ->pluck('user_id')
+            ->all();
+
+        if ($watcherIds !== []) {
+            $notifications->notifyCrud(
+                actor: $actor,
+                action: 'assigned',
+                entityLabel: 'Task',
+                entity: null,
+                extra: [
+                    'event_key' => 'tasks.assigned',
+                    'title' => "{$label} was reassigned",
+                    'body' => $item?->title,
+                    'url' => $item?->link ?? '/tasks',
+                    'target_user_ids' => $watcherIds,
+                    'include_managers' => false,
+                    'include_assigned_workers' => false,
+                    'include_entity_user' => false,
+                ],
+            );
+        }
     }
 }

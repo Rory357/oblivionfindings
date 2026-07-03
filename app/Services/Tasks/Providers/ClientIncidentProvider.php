@@ -3,18 +3,24 @@
 namespace App\Services\Tasks\Providers;
 
 use App\Models\ClientIncident;
+use App\Models\IncidentFollowup;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
 /**
  * NOT assignable from the queue: `investigation_assigned_to` is a legacy
  * column no incidents-module endpoint writes any more (investigation
  * editing moved to the H&S register — see IncidentController::update()'s
  * Option B note), so there are no module assignment rules to mirror.
+ *
+ * IS splittable: a queue row can be forked into an IncidentFollowup, mirroring
+ * IncidentFollowupController::store() exactly (permission, columns, scoping).
  */
-class ClientIncidentProvider implements TaskProvider, HasModelClass
+class ClientIncidentProvider implements TaskProvider, HasModelClass, SplittableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -95,5 +101,58 @@ class ClientIncidentProvider implements TaskProvider, HasModelClass
                 description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
             );
         })->all();
+    }
+
+    public function childLabel(): string
+    {
+        return 'follow-up';
+    }
+
+    public function createChild(User $actor, int $id, array $data): ?string
+    {
+        // Mirror IncidentFollowupController::store()'s permission gate. The
+        // parent `view` policy is enforced by the re-fetch scoping below; the
+        // followups.manage key is the write gate the controller adds on top.
+        if (! $actor->canDo('incidents.followups.manage')) {
+            throw ValidationException::withMessages([
+                'title' => 'You do not have permission to add a follow-up to this incident.',
+            ]);
+        }
+
+        // Re-fetch with the SAME viewAssigned client scoping tasks() applies,
+        // so an incident outside the actor's assigned clients reads as absent.
+        $incident = ClientIncident::query()
+            ->when(
+                ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
+                fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($actor->id)),
+            )
+            ->find($id);
+
+        if (! $incident) {
+            throw ValidationException::withMessages([
+                'title' => 'Incident not found or outside your assigned clients.',
+            ]);
+        }
+
+        // Map the cross-cutting split shape onto the follow-up columns exactly
+        // as IncidentFollowupController::store() writes them. The queue has no
+        // separate body column, so title (+ description) become the notes.
+        $title = trim((string) ($data['title'] ?? ''));
+        $description = trim((string) ($data['description'] ?? ''));
+        $notes = $description !== '' ? $title."\n\n".$description : $title;
+
+        IncidentFollowup::create([
+            'client_incident_id' => $incident->id,
+            'assigned_to_user_id' => $data['assignee_id'] ?? null,
+            'due_at' => $data['due_at'] ?? null,
+            'notes' => $notes,
+            'created_by' => $actor->id,
+        ]);
+
+        // The /tasks split controller sends the assignment FYI — do NOT fire
+        // the module's own followups.created notification (that would double up
+        // and fan out to managers the queue action deliberately excludes).
+
+        return "/incidents/{$incident->id}";
     }
 }

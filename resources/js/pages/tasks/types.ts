@@ -4,6 +4,26 @@ import type { StatusVariant } from '@/components/ui/status-badge';
 
 export type NamedRef = { id: number; name: string };
 
+/** One audit row in the drawer's Activity timeline. */
+export interface TimelineEntry {
+    id: number;
+    action: string;
+    user: string | null;
+    at: string | null;
+}
+
+/** Shape of the GET /tasks/detail JSON payload (permission-scoped). */
+export interface TaskDetail {
+    item: TaskItem;
+    timeline: TimelineEntry[];
+    canAssign: boolean;
+    watchers: NamedRef[];
+    /** True when the follower list is withheld (need-to-know restricted row). */
+    watchersHidden?: boolean;
+    isWatching: boolean;
+    canSplit: boolean;
+}
+
 export type TaskBucket = 'open' | 'in_progress' | 'done';
 
 export type TaskSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -63,4 +83,21 @@ export function dueInfo(item: TaskItem): { label: string; className: string } {
  *  the record in /tasks/detail and /tasks/{source}/{id}/assign. */
 export function taskNumericId(item: TaskItem): string {
     return item.id.slice(item.id.lastIndexOf('-') + 1);
+}
+
+/** The word for the child record a split produces, keyed by owning module.
+ *  The backend gates the affordance via `canSplit`; this only labels it, so an
+ *  unknown source falls back to the neutral "follow-up". */
+const CHILD_LABELS: Record<string, string> = {
+    incident: 'follow-up',
+    incidents: 'follow-up',
+    safeguarding: 'action',
+    hazard: 'corrective action',
+    hazards: 'corrective action',
+    injury: 'follow-up',
+    injuries: 'follow-up',
+};
+
+export function childLabelFor(source: string): string {
+    return CHILD_LABELS[source] ?? 'follow-up';
 }

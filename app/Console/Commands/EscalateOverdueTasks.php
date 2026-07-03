@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Tasks\TaskAggregator;
@@ -14,12 +15,16 @@ use Illuminate\Support\Str;
 /**
  * Hourly escalation sweep over the company-wide work-item feed (TaskAggregator).
  *
- * Two escalation levels, deduped for the item's lifetime via task_escalations:
+ * Three escalation levels, deduped for the item's lifetime via task_escalations:
  *   • Level 1 — assignee nudge: the moment an assigned item is overdue,
  *     notify its assignee once. Skipped for unassigned items.
  *   • Level 2 — manager escalation: once an item has been overdue for 3+ days
  *     (dueAt <= now - 3d), notify the managers group once — regardless of
  *     whether the item has an assignee.
+ *   • Level 3 — watcher FYI: the moment an item is overdue, notify each of
+ *     its watchers ("Following") once, EXCEPT the assignee (who gets level 1).
+ *     Deduped per (source, item, level=3, watcher_id) so each watcher is
+ *     pinged once per item lifetime even across users' aggregator passes.
  *
  * DESIGN NOTE (pragmatic v1): TaskAggregator is strictly per-user — every
  * provider gates on the viewing user's permissions and there is no system
@@ -50,11 +55,12 @@ class EscalateOverdueTasks extends Command
         $managerCutoff = now()->subDays(self::MANAGER_ESCALATION_DAYS);
         $nudged = 0;
         $escalated = 0;
+        $watchersPinged = 0;
 
         User::query()
             ->whereNotNull('approved_at')
             ->orderBy('id')
-            ->chunkById(100, function ($users) use ($aggregator, $notifications, $managerCutoff, &$seen, &$nudged, &$escalated) {
+            ->chunkById(100, function ($users) use ($aggregator, $notifications, $managerCutoff, &$seen, &$nudged, &$escalated, &$watchersPinged) {
                 foreach ($users as $user) {
                     $overdue = $aggregator->filterItems(
                         $aggregator->itemsFor($user),
@@ -79,6 +85,30 @@ class EscalateOverdueTasks extends Command
                             ]) ? 1 : 0;
                         }
 
+                        // Level 3 — FYI each watcher ("Following") that the item
+                        // is overdue, once per watcher per item lifetime. The
+                        // assignee is excluded (they get the level-1 nudge). The
+                        // dedupe row keys on the watcher id in assignee_id, so
+                        // this is idempotent regardless of which user's pass
+                        // surfaced the item.
+                        $assigneeId = (int) ($item->assignee['id'] ?? 0);
+                        $watcherIds = TaskWatcher::query()
+                            ->where('source', $item->source)
+                            ->where('item_id', (int) Str::afterLast($item->id, '-'))
+                            ->when($assigneeId > 0, fn ($q) => $q->where('user_id', '!=', $assigneeId))
+                            ->pluck('user_id')
+                            ->all();
+
+                        foreach ($watcherIds as $watcherId) {
+                            $watchersPinged += $this->escalate($notifications, $seen, $item, 3, [
+                                'event_key' => 'tasks.overdue_assignee',
+                                'title' => 'Watching: '.trim(($item->ref ? $item->ref.' ' : '').$item->title).' is overdue',
+                                'body' => 'A work item you are following is overdue.',
+                                'target_user_ids' => [(int) $watcherId],
+                                'include_managers' => false,
+                            ], (int) $watcherId) ? 1 : 0;
+                        }
+
                         // Level 2 — 3+ days overdue: escalate to the managers
                         // group, assignee or not.
                         if ($item->dueAt !== null && Carbon::parse($item->dueAt)->lte($managerCutoff)) {
@@ -96,7 +126,7 @@ class EscalateOverdueTasks extends Command
                 }
             });
 
-        $this->info("Overdue task escalations sent — assignee nudges: {$nudged}, manager escalations: {$escalated}.");
+        $this->info("Overdue task escalations sent — assignee nudges: {$nudged}, manager escalations: {$escalated}, watcher FYIs: {$watchersPinged}.");
 
         return self::SUCCESS;
     }
@@ -104,8 +134,10 @@ class EscalateOverdueTasks extends Command
     /**
      * Notify once per (source, item, level, assignee) and record the dedupe
      * row — level-1 nudges re-fire for a NEW assignee after reassignment;
-     * level-2 manager escalations use assignee 0 (once per item lifetime).
-     * Returns true when a new notification was actually sent.
+     * level-2 manager escalations use assignee 0 (once per item lifetime);
+     * level-3 watcher FYIs pass an explicit $dedupeKey (the watcher id) so
+     * each follower is pinged once per item lifetime. Returns true when a new
+     * notification was actually sent.
      */
     private function escalate(
         NotificationService $notifications,
@@ -113,9 +145,10 @@ class EscalateOverdueTasks extends Command
         TaskItem $item,
         int $level,
         array $extra,
+        ?int $dedupeKey = null,
     ): bool {
         $itemId = (int) Str::afterLast($item->id, '-');
-        $assigneeKey = $level === 1 ? (int) ($item->assignee['id'] ?? 0) : 0;
+        $assigneeKey = $dedupeKey ?? ($level === 1 ? (int) ($item->assignee['id'] ?? 0) : 0);
         $key = $item->source.'|'.$itemId.'|'.$level.'|'.$assigneeKey;
 
         if (isset($seen[$key])) {

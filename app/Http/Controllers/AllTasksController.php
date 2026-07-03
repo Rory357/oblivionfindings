@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\TaskWatcher;
+use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SplittableTaskProvider;
+use App\Services\NotificationService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +54,7 @@ class AllTasksController extends Controller
             'overdue' => filter_var($params['overdue'] ?? false, FILTER_VALIDATE_BOOL),
             'due' => ($params['due'] ?? null) === 'week' ? 'week' : null,
             'q' => ($q = trim((string) ($params['q'] ?? ''))) === '' ? null : $q,
+            'following' => filter_var($params['following'] ?? false, FILTER_VALIDATE_BOOL),
             'include_done' => filter_var($params['done'] ?? false, FILTER_VALIDATE_BOOL),
         ];
 
@@ -127,10 +132,36 @@ class AllTasksController extends Controller
                 ->all();
         }
 
+        // Watchers ("Following") for this exact source+id. On a need-to-know
+        // row we withhold the follower list (revealing who is watching a
+        // sensitive concern points at the investigators the register redacts)
+        // — but the caller's OWN follow-state is always returned so the toggle
+        // still works.
+        $isWatching = TaskWatcher::query()
+            ->where('source', $source)
+            ->where('item_id', $id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        $watchers = $item->restricted
+            ? []
+            : TaskWatcher::query()
+                ->where('source', $source)
+                ->where('item_id', $id)
+                ->join('users', 'users.id', '=', 'task_watchers.user_id')
+                ->orderBy('users.name')
+                ->get(['users.id', 'users.name'])
+                ->map(fn ($row) => ['id' => (int) $row->id, 'name' => (string) $row->name])
+                ->all();
+
         return response()->json([
             'item' => $item->toArray(),
             'timeline' => $timeline,
             'canAssign' => $provider instanceof AssignableTaskProvider && $provider->canAssign($user),
+            'watchers' => $watchers,
+            'watchersHidden' => $item->restricted,
+            'isWatching' => $isWatching,
+            'canSplit' => $provider instanceof SplittableTaskProvider && $provider->canView($user),
         ]);
     }
 
@@ -176,6 +207,125 @@ class AllTasksController extends Controller
         \App\Services\Tasks\TaskAssignmentNotifier::notify($user, $provider, $id, $assigneeId);
 
         return back()->with('success', $assigneeId === null ? 'Task unassigned.' : 'Task assigned.');
+    }
+
+    /**
+     * Follow / unfollow a queue item. Watchers get FYI notifications when the
+     * item is reassigned (TaskAssignmentNotifier) or falls overdue
+     * (EscalateOverdueTasks level 3) without owning it. Gated on the same
+     * per-module view permission as everything else in the queue.
+     */
+    public function watch(Request $request, TaskAggregator $aggregator, string $source, int $id): RedirectResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'watching' => ['required', 'boolean'],
+        ]);
+
+        $provider = $aggregator->providerFor($source);
+        abort_unless($provider !== null && $provider->canView($user), 404);
+
+        if ($validated['watching']) {
+            TaskWatcher::query()->firstOrCreate([
+                'source' => $source,
+                'item_id' => $id,
+                'user_id' => $user->id,
+            ]);
+        } else {
+            TaskWatcher::query()
+                ->where('source', $source)
+                ->where('item_id', $id)
+                ->where('user_id', $user->id)
+                ->delete();
+        }
+
+        // The badge helper counts watched items, so its cache must refresh.
+        Cache::forget("tasks.nav.{$user->id}");
+
+        return back()->with('success', $validated['watching'] ? 'Following this task.' : 'Stopped following.');
+    }
+
+    /**
+     * "Split" a queue item into a child work item (follow-up / action plan)
+     * via the owning module's own child-create rules. The provider mirrors
+     * its module's permission, validation, column mapping and redaction; the
+     * controller only validates the thin cross-cutting shape and delegates.
+     */
+    public function split(Request $request, TaskAggregator $aggregator, string $source, int $id): RedirectResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
+            'due_at' => ['nullable', 'date'],
+        ]);
+
+        $provider = $aggregator->providerFor($source);
+        abort_unless($provider !== null && $provider->canView($user), 404);
+        abort_unless($provider instanceof SplittableTaskProvider, 400, 'This record type cannot be split into a child task.');
+
+        try {
+            $childLink = $provider->createChild($user, $id, $validated);
+        } catch (ValidationException $e) {
+            // Module-rule / permission / redaction rejections flow to the flash
+            // toast — the split dialog does not render field errors.
+            return back()->with('error', collect($e->errors())->flatten()->first()
+                ?? 'This task could not be split.');
+        }
+
+        $assigneeId = isset($validated['assignee_id']) ? (int) $validated['assignee_id'] : null;
+
+        // FYI the new child's assignee (never the actor). Personal ping only —
+        // the false trio stops NotificationService fanning it to every manager.
+        if ($assigneeId !== null && $assigneeId !== $user->id) {
+            $parent = collect($provider->tasks($user, ['include_done' => true]))
+                ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}");
+
+            app(NotificationService::class)->notifyCrud(
+                actor: $user,
+                action: 'assigned',
+                entityLabel: 'Task',
+                entity: null,
+                extra: [
+                    'event_key' => 'tasks.assigned',
+                    'title' => "You've been assigned a {$provider->childLabel()}",
+                    'body' => $validated['title'],
+                    'url' => $childLink ?? $parent?->link ?? '/tasks?assigned=me',
+                    'target_user_ids' => [$assigneeId],
+                    'include_managers' => false,
+                    'include_assigned_workers' => false,
+                    'include_entity_user' => false,
+                ],
+            );
+
+            Cache::forget("tasks.nav.{$assigneeId}");
+        }
+
+        Cache::forget("tasks.nav.{$user->id}");
+
+        return back()->with('success', 'Child task created.');
+    }
+
+    /**
+     * Staff picker for the split-assignee field. Mirrors the inline
+     * User::staff() pattern used across modules; no standalone staff-search
+     * endpoint existed, so this adds a thin typeahead just for the queue.
+     */
+    public function users(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q'));
+
+        $users = User::query()
+            ->staff()
+            ->when($q !== '', fn ($query) => $query->where('name', 'like', '%'.$q.'%'))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+
+        return response()->json(['users' => $users]);
     }
 
     /**
