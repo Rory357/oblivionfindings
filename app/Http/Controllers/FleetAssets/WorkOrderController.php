@@ -57,10 +57,40 @@ class WorkOrderController extends Controller
 
         $users = User::query()->orderBy('name')->get(['id', 'name']);
 
+        // Hero band stats — whole-table counts (the paginated slice above is not the world)
+        $stats = [
+            'open' => FleetWorkOrder::where('status', 'open')->count(),
+            'overdue' => FleetWorkOrder::whereNotIn('status', ['completed', 'cancelled'])
+                ->whereNotNull('due_at')
+                ->where('due_at', '<', now())
+                ->count(),
+            'in_progress' => FleetWorkOrder::where('status', 'in_progress')->count(),
+            'completed_30d' => FleetWorkOrder::where('status', 'completed')
+                ->where('updated_at', '>=', now()->subDays(30))
+                ->count(),
+        ];
+
+        // Create-wizard options (modal lives on this page — ?new=1 shim)
+        $assets = Asset::query()->orderBy('name')->get(['id', 'name', 'asset_tag', 'category']);
+        $checklistRuns = \App\Models\FleetChecklistRun::query()
+            ->where('passed', false)
+            ->with('asset:id,name', 'template:id,name')
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'asset_name' => $r->asset?->name ?? 'Unknown',
+                'template_name' => $r->template?->name ?? 'Unknown',
+                'run_at' => optional($r->created_at)->toISOString(),
+            ])
+            ->values();
+
         return Inertia::render('fleet-assets/maintenance/work-orders/index', [
             'work_orders' => [
                 'data' => $workOrders->getCollection()->map(fn ($wo) => [
                     'id' => $wo->id,
+                    'reference_number' => $wo->reference_number,
                     'title' => $wo->title,
                     'status' => $wo->status,
                     'priority' => $wo->priority,
@@ -79,36 +109,22 @@ class WorkOrderController extends Controller
             ],
             'filters' => $request->only(['status', 'priority', 'asset_id']),
             'users' => $users,
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $assets = Asset::query()->orderBy('name')->get(['id', 'name', 'asset_tag', 'category']);
-        $users = User::query()->orderBy('name')->get(['id', 'name']);
-
-        // Fetch recent failed checklist runs for linking
-        $checklistRuns = \App\Models\FleetChecklistRun::query()
-            ->where('passed', false)
-            ->with('asset:id,name', 'template:id,name')
-            ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn ($r) => [
-                'id' => $r->id,
-                'asset_name' => $r->asset?->name ?? 'Unknown',
-                'template_name' => $r->template?->name ?? 'Unknown',
-                'run_at' => optional($r->created_at)->toISOString(),
-            ])
-            ->values();
-
-        return Inertia::render('fleet-assets/maintenance/work-orders/create', [
+            'stats' => $stats,
             'assets' => $assets,
-            'users' => $users,
             'checklist_runs' => $checklistRuns,
             'prefill_asset_id' => $request->input('asset_id'),
             'prefill_checklist_run_id' => $request->input('checklist_run_id'),
         ]);
+    }
+
+    /** Legacy full-page create — the wizard now lives on the index as a modal (?new=1 shim). */
+    public function create(Request $request)
+    {
+        return redirect()->to('/fleet-assets/maintenance/work-orders?' . http_build_query(array_filter([
+            'new' => 1,
+            'asset_id' => $request->input('asset_id'),
+            'checklist_run_id' => $request->input('checklist_run_id'),
+        ])));
     }
 
     public function store(Request $request)

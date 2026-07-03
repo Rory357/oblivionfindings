@@ -86,7 +86,30 @@ class KeyController extends Controller
         // Vehicles for dropdowns
         $vehicles = Asset::vehicles()->get(['id', 'name', 'asset_tag']);
 
+        // Hero band stats. There is no due-back date on key logs, so "overdue"
+        // is not a real stat here — the tiles stick to what the ledger supports:
+        // tracked vehicles, keys currently out (checked out or transferred),
+        // keys back in the safe, and today's ledger activity.
+        $activityToday = $tableExists
+            ? FleetKeyLog::query()
+                ->where('created_at', '>=', now()->startOfDay())
+                ->where('created_at', '<=', now()->endOfDay())
+                ->count()
+            : 0;
+
+        $hero = [
+            'tracked' => $currentHolders->count(),
+            'checked_out' => $currentHolders
+                ->filter(fn ($h) => in_array($h['status'], ['checked_out', 'transferred'], true))
+                ->count(),
+            'in_safe' => $currentHolders
+                ->filter(fn ($h) => $h['status'] === 'returned' || $h['location'] === 'key_safe')
+                ->count(),
+            'activity_today' => $activityToday,
+        ];
+
         return Inertia::render('fleet-assets/keys/index', [
+            'hero' => $hero,
             'current_holders' => $currentHolders,
             'recent_logs' => $recentLogs,
             'users' => $users,

@@ -1,5 +1,12 @@
 import LeafletMap, { MapGeofence } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
@@ -65,6 +72,11 @@ type Geofence = {
 };
 
 type Props = {
+    hero?: {
+        active: number;
+        vehicles_covered: number;
+        breaches_7d: number;
+    };
     geofences: Geofence[];
     sites: Array<{ id: number; name: string }>;
     filters: {
@@ -79,7 +91,8 @@ const GEOFENCE_COLORS = [
     '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
 ];
 
-export default function GeofencesIndex({ geofences, sites, filters }: Props) {
+export default function GeofencesIndex({ hero: rawHero, geofences, sites, filters }: Props) {
+    const hero = rawHero ?? { active: 0, vehicles_covered: 0, breaches_7d: 0 };
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(
@@ -180,28 +193,55 @@ export default function GeofencesIndex({ geofences, sites, filters }: Props) {
         >
             <Head title="Geofences" />
             <PageShell>
-                <PageHero
-                    title="Geofences"
-                    description={`${(geofences ?? []).length} geofence${(geofences ?? []).length !== 1 ? 's' : ''} configured. ${activeCount} active, ${inactiveCount} inactive.`}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowFilters(!showFilters)}
-                            >
-                                <Filter className="mr-1.5 h-4 w-4" />
-                                Filters
-                            </Button>
-                            <Button asChild>
-                                <Link href="/fleet-assets/geofences/create">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create Geofence
-                                </Link>
-                            </Button>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={MapPin} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Geofence register · live evaluation</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Geofences</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                {`${(geofences ?? []).length} geofence${(geofences ?? []).length !== 1 ? 's' : ''} configured. ${activeCount} active, ${inactiveCount} inactive.`}
+                            </p>
                         </div>
-                    }
-                />
+                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/geofences?status=active"
+                                label="Active geofences"
+                                value={fmt(hero.active)}
+                                caption="being evaluated"
+                                tone={hero.active > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                label="Vehicles covered"
+                                value={fmt(hero.vehicles_covered)}
+                                caption="inside an active zone rule"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts"
+                                label="Breaches 7d"
+                                value={fmt(hero.breaches_7d)}
+                                caption="exit signals this week"
+                                tone={hero.breaches_7d > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href="/fleet-assets/geofences/create" icon={Plus} emphasis>
+                            Create geofence
+                        </FleetHeroAction>
+                        {/* eslint-disable-next-line no-restricted-syntax -- onDark filters toggle in the hero action row */}
+                        <button
+                            type="button"
+                            onClick={() => setShowFilters(!showFilters)}
+                            aria-pressed={showFilters}
+                            className="inline-flex h-[34px] items-center gap-2 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-3.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                        >
+                            <Filter className="h-[15px] w-[15px]" />
+                            Filters
+                        </button>
+                    </div>
+                </HeroShell>
 
                 {/* Filters */}
                 {showFilters && (

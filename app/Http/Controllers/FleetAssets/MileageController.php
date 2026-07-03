@@ -34,9 +34,14 @@ class MileageController extends Controller
                     'total_distance' => 0,
                     'total_reimbursement' => 0,
                     'pending_approval' => 0,
+                    'approved_unpaid' => 0,
+                    'paid_this_month' => 0,
+                    'claims_30d' => 0,
                 ],
                 'staff_summary' => [],
                 'is_manager' => $canViewAll,
+                'clients' => $this->clientOptions(),
+                'ird_rate' => 0.95,
                 'can' => [
                     'approve' => $canApprove,
                 ],
@@ -87,6 +92,16 @@ class MileageController extends Controller
             $pendingQuery->where('user_id', $user->id);
         }
         $pendingApproval = $pendingQuery->count();
+
+        // Hero extras — approved-but-unpaid backlog, paid $ this month, claim volume 30d
+        // (each scoped to own trips for non-managers, like the other stats).
+        $scope = fn ($q) => $canViewAll ? $q : $q->where('user_id', $user->id);
+        $approvedUnpaid = $scope(FleetPersonalTrip::where('status', 'approved'))->count();
+        $paidThisMonth = (float) $scope(
+            FleetPersonalTrip::where('status', 'paid')
+                ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
+        )->sum('total_amount');
+        $claims30d = $scope(FleetPersonalTrip::where('date', '>=', now()->subDays(30)->format('Y-m-d')))->count();
 
         // Staff summary for managers
         $staffSummary = [];
@@ -154,33 +169,43 @@ class MileageController extends Controller
                 'total_distance' => round((float) $totalDistance, 1),
                 'total_reimbursement' => round((float) $totalReimbursement, 2),
                 'pending_approval' => $pendingApproval,
+                'approved_unpaid' => $approvedUnpaid,
+                'paid_this_month' => round($paidThisMonth, 2),
+                'claims_30d' => $claims30d,
             ],
             'staff_summary' => $staffSummary,
             'is_manager' => $canViewAll,
+            'clients' => $this->clientOptions(),
+            'ird_rate' => 0.95,
             'can' => [
                 'approve' => $canApprove,
             ],
         ]);
     }
 
+    /** Legacy full-page create — retired in favour of the wizard modal on the index. */
     public function create(Request $request)
     {
-        $clients = [];
-        if (Schema::hasTable('clients')) {
-            $clients = Client::query()
-                ->orderBy('first_name')
-                ->limit(200)
-                ->get(['id', 'first_name', 'last_name'])
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
-                ]);
+        return redirect()->route('fleet-assets.mileage.index', ['new' => 1]);
+    }
+
+    /** @return array<int, array{id: int, name: string}> */
+    private function clientOptions(): array
+    {
+        if (!Schema::hasTable('clients')) {
+            return [];
         }
 
-        return Inertia::render('fleet-assets/mileage/create', [
-            'clients' => $clients,
-            'ird_rate' => 0.95,
-        ]);
+        return Client::query()
+            ->orderBy('first_name')
+            ->limit(200)
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+            ])
+            ->values()
+            ->all();
     }
 
     public function store(Request $request)

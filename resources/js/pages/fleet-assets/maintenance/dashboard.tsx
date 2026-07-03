@@ -1,23 +1,27 @@
 import { HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroCluster,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroSegmented,
+    HeroShell,
+    HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Clock,
-    DollarSign,
-    LayoutGrid,
+    CalendarClock,
+    ClipboardCheck,
+    ClipboardList,
+    Plus,
     Wrench,
 } from 'lucide-react';
 import { formatDate } from '@/lib/fleet-utils';
@@ -56,6 +60,7 @@ type CostByPriority = {
 
 type WorkOrder = {
     id: number;
+    reference_number?: string | null;
     title: string;
     status: string;
     priority: string;
@@ -73,9 +78,20 @@ type OverdueService = {
     days_overdue: number;
 };
 
+type HeroStats = {
+    wo_open: number;
+    wo_overdue: number;
+    wo_in_progress: number;
+    service_due_7d: number;
+    service_due_30d: number;
+    service_overdue: number;
+    month_cost: number;
+};
+
 type Props = {
     period: number;
     stats: Stats;
+    hero?: HeroStats;
     cost_by_vehicle: CostByVehicle[];
     cost_by_month: CostByMonth[];
     cost_by_priority: CostByPriority[];
@@ -174,7 +190,7 @@ function DonutLegend({ segments }: { segments: DonutSegment[] }) {
 /* ------------------------------------------------------------------ */
 
 function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 }
 
 function priorityColor(priority: string): string {
@@ -253,6 +269,7 @@ function MonthlyBarChartWrapper({ data }: { data: CostByMonth[] }) {
 export default function MaintenanceDashboard({
     period: rawPeriod,
     stats: rawStats,
+    hero: rawHero,
     cost_by_vehicle: rawCostByVehicle,
     cost_by_month: rawCostByMonth,
     cost_by_priority: rawCostByPriority,
@@ -261,6 +278,15 @@ export default function MaintenanceDashboard({
 }: Props) {
     const period = rawPeriod ?? 90;
     const stats = rawStats ?? { total_work_orders: 0, open_work_orders: 0, total_spend: 0, avg_cost: 0, overdue_schedules: 0 };
+    const hero = rawHero ?? {
+        wo_open: 0,
+        wo_overdue: 0,
+        wo_in_progress: 0,
+        service_due_7d: 0,
+        service_due_30d: 0,
+        service_overdue: 0,
+        month_cost: 0,
+    };
     const costByVehicle = rawCostByVehicle ?? [];
     const costByMonth = rawCostByMonth ?? [];
     const costByPriority = rawCostByPriority ?? [];
@@ -289,82 +315,125 @@ export default function MaintenanceDashboard({
         >
             <Head title="Maintenance Overview" />
             <PageShell>
-                <PageHero
-                    title="Maintenance Overview"
-                    description="Cost analytics and maintenance health at a glance."
-                    actions={
-                        <Select value={String(period)} onValueChange={handlePeriodChange}>
-                            <SelectTrigger className="w-40">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="30">Last 30 days</SelectItem>
-                                <SelectItem value="90">Last 90 days</SelectItem>
-                                <SelectItem value="180">Last 6 months</SelectItem>
-                                <SelectItem value="365">Last 12 months</SelectItem>
-                            </SelectContent>
-                        </Select>
+                <HeroShell
+                    footer={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                Quick actions
+                            </span>
+                            <FleetHeroAction href="/fleet-assets/maintenance/work-orders?new=1" icon={Plus} emphasis>
+                                New work order
+                            </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/maintenance/checklists/run" icon={ClipboardList}>
+                                Run checklist
+                            </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/inspections?new=1" icon={ClipboardCheck}>
+                                New inspection
+                            </FleetHeroAction>
+                            <div className="ml-auto">
+                                <HeroSegmented
+                                    variant="pill"
+                                    label="Period"
+                                    ariaLabel="Analytics period"
+                                    value={String(period)}
+                                    onChange={handlePeriodChange}
+                                    items={[
+                                        { key: '30', label: '30d' },
+                                        { key: '90', label: '90d' },
+                                        { key: '180', label: '6m' },
+                                        { key: '365', label: '12m' },
+                                    ]}
+                                />
+                            </div>
+                        </div>
                     }
-                />
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Wrench} />
+                        <div className="min-w-0 flex-1">
+                            <HeroStatusPill>
+                                Maintenance command · live
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-[28px]">
+                                Maintenance Overview
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Work orders, service schedules and cost analytics at a glance.
+                            </p>
+                        </div>
+                    </div>
 
-                {/* Summary Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-primary/10 p-2.5">
-                                <Wrench className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{stats.total_work_orders}</p>
-                                <p className="text-xs text-muted-foreground">Total Work Orders</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-status-warning p-2.5">
-                                <Clock className="h-5 w-5 text-status-warning" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{stats.open_work_orders}</p>
-                                <p className="text-xs text-muted-foreground">Open Work Orders</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-primary/10 p-2.5">
-                                <DollarSign className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{formatCurrency(stats.total_spend)}</p>
-                                <p className="text-xs text-muted-foreground">Total Spend</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-status-info p-2.5">
-                                <DollarSign className="h-5 w-5 text-status-info" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{formatCurrency(stats.avg_cost)}</p>
-                                <p className="text-xs text-muted-foreground">Avg Cost / WO</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-status-critical p-2.5">
-                                <AlertTriangle className="h-5 w-5 text-status-critical" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{stats.overdue_schedules}</p>
-                                <p className="text-xs text-muted-foreground">Overdue Schedules</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                    <div className="grid gap-3 lg:grid-cols-2">
+                        <HeroCluster title="Work orders" icon={Wrench}>
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?status=open"
+                                label="Open"
+                                value={fmt(hero.wo_open)}
+                                caption="awaiting action"
+                                tone={hero.wo_open > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders"
+                                label="Overdue"
+                                value={fmt(hero.wo_overdue)}
+                                caption="past due date"
+                                tone={hero.wo_overdue > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?status=in_progress"
+                                label="In progress"
+                                value={fmt(hero.wo_in_progress)}
+                                caption="being worked on"
+                                tone="neutral"
+                            />
+                        </HeroCluster>
+
+                        <HeroCluster title="Service & spend" icon={CalendarClock}>
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/schedules"
+                                label="Due 7d"
+                                value={fmt(hero.service_due_7d)}
+                                caption="services this week"
+                                tone={hero.service_due_7d > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/schedules"
+                                label="Due 30d"
+                                value={fmt(hero.service_due_30d)}
+                                caption="services this month"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/schedules"
+                                label="Overdue"
+                                value={fmt(hero.service_overdue)}
+                                caption="services missed"
+                                tone={hero.service_overdue > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="This month"
+                                value={formatCurrency(hero.month_cost)}
+                                caption="actual cost"
+                                tone="neutral"
+                            />
+                        </HeroCluster>
+                    </div>
+
+                    <HeroSummaryStrip label={`Last ${period} days`}>
+                        <HeroSummaryMetric tone="neutral">
+                            {stats.total_work_orders} work orders raised
+                        </HeroSummaryMetric>
+                        <HeroSummaryMetric tone={stats.open_work_orders > 0 ? 'warning' : 'success'}>
+                            {stats.open_work_orders} currently open
+                        </HeroSummaryMetric>
+                        <HeroSummaryMetric tone="neutral">
+                            {formatCurrency(stats.total_spend)} total spend
+                        </HeroSummaryMetric>
+                        <HeroSummaryMetric tone="neutral">
+                            {formatCurrency(stats.avg_cost)} avg cost / WO
+                        </HeroSummaryMetric>
+                    </HeroSummaryStrip>
+                </HeroShell>
 
                 {/* Charts Row */}
                 <div className="grid gap-4 lg:grid-cols-3">
@@ -422,6 +491,9 @@ export default function MaintenanceDashboard({
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+                                                        {wo.reference_number ?? `#${wo.id}`}
+                                                    </span>
                                                     <span className="truncate text-sm font-medium">{wo.title}</span>
                                                     <Badge variant={statusVariant(wo.status)} className="text-[10px]">
                                                         {wo.status.replace(/_/g, ' ')}

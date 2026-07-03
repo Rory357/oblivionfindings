@@ -29,6 +29,7 @@ import { formatCurrency, formatDate } from '@/lib/fleet-utils';
 type Props = {
     work_order: {
         id: number;
+        reference_number?: string | null;
         title: string;
         description: string | null;
         asset: { id: number; name: string; asset_tag: string | null; category: string | null; status: string | null } | null;
@@ -120,6 +121,9 @@ export default function WorkOrderShow({ work_order }: Props) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Wrench className="h-5 w-5" />
+                            <span className="inline-flex items-center rounded border border-border bg-background/60 px-2 py-0.5 font-mono text-xs font-bold tracking-wide">
+                                {wo.reference_number ?? `#${wo.id}`}
+                            </span>
                             <span className="font-medium">{wo.title}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -231,13 +235,13 @@ export default function WorkOrderShow({ work_order }: Props) {
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
                                         <div className="text-xs text-muted-foreground">Estimated</div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.estimated_cost != null ? `{formatCurrency((wo.estimated_cost))}` : '---'}
+                                            {wo.estimated_cost != null ? formatCurrency(wo.estimated_cost) : '---'}
                                         </div>
                                     </div>
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
                                         <div className="text-xs text-muted-foreground">Actual</div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.actual_cost != null ? `{formatCurrency((wo.actual_cost))}` : '---'}
+                                            {wo.actual_cost != null ? formatCurrency(wo.actual_cost) : '---'}
                                         </div>
                                     </div>
                                 </div>
@@ -249,8 +253,8 @@ export default function WorkOrderShow({ work_order }: Props) {
                                             : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
                                     )}>
                                         {wo.actual_cost <= wo.estimated_cost
-                                            ? `{formatCurrency((wo.estimated_cost - wo.actual_cost))} under budget`
-                                            : `{formatCurrency((wo.actual_cost - wo.estimated_cost))} over budget`
+                                            ? `${formatCurrency(wo.estimated_cost - wo.actual_cost)} under budget`
+                                            : `${formatCurrency(wo.actual_cost - wo.estimated_cost)} over budget`
                                         }
                                     </div>
                                 )}

@@ -644,6 +644,22 @@ class VehicleController extends Controller
             $distanceTrend = [];
         }
 
+        // Hero stats — whole-fleet counts (independent of filters/pagination),
+        // matching the vehicles-index hero convention. After-hours mirrors the
+        // dashboard definition (before 8am / after 6pm, last 7 days).
+        $todayStart = now()->startOfDay();
+        $hero = [
+            'trips_today' => FleetTrip::where('started_at', '>=', $todayStart)->count(),
+            'distance_today_km' => round((float) FleetTrip::where('started_at', '>=', $todayStart)->sum('distance_km'), 1),
+            'active_now' => FleetTrip::whereIn('status', ['open', 'in_progress'])->count(),
+            'after_hours_7d' => FleetTrip::where('started_at', '>=', now()->subDays(7))
+                ->where(function ($q) {
+                    $q->whereRaw('HOUR(started_at) < 8')
+                        ->orWhereRaw('HOUR(started_at) >= 18');
+                })
+                ->count(),
+        ];
+
         // Sorting
         $allowedSorts = ['started_at', 'distance_km', 'duration_s', 'status'];
         $sort = $request->input('sort', 'started_at');
@@ -703,6 +719,7 @@ class VehicleController extends Controller
             ],
             'vehicles' => $vehicles,
             'filters' => $request->only(['date_from', 'date_to', 'vehicle_id', 'status', 'search']),
+            'hero' => $hero,
             'summary' => $summary,
             'trips_by_day' => $tripsByDay,
             'top_vehicles' => $topVehicles,
@@ -765,6 +782,9 @@ class VehicleController extends Controller
         $totalLitres = round((float) (clone $mtdQuery)->sum('quantity_litres'), 1);
         $totalCost = round((float) (clone $mtdQuery)->sum('total_cost'), 2);
         $avgCostPerLitre = $totalLitres > 0 ? round($totalCost / $totalLitres, 3) : 0;
+
+        // Hero — whole-fleet, independent of filters (MTD spend/litres + 30-day entry count).
+        $entries30d = FleetFuelLog::where('logged_at', '>=', now()->subDays(30))->count();
 
         // Per-vehicle efficiency (batch-query trip distances to avoid N+1)
         $fuelByAsset = FleetFuelLog::query()
@@ -844,6 +864,12 @@ class VehicleController extends Controller
             ],
             'vehicles' => $vehicles,
             'filters' => $request->only(['date_from', 'date_to', 'asset_id']),
+            'hero' => [
+                'spend_month' => $totalCost,
+                'litres_month' => $totalLitres,
+                'entries_30d' => $entries30d,
+                'avg_cost_per_litre' => $avgCostPerLitre,
+            ],
             'summary' => [
                 'total_fill_ups' => $totalFillUps,
                 'total_litres' => $totalLitres,

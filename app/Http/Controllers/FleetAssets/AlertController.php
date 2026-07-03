@@ -98,7 +98,17 @@ class AlertController extends Controller
                 'tracker' => $a->tracker ? ['id' => $a->tracker->id, 'vendor' => $a->tracker->vendor, 'device_uid' => $a->tracker->device_uid] : null,
             ])->values();
 
+        // Hero — whole fleet-alert universe (independent of filters/pagination).
+        $heroBase = ControlRoomAlert::query()->whereIn('source', $this->fleetAlertSources());
+        $hero = [
+            'unresolved' => (clone $heroBase)->whereNotIn('status', ['closed', 'resolved'])->count(),
+            'critical' => (clone $heroBase)->whereNotIn('status', ['closed', 'resolved'])->where('severity', 'critical')->count(),
+            'acknowledged_today' => (clone $heroBase)->where('acknowledged_at', '>=', now()->startOfDay())->count(),
+            'resolved_7d' => (clone $heroBase)->where('resolved_at', '>=', now()->subDays(7))->count(),
+        ];
+
         return Inertia::render('fleet-assets/alerts/index', [
+            'hero' => $hero,
             'control_room_alerts' => [
                 'data' => $controlRoomAlerts->getCollection()->map(fn ($a) => [
                     'id' => $a->id,

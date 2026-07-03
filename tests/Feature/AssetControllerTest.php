@@ -69,16 +69,25 @@ class AssetControllerTest extends TestCase
         $this->get('/fleet-assets/assets/create')->assertRedirect('/login');
     }
 
-    public function test_asset_create_accessible_by_admin(): void
+    public function test_asset_create_redirects_to_index_wizard_shim(): void
     {
+        // The full-page create form was replaced by the AssetWizardDialog on
+        // the index (?new=1 opens it on mount).
         $this->actingAs($this->admin)
             ->get('/fleet-assets/assets/create')
+            ->assertRedirect('/fleet-assets/assets?new=1');
+    }
+
+    public function test_asset_index_ships_wizard_option_lists(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/assets')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('fleet-assets/assets/create')
+                ->component('fleet-assets/assets/index')
                 ->has('sites')
                 ->has('clients')
-                ->has('categories')
+                ->has('prefill')
             );
     }
 
@@ -229,18 +238,53 @@ class AssetControllerTest extends TestCase
     // Edit & Update
     // ──────────────────────────────────────
 
-    public function test_asset_edit_accessible_by_admin(): void
+    public function test_asset_edit_redirects_to_show_wizard_shim(): void
     {
+        // The full-page edit form was replaced by the AssetWizardDialog on the
+        // show page (?edit=1 opens it on mount).
         $asset = Asset::factory()->forSite($this->site)->create();
 
         $this->actingAs($this->admin)
             ->get("/fleet-assets/assets/{$asset->id}/edit")
+            ->assertRedirect("/fleet-assets/assets/{$asset->id}?edit=1");
+    }
+
+    public function test_asset_show_ships_edit_wizard_option_lists(): void
+    {
+        $asset = Asset::factory()->forSite($this->site)->create();
+
+        $this->actingAs($this->admin)
+            ->get("/fleet-assets/assets/{$asset->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('fleet-assets/assets/edit')
+                ->component('fleet-assets/assets/show')
                 ->has('asset')
                 ->has('sites')
-                ->has('categories')
+                ->has('clients')
+            );
+    }
+
+    public function test_asset_store_from_modal_redirects_back_to_index_with_created_id(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/fleet-assets/assets', [
+                'name' => 'Modal Asset',
+                'site_id' => $this->site->id,
+                'status' => 'active',
+                'risk_level' => 'low',
+                'requires_inspection' => false,
+                'requires_maintenance' => false,
+                '_modal' => true,
+            ])
+            ->assertRedirect();
+
+        $asset = Asset::query()->where('name', 'Modal Asset')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->get("/fleet-assets/assets?created={$asset->id}")
+            ->assertInertia(fn ($page) => $page
+                ->component('fleet-assets/assets/index')
+                ->where('created_asset_id', $asset->id)
             );
     }
 

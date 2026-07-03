@@ -1524,16 +1524,14 @@ function buildFleetAssetsSubPanelGroups({
 
     // Safety — keep label/icon consistent with the Health & Safety flyout's
     // "Fleet Incidents" entry so the same destination reads the same everywhere.
+    // Wandering Alerts now lives as a tab on Resident Tracking
+    // (/fleet-assets/resident-tracking?tab=wandering), so it no longer gets a
+    // sidebar entry of its own.
     const safety: SubPanelGroup = { label: 'Safety', items: [] };
     safety.items.push({
         title: 'Fleet Incidents',
         href: '/fleet-assets/incidents',
         icon: Truck,
-    });
-    safety.items.push({
-        title: 'Wandering Alerts',
-        href: '/fleet-assets/wandering-alerts',
-        icon: ShieldAlert,
     });
     if (safety.items.length > 0) groups.push(safety);
 

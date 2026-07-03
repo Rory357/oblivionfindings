@@ -242,7 +242,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, hero, comp
                 </HeroShell>
 
                 {vehicles.length === 0 && !searchTerm && statusFilter === 'all' ? (
-                    <FleetEmptyState icon={Car} title="No vehicles tracked yet" description="Add vehicles to start fleet tracking. Vehicles with GPS trackers will appear on the map in real time." actionLabel="Add Vehicle" actionHref="/fleet-assets/assets/create" />
+                    <FleetEmptyState icon={Car} title="No vehicles tracked yet" description="Add vehicles to start fleet tracking. Vehicles with GPS trackers will appear on the map in real time." actionLabel="Add Vehicle" actionHref="/fleet-assets/assets?new=1&category=vehicle" />
                 ) : (
                     <>
                         {/* Map + Vehicle List side by side */}

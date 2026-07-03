@@ -35,6 +35,7 @@ import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
 type Props = {
     booking: {
         id: number;
+        reference_number?: string | null;
         asset: { id: number; name: string; asset_tag?: string; registration_number?: string } | null;
         user: { id: number; name: string; email?: string } | null;
         purpose: string | null;
@@ -103,6 +104,9 @@ export default function BookingShow({ booking, can }: Props) {
                         <div className="flex items-center gap-3">
                             <Badge className="text-sm capitalize">{(b.status ?? '').replace(/_/g, ' ')}</Badge>
                             <span className="font-medium">Booking #{b.id}</span>
+                            <span className="inline-flex items-center rounded-md border border-current/25 bg-white/50 px-2 py-0.5 font-mono text-xs font-semibold dark:bg-black/20">
+                                {b.reference_number ?? '—'}
+                            </span>
                         </div>
                         <span className="text-sm opacity-80">
                             {b.created_at ? `Created ${formatDate(b.created_at)}` : ''}

@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -557,28 +557,29 @@ export default function TransportShow({
         >
             <Head title={`Transport #${t.id ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Resident transports · ${(t.status ?? 'record').replace(/_/g, ' ')}`}
                     title={`Transport #${t.id ?? ''}`}
                     backHref="/fleet-assets/transports"
-                    backLabel="Back to Transport Logs"
+                    backLabel="Transport Logs"
                     actions={
                         t.status === 'in_progress' ? (
-                            <div className="flex flex-wrap gap-2">
-                                <Button asChild variant="outline">
-                                    <Link
-                                        href={`/fleet-assets/transports/medications?transport_id=${t.id}`}
-                                    >
-                                        <Pill className="mr-2 h-4 w-4" />
-                                        Medication Transit
-                                    </Link>
-                                </Button>
-                                <Button asChild variant="outline">
-                                    <Link href={`/fleet-assets/transports/${t.id}/pre-check`}>
-                                        <ClipboardCheck className="mr-2 h-4 w-4" />
-                                        Pre-Transport Check
-                                    </Link>
-                                </Button>
-                            </div>
+                            <>
+                                <Link
+                                    href={`/fleet-assets/transports/medications?transport_id=${t.id}`}
+                                    className="inline-flex h-[30px] items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                                >
+                                    <Pill className="h-3.5 w-3.5" />
+                                    Medication Transit
+                                </Link>
+                                <Link
+                                    href={`/fleet-assets/transports/${t.id}/pre-check`}
+                                    className="inline-flex h-[30px] items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                                >
+                                    <ClipboardCheck className="h-3.5 w-3.5" />
+                                    Pre-Transport Check
+                                </Link>
+                            </>
                         ) : undefined
                     }
                 />

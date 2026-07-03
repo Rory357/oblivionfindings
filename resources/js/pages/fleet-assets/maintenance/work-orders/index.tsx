@@ -1,7 +1,5 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { PageHero } from '@/components/page';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,24 +13,36 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
+import {
+    WorkOrderCreateWizard,
+    type WizardAsset,
+    type WizardChecklistRun,
+} from '@/pages/fleet-assets/maintenance/work-orders/create-wizard';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle,
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
-    ClipboardList,
     Download,
-    Loader,
     Plus,
     User,
     Wrench,
     X,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type WorkOrder = {
     id: number;
+    reference_number: string | null;
     title: string;
     asset: { id: number; name: string; asset_tag: string | null } | null;
     priority: string;
@@ -51,6 +61,16 @@ type Props = {
     };
     filters: { status?: string; priority?: string; asset_id?: string };
     users?: Array<{ id: number; name: string }>;
+    stats?: {
+        open: number;
+        overdue: number;
+        in_progress: number;
+        completed_30d: number;
+    };
+    assets?: WizardAsset[];
+    checklist_runs?: WizardChecklistRun[];
+    prefill_asset_id?: string | null;
+    prefill_checklist_run_id?: string | null;
 };
 
 const PRIORITY_BORDER: Record<string, string> = {
@@ -98,6 +118,11 @@ export default function WorkOrdersIndex({
     work_orders,
     filters,
     users,
+    stats,
+    assets,
+    checklist_runs,
+    prefill_asset_id,
+    prefill_checklist_run_id,
 }: Props) {
     const safeFilters = filters ?? {};
     const safeData = useMemo(
@@ -110,15 +135,21 @@ export default function WorkOrdersIndex({
         total: 0,
     };
     const safeLinks = work_orders?.links ?? [];
+    const heroStats = stats ?? {
+        open: 0,
+        overdue: 0,
+        in_progress: 0,
+        completed_30d: 0,
+    };
 
-    const totalCount = safeMeta.total ?? safeData.length;
-    const openCount = safeData.filter((wo) => wo.status === 'open').length;
-    const inProgressCount = safeData.filter(
-        (wo) => wo.status === 'in_progress',
-    ).length;
-    const completedCount = safeData.filter(
-        (wo) => wo.status === 'completed',
-    ).length;
+    const [wizardOpen, setWizardOpen] = useState(false);
+
+    // Deep-link shim: /create redirects here with ?new=1 (opens the wizard modal).
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get('new') === '1') {
+            setWizardOpen(true);
+        }
+    }, []);
 
     const criticalCount = safeData.filter(
         (wo) => wo.priority === 'critical',
@@ -235,74 +266,83 @@ export default function WorkOrdersIndex({
         >
             <Head title="Work Orders" />
             <PageShell>
-                <PageHero
-                    title="Work Orders"
-                    description="Track maintenance work orders for assets."
-                    actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <a href="/fleet-assets/maintenance/work-orders?export=csv">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export CSV
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <Link href="/fleet-assets/maintenance/work-orders/create">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create Work Order
-                                </Link>
-                            </Button>
-                        </div>
-                    }
-                />
-
-                {/* Dark KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard
-                        label="TOTAL"
-                        value={totalCount}
-                        icon={ClipboardList}
-                        subtitle="All work orders"
-                    />
-                    <FleetStatCard
-                        label="OPEN"
-                        value={openCount}
-                        icon={Wrench}
-                        color="amber"
-                        valueClassName="text-status-warning"
-                        subtitle="Awaiting action"
-                    />
-                    <FleetStatCard
-                        label="IN PROGRESS"
-                        value={inProgressCount}
-                        icon={Loader}
-                        color="blue"
-                        valueClassName="text-status-info"
-                        subtitle="Being worked on"
-                    />
-                    <FleetStatCard
-                        label="COMPLETED"
-                        value={completedCount}
-                        icon={CheckCircle}
-                        color="amber"
-                        valueClassName="text-status-success"
-                        subtitle="Done"
-                    />
-                    <Card className="border bg-primary/10 sm:col-span-2 md:col-span-3 lg:col-span-4 dark:bg-primary/20">
-                        <CardContent className="p-4">
-                            <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                PRIORITY DISTRIBUTION
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Wrench} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>
+                                Maintenance · work orders
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Work Orders
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Track maintenance work orders for assets.
                             </p>
-                            <MiniBarChart
-                                data={priorityChartData.map((d) => ({
-                                    label: d.label,
-                                    value: d.value,
-                                }))}
-                                height={80}
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?status=open"
+                                label="Open"
+                                value={fmt(heroStats.open)}
+                                caption="awaiting action"
+                                tone={heroStats.open > 0 ? 'warning' : 'success'}
                             />
-                        </CardContent>
-                    </Card>
-                </div>
+                            <HeroClusterTile
+                                label="Overdue"
+                                value={fmt(heroStats.overdue)}
+                                caption="past due date"
+                                tone={heroStats.overdue > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?status=in_progress"
+                                label="In progress"
+                                value={fmt(heroStats.in_progress)}
+                                caption="being worked on"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders?status=completed"
+                                label="Completed 30d"
+                                value={fmt(heroStats.completed_30d)}
+                                caption="closed this month"
+                                tone="neutral"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <HeroActionButton
+                            onClick={() => setWizardOpen(true)}
+                            icon={Plus}
+                            emphasis
+                        >
+                            New work order
+                        </HeroActionButton>
+                        <FleetHeroAction
+                            href="/fleet-assets/maintenance/work-orders?export=csv"
+                            icon={Download}
+                            external
+                        >
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
+
+                {/* Priority distribution (current page) */}
+                <Card className="border bg-primary/10 dark:bg-primary/20">
+                    <CardContent className="p-4">
+                        <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                            PRIORITY DISTRIBUTION
+                        </p>
+                        <MiniBarChart
+                            data={priorityChartData.map((d) => ({
+                                label: d.label,
+                                value: d.value,
+                            }))}
+                            height={80}
+                        />
+                    </CardContent>
+                </Card>
 
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -406,6 +446,10 @@ export default function WorkOrdersIndex({
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Wrench className="h-4 w-4 text-muted-foreground" />
+                                                <span className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
+                                                    {wo.reference_number ??
+                                                        `#${wo.id}`}
+                                                </span>
                                                 <span className="font-medium">
                                                     {wo.title}
                                                 </span>
@@ -476,7 +520,9 @@ export default function WorkOrdersIndex({
                                             title="No work orders"
                                             description="Create a work order to track vehicle and asset maintenance tasks."
                                             actionLabel="Create Work Order"
-                                            actionHref="/fleet-assets/maintenance/work-orders/create"
+                                            onAction={() =>
+                                                setWizardOpen(true)
+                                            }
                                         />
                                     </td>
                                 </tr>
@@ -565,6 +611,16 @@ export default function WorkOrdersIndex({
                         ))}
                     </div>
                 )}
+
+                <WorkOrderCreateWizard
+                    open={wizardOpen}
+                    onClose={() => setWizardOpen(false)}
+                    assets={assets ?? []}
+                    users={users ?? []}
+                    checklistRuns={checklist_runs ?? []}
+                    prefillAssetId={prefill_asset_id}
+                    prefillChecklistRunId={prefill_checklist_run_id}
+                />
             </PageShell>
         </AppLayout>
     );

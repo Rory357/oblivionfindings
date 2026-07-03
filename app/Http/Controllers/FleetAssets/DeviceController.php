@@ -68,6 +68,11 @@ class DeviceController extends Controller
 
         $devices = $query->paginate(25)->withQueryString();
 
+        // Consent payload — merged from the retired /devices/consent page; the
+        // tracking-device population is small so it ships on every index render
+        // (instant tab switching, and it feeds the hero consent stat).
+        $consent = $this->consentPayload();
+
         // Stats across all tracking devices (not just page).
         $allStats = Device::where('domain', 'tracking');
         $totalCount = (clone $allStats)->count();
@@ -76,9 +81,28 @@ class DeviceController extends Controller
             'online' => (clone $allStats)->where('status', DeviceStatus::Active->value)->count(),
             'offline' => (clone $allStats)->whereIn('status', [DeviceStatus::Offline->value, DeviceStatus::Degraded->value])->count(),
             'unpaired' => (clone $allStats)->whereDoesntHave('activeAssetLinks')->count(),
+            'low_battery' => (clone $allStats)->whereNotNull('battery_level')->where('battery_level', '<=', 20)->count(),
+            'consent_granted' => $consent['stats']['consented'],
+            'consent_blocked' => max(0, $consent['stats']['total'] - $consent['stats']['consented']),
         ];
 
+        // Detail payload — the retired /devices/{device} page now opens as a
+        // dialog; deep links redirect here with ?device={id}.
+        $deviceDetail = null;
+        if ($request->filled('device')) {
+            $detailDevice = Device::query()
+                ->where('domain', 'tracking')
+                ->find($request->integer('device'));
+            if ($detailDevice) {
+                $deviceDetail = $this->deviceDetailPayload($detailDevice);
+            }
+        }
+
         return Inertia::render('fleet-assets/devices/index', [
+            'tab' => $request->input('tab') === 'consent' ? 'consent' : 'devices',
+            'consent_devices' => $consent['rows'],
+            'consent_stats' => $consent['stats'],
+            'device_detail' => $deviceDetail,
             'devices' => [
                 'data' => $devices->getCollection()->map(fn (Device $d) => $this->mapDeviceForFleet($d)),
                 'links' => $devices->linkCollection()->toArray(),
@@ -115,9 +139,21 @@ class DeviceController extends Controller
     }
 
     /**
-     * Device detail — reads from canonical device.
+     * Device detail — the standalone page is retired; deep links land on the
+     * index which opens the detail dialog for ?device={id}.
      */
     public function show(Request $request, Device $device)
+    {
+        return redirect()->route(
+            'fleet-assets.devices.index',
+            array_merge($request->query(), ['device' => $device->id]),
+        );
+    }
+
+    /**
+     * Detail payload for the index-page device dialog.
+     */
+    private function deviceDetailPayload(Device $device): array
     {
         $device->load([
             'activeAssetLinks.asset:id,name,asset_tag,category,status',
@@ -133,33 +169,31 @@ class DeviceController extends Controller
 
         $activeLink = $device->activeAssetLinks->first();
 
-        return Inertia::render('fleet-assets/devices/show', [
-            'tracker' => [
-                'id' => $device->id,
-                'device_uid' => $device->device_uid,
-                'vendor' => $device->provider,
-                'name' => $device->name,
-                'imei' => $device->imei,
-                'serial_number' => $device->serial_number,
-                'device_status' => $device->status?->value,
-                'link_status' => $activeLink ? 'paired' : 'unpaired',
-                'health_status' => $device->health_status?->value,
-                'paired_at' => $activeLink?->linked_at?->toISOString(),
-                'unpaired_at' => null,
-                'last_seen_at' => $device->last_seen_at?->toISOString(),
-                'battery_level' => $device->battery_level,
-                'vendor_metadata' => $device->external_ref,
-                'detail_url' => "/security-devices/devices/{$device->id}",
-                'asset' => $activeLink?->asset ? [
-                    'id' => $activeLink->asset->id,
-                    'name' => $activeLink->asset->name,
-                    'asset_tag' => $activeLink->asset->asset_tag,
-                    'category' => $activeLink->asset->category,
-                    'status' => $activeLink->asset->status,
-                ] : null,
-                'telemetry_snapshots' => $telemetrySnapshots->values(),
-            ],
-        ]);
+        return [
+            'id' => $device->id,
+            'device_uid' => $device->device_uid,
+            'vendor' => $device->provider,
+            'name' => $device->name,
+            'imei' => $device->imei,
+            'serial_number' => $device->serial_number,
+            'device_status' => $device->status?->value,
+            'link_status' => $activeLink ? 'paired' : 'unpaired',
+            'health_status' => $device->health_status?->value,
+            'paired_at' => $activeLink?->linked_at?->toISOString(),
+            'unpaired_at' => null,
+            'last_seen_at' => $device->last_seen_at?->toISOString(),
+            'battery_level' => $device->battery_level,
+            'vendor_metadata' => $device->external_ref,
+            'detail_url' => "/security-devices/devices/{$device->id}",
+            'asset' => $activeLink?->asset ? [
+                'id' => $activeLink->asset->id,
+                'name' => $activeLink->asset->name,
+                'asset_tag' => $activeLink->asset->asset_tag,
+                'category' => $activeLink->asset->category,
+                'status' => $activeLink->asset->status,
+            ] : null,
+            'telemetry_snapshots' => $telemetrySnapshots->values(),
+        ];
     }
 
     /**
@@ -230,11 +264,24 @@ class DeviceController extends Controller
     }
 
     /**
-     * Consent management now resolves through canonical devices first.
-     * DeviceAssignment.consent_id is the primary source when present; legacy
-     * AssetTracker consent remains a narrow compatibility fallback.
+     * The standalone consent page is retired — it now lives as the "Consent"
+     * tab on the devices index.
      */
     public function consentIndex(Request $request)
+    {
+        return redirect()->route(
+            'fleet-assets.devices.index',
+            array_merge($request->query(), ['tab' => 'consent']),
+        );
+    }
+
+    /**
+     * Consent rows + stats for the devices index "Consent" tab.
+     * Resolves through canonical devices first: DeviceAssignment.consent_id is
+     * the primary source when present; legacy AssetTracker consent remains a
+     * narrow compatibility fallback.
+     */
+    private function consentPayload(): array
     {
         $devices = Device::query()
             ->where('domain', 'tracking')
@@ -297,10 +344,10 @@ class DeviceController extends Controller
             'expired' => $deviceRows->where('consent_status', 'expired')->count(),
         ];
 
-        return Inertia::render('fleet-assets/devices/consent', [
-            'devices' => $deviceRows->values(),
+        return [
+            'rows' => $deviceRows->values(),
             'stats' => $stats,
-        ]);
+        ];
     }
 
     public function grantConsent(Request $request, Device $device)

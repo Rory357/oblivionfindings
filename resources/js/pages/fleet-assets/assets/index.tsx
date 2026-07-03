@@ -24,6 +24,10 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
+import {
+    AssetWizardDialog,
+    type AssetWizardPrefill,
+} from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Download,
@@ -74,6 +78,14 @@ type Props = {
     };
     sites: Array<{ id: number; name: string }>;
     categories: string[];
+    clients?: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        site_id?: number | null;
+    }>;
+    prefill?: AssetWizardPrefill | null;
+    created_asset_id?: number | null;
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -102,8 +114,27 @@ function categoryColor(category: string): string {
     }
 }
 
-export default function AssetsIndex({ hero, assets, filters, sites, categories }: Props) {
+export default function AssetsIndex({ hero, assets, filters, sites, categories, clients, prefill }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
+
+    // /fleet-assets/assets/create now redirects here with ?new=1 — open the
+    // create wizard on mount (the hero action links to the same shim).
+    const [wizardOpen, setWizardOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
+
+    const closeWizard = () => {
+        setWizardOpen(false);
+        // Strip the shim params so a refresh doesn't reopen the wizard.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('new');
+            url.searchParams.delete('created');
+            window.history.replaceState({}, '', url);
+        }
+    };
 
     const allAssets = assets?.data ?? [];
 
@@ -170,7 +201,7 @@ export default function AssetsIndex({ hero, assets, filters, sites, categories }
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href="/fleet-assets/assets/create" icon={Plus} emphasis>
+                        <FleetHeroAction href="/fleet-assets/assets?new=1" icon={Plus} emphasis>
                             New asset
                         </FleetHeroAction>
                         <FleetHeroAction href="/fleet-assets/assets?export=csv" icon={Download} external>
@@ -290,7 +321,7 @@ export default function AssetsIndex({ hero, assets, filters, sites, categories }
                         ))}
                     </div>
                 ) : (
-                    <FleetEmptyState icon={Package} title="No assets found" description="Add assets to start tracking." actionLabel="Create Asset" actionHref="/fleet-assets/assets/create" />
+                    <FleetEmptyState icon={Package} title="No assets found" description="Add assets to start tracking." actionLabel="Create Asset" actionHref="/fleet-assets/assets?new=1" />
                 )}
 
                 {/* Pagination */}
@@ -308,6 +339,14 @@ export default function AssetsIndex({ hero, assets, filters, sites, categories }
                         ))}
                     </div>
                 )}
+
+                <AssetWizardDialog
+                    open={wizardOpen}
+                    onClose={closeWizard}
+                    sites={sites ?? []}
+                    clients={clients}
+                    prefill={prefill}
+                />
             </PageShell>
         </AppLayout>
     );

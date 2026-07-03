@@ -33,6 +33,12 @@ class OutingController extends Controller
                     'avg_duration_minutes' => 0,
                     'upcoming' => 0,
                 ],
+                'hero' => [
+                    'planned_today' => 0,
+                    'active_now' => 0,
+                    'residents_out_now' => 0,
+                    'completed_7d' => 0,
+                ],
                 'chart_data' => [],
             ]);
         }
@@ -133,6 +139,21 @@ class OutingController extends Controller
                 'residents_this_week' => $residentsThisWeek,
                 'avg_duration_minutes' => round((float) ($avgDuration ?? 0), 1),
                 'upcoming' => $upcoming,
+            ],
+            'hero' => [
+                'planned_today' => FleetOuting::query()
+                    ->where('status', 'planned')
+                    ->whereDate('planned_departure', today())
+                    ->count(),
+                'active_now' => FleetOuting::query()->where('status', 'active')->count(),
+                'residents_out_now' => FleetOutingResident::query()
+                    ->whereHas('outing', fn ($q) => $q->where('status', 'active'))
+                    ->whereNull('returned_at')
+                    ->count(),
+                'completed_7d' => FleetOuting::query()
+                    ->where('status', 'completed')
+                    ->where('planned_departure', '>=', now()->subDays(7))
+                    ->count(),
             ],
             'chart_data' => $chartFormatted,
             'can' => [

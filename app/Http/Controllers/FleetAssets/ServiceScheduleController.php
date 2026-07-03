@@ -152,8 +152,22 @@ class ServiceScheduleController extends Controller
             $assets = [];
         }
 
+        // Hero band stats — efficient COUNTs (active schedules only)
+        $stats = [
+            'due_7d' => FleetServiceSchedule::where('is_active', true)
+                ->whereNotNull('next_due_at')
+                ->whereBetween('next_due_at', [Carbon::now(), Carbon::now()->addDays(7)])
+                ->count(),
+            'overdue' => FleetServiceSchedule::where('is_active', true)
+                ->whereNotNull('next_due_at')
+                ->where('next_due_at', '<', Carbon::now())
+                ->count(),
+            'active' => FleetServiceSchedule::where('is_active', true)->count(),
+        ];
+
         return Inertia::render('fleet-assets/maintenance/schedules/index', [
             'schedules' => $schedules,
+            'stats' => $stats,
             'assets' => $assets,
             'fleet_health_pct' => $fleetHealthPct,
             'schedules_per_vehicle' => $schedulesPerVehicle,

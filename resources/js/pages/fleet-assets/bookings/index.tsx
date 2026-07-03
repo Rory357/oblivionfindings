@@ -1,7 +1,4 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,16 +6,31 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    Calendar, CalendarDays, Car, CheckCircle, ChevronLeft, ChevronRight,
-    ClipboardList, Clock, Download, List, Plus, User,
+    Calendar, CalendarClock, CalendarDays, Car, ChevronLeft, ChevronRight,
+    Download, List, Plus, User,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatDate as formatDateStr } from '@/lib/fleet-utils';
+import {
+    BookVehicleWizard,
+    type BookingConflict,
+    type BookingWizardOptions,
+    type WizardVehicleBooking,
+} from './book-vehicle-wizard';
 
 type Booking = {
     id: number;
+    reference_number?: string | null;
     asset: { id: number; name: string; asset_tag?: string } | null;
     user: { id: number; name: string } | null;
     purpose: string;
@@ -36,13 +48,23 @@ type Props = {
         meta?: { current_page: number; last_page: number; total: number };
         links?: Array<{ url: string | null; label: string; active: boolean }>;
     };
+    hero: {
+        pending: number;
+        approved_upcoming: number;
+        checked_out: number;
+        overdue: number;
+    };
     filters: {
         status?: string; asset_id?: string; date_from?: string; date_to?: string;
-        view?: string; week_start?: string;
+        view?: string; week_start?: string; overdue?: string;
     };
     vehicles?: Vehicle[];
     calendar_bookings?: Booking[];
     week_start?: string;
+    booking_options?: BookingWizardOptions | null;
+    booking_conflicts?: BookingConflict[];
+    booking_vehicle_status?: string | null;
+    booking_vehicle_bookings?: WizardVehicleBooking[];
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -134,7 +156,7 @@ function BookingCalendar({ bookings, vehicles, weekStart, onWeekChange }: {
                                         <Link key={booking.id} href={`/fleet-assets/bookings/${booking.id}`}
                                             className="absolute flex items-center rounded px-1.5 text-[10px] font-medium text-white shadow-sm transition-opacity hover:opacity-80"
                                             style={{ left: `${(startCol / 7) * 100}%`, width: `${(spanCols / 7) * 100}%`, top: `${4 + idx * 18}px`, height: '16px', backgroundColor: color }}
-                                            title={`${booking.user?.name ?? 'Unknown'}: ${booking.purpose ?? ''}`}>
+                                            title={`${booking.reference_number ?? '—'} · ${booking.user?.name ?? 'Unknown'}: ${booking.purpose ?? ''}`}>
                                             <span className="truncate">{booking.user?.name ?? 'Booking'}</span>
                                         </Link>
                                     );
@@ -157,8 +179,9 @@ function BookingCalendar({ bookings, vehicles, weekStart, onWeekChange }: {
 }
 
 export default function BookingsIndex({
-    bookings: rawBookings, filters: rawFilters, vehicles: rawVehicles,
+    bookings: rawBookings, hero, filters: rawFilters, vehicles: rawVehicles,
     calendar_bookings: rawCalendarBookings, week_start: rawWeekStart,
+    booking_options, booking_conflicts, booking_vehicle_status, booking_vehicle_bookings,
 }: Props) {
     const bookings = useMemo(() => rawBookings?.data ?? [], [rawBookings?.data]);
     const meta = rawBookings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
@@ -166,26 +189,28 @@ export default function BookingsIndex({
     const filters = rawFilters ?? {};
     const vehicles = rawVehicles ?? [];
     const calendarBookings = rawCalendarBookings ?? [];
-
-    const totalCount = meta.total ?? bookings.length;
-    const pendingCount = bookings.filter((b) => b.status === 'pending').length;
-    const approvedCount = bookings.filter((b) => b.status === 'approved').length;
-    const checkedOutCount = bookings.filter((b) => b.status === 'checked_out').length;
-
-    // Generate booking trend for last 7 days from booking data
-    const bookingTrend = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return Array.from({ length: 7 }, (_, i) => {
-            const day = new Date(today);
-            day.setDate(day.getDate() - (6 - i));
-            const dayStr = day.toISOString().split('T')[0];
-            return bookings.filter((b) => b.created_at && b.created_at.startsWith(dayStr)).length;
-        });
-    }, [bookings]);
+    const heroStats = hero ?? { pending: 0, approved_upcoming: 0, checked_out: 0, overdue: 0 };
 
     const [viewMode, setViewMode] = useState<'list' | 'calendar'>(filters.view === 'calendar' ? 'calendar' : 'list');
     const weekStart = useMemo(() => rawWeekStart ? new Date(rawWeekStart) : getMonday(new Date()), [rawWeekStart]);
+
+    // Open the wizard on mount when arriving via the legacy GET create route
+    // (it redirects here with ?new=1).
+    const [wizardOpen, setWizardOpen] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return new URLSearchParams(window.location.search).has('new');
+    });
+
+    const closeWizard = () => {
+        setWizardOpen(false);
+        // Strip the shim + conflict-check params so a refresh doesn't reopen
+        // the modal or re-run the availability check.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            ['new', 'check_asset_id', 'check_starts_at', 'check_ends_at'].forEach((p) => url.searchParams.delete(p));
+            window.history.replaceState(window.history.state, '', url.toString());
+        }
+    };
 
     const applyFilters = (newFilters: Record<string, string | undefined>) => {
         router.get('/fleet-assets/bookings', { ...filters, ...newFilters, page: 1 }, { preserveState: true });
@@ -201,24 +226,62 @@ export default function BookingsIndex({
         <AppLayout breadcrumbs={[{ title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Bookings', href: '/fleet-assets/bookings' }]}>
             <Head title="Vehicle Bookings" />
             <PageShell>
-                <PageHero
-                    title="Vehicle Bookings"
-                    description="Manage vehicle booking requests and availability."
-                    actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild><a href="/fleet-assets/bookings?export=csv"><Download className="mr-2 h-4 w-4" />Export CSV</a></Button>
-                            <Button asChild><Link href="/fleet-assets/bookings/create"><Plus className="mr-2 h-4 w-4" />Create Booking</Link></Button>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={CalendarClock} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Vehicle bookings · live</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Vehicle Bookings</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Manage vehicle booking requests and availability.
+                            </p>
                         </div>
-                    }
-                />
-
-                {/* Dark KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard label="TOTAL" value={totalCount} icon={ClipboardList} subtitle="All bookings" trend={bookingTrend} />
-                    <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-status-warning" subtitle="Awaiting approval" />
-                    <FleetStatCard label="APPROVED" value={approvedCount} icon={CheckCircle} color="blue" valueClassName="text-status-info" subtitle="Ready for use" />
-                    <FleetStatCard label="CHECKED OUT" value={checkedOutCount} icon={Car} color="amber" valueClassName="text-status-success" subtitle="Currently in use" />
-                </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings?status=pending"
+                                label="Pending approval"
+                                value={fmt(heroStats.pending)}
+                                caption="awaiting a decision"
+                                tone={heroStats.pending > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings?status=approved"
+                                label="Approved upcoming"
+                                value={fmt(heroStats.approved_upcoming)}
+                                caption="ready to check out"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings?status=checked_out"
+                                label="Checked out now"
+                                value={fmt(heroStats.checked_out)}
+                                caption="vehicles on the road"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings?overdue=1"
+                                label="Overdue returns"
+                                value={fmt(heroStats.overdue)}
+                                caption="past their end time"
+                                tone={heroStats.overdue > 0 ? 'critical' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* eslint-disable-next-line no-restricted-syntax -- on-dark hero quick action (FleetHeroAction chrome) opening the modal, not a nav link. */}
+                        <button
+                            type="button"
+                            onClick={() => setWizardOpen(true)}
+                            className="inline-flex h-[34px] items-center gap-2 rounded-lg bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
+                        >
+                            <Plus className="h-[15px] w-[15px]" />
+                            Book vehicle
+                        </button>
+                        <FleetHeroAction href="/fleet-assets/bookings?export=csv" icon={Download} external>
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {/* View Toggle + Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -231,7 +294,7 @@ export default function BookingsIndex({
                         </Button>
                     </div>
                     {viewMode === 'list' && (
-                        <Select value={filters.status || 'all'} onValueChange={(v) => applyFilters({ status: v === 'all' ? '' : v })}>
+                        <Select value={filters.status || 'all'} onValueChange={(v) => applyFilters({ status: v === 'all' ? '' : v, overdue: undefined })}>
                             <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All statuses</SelectItem>
@@ -257,6 +320,9 @@ export default function BookingsIndex({
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Car className="h-4 w-4 text-muted-foreground" />
                                             <span className="text-sm font-semibold">{booking.asset?.name ?? 'No vehicle'}</span>
+                                            <span className="inline-flex items-center rounded-md border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                                {booking.reference_number ?? '—'}
+                                            </span>
                                             <Badge variant={statusVariant(booking.status)}>{booking.status.replace(/_/g, ' ')}</Badge>
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -270,7 +336,7 @@ export default function BookingsIndex({
                                     </div>
                                 </Link>
                             )) : (
-                                <FleetEmptyState icon={Calendar} title="No bookings yet" description="Create a booking to reserve a vehicle for a trip or task." actionLabel="Create Booking" actionHref="/fleet-assets/bookings/create" />
+                                <FleetEmptyState icon={Calendar} title="No bookings yet" description="Create a booking to reserve a vehicle for a trip or task." actionLabel="Book Vehicle" onAction={() => setWizardOpen(true)} />
                             )}
                         </div>
                         {(meta.last_page ?? 1) > 1 && (
@@ -280,6 +346,15 @@ export default function BookingsIndex({
                         )}
                     </>
                 )}
+
+                <BookVehicleWizard
+                    open={wizardOpen}
+                    onClose={closeWizard}
+                    options={booking_options}
+                    conflicts={booking_conflicts}
+                    vehicleStatus={booking_vehicle_status}
+                    vehicleBookings={booking_vehicle_bookings}
+                />
             </PageShell>
         </AppLayout>
     );

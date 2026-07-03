@@ -1,10 +1,7 @@
-import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -15,19 +12,26 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Car,
-    CheckCircle,
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
-    Clock,
     Download,
     Search,
+    ShieldCheck,
     User,
-    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -53,6 +57,14 @@ type PaginatedDrivers = {
 
 type Props = {
     drivers: PaginatedDrivers;
+    hero: {
+        total: number;
+        active: number;
+        expiring_30: number;
+        at_risk: number;
+        licence_expired: number;
+        sessions_today: number;
+    };
     filters: { search?: string; status?: string };
 };
 
@@ -94,6 +106,7 @@ function getLicenceRowClass(driver: Driver): string {
 
 export default function DriversIndex({
     drivers: rawDrivers,
+    hero,
     filters: rawFilters,
 }: Props) {
     const drivers = rawDrivers?.data ?? [];
@@ -163,33 +176,14 @@ export default function DriversIndex({
         );
     };
 
-    // Compute stats from the current page data
-    const stats = {
-        total: meta.total ?? drivers.length,
-        eligible: drivers.filter((d) => d.eligibility?.status === 'eligible')
-            .length,
-        pending: drivers.filter((d) => d.eligibility?.status === 'pending')
-            .length,
-        suspended: drivers.filter((d) => d.eligibility?.status === 'suspended')
-            .length,
-        expired: drivers.filter((d) => d.eligibility?.status === 'expired')
-            .length,
+    const heroStats = hero ?? {
+        total: 0,
+        active: 0,
+        expiring_30: 0,
+        at_risk: 0,
+        licence_expired: 0,
+        sessions_today: 0,
     };
-
-    // Licence expiry warnings
-    const expiredCount = drivers.filter((d) => {
-        const days = getLicenceExpiryDays(
-            d.eligibility?.licence_expires_at ?? null,
-        );
-        return days !== null && days < 0;
-    }).length;
-
-    const expiringSoonCount = drivers.filter((d) => {
-        const days = getLicenceExpiryDays(
-            d.eligibility?.licence_expires_at ?? null,
-        );
-        return days !== null && days >= 0 && days <= 60;
-    }).length;
 
     return (
         <AppLayout
@@ -200,127 +194,70 @@ export default function DriversIndex({
         >
             <Head title="Drivers" />
             <PageShell>
-                <PageHero
-                    title="Drivers"
-                    description="Manage fleet drivers, licenses, and assignments."
-                    actions={
-                        <Button variant="outline" size="sm" asChild>
-                            <a href="/fleet-assets/drivers?export=csv">
-                                <Download className="mr-2 h-4 w-4" />
-                                Export CSV
-                            </a>
-                        </Button>
+                <HeroShell
+                    footer={
+                        <HeroSummaryStrip label="Licence compliance">
+                            <HeroSummaryMetric tone={heroStats.licence_expired > 0 ? 'critical' : 'success'}>
+                                {heroStats.licence_expired > 0
+                                    ? `${heroStats.licence_expired} licence${heroStats.licence_expired !== 1 ? 's' : ''} expired`
+                                    : 'No expired licences'}
+                            </HeroSummaryMetric>
+                            <HeroSummaryMetric tone={heroStats.expiring_30 > 0 ? 'warning' : 'success'}>
+                                {heroStats.expiring_30 > 0
+                                    ? `${heroStats.expiring_30} expiring within 30 days`
+                                    : 'None expiring within 30 days'}
+                            </HeroSummaryMetric>
+                            <HeroSummaryMetric tone="neutral">
+                                {heroStats.active} of {heroStats.total} drivers fully eligible
+                            </HeroSummaryMetric>
+                        </HeroSummaryStrip>
                     }
-                />
-
-                {/* Expired license warning banner */}
-                {(expiredCount > 0 || expiringSoonCount > 0) && (
-                    <div className="rounded-lg border border-status-critical/30 bg-status-critical p-4">
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-status-critical" />
-                            <div className="space-y-0.5">
-                                {expiredCount > 0 && (
-                                    <p className="text-sm font-medium text-status-critical dark:text-status-critical">
-                                        {expiredCount} driver
-                                        {expiredCount !== 1 ? 's have' : ' has'}{' '}
-                                        expired licences
-                                    </p>
-                                )}
-                                {expiringSoonCount > 0 && (
-                                    <p className="text-sm text-status-warning dark:text-status-warning">
-                                        {expiringSoonCount} driver
-                                        {expiringSoonCount !== 1
-                                            ? 's have'
-                                            : ' has'}{' '}
-                                        licences expiring within 60 days
-                                    </p>
-                                )}
-                            </div>
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={ShieldCheck} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Driver compliance · licence watch</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Drivers</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Manage fleet drivers, licences, and assignments.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/drivers?status=eligible"
+                                label="Active drivers"
+                                value={fmt(heroStats.active)}
+                                caption="eligible to drive"
+                                tone={heroStats.active > 0 ? 'success' : 'warning'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/drivers?status=expiring_30"
+                                label="Expiring 30d"
+                                value={fmt(heroStats.expiring_30)}
+                                caption="licences due to renew"
+                                tone={heroStats.expiring_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/drivers?status=at_risk"
+                                label="Expired / suspended"
+                                value={fmt(heroStats.at_risk)}
+                                caption="must not drive"
+                                tone={heroStats.at_risk > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Sessions today"
+                                value={fmt(heroStats.sessions_today)}
+                                caption="driving sessions started"
+                                tone="neutral"
+                            />
                         </div>
                     </div>
-                )}
-
-                {/* Summary Cards + Safety Score Gauge */}
-                <div className="grid gap-4 lg:grid-cols-[1fr,auto]">
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Total
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.total}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-primary">
-                                    <CheckCircle className="h-4 w-4" /> Eligible
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.eligible}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-warning">
-                                    <Clock className="h-4 w-4" /> Pending
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.pending}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-critical">
-                                    <XCircle className="h-4 w-4" /> Suspended
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.suspended}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-critical">
-                                    <AlertTriangle className="h-4 w-4" />{' '}
-                                    Expired
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">
-                                    {stats.expired}
-                                </div>
-                            </CardContent>
-                        </Card>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href="/fleet-assets/drivers?export=csv" icon={Download} external>
+                            Export CSV
+                        </FleetHeroAction>
                     </div>
-                    <Card className="flex items-center justify-center px-6 py-4">
-                        <HalfMoonGauge
-                            value={
-                                stats.total > 0
-                                    ? Math.round(
-                                          (stats.eligible / stats.total) * 100,
-                                      )
-                                    : 0
-                            }
-                            label="Fleet Safety"
-                            sublabel={`${stats.eligible} eligible of ${stats.total}`}
-                            size={130}
-                            color={FLEET_COLORS.primary}
-                        />
-                    </Card>
-                </div>
+                </HeroShell>
 
                 {/* Search & Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -352,7 +289,13 @@ export default function DriversIndex({
                             <SelectItem value="suspended">Suspended</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
                             <SelectItem value="expiring_soon">
-                                Expiring Soon
+                                Expiring Soon (60d)
+                            </SelectItem>
+                            <SelectItem value="expiring_30">
+                                Expiring Soon (30d)
+                            </SelectItem>
+                            <SelectItem value="at_risk">
+                                Expired / Suspended
                             </SelectItem>
                         </SelectContent>
                     </Select>

@@ -26,7 +26,7 @@ import {
     formatDistance,
     formatDuration,
 } from '@/lib/fleet-utils';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     Car,
@@ -38,6 +38,7 @@ import {
     Download,
     Gauge,
     MapPin,
+    Play,
     Route,
     Search,
     User,
@@ -604,6 +605,20 @@ function TripRow({
                                 Personal
                             </Badge>
                         )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Trip playback"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Link
+                                href={`/fleet-assets/trips/${trip.id}/playback`}
+                            >
+                                <Play className="h-4 w-4 text-muted-foreground" />
+                            </Link>
+                        </Button>
                         <Button
                             variant="ghost"
                             size="sm"

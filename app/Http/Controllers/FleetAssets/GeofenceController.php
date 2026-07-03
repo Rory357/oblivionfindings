@@ -5,11 +5,14 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
+use App\Models\FleetSignal;
 use App\Models\Site;
 use App\Rules\GeofenceShape;
 use App\Services\AuditLogger;
 use App\Services\Fleet\GeofenceStateCleanupService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class GeofenceController extends Controller
@@ -58,7 +61,35 @@ class GeofenceController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Hero — whole-register counts (independent of filters). Coverage counts
+        // distinct vehicles reached by an active geofence (direct asset_id plus
+        // the assignment pivot the evaluator also consults). Breaches come from
+        // the geofence.breach signals the evaluator emits.
+        $activeGeofenceIds = AssetGeofence::query()->where('is_active', true)->pluck('id');
+        $coveredAssetIds = AssetGeofence::query()
+            ->where('is_active', true)
+            ->whereNotNull('asset_id')
+            ->pluck('asset_id');
+        if ($activeGeofenceIds->isNotEmpty() && Schema::hasTable('asset_geofence_assignments')) {
+            $coveredAssetIds = $coveredAssetIds->merge(
+                DB::table('asset_geofence_assignments')
+                    ->whereIn('asset_geofence_id', $activeGeofenceIds)
+                    ->pluck('asset_id'),
+            );
+        }
+        $hero = [
+            'active' => $activeGeofenceIds->count(),
+            'vehicles_covered' => $coveredAssetIds->unique()->count(),
+            'breaches_7d' => Schema::hasTable('fleet_signals')
+                ? FleetSignal::query()
+                    ->where('signal_type', 'geofence.breach')
+                    ->where('occurred_at', '>=', now()->subDays(7))
+                    ->count()
+                : 0,
+        ];
+
         return Inertia::render('fleet-assets/geofences/index', [
+            'hero' => $hero,
             'geofences' => $geofences,
             'sites' => $sites,
             'filters' => [
