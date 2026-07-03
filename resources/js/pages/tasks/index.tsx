@@ -31,7 +31,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/health-safety/components/hs-hero-kit';
-import { TaskDetailDrawer } from '@/pages/tasks/task-detail-drawer';
+import { TaskDetailDialog } from '@/pages/tasks/task-detail-dialog';
 import {
     dueInfo,
     humanise,
@@ -707,7 +707,7 @@ export default function TasksIndex({
 
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
 
-            <TaskDetailDrawer item={selected} currentUserId={currentUserId} onClose={() => setSelected(null)} />
+            <TaskDetailDialog item={selected} currentUserId={currentUserId} onClose={() => setSelected(null)} />
         </AppLayout>
     );
 }

@@ -1,18 +1,19 @@
-/* Right-side preview drawer for the All Tasks queue. Opens on row click,
- * fetches the permission-scoped detail payload (item + audit timeline +
- * canAssign) from GET /tasks/detail, and carries the deep link that used to
- * live on the row itself. Assignment mirrors the queue's one write action. */
+/* Centered preview modal for the All Tasks queue. Opens on row click, fetches
+ * the permission-scoped detail payload (item + audit timeline + watchers +
+ * canAssign/canSplit) from GET /tasks/detail, and carries the deep link that
+ * used to live on the row itself. Uses the shared Dialog chrome so it matches
+ * every other modal in the app. Assignment / watch / split mirror the queue's
+ * write actions. */
 import { Button } from '@/components/ui/button';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
-import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -265,7 +266,7 @@ function SplitTaskForm({
     );
 }
 
-export function TaskDetailDrawer({
+export function TaskDetailDialog({
     item,
     currentUserId,
     onClose,
@@ -314,7 +315,7 @@ export function TaskDetailDrawer({
     }, [item, fetchDetail]);
 
     // Prefer the freshly fetched item (it reflects assignment changes) over
-    // the possibly stale row the drawer was opened from.
+    // the possibly stale row the dialog was opened from.
     const display = detail?.item ?? item;
 
     const assign = (assigneeId: number | null) => {
@@ -370,12 +371,15 @@ export function TaskDetailDrawer({
     const childLabel = item ? childLabelFor(item.source) : 'follow-up';
 
     return (
-        <Sheet open={item !== null} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="right" data-test="tasks-drawer" className="w-full gap-0 sm:max-w-lg">
+        <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent
+                data-test="tasks-detail-dialog"
+                className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+            >
                 {display ? (
                     <>
-                        <SheetHeader className="border-b border-border pb-4">
-                            <div className="flex flex-wrap items-center gap-1.5 pr-8">
+                        <DialogHeader className="border-b border-border p-5 pr-12 text-left">
+                            <div className="flex flex-wrap items-center gap-1.5">
                                 {display.ref ? (
                                     <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
                                         {display.ref}
@@ -388,14 +392,14 @@ export function TaskDetailDrawer({
                                     {humanise(display.status)}
                                 </StatusBadge>
                             </div>
-                            <SheetTitle className="text-base leading-snug">{display.title}</SheetTitle>
-                            <SheetDescription>
+                            <DialogTitle className="text-base leading-snug">{display.title}</DialogTitle>
+                            <DialogDescription>
                                 {display.type ? `${display.type} · ` : ''}
                                 {display.sourceLabel}
-                            </SheetDescription>
-                        </SheetHeader>
+                            </DialogDescription>
+                        </DialogHeader>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-4">
+                        <div className="flex-1 overflow-y-auto px-5 py-4">
                             {display.description ? (
                                 <p className="mb-4 text-sm whitespace-pre-line text-muted-foreground">{display.description}</p>
                             ) : null}
@@ -567,14 +571,12 @@ export function TaskDetailDrawer({
                         </div>
                     </>
                 ) : (
-                    <div className={cn('flex flex-1 items-center justify-center text-sm text-muted-foreground')}>
-                        {/* Radix requires a title even while empty/closing. */}
-                        <SheetTitle className="sr-only">Task detail</SheetTitle>
-                    </div>
+                    // Radix requires a title while mounted; display is only null on close.
+                    <DialogTitle className="sr-only">Task detail</DialogTitle>
                 )}
-            </SheetContent>
-        </Sheet>
+            </DialogContent>
+        </Dialog>
     );
 }
 
-export default TaskDetailDrawer;
+export default TaskDetailDialog;
