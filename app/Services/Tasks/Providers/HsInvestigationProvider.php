@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\HsInvestigation;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class HsInvestigationProvider implements TaskProvider
+class HsInvestigationProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class HsInvestigationProvider implements TaskProvider
     public function label(): string
     {
         return 'H&S Investigations';
+    }
+
+    public function modelClass(): string
+    {
+        return HsInvestigation::class;
     }
 
     public function canView(User $user): bool

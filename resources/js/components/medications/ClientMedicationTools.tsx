@@ -900,6 +900,7 @@ function ChartSettingsDialog({
 }) {
     const [suppress, setSuppress] = useState(Boolean(settings.suppress_med_admin_alerts));
     const [reason, setReason] = useState(settings.med_alerts_suppressed_reason ?? '');
+    const [suppressBasis, setSuppressBasis] = useState('');
     const [careLevel, setCareLevel] = useState(settings.care_level ?? 'none');
     const [interval, setInterval] = useState((settings.chart_review_interval_months ?? 3).toString());
     const [nextReview, setNextReview] = useState(settings.next_chart_review_date ?? '');
@@ -910,9 +911,13 @@ function ChartSettingsDialog({
             toast.error('Enter why medication alerts are being suppressed.');
             return;
         }
+        if (suppress && !suppressBasis) {
+            toast.error('Select the basis for suppressing these alerts.');
+            return;
+        }
         router.post(
             `/emar/clients/${client.id}/alert-suppression`,
-            { suppress_med_admin_alerts: suppress, reason: reason.trim() || null },
+            { suppress_med_admin_alerts: suppress, reason: reason.trim() || null, basis: suppressBasis || null },
             { preserveScroll: true, onStart: () => setSaving(true), onFinish: () => setSaving(false) },
         );
     }
@@ -958,12 +963,25 @@ function ChartSettingsDialog({
                             <Switch checked={suppress} onCheckedChange={setSuppress} />
                         </div>
                         {suppress && (
-                            <Textarea
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                placeholder="Reason for suppression (required)"
-                                rows={2}
-                            />
+                            <>
+                                <Select value={suppressBasis} onValueChange={setSuppressBasis}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Basis for suppression (required)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="capacity_assessment">Capacity assessment</SelectItem>
+                                        <SelectItem value="mdt_decision">MDT decision</SelectItem>
+                                        <SelectItem value="clinical_judgement">Clinical judgement</SelectItem>
+                                        <SelectItem value="client_preference">Client preference</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Textarea
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Reason for suppression (required)"
+                                    rows={2}
+                                />
+                            </>
                         )}
                         <div className="flex justify-end">
                             <Button size="sm" variant="outline" onClick={saveSuppression} disabled={saving}>

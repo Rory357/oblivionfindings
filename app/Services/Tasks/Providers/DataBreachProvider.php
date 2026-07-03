@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\DataBreachLog;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class DataBreachProvider implements TaskProvider
+class DataBreachProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class DataBreachProvider implements TaskProvider
     public function label(): string
     {
         return 'Privacy Breaches';
+    }
+
+    public function modelClass(): string
+    {
+        return DataBreachLog::class;
     }
 
     public function canView(User $user): bool

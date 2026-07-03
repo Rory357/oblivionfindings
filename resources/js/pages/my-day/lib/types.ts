@@ -351,6 +351,32 @@ export interface MyDayPpe {
     fit_test_completed: boolean;
 }
 
+/**
+ * One row of the My Day "My tasks" card — an open work item from the
+ * company-wide /tasks aggregator assigned to the signed-in user. Mirrors
+ * `MyTasksController::getMyAggregatedTasks()`.
+ */
+export interface MyDayAggregatedTask {
+    /** Aggregator id, e.g. "followup-42" — unique across sources. */
+    id: string;
+    /** Ticket number, e.g. "INC-2026-0042". */
+    ref: string | null;
+    title: string;
+    severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+    dueAt: string | null;
+    overdue: boolean;
+    /** Deep link back to the owning module's record. */
+    link: string | null;
+    /** Owning module, e.g. "Client Incidents". */
+    sourceLabel: string;
+}
+
+/** The My Day "My tasks" card payload — first 8 items + uncapped count. */
+export interface MyDayMyTasks {
+    total: number;
+    items: MyDayAggregatedTask[];
+}
+
 export interface MyDayPreShiftBriefing {
     id: number;
     starts_at: string;
@@ -413,6 +439,7 @@ export interface MyDayPageProps {
     active_lone_worker_session?: MyDayLoneWorkerSession | null;
     first_aid_followups?: MyDayFirstAidFollowup[];
     my_ppe?: MyDayPpe[];
+    myTasks?: MyDayMyTasks;
     shiftChecklists?: ShiftChecklistRun[];
     checklistConfig?: MyDayChecklistConfig;
     runDetail?: RunDetail | null;

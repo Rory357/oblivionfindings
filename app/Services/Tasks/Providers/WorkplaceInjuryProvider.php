@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class WorkplaceInjuryProvider implements TaskProvider
+class WorkplaceInjuryProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class WorkplaceInjuryProvider implements TaskProvider
     public function label(): string
     {
         return 'Workplace Injuries';
+    }
+
+    public function modelClass(): string
+    {
+        return WorkplaceInjury::class;
     }
 
     public function canView(User $user): bool

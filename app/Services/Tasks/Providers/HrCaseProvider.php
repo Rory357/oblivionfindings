@@ -5,8 +5,11 @@ namespace App\Services\Tasks\Providers;
 use App\Domain\Hr\Models\HrCase;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
 /**
  * HR cases are confidential by default: the query replicates
@@ -15,7 +18,7 @@ use App\Services\Tasks\TaskItem;
  * the controller's tenant scoping, and the title/description never expose the
  * case title or narrative — only the humanised case type.
  */
-class HrCaseProvider implements TaskProvider
+class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     use ResolvesHrTenant;
 
@@ -27,6 +30,39 @@ class HrCaseProvider implements TaskProvider
     public function label(): string
     {
         return 'HR Cases';
+    }
+
+    public function modelClass(): string
+    {
+        return HrCase::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // Mirrors HrCaseController::update(): abort_unless hr.cases.manage.
+        return $user->canDo('hr.cases.manage');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        // Re-fetch under the same tenant + confidentiality scoping tasks()
+        // applies, so an out-of-scope case reads as "not found".
+        $tenantId = $this->resolveHrTenantIdForUser($actor);
+
+        $case = HrCase::forTenant($tenantId)
+            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $actor))
+            ->find($id);
+
+        if (! $case) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'HR case not found or outside your visibility.',
+            ]);
+        }
+
+        $case->update([
+            'assigned_to' => $assigneeId,
+            'updated_by' => $actor->id,
+        ]);
     }
 
     public function canView(User $user): bool

@@ -30,6 +30,7 @@ class MedicationRefusalFollowup extends Model
         'follow_up_due_at',
         'follow_up_completed_at',
         'follow_up_completed_by',
+        'follow_up_outcome',
         'escalated_to_manager',
         'escalated_at',
         'created_by',

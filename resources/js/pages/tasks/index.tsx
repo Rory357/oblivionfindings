@@ -13,51 +13,59 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    ShiftContextMenu,
+    TabStrip,
+    type RosterTabItem,
+    type ShiftCtxItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import {
     HeroCluster,
     HeroClusterTile,
     HeroMedallion,
-    HeroSegmented,
     HeroShell,
     HeroStatusPill,
 } from '@/pages/health-safety/components/hs-hero-kit';
-import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, ChevronDown, Download, ListChecks, Search, Siren } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-
-/* ------------------------------------------------------------------ */
-/*  Types — mirror app/Services/Tasks/TaskItem::toArray()               */
-/* ------------------------------------------------------------------ */
-
-type NamedRef = { id: number; name: string };
-
-type TaskBucket = 'open' | 'in_progress' | 'done';
-
-type TaskSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-
-interface TaskItem {
-    id: string;
-    source: string;
-    sourceLabel: string;
-    ref: string | null;
-    title: string;
-    status: string;
-    bucket: TaskBucket;
-    severity: TaskSeverity;
-    assignee: NamedRef | null;
-    client: NamedRef | null;
-    site: NamedRef | null;
-    dueAt: string | null;
-    createdAt: string | null;
-    link: string | null;
-    type: string | null;
-    description: string | null;
-    overdue: boolean;
-}
+import { TaskDetailDrawer } from '@/pages/tasks/task-detail-drawer';
+import {
+    dueInfo,
+    humanise,
+    SEVERITY_VARIANT,
+    taskNumericId,
+    type TaskItem,
+    type TaskSeverity,
+} from '@/pages/tasks/types';
+import type { SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    Bookmark,
+    Building2,
+    CalendarClock,
+    CheckCircle2,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Copy,
+    Download,
+    ExternalLink,
+    Eye,
+    LayoutList,
+    ListChecks,
+    Search,
+    Siren,
+    User as UserIcon,
+    UserCheck,
+    UserX,
+    X,
+} from 'lucide-react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 interface Filters {
     sources: string[] | null;
@@ -82,22 +90,52 @@ interface Stats {
     myOverdue: number;
 }
 
+interface Pagination {
+    page: number;
+    perPage: number;
+    total: number;
+}
+
 interface Props {
     items: TaskItem[];
     stats: Stats;
     sources: Array<{ key: string; label: string }>;
     filters: Filters;
+    pagination: Pagination;
+    usingDefaultView: boolean;
+    assignableSources: string[];
 }
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const QUICK_VIEWS = [
-    { key: 'all', label: 'All' },
-    { key: 'mine', label: 'Mine' },
-    { key: 'overdue', label: 'Overdue' },
-] as const;
+/** Register views — the TabStrip below the hero owns these dimensions. */
+type TabKey = 'all' | 'mine' | 'overdue' | 'unassigned' | 'week' | 'high' | 'done';
+
+/** Filter override applied when a tab is clicked (search + modules persist). */
+const TAB_FILTERS: Record<TabKey, Partial<Filters>> = {
+    all: { assigned: null, overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    mine: { assigned: 'me', overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    overdue: { assigned: null, overdue: true, due: null, severity: null, bucket: null, include_done: false },
+    unassigned: { assigned: 'unassigned', overdue: false, due: null, severity: null, bucket: null, include_done: false },
+    week: { assigned: null, overdue: false, due: 'week', severity: null, bucket: null, include_done: false },
+    high: { assigned: null, overdue: false, due: null, severity: ['critical', 'high'], bucket: null, include_done: false },
+    done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true },
+};
+
+function deriveTab(f: Filters): TabKey | 'none' {
+    if (f.include_done && (f.bucket ?? []).join(',') === 'done') return 'done';
+    // Combined views (e.g. the "My overdue" hero tile: assigned=me&overdue=1)
+    // match no single tab — highlight none rather than lie.
+    if (f.overdue && f.assigned) return 'none';
+    if (f.overdue) return 'overdue';
+    if (f.assigned === 'me') return 'mine';
+    if (f.assigned === 'unassigned') return 'unassigned';
+    if (f.due === 'week') return 'week';
+    if ((f.severity ?? []).slice().sort().join(',') === 'critical,high') return 'high';
+    return 'all';
+}
 
 const SEVERITIES: Array<{ key: TaskSeverity; label: string }> = [
     { key: 'critical', label: 'Critical' },
@@ -107,44 +145,10 @@ const SEVERITIES: Array<{ key: TaskSeverity; label: string }> = [
     { key: 'info', label: 'Info' },
 ];
 
-const BUCKETS: Array<{ key: TaskBucket; label: string }> = [
-    { key: 'open', label: 'Open' },
-    { key: 'in_progress', label: 'In progress' },
-];
-
-const SEVERITY_VARIANT: Record<TaskSeverity, StatusVariant> = {
-    critical: 'critical',
-    high: 'warning',
-    medium: 'warning',
-    low: 'info',
-    info: 'neutral',
-};
-
-function humanise(raw: string): string {
-    const label = raw.replace(/[_-]/g, ' ');
-    return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-/** Relative due label + tone class. Overdue rows read critical. */
-function dueInfo(item: TaskItem): { label: string; className: string } {
-    if (!item.dueAt) return { label: '—', className: 'text-muted-foreground' };
-    const days = Math.ceil((new Date(item.dueAt).getTime() - Date.now()) / 86_400_000);
-    if (item.overdue) {
-        return {
-            label: days >= 0 ? 'Overdue' : `${Math.abs(days)}d overdue`,
-            className: 'font-semibold text-status-critical',
-        };
-    }
-    if (days <= 0) return { label: 'Due today', className: 'font-semibold text-status-warning' };
-    if (days <= 7) return { label: `Due in ${days}d`, className: 'text-status-warning' };
-    return {
-        label: new Date(item.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }),
-        className: 'text-muted-foreground',
-    };
-}
-
-/** Serialise the filter state into shareable query params, omitting empties. */
-function buildParams(f: Filters): Record<string, string> {
+/** Serialise the filter state into shareable query params, omitting empties.
+ *  `page` rides along only when past the first page — every filter change
+ *  omits it, which is exactly the "reset to page 1" behaviour we want. */
+function buildParams(f: Filters, page?: number): Record<string, string> {
     const params: Record<string, string> = {};
     if (f.sources?.length) params.sources = f.sources.join(',');
     if (f.severity?.length) params.severity = f.severity.join(',');
@@ -154,6 +158,7 @@ function buildParams(f: Filters): Record<string, string> {
     if (f.due) params.due = f.due;
     if (f.q) params.q = f.q;
     if (f.include_done) params.done = '1';
+    if (page && page > 1) params.page = String(page);
     return params;
 }
 
@@ -166,8 +171,21 @@ function toggleKey(list: string[] | null, key: string): string[] {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function TasksIndex({ items, stats, sources, filters }: Props) {
+export default function TasksIndex({
+    items,
+    stats,
+    sources,
+    filters,
+    pagination,
+    usingDefaultView,
+    assignableSources,
+}: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const currentUserId = auth.user.id;
+
     const [search, setSearch] = useState(filters.q ?? '');
+    const [selected, setSelected] = useState<TaskItem | null>(null);
+    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     // The debounce timer must always read the LATEST committed filters —
     // a closure over the render-time `filters` re-applies stale filters
@@ -183,8 +201,10 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         lastSentQ.current = filters.q ?? '';
     }, [filters.q]);
 
-    const go = (next: Partial<Filters>) =>
-        router.get('/tasks', buildParams({ ...filtersRef.current, ...next }), {
+    // Any filter change omits `page` (→ back to page 1); only the pager
+    // passes an explicit page to stay within the current filter slice.
+    const go = (next: Partial<Filters>, page?: number) =>
+        router.get('/tasks', buildParams({ ...filtersRef.current, ...next }, page), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -201,9 +221,18 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const quickView = filters.overdue ? 'overdue' : filters.assigned === 'me' ? 'mine' : 'all';
-    const setQuickView = (key: string) =>
-        go({ assigned: key === 'mine' ? 'me' : null, overdue: key === 'overdue' });
+    const tab = deriveTab(filters);
+    const setTab = (id: string) => go(TAB_FILTERS[id as TabKey] ?? TAB_FILTERS.all);
+
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: stats.open || undefined },
+        { id: 'mine', label: 'Mine', icon: UserCheck, tone: 'info', badge: stats.mine || undefined },
+        { id: 'overdue', label: 'Overdue', icon: Clock, tone: 'critical', badge: stats.overdue || undefined },
+        { id: 'unassigned', label: 'Unassigned', icon: UserX, tone: 'warning', badge: stats.unassigned || undefined },
+        { id: 'week', label: 'Due this week', icon: CalendarClock, tone: 'info', badge: stats.dueWeek || undefined },
+        { id: 'high', label: 'High priority', icon: AlertTriangle, tone: 'warning', badge: stats.critical || undefined },
+        { id: 'done', label: 'Done', icon: CheckCircle2, tone: 'success' },
+    ];
 
     const hasFilters = !!(
         filters.sources?.length ||
@@ -235,6 +264,102 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
         router.get('/tasks', {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
+    /* ── Default view (bookmarked filter set) ── */
+    const saveView = () =>
+        router.post('/tasks/default-view', { view: buildParams(filters) }, { preserveScroll: true });
+    const clearDefaultView = () =>
+        router.post('/tasks/default-view', { view: [] }, { preserveScroll: true });
+
+    /* ── Assignment (the queue's one write action) ── */
+    const assign = (item: TaskItem, assigneeId: number | null) =>
+        router.post(
+            `/tasks/${item.source}/${taskNumericId(item)}/assign`,
+            { assignee_id: assigneeId },
+            { preserveState: true, preserveScroll: true },
+        );
+
+    /* ── Row right-click context menu ── */
+    const openRowCtx = (e: ReactMouseEvent, item: TaskItem) => {
+        e.preventDefault();
+
+        const menu: ShiftCtxItem[] = [];
+        if (item.link) {
+            menu.push(
+                {
+                    icon: <Eye className="h-3.5 w-3.5" />,
+                    label: 'Open record',
+                    sub: item.sourceLabel,
+                    tone: 'primary',
+                    onClick: () => router.visit(item.link!),
+                },
+                {
+                    icon: <ExternalLink className="h-3.5 w-3.5" />,
+                    label: 'Open in new tab',
+                    onClick: () => window.open(item.link!, '_blank'),
+                },
+            );
+        }
+        if (item.ref) {
+            menu.push({
+                icon: <Copy className="h-3.5 w-3.5" />,
+                label: 'Copy ticket #',
+                sub: item.ref,
+                onClick: () => void navigator.clipboard.writeText(item.ref!),
+            });
+        }
+
+        const actions: ShiftCtxItem[] = [];
+        if (assignableSources.includes(item.source)) {
+            if (item.assignee?.id !== currentUserId) {
+                actions.push({
+                    icon: <UserCheck className="h-3.5 w-3.5" />,
+                    label: 'Assign to me',
+                    onClick: () => assign(item, currentUserId),
+                });
+            }
+            if (item.assignee) {
+                actions.push({
+                    icon: <UserX className="h-3.5 w-3.5" />,
+                    label: 'Unassign',
+                    sub: item.assignee.name,
+                    onClick: () => assign(item, null),
+                });
+            }
+        }
+        if (item.client) {
+            actions.push({
+                icon: <UserIcon className="h-3.5 w-3.5" />,
+                label: 'View client',
+                sub: item.client.name,
+                onClick: () => router.visit(`/clients/${item.client!.id}`),
+            });
+        }
+        if (item.site) {
+            actions.push({
+                icon: <Building2 className="h-3.5 w-3.5" />,
+                label: 'View site',
+                sub: item.site.name,
+                onClick: () => router.visit(`/sites/${item.site!.id}`),
+            });
+        }
+        if (actions.length) menu.push({ sep: true }, ...actions);
+
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: item.severity.toUpperCase(),
+            meta: `${item.ref ?? humanise(item.status)} · ${item.sourceLabel}`,
+            items: menu,
+        });
+    };
+
+    /* ── Pagination (backend slices at pagination.perPage) ── */
+    const { page, perPage, total } = pagination;
+    const pageStart = total === 0 ? 0 : (page - 1) * perPage + 1;
+    const pageEnd = Math.min(page * perPage, total);
+    const hasPrev = page > 1;
+    const hasNext = pageEnd < total;
+
     const selectedSources = filters.sources ?? [];
     const moduleLabel =
         selectedSources.length === 0
@@ -249,23 +374,7 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
 
             <div className="flex flex-col gap-4 p-6">
                 {/* ── Hero ── */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <HeroSegmented
-                                label="View"
-                                ariaLabel="Quick view"
-                                variant="pill"
-                                value={quickView}
-                                onChange={setQuickView}
-                                items={QUICK_VIEWS}
-                            />
-                            <span className="text-xs text-primary-foreground/70 tabular-nums">
-                                {items.length} task{items.length === 1 ? '' : 's'} in view
-                            </span>
-                        </div>
-                    }
-                >
+                <HeroShell>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ListChecks} />
@@ -353,6 +462,9 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                     </div>
                 </HeroShell>
 
+                {/* ── Register views ── */}
+                <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Task views" />
+
                 {/* ── Filter bar ── */}
                 <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
                     <div className="relative min-w-[240px] flex-1">
@@ -365,6 +477,22 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                             className="h-9 w-full rounded-lg border border-border bg-background pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-primary"
                         />
                     </div>
+
+                    {usingDefaultView ? (
+                        <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 text-xs font-medium text-muted-foreground">
+                            <Bookmark className="h-3 w-3" />
+                            Default view
+                            <button
+                                type="button"
+                                aria-label="Clear default view"
+                                title="Clear default view"
+                                onClick={clearDefaultView}
+                                className="-mr-1 rounded-full p-0.5 transition-colors hover:bg-background hover:text-foreground"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    ) : null}
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -409,44 +537,28 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                         })}
                     </div>
 
-                    <div role="group" aria-label="Status filter" className="flex items-center gap-1 rounded-lg bg-muted p-1">
-                        {BUCKETS.map((b) => {
-                            const active = (filters.bucket ?? []).includes(b.key);
-                            return (
-                                <button
-                                    key={b.key}
-                                    type="button"
-                                    aria-pressed={active}
-                                    onClick={() => go({ bucket: toggleKey(filters.bucket, b.key) })}
-                                    className={cn(
-                                        'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                                        active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                                    )}
-                                >
-                                    {b.label}
-                                </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            aria-pressed={filters.include_done}
-                            onClick={() => go({ include_done: !filters.include_done })}
-                            className={cn(
-                                'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
-                                filters.include_done
-                                    ? 'bg-card text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground',
-                            )}
+                    {hasFilters ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9"
+                            onClick={saveView}
+                            title="Save the current filters as your default /tasks view"
                         >
-                            Include done
-                        </button>
-                    </div>
+                            <Bookmark className="h-4 w-4" />
+                            Save view
+                        </Button>
+                    ) : null}
 
                     {hasFilters ? (
                         <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
                             Clear filters
                         </Button>
                     ) : null}
+
+                    <span className="ml-auto pr-1 text-xs text-muted-foreground tabular-nums">
+                        {total} in view
+                    </span>
                 </div>
 
                 {/* ── Queue ── */}
@@ -490,14 +602,18 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                                     <tbody>
                                         {items.map((item) => {
                                             const due = dueInfo(item);
-                                            const open = () => item.link && router.visit(item.link);
+                                            // Row click previews in the drawer; the deep link
+                                            // lives on the drawer button + context menu now.
+                                            const open = () => setSelected(item);
                                             return (
                                                 <tr
                                                     key={item.id}
-                                                    role="link"
+                                                    role="button"
                                                     tabIndex={0}
+                                                    data-test="tasks-row"
                                                     onClick={open}
                                                     onKeyDown={(e) => e.key === 'Enter' && open()}
+                                                    onContextMenu={(e) => openRowCtx(e, item)}
                                                     className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
                                                 >
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -542,7 +658,45 @@ export default function TasksIndex({ items, stats, sources, filters }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* ── Pager ── */}
+                {total > 0 ? (
+                    <div
+                        data-test="tasks-pager"
+                        className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2"
+                    >
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                            Showing {pageStart}–{pageEnd} of {total}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8"
+                                disabled={!hasPrev}
+                                onClick={() => go({}, page - 1)}
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                Prev
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8"
+                                disabled={!hasNext}
+                                onClick={() => go({}, page + 1)}
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
             </div>
+
+            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+
+            <TaskDetailDrawer item={selected} currentUserId={currentUserId} onClose={() => setSelected(null)} />
         </AppLayout>
     );
 }

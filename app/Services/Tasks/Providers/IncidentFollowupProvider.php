@@ -4,10 +4,13 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\IncidentFollowup;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class IncidentFollowupProvider implements TaskProvider
+class IncidentFollowupProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -17,6 +20,44 @@ class IncidentFollowupProvider implements TaskProvider
     public function label(): string
     {
         return 'Incident Follow-ups';
+    }
+
+    public function modelClass(): string
+    {
+        return IncidentFollowup::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // Mirrors routes/incidents.php: followup writes → permission:incidents.followups.manage
+        // (IncidentFollowupPolicy::update).
+        return $user->canDo('incidents.followups.manage');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        // Re-fetch with the same viewAssigned client scoping tasks() applies.
+        $followup = IncidentFollowup::query()
+            ->when(
+                ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
+                fn ($q) => $q->whereHas('incident.client.supportWorkers', fn ($qq) => $qq->whereKey($actor->id)),
+            )
+            ->find($id);
+
+        if (! $followup) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Follow-up not found or outside your assigned clients.',
+            ]);
+        }
+
+        // Audit guardrail mirrored from IncidentFollowupController::update().
+        if (! empty($followup->completed_at)) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'A completed follow-up cannot be modified.',
+            ]);
+        }
+
+        $followup->update(['assigned_to_user_id' => $assigneeId]);
     }
 
     public function canView(User $user): bool

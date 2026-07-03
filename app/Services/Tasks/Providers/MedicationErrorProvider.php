@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\MedicationError;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class MedicationErrorProvider implements TaskProvider
+class MedicationErrorProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class MedicationErrorProvider implements TaskProvider
     public function label(): string
     {
         return 'Medication Errors';
+    }
+
+    public function modelClass(): string
+    {
+        return MedicationError::class;
     }
 
     public function canView(User $user): bool

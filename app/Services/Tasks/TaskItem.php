@@ -36,6 +36,7 @@ class TaskItem
         public ?string $link = null,       // deep link back to the source record
         public ?string $type = null,       // human row label, e.g. "Corrective action"
         public ?string $description = null,
+        public bool $restricted = false,   // need-to-know row: drawer attaches no extra context
     ) {}
 
     private ?bool $overdue = null;
@@ -81,6 +82,7 @@ class TaskItem
             'link' => $this->link,
             'type' => $this->type,
             'description' => $this->description,
+            'restricted' => $this->restricted,
             'overdue' => $this->isOverdue(),
         ];
     }

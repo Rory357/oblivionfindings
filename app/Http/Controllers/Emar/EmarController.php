@@ -3231,6 +3231,10 @@ class EmarController extends Controller
         $validated = $request->validate([
             'suppress_med_admin_alerts' => ['required', 'boolean'],
             'reason' => ['nullable', 'string', 'max:500'],
+            // Structured lawful basis for suppressing a safety alert — free text
+            // alone left auditors unable to verify the decision was grounded
+            // (capacity / MDT / clinical judgement / client preference).
+            'basis' => ['nullable', 'string', Rule::in(['capacity_assessment', 'mdt_decision', 'clinical_judgement', 'client_preference'])],
         ]);
 
         if ($validated['suppress_med_admin_alerts'] && blank($validated['reason'] ?? null)) {
@@ -3239,9 +3243,25 @@ class EmarController extends Controller
             ]);
         }
 
+        if ($validated['suppress_med_admin_alerts'] && blank($validated['basis'] ?? null)) {
+            throw ValidationException::withMessages([
+                'basis' => 'Select the basis for suppressing these alerts (capacity assessment, MDT decision, clinical judgement, or client preference).',
+            ]);
+        }
+
+        $basisLabel = match ($validated['basis'] ?? null) {
+            'capacity_assessment' => 'Capacity assessment',
+            'mdt_decision' => 'MDT decision',
+            'clinical_judgement' => 'Clinical judgement',
+            'client_preference' => 'Client preference',
+            default => null,
+        };
+
         $client->forceFill([
             'suppress_med_admin_alerts' => (bool) $validated['suppress_med_admin_alerts'],
-            'med_alerts_suppressed_reason' => $validated['suppress_med_admin_alerts'] ? $validated['reason'] : null,
+            'med_alerts_suppressed_reason' => $validated['suppress_med_admin_alerts']
+                ? trim(($basisLabel ? "[{$basisLabel}] " : '').$validated['reason'])
+                : null,
             'med_alerts_suppressed_by' => $validated['suppress_med_admin_alerts'] ? $request->user()?->id : null,
             'med_alerts_suppressed_at' => $validated['suppress_med_admin_alerts'] ? now() : null,
         ])->save();
@@ -3394,6 +3414,15 @@ class EmarController extends Controller
             'status' => ['nullable', 'string', Rule::in(['completed', 'stopped'])],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        // A driver must have at least one recorded running check before it can
+        // be closed out — otherwise "completed" is indistinguishable from
+        // "abandoned without monitoring" in the audit trail.
+        if (! $driver->checks()->exists()) {
+            throw ValidationException::withMessages([
+                'status' => 'Record at least one syringe-driver check before completing — a driver with no checks cannot be signed off as monitored.',
+            ]);
+        }
 
         $driver->forceFill([
             'status' => $validated['status'] ?? 'completed',

@@ -3,11 +3,15 @@
 namespace App\Services\Tasks\Providers;
 
 use App\Models\SafeguardingActionPlan;
+use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class SafeguardingActionPlanProvider implements TaskProvider
+class SafeguardingActionPlanProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -17,6 +21,69 @@ class SafeguardingActionPlanProvider implements TaskProvider
     public function label(): string
     {
         return 'Safeguarding Actions';
+    }
+
+    public function modelClass(): string
+    {
+        return SafeguardingActionPlan::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // SafeguardingActionPlanController authorizes 'update' on the parent
+        // concern — globally that is the safeguarding.update permission (the
+        // per-record policy branch is re-checked in assign()).
+        return $user->canDo('safeguarding.update');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        $plan = SafeguardingActionPlan::query()->with('concern')->find($id);
+        $concern = $plan?->concern;
+
+        if (! $plan || ! $concern) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Safeguarding action plan not found.',
+            ]);
+        }
+
+        if ($assigneeId === null) {
+            // The module requires every action plan to carry an assignee.
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Safeguarding action plans must be assigned to a staff member.',
+            ]);
+        }
+
+        if (in_array($plan->status, ['completed', 'cancelled'], true)) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'A '.$plan->status.' action plan cannot be reassigned.',
+            ]);
+        }
+
+        // Mirror of SafeguardingConcernPolicy::update on the parent concern.
+        if (! $actor->can('update', $concern)) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'You are not authorized to assign this action plan.',
+            ]);
+        }
+
+        // Same need-to-know rule as the concern itself: restricted viewers of a
+        // sensitive concern cannot (re)allocate its action plans.
+        $restricted = $concern->is_sensitive
+            && ! $actor->can('viewSensitive', SafeguardingConcern::class)
+            && $concern->assigned_to_user_id !== $actor->id
+            && $concern->reported_by_user_id !== $actor->id;
+
+        if ($restricted) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'This concern is restricted — you cannot assign its action plans.',
+            ]);
+        }
+
+        $plan->update([
+            'assigned_to_user_id' => $assigneeId,
+            'updated_by' => $actor->id,
+        ]);
     }
 
     public function canView(User $user): bool

@@ -1,0 +1,66 @@
+/* Shared types + helpers for the All Tasks queue (page + drawer).
+ * Mirrors app/Services/Tasks/TaskItem::toArray(). */
+import type { StatusVariant } from '@/components/ui/status-badge';
+
+export type NamedRef = { id: number; name: string };
+
+export type TaskBucket = 'open' | 'in_progress' | 'done';
+
+export type TaskSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+export interface TaskItem {
+    id: string;
+    source: string;
+    sourceLabel: string;
+    ref: string | null;
+    title: string;
+    status: string;
+    bucket: TaskBucket;
+    severity: TaskSeverity;
+    assignee: NamedRef | null;
+    client: NamedRef | null;
+    site: NamedRef | null;
+    dueAt: string | null;
+    createdAt: string | null;
+    link: string | null;
+    type: string | null;
+    description: string | null;
+    overdue: boolean;
+}
+
+export const SEVERITY_VARIANT: Record<TaskSeverity, StatusVariant> = {
+    critical: 'critical',
+    high: 'warning',
+    medium: 'warning',
+    low: 'info',
+    info: 'neutral',
+};
+
+export function humanise(raw: string): string {
+    const label = raw.replace(/[_-]/g, ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Relative due label + tone class. Overdue rows read critical. */
+export function dueInfo(item: TaskItem): { label: string; className: string } {
+    if (!item.dueAt) return { label: '—', className: 'text-muted-foreground' };
+    const days = Math.ceil((new Date(item.dueAt).getTime() - Date.now()) / 86_400_000);
+    if (item.overdue) {
+        return {
+            label: days >= 0 ? 'Overdue' : `${Math.abs(days)}d overdue`,
+            className: 'font-semibold text-status-critical',
+        };
+    }
+    if (days <= 0) return { label: 'Due today', className: 'font-semibold text-status-warning' };
+    if (days <= 7) return { label: `Due in ${days}d`, className: 'text-status-warning' };
+    return {
+        label: new Date(item.dueAt).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }),
+        className: 'text-muted-foreground',
+    };
+}
+
+/** Composite queue ids are "{source}-{modelId}"; the numeric tail addresses
+ *  the record in /tasks/detail and /tasks/{source}/{id}/assign. */
+export function taskNumericId(item: TaskItem): string {
+    return item.id.slice(item.id.lastIndexOf('-') + 1);
+}

@@ -121,6 +121,12 @@ class MedicationAuditEventController extends Controller
         $clientId = $model instanceof Client ? $model->getKey() : ($model->client_id ?? null);
         abort_unless($clientId, 422, 'This event is not linked to a client.');
 
+        // Flagging raises a medication-error record against the client, so the
+        // flagger must be allowed to act on that client's medication record —
+        // the broad route permission alone let staff flag other clients' events.
+        $client = $model instanceof Client ? $model : Client::findOrFail($clientId);
+        $this->authorize('viewMedications', $client);
+
         // Map the audit gap to a medication-error type where we can be specific.
         $errorType = match ($validated['flag'] ?? null) {
             'omission' => 'omission',

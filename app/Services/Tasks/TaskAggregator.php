@@ -56,7 +56,26 @@ class TaskAggregator
             new Providers\DataSubjectRequestProvider(),
             new Providers\ActionItemProvider(),
             new Providers\HrCaseProvider(),
+            new Providers\SiteChecklistRunProvider(),
+            new Providers\ShiftTaskProvider(),
+            new Providers\RespiteTaskProvider(),
+            new Providers\FirstAidFollowupProvider(),
+            new Providers\RestraintReviewProvider(),
         ];
+    }
+
+    /**
+     * The registered provider for a source key, or null.
+     */
+    public function providerFor(string $sourceKey): ?TaskProvider
+    {
+        foreach ($this->providers as $provider) {
+            if ($provider->sourceKey() === $sourceKey) {
+                return $provider;
+            }
+        }
+
+        return null;
     }
 
     /**
