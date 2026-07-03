@@ -35,6 +35,12 @@ class TaskAssignmentNotifier
                 'body' => $item?->title,
                 'url' => $item?->link ?? '/tasks?assigned=me',
                 'target_user_ids' => [$assigneeId],
+                // Personal ping only — without these, NotificationService's
+                // defaults fan the "You've been assigned…" message out to
+                // every manager-role user.
+                'include_managers' => false,
+                'include_assigned_workers' => false,
+                'include_entity_user' => false,
             ],
         );
     }

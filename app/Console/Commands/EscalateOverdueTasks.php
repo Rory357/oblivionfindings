@@ -42,8 +42,8 @@ class EscalateOverdueTasks extends Command
         // Preload the dedupe ledger once; extend it in memory as we insert so
         // the same item seen through a later user's pass is not re-notified.
         $seen = DB::table('task_escalations')
-            ->get(['source', 'item_id', 'level'])
-            ->map(fn ($row) => $row->source.'|'.$row->item_id.'|'.$row->level)
+            ->get(['source', 'item_id', 'level', 'assignee_id'])
+            ->map(fn ($row) => $row->source.'|'.$row->item_id.'|'.$row->level.'|'.$row->assignee_id)
             ->flip()
             ->all();
 
@@ -102,7 +102,9 @@ class EscalateOverdueTasks extends Command
     }
 
     /**
-     * Notify once per (source, item, level) and record the dedupe row.
+     * Notify once per (source, item, level, assignee) and record the dedupe
+     * row — level-1 nudges re-fire for a NEW assignee after reassignment;
+     * level-2 manager escalations use assignee 0 (once per item lifetime).
      * Returns true when a new notification was actually sent.
      */
     private function escalate(
@@ -113,7 +115,8 @@ class EscalateOverdueTasks extends Command
         array $extra,
     ): bool {
         $itemId = (int) Str::afterLast($item->id, '-');
-        $key = $item->source.'|'.$itemId.'|'.$level;
+        $assigneeKey = $level === 1 ? (int) ($item->assignee['id'] ?? 0) : 0;
+        $key = $item->source.'|'.$itemId.'|'.$level.'|'.$assigneeKey;
 
         if (isset($seen[$key])) {
             return false;
@@ -141,6 +144,7 @@ class EscalateOverdueTasks extends Command
                 'source' => $item->source,
                 'item_id' => $itemId,
                 'level' => $level,
+                'assignee_id' => $assigneeKey,
                 'notified_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),

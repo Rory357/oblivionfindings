@@ -127,6 +127,9 @@ class ControlRoomAlertProvider implements TaskProvider, HasModelClass, Assignabl
     {
         $query = ControlRoomAlert::query()
             ->with(['client:id,first_name,last_name', 'site:id,name', 'assignedTo:id,name'])
+            // Same site scoping as the Control Room index (applyAlertScope) —
+            // the queue must never show alerts the module itself would hide.
+            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyAlertScope($q, $user, self::ALERT_BYPASS_PERMISSIONS))
             ->orderByDesc('triggered_at')
             ->limit(300);
 

@@ -124,9 +124,12 @@ const TAB_FILTERS: Record<TabKey, Partial<Filters>> = {
     done: { assigned: null, overdue: false, due: null, severity: null, bucket: ['done'], include_done: true },
 };
 
-function deriveTab(f: Filters): TabKey {
+function deriveTab(f: Filters): TabKey | 'none' {
     if (f.include_done && (f.bucket ?? []).join(',') === 'done') return 'done';
-    if (f.overdue && !f.assigned) return 'overdue';
+    // Combined views (e.g. the "My overdue" hero tile: assigned=me&overdue=1)
+    // match no single tab — highlight none rather than lie.
+    if (f.overdue && f.assigned) return 'none';
+    if (f.overdue) return 'overdue';
     if (f.assigned === 'me') return 'mine';
     if (f.assigned === 'unassigned') return 'unassigned';
     if (f.due === 'week') return 'week';
@@ -534,16 +537,18 @@ export default function TasksIndex({
                         })}
                     </div>
 
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9"
-                        onClick={saveView}
-                        title="Save the current filters as your default /tasks view"
-                    >
-                        <Bookmark className="h-4 w-4" />
-                        Save view
-                    </Button>
+                    {hasFilters ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9"
+                            onClick={saveView}
+                            title="Save the current filters as your default /tasks view"
+                        >
+                            <Bookmark className="h-4 w-4" />
+                            Save view
+                        </Button>
+                    ) : null}
 
                     {hasFilters ? (
                         <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>

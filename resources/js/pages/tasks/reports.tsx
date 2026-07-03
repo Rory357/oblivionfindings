@@ -456,9 +456,10 @@ export default function TaskReports({ totals, modules, severity, closure }: Prop
                 </Card>
 
                 <p className="text-xs text-muted-foreground">
-                    Throughput caveat: modules only surface recently-completed items into the queue, so
-                    "closed in the last 30 days" understates true closures — read it as rough throughput,
-                    not an exact ledger.
+                    Throughput caveat: both 30-day figures count items by the date they were <em>created</em>{' '}
+                    (the queue doesn't track close dates), and modules only surface recently-completed
+                    items, so "closed" understates true closures — read these as rough throughput, not an
+                    exact ledger.
                 </p>
             </div>
         </AppLayout>

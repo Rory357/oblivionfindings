@@ -56,6 +56,7 @@ class HsCorrectiveActionProvider implements TaskProvider, HasModelClass, Assigna
             'assigned_to_user_id' => $assigneeId,
             'assigned_by_user_id' => $assigneeId !== null ? $actor->id : null,
             'assigned_at' => $assigneeId !== null ? now() : null,
+            'updated_by' => $actor->id, // module service stamps this on every write
         ]);
     }
 

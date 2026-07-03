@@ -139,6 +139,7 @@ class SafeguardingConcernProvider implements TaskProvider, HasModelClass, Assign
                 description: (! $restricted && $concern->description)
                     ? str($concern->description)->limit(140)->toString()
                     : null,
+                restricted: $restricted,
             );
         })->all();
     }

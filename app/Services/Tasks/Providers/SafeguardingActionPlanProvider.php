@@ -54,6 +54,12 @@ class SafeguardingActionPlanProvider implements TaskProvider, HasModelClass, Ass
             ]);
         }
 
+        if (in_array($plan->status, ['completed', 'cancelled'], true)) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'A '.$plan->status.' action plan cannot be reassigned.',
+            ]);
+        }
+
         // Mirror of SafeguardingConcernPolicy::update on the parent concern.
         if (! $actor->can('update', $concern)) {
             throw ValidationException::withMessages([

@@ -61,8 +61,11 @@ class AllTasksController extends Controller
             return $this->exportCsv($filtered);
         }
 
-        $page = max(1, (int) ($params['page'] ?? 1));
         $total = count($filtered);
+        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
+        // Clamp so a shrunken result set (or stale bookmark) can't land past
+        // the end and render a false "all clear".
+        $page = min(max(1, (int) ($params['page'] ?? 1)), $lastPage);
         $pageItems = array_slice($filtered, ($page - 1) * self::PER_PAGE, self::PER_PAGE);
 
         return Inertia::render('tasks/index', [
@@ -94,13 +97,20 @@ class AllTasksController extends Controller
 
         // Resolve through the provider's own feed so per-row visibility rules
         // (confidentiality, need-to-know redaction) hold for the drawer too.
-        $item = collect($provider->tasks($user, ['include_done' => true]))
-            ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}");
+        // Try the open-only window first — it's the one the list renders — and
+        // only then the include_done window, so a row that is on screen can
+        // never 404 just because closed items pushed it past the feed cap.
+        $item = collect($provider->tasks($user))
+            ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}")
+            ?? collect($provider->tasks($user, ['include_done' => true]))
+                ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}");
 
         abort_if($item === null, 404);
 
         $timeline = [];
-        if ($provider instanceof HasModelClass) {
+        // Need-to-know rows get no timeline: audit actors reveal the reporter
+        // and investigators — exactly what the owning register redacts.
+        if ($provider instanceof HasModelClass && ! $item->restricted) {
             $timeline = AuditLog::query()
                 ->where('auditable_type', $provider->modelClass())
                 ->where('auditable_id', $id)
@@ -148,7 +158,14 @@ class AllTasksController extends Controller
 
         $assigneeId = isset($validated['assignee_id']) ? (int) $validated['assignee_id'] : null;
 
-        $provider->assign($user, $id, $assigneeId);
+        try {
+            $provider->assign($user, $id, $assigneeId);
+        } catch (ValidationException $e) {
+            // Surface module-rule rejections through the global flash toast —
+            // neither the drawer nor the context menu renders field errors.
+            return back()->with('error', collect($e->errors())->flatten()->first()
+                ?? 'This record could not be assigned.');
+        }
 
         // Sidebar badges react to assignment immediately.
         Cache::forget("tasks.nav.{$user->id}");
@@ -193,7 +210,8 @@ class AllTasksController extends Controller
     {
         $validated = $request->validate([
             'view' => ['nullable', 'array'],
-            'view.*' => ['nullable', 'string', 'max:200'],
+            // All 22 module keys as one CSV run past 250 chars — cap generously.
+            'view.*' => ['nullable', 'string', 'max:500'],
         ]);
 
         $view = array_filter($validated['view'] ?? [], fn ($v) => $v !== null && $v !== '');
@@ -347,7 +365,12 @@ class AllTasksController extends Controller
             }
         }
 
-        $modules = array_values($modules);
+        // Done-only sources have nothing actionable to report — drop the
+        // all-zero rows rather than padding the breakdown table.
+        $modules = array_values(array_filter(
+            $modules,
+            fn (array $m) => $m['open'] > 0 || $m['overdue'] > 0,
+        ));
         usort($modules, fn (array $a, array $b) => [$b['open'], $b['overdue'], $a['label']] <=> [$a['open'], $a['overdue'], $b['label']]);
 
         return Inertia::render('tasks/reports', [
