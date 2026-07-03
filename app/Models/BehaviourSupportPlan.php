@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\HasReferenceNumber;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,9 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BehaviourSupportPlan extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, HasReferenceNumber, SoftDeletes;
+
+    public const REFERENCE_PREFIX = 'BSP';
 
     protected $fillable = [
+        'reference_number',
         'client_id',
         'title',
         'triggers',

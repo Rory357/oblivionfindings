@@ -189,13 +189,15 @@ class RespiteWorkspaceController extends Controller
             'plans' => BehaviourSupportPlan::query()
                 ->where('status', '!=', 'archived')
                 ->orderByDesc('created_at')
-                ->get(['id', 'client_id', 'title', 'status', 'restrictive_practice_type'])
+                ->get(['id', 'reference_number', 'client_id', 'title', 'status', 'restrictive_practice_type'])
                 ->map(fn (BehaviourSupportPlan $p) => [
                     'id' => $p->id,
                     'client_id' => $p->client_id,
                     'title' => $p->title,
                     'status' => $p->status,
-                    'reference' => 'BSP-'.str_pad((string) $p->id, 3, '0', STR_PAD_LEFT),
+                    // Stored ticket number, with the legacy display format as fallback
+                    // for rows created before the reference_number backfill ran.
+                    'reference' => $p->reference_number ?? 'BSP-'.str_pad((string) $p->id, 3, '0', STR_PAD_LEFT),
                     'restrictive_practice_type' => $p->restrictive_practice_type,
                 ])
                 ->all(),

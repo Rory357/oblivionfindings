@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\HsEvent;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class HsEventProvider implements TaskProvider
+class HsEventProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class HsEventProvider implements TaskProvider
     public function label(): string
     {
         return 'H&S Events';
+    }
+
+    public function modelClass(): string
+    {
+        return HsEvent::class;
     }
 
     public function canView(User $user): bool

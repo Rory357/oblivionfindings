@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\ControlledDrugLossReport;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class CdLossReportProvider implements TaskProvider
+class CdLossReportProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class CdLossReportProvider implements TaskProvider
     public function label(): string
     {
         return 'CD Loss Reports';
+    }
+
+    public function modelClass(): string
+    {
+        return ControlledDrugLossReport::class;
     }
 
     public function canView(User $user): bool

@@ -10,8 +10,18 @@ import {
 } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { router, usePage } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { Search, Ticket } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+/** Ticket-number shapes worth a server lookup, e.g. "INC-2026-0042". */
+const TICKET_RE = /^[a-zA-Z]{2,4}-\d/;
+
+interface TicketMatch {
+    ref: string;
+    title: string;
+    sourceLabel: string;
+    link: string | null;
+}
 
 export default function GlobalNavSearch() {
     const page = usePage<any>();
@@ -23,6 +33,8 @@ export default function GlobalNavSearch() {
     const unreadMessageCount = auth?.unreadMessageCount;
 
     const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const [ticket, setTicket] = useState<TicketMatch | null>(null);
 
     const catalog = useMemo(
         () =>
@@ -57,6 +69,47 @@ export default function GlobalNavSearch() {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, []);
+
+    // Fresh palette each open — a stale ticket result must not linger.
+    useEffect(() => {
+        if (!open) {
+            setQuery('');
+            setTicket(null);
+        }
+    }, [open]);
+
+    // Ticket-number lookup: when the query looks like a ticket ref
+    // (e.g. "INC-2026-0042"), debounce and ask /tasks/lookup for an exact
+    // match to prepend. Loading/errors fail silently to the static results.
+    useEffect(() => {
+        const q = query.trim();
+        if (!open || !TICKET_RE.test(q)) {
+            setTicket(null);
+            return;
+        }
+        let cancelled = false;
+        const t = setTimeout(() => {
+            fetch(`/tasks/lookup?q=${encodeURIComponent(q)}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            })
+                .then((r) => (r.ok ? r.json() : { match: null }))
+                .then((data) => {
+                    if (!cancelled) {
+                        setTicket(data?.match ?? null);
+                    }
+                })
+                .catch(() => {
+                    if (!cancelled) {
+                        setTicket(null);
+                    }
+                });
+        }, 300);
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
+    }, [query, open]);
 
     const select = (href: string) => {
         setOpen(false);
@@ -101,9 +154,32 @@ export default function GlobalNavSearch() {
                         Search modules and pages
                     </DialogTitle>
                     <Command>
-                        <CommandInput placeholder="Search modules, pages, reports…" />
+                        <CommandInput
+                            placeholder="Search modules, pages, ticket #…"
+                            value={query}
+                            onValueChange={setQuery}
+                        />
                         <CommandList>
                             <CommandEmpty>No matches found.</CommandEmpty>
+                            {ticket && ticket.link ? (
+                                <CommandGroup heading="Tickets">
+                                    <CommandItem
+                                        key={`ticket-${ticket.ref}`}
+                                        value={`${ticket.ref} ${ticket.title} ${ticket.sourceLabel}`}
+                                        onSelect={() => select(ticket.link!)}
+                                    >
+                                        <Ticket className="mr-2 h-4 w-4 opacity-70" />
+                                        <div className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate">
+                                                {ticket.ref} — {ticket.title}
+                                            </span>
+                                            <span className="truncate text-xs text-muted-foreground">
+                                                {ticket.sourceLabel}
+                                            </span>
+                                        </div>
+                                    </CommandItem>
+                                </CommandGroup>
+                            ) : null}
                             {grouped.map(([section, items]) => (
                                 <CommandGroup key={section} heading={section}>
                                     {items.map((item) => {

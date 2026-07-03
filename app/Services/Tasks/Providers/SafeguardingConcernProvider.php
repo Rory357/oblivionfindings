@@ -5,10 +5,13 @@ namespace App\Services\Tasks\Providers;
 use App\Models\Client;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class SafeguardingConcernProvider implements TaskProvider
+class SafeguardingConcernProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -18,6 +21,64 @@ class SafeguardingConcernProvider implements TaskProvider
     public function label(): string
     {
         return 'Safeguarding Concerns';
+    }
+
+    public function modelClass(): string
+    {
+        return SafeguardingConcern::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // SafeguardingConcernController::assign authorizes 'update' —
+        // globally that is the safeguarding.update permission (the policy's
+        // per-record assignee branch is re-checked in assign()).
+        return $user->canDo('safeguarding.update');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        $concern = SafeguardingConcern::query()->find($id);
+
+        if (! $concern) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Safeguarding concern not found.',
+            ]);
+        }
+
+        if ($assigneeId === null) {
+            // The module's assign action requires an assignee — no unassign flow.
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Safeguarding concerns must be assigned to a staff member.',
+            ]);
+        }
+
+        // Mirror of SafeguardingConcernPolicy::update.
+        if (! $actor->can('update', $concern)) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'You are not authorized to assign this concern.',
+            ]);
+        }
+
+        // Need-to-know: a sensitive concern is restricted unless the actor has
+        // viewSensitive or is already the assignee/reporter — restricted viewers
+        // must not be able to (re)allocate it either.
+        $restricted = $concern->is_sensitive
+            && ! $actor->can('viewSensitive', SafeguardingConcern::class)
+            && $concern->assigned_to_user_id !== $actor->id
+            && $concern->reported_by_user_id !== $actor->id;
+
+        if ($restricted) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'This concern is restricted — you cannot assign it.',
+            ]);
+        }
+
+        $concern->update([
+            'assigned_to_user_id' => $assigneeId,
+            'assigned_at' => now(),
+            'updated_by' => $actor->id,
+        ]);
     }
 
     public function canView(User $user): bool

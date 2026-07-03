@@ -23,6 +23,8 @@ use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\ShiftHandoverService;
+use App\Services\Tasks\TaskAggregator;
+use App\Services\Tasks\TaskItem;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
@@ -158,6 +160,10 @@ class MyTasksController extends Controller
             // needed. One-tap acknowledge POSTs to ppe.allocations.acknowledge-own
             // (auth-only + ownership), so support workers (no hazards.* perms) can use it.
             'my_ppe' => $this->getMyPpe($user),
+            // Cross-module "My tasks" card — the signed-in user's open work
+            // items from the /tasks aggregator (assigned=me), capped at 8
+            // rows. `total` carries the uncapped count for the footer link.
+            'myTasks' => $this->getMyAggregatedTasks($user),
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
@@ -1067,6 +1073,47 @@ class MyTasksController extends Controller
             report($e);
 
             return [];
+        }
+    }
+
+    /**
+     * The signed-in user's open work items from the company-wide /tasks
+     * aggregator (assigned=me), for the My Day "My tasks" card. Permission-
+     * scoped exactly like /tasks — the aggregator runs as this user. Capped
+     * at 8 rows; `total` is the uncapped open count. Fail-soft: the home
+     * renders without the card if a provider throws.
+     *
+     * @return array{total: int, items: array<int, array<string, mixed>>}
+     */
+    private function getMyAggregatedTasks(User $user): array
+    {
+        try {
+            $aggregator = app(TaskAggregator::class);
+            $items = $aggregator->filterItems(
+                $aggregator->itemsFor($user),
+                $user,
+                ['assigned' => 'me'],
+            );
+            // itemsFor() excludes done items by default; keep a guard anyway.
+            $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE));
+
+            return [
+                'total' => count($items),
+                'items' => array_map(fn (TaskItem $i) => [
+                    'id' => $i->id,
+                    'ref' => $i->ref,
+                    'title' => $i->title,
+                    'severity' => $i->severity,
+                    'dueAt' => $i->dueAt,
+                    'overdue' => $i->isOverdue(),
+                    'link' => $i->link,
+                    'sourceLabel' => $i->sourceLabel,
+                ], array_slice($items, 0, 8)),
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['total' => 0, 'items' => []];
         }
     }
 

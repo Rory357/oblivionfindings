@@ -145,6 +145,15 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyTenMinutes();
 
+// All Tasks overdue escalations: nudge assignees the hour an item goes
+// overdue, escalate 3-day-overdue items to managers. Once per item+level
+// for its lifetime (deduped via task_escalations).
+app(Schedule::class)
+    ->command('tasks:escalate')
+    ->timezone('Pacific/Auckland')
+    ->hourly()
+    ->withoutOverlapping();
+
 // Fleet device offline detection
 app(Schedule::class)
     ->job(new DetectFleetOfflineDevices)

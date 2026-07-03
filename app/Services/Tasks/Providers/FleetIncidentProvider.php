@@ -4,10 +4,11 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\FleetIncident;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class FleetIncidentProvider implements TaskProvider
+class FleetIncidentProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +18,11 @@ class FleetIncidentProvider implements TaskProvider
     public function label(): string
     {
         return 'Fleet & Asset Incidents';
+    }
+
+    public function modelClass(): string
+    {
+        return FleetIncident::class;
     }
 
     public function canView(User $user): bool

@@ -97,6 +97,7 @@ class User extends Authenticatable
             'desktop_notifications_enabled' => 'boolean',
             'notification_sounds_enabled' => 'boolean',
             'job_board_alerts_enabled' => 'boolean',
+            'tasks_default_view' => 'array',
         ];
     }
 

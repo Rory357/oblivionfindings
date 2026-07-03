@@ -4,10 +4,17 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\ClientIncident;
 use App\Models\User;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class ClientIncidentProvider implements TaskProvider
+/**
+ * NOT assignable from the queue: `investigation_assigned_to` is a legacy
+ * column no incidents-module endpoint writes any more (investigation
+ * editing moved to the H&S register — see IncidentController::update()'s
+ * Option B note), so there are no module assignment rules to mirror.
+ */
+class ClientIncidentProvider implements TaskProvider, HasModelClass
 {
     public function sourceKey(): string
     {
@@ -17,6 +24,11 @@ class ClientIncidentProvider implements TaskProvider
     public function label(): string
     {
         return 'Client Incidents';
+    }
+
+    public function modelClass(): string
+    {
+        return ClientIncident::class;
     }
 
     public function canView(User $user): bool

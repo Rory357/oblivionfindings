@@ -165,13 +165,13 @@ class RestraintController extends Controller
             'plansForPicker' => BehaviourSupportPlan::query()
                 ->where('status', '!=', 'archived')
                 ->orderByDesc('created_at')
-                ->get(['id', 'client_id', 'title', 'status', 'restrictive_practice_type'])
+                ->get(['id', 'reference_number', 'client_id', 'title', 'status', 'restrictive_practice_type'])
                 ->map(fn (BehaviourSupportPlan $p) => [
                     'id' => $p->id,
                     'client_id' => $p->client_id,
                     'title' => $p->title,
                     'status' => $p->status,
-                    'reference' => $this->planRef($p->id),
+                    'reference' => $this->planRef($p),
                     'restrictive_practice_type' => $p->restrictive_practice_type,
                 ]),
             'detail' => $this->resolveDetail($request),
@@ -245,7 +245,7 @@ class RestraintController extends Controller
         $e = RestraintEvent::with([
             'client:id,first_name,last_name',
             'site:id,name',
-            'behaviourSupportPlan:id,title,status',
+            'behaviourSupportPlan:id,reference_number,title,status',
             'relatedIncident:id,reference_number,type,occurred_at',
             'reviewedBy:id,name',
             'authorisedBy:id,name',
@@ -288,7 +288,7 @@ class RestraintController extends Controller
             'authorised_by' => $e->authorisedBy ? ['id' => $e->authorisedBy->id, 'name' => $e->authorisedBy->name] : null,
             'plan' => $e->behaviourSupportPlan ? [
                 'id' => $e->behaviourSupportPlan->id,
-                'reference' => $this->planRef($e->behaviourSupportPlan->id),
+                'reference' => $this->planRef($e->behaviourSupportPlan),
                 'title' => $e->behaviourSupportPlan->title,
                 'status' => $e->behaviourSupportPlan->status,
             ] : null,
@@ -341,7 +341,7 @@ class RestraintController extends Controller
         return [
             'kind' => 'plan',
             'id' => $p->id,
-            'reference' => $this->planRef($p->id),
+            'reference' => $this->planRef($p),
             'title' => $p->title,
             'client' => $p->client ? ['id' => $p->client->id, 'name' => trim("{$p->client->first_name} {$p->client->last_name}")] : null,
             'status' => $p->status,
@@ -396,7 +396,7 @@ class RestraintController extends Controller
         return response()->json([
             'active_plan' => $plan ? [
                 'id' => $plan->id,
-                'reference' => $this->planRef($plan->id),
+                'reference' => $this->planRef($plan),
                 'title' => $plan->title,
                 'status' => $plan->status,
                 'review_date' => $plan->review_date,
@@ -774,7 +774,7 @@ class RestraintController extends Controller
                     ->chunk(200, function ($plans) use ($out) {
                         foreach ($plans as $p) {
                             $this->putCsv($out, [
-                                $this->planRef($p->id),
+                                $this->planRef($p),
                                 $p->client ? trim("{$p->client->first_name} {$p->client->last_name}") : '',
                                 $p->title,
                                 $p->status,
@@ -850,7 +850,7 @@ class RestraintController extends Controller
     {
         return [
             'id' => $p->id,
-            'reference' => $this->planRef($p->id),
+            'reference' => $this->planRef($p),
             'title' => $p->title,
             'client' => $p->client ? ['id' => $p->client->id, 'name' => trim("{$p->client->first_name} {$p->client->last_name}")] : null,
             'status' => $p->status,
@@ -909,9 +909,11 @@ class RestraintController extends Controller
         return $event->reference_number ?? 'RE-'.str_pad((string) $event->id, 3, '0', STR_PAD_LEFT);
     }
 
-    private function planRef(int $id): string
+    private function planRef(BehaviourSupportPlan $plan): string
     {
-        return 'BSP-'.str_pad((string) $id, 3, '0', STR_PAD_LEFT);
+        // Stored ticket number, with the legacy display format as fallback for
+        // rows created before the reference_number backfill ran.
+        return $plan->reference_number ?? 'BSP-'.str_pad((string) $plan->id, 3, '0', STR_PAD_LEFT);
     }
 
     private function incidentRef(ClientIncident $incident): string

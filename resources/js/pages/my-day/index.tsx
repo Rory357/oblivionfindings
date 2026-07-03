@@ -7,6 +7,7 @@ import {
     FileText,
     HeartPulse,
     Home,
+    ListChecks,
     Pill,
     ShieldAlert,
     ShieldCheck,
@@ -58,6 +59,7 @@ import type {
     MyDayHrTask,
     MyDayLoneWorkerSession,
     MyDayMedDue,
+    MyDayMyTasks,
     MyDayNotification,
     MyDayPageProps,
     MyDayPpe,
@@ -865,6 +867,10 @@ export default function MyDay() {
                         />
                     ) : null}
 
+                    {props.myTasks && props.myTasks.total > 0 ? (
+                        <MyTasksCard tasks={props.myTasks} />
+                    ) : null}
+
                     {activeRound ? (
                         <ActiveRoundBanner round={activeRound} />
                     ) : null}
@@ -1335,6 +1341,96 @@ function FirstAidFollowupsCard({
                     </li>
                 ))}
             </ul>
+        </section>
+    );
+}
+
+/**
+ * "My tasks" — the signed-in user's open work items from the company-wide
+ * /tasks aggregator (assigned=me), capped to 8 rows. Read-only: each row
+ * deep-links into the owning module; completing an item happens there. The
+ * footer links into All Tasks pre-filtered to the user's own queue.
+ */
+function MyTasksCard({ tasks }: { tasks: MyDayMyTasks }) {
+    const overdueCount = tasks.items.filter((t) => t.overdue).length;
+
+    return (
+        <section
+            aria-label="My tasks"
+            className="rounded-xl border border-border bg-card p-4"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <ListChecks className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-foreground">
+                        My tasks
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {overdueCount > 0
+                            ? `${overdueCount} overdue · ${tasks.total} assigned to you`
+                            : `${tasks.total} assigned to you`}
+                    </p>
+                </div>
+            </div>
+
+            <ul className="mt-3 space-y-2">
+                {tasks.items.map((item) => (
+                    <li key={item.id}>
+                        {/* eslint-disable-next-line no-restricted-syntax -- custom card-row selector (tone-by-overdue), not a shadcn Button */}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                item.link && router.visit(item.link)
+                            }
+                            className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+                                item.overdue
+                                    ? 'border-status-critical/30 bg-status-critical-bg hover:bg-status-critical-bg/70'
+                                    : 'border-border bg-card hover:bg-muted'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                {item.ref ? (
+                                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+                                        {item.ref}
+                                    </span>
+                                ) : null}
+                                <span className="line-clamp-1 text-xs font-medium text-foreground">
+                                    {item.title}
+                                </span>
+                            </span>
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                                <span className="truncate">
+                                    {item.sourceLabel}
+                                </span>
+                                {item.dueAt ? (
+                                    <span
+                                        className={`flex items-center gap-1 ${
+                                            item.overdue
+                                                ? 'font-medium text-status-critical'
+                                                : ''
+                                        }`}
+                                    >
+                                        <Calendar className="h-3 w-3 shrink-0" />
+                                        {item.overdue ? 'Overdue · ' : 'Due '}
+                                        {formatRelative(item.dueAt)}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+
+            {/* eslint-disable-next-line no-restricted-syntax -- inline text link into All Tasks, not a shadcn Button */}
+            <button
+                type="button"
+                onClick={() => router.visit('/tasks?assigned=me')}
+                className="mt-3 w-full text-left text-xs font-medium text-primary hover:underline"
+            >
+                View all in All Tasks →
+            </button>
         </section>
     );
 }

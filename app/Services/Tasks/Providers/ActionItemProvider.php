@@ -4,10 +4,13 @@ namespace App\Services\Tasks\Providers;
 
 use App\Domain\Governance\Models\ActionItem;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class ActionItemProvider implements TaskProvider
+class ActionItemProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -17,6 +20,45 @@ class ActionItemProvider implements TaskProvider
     public function label(): string
     {
         return 'Governance Actions';
+    }
+
+    public function modelClass(): string
+    {
+        return ActionItem::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // ActionItemPolicy::update — the module's write-side gate for changing
+        // an existing action item (the assignee branch only covers lifecycle
+        // verbs on your own item, not reallocating it).
+        return $user->canDo('governance.actions.manage');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        $action = ActionItem::query()->find($id);
+
+        if (! $action) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Governance action not found.',
+            ]);
+        }
+
+        if ($assigneeId === null) {
+            // StoreActionItemRequest requires assigned_to — items are never ownerless.
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Governance actions must be assigned to a staff member.',
+            ]);
+        }
+
+        if ($action->status === 'complete') {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'A completed action item cannot be reassigned.',
+            ]);
+        }
+
+        $action->update(['assigned_to' => $assigneeId]);
     }
 
     public function canView(User $user): bool

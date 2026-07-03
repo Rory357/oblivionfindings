@@ -4,10 +4,13 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\HsCorrectiveAction;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class HsCorrectiveActionProvider implements TaskProvider
+class HsCorrectiveActionProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -17,6 +20,43 @@ class HsCorrectiveActionProvider implements TaskProvider
     public function label(): string
     {
         return 'Corrective Actions';
+    }
+
+    public function modelClass(): string
+    {
+        return HsCorrectiveAction::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // Mirrors routes/health-safety.php: all corrective-action writes sit
+        // behind permission:hazards.manage.
+        return $user->canDo('hazards.manage');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        $action = HsCorrectiveAction::query()->find($id);
+
+        if (! $action) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Corrective action not found.',
+            ]);
+        }
+
+        if ($action->status === HsCorrectiveAction::STATUS_CLOSED) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'A closed corrective action cannot be reassigned.',
+            ]);
+        }
+
+        // Same side-effect columns HsCorrectiveActionService stamps on
+        // create/start: assignee + who assigned it + when.
+        $action->update([
+            'assigned_to_user_id' => $assigneeId,
+            'assigned_by_user_id' => $assigneeId !== null ? $actor->id : null,
+            'assigned_at' => $assigneeId !== null ? now() : null,
+        ]);
     }
 
     public function canView(User $user): bool

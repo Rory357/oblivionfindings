@@ -4,10 +4,13 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\DataSubjectRequest;
 use App\Models\User;
+use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use Illuminate\Validation\ValidationException;
 
-class DataSubjectRequestProvider implements TaskProvider
+class DataSubjectRequestProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
 {
     public function sourceKey(): string
     {
@@ -17,6 +20,42 @@ class DataSubjectRequestProvider implements TaskProvider
     public function label(): string
     {
         return 'Privacy Requests';
+    }
+
+    public function modelClass(): string
+    {
+        return DataSubjectRequest::class;
+    }
+
+    public function canAssign(User $user): bool
+    {
+        // Mirrors routes/privacy.php: PUT /privacy/requests/{dsRequest}
+        // (the module's assignment surface) → permission:privacy.processRequests.
+        return $user->canDo('privacy.processRequests');
+    }
+
+    public function assign(User $actor, int $id, ?int $assigneeId): void
+    {
+        $dsRequest = DataSubjectRequest::query()->find($id);
+
+        if (! $dsRequest) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'Privacy request not found.',
+            ]);
+        }
+
+        $data = [
+            'assigned_to_user_id' => $assigneeId,
+            'updated_by' => $actor->id,
+        ];
+
+        // DataSubjectRequestController::update() stamps assigned_at only on
+        // first assignment — keep the original allocation time on reassigns.
+        if ($assigneeId !== null && ! $dsRequest->assigned_at) {
+            $data['assigned_at'] = now();
+        }
+
+        $dsRequest->update($data);
     }
 
     public function canView(User $user): bool
