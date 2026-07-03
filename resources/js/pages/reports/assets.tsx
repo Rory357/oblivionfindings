@@ -20,7 +20,7 @@ function Row({ a, right }: { a: AssetRow; right?: string | null }) {
         <div className="flex items-start justify-between gap-3 rounded-md border p-3">
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Link href={`/assets/${a.id}`} className="truncate text-sm font-medium hover:underline">
+                    <Link href={`/fleet-assets/assets/${a.id}`} className="truncate text-sm font-medium hover:underline">
                         {a.name}
                     </Link>
                     {a.asset_tag ? (

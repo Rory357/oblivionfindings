@@ -5,7 +5,6 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
-use App\Models\AssetCategory;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
@@ -124,7 +123,40 @@ class AssetController extends Controller
 
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
+        // Asset wizard (create mode) — client picker + auto-set-site behaviour.
+        $clients = Client::query()
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'site_id']);
+
+        // ?new=1 opens the wizard on mount; these seed it (e.g. from a site page).
+        $prefillCategory = $request->string('category')->toString();
+        $prefill = [
+            'site_id' => $request->integer('site_id') ?: null,
+            'client_id' => $request->integer('client_id') ?: null,
+            'category' => in_array($prefillCategory, ['vehicle', 'equipment', 'property', 'other'], true)
+                ? $prefillCategory
+                : null,
+        ];
+
+        // Hero stats — whole-register counts (independent of filters/pagination).
+        $heroTotal = Asset::query()->count();
+        $heroActive = Asset::query()->where('status', 'active')->count();
+        $heroMaintenance = Asset::query()->whereIn('status', ['maintenance', 'out_of_service'])->count();
+        $heroInspectionsDue = Schema::hasColumn('assets', 'inspection_due_at')
+            ? Asset::query()
+                ->whereNotNull('inspection_due_at')
+                ->where('inspection_due_at', '<=', now()->addDays(30))
+                ->count()
+            : 0;
+
         return Inertia::render('fleet-assets/assets/index', [
+            'hero' => [
+                'total' => $heroTotal,
+                'active' => $heroActive,
+                'maintenance' => $heroMaintenance,
+                'inspections_due' => $heroInspectionsDue,
+            ],
             'assets' => [
                 'data' => $assets->getCollection()->map(fn ($a) => [
                     'id' => $a->id,
@@ -155,6 +187,11 @@ class AssetController extends Controller
                 ],
             ],
             'sites' => $sites,
+            'clients' => $clients,
+            'prefill' => $prefill,
+            // Set by the modal store() redirect so the wizard success pane can
+            // link straight to the newly created asset.
+            'created_asset_id' => $request->integer('created') ?: null,
             'filters' => $request->only(['category', 'status', 'search', 'site_id']),
         ]);
     }
@@ -268,6 +305,12 @@ class AssetController extends Controller
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
         $currentAssignment = $asset->assignments->first(fn ($assignment) => $assignment->released_at === null);
 
+        // Federation: the HR-register wrapper (if any) so the fleet page can
+        // point back at /hr/assets/{id} — link only for hr.assets.view holders.
+        $hrAsset = $this->hasTable('hr_assets')
+            ? $asset->hrAsset()->with('currentAssignment.employeeProfile.user:id,name')->first()
+            : null;
+
         $safeAsset = [
             'id' => $asset->id,
             'name' => $asset->name,
@@ -281,6 +324,7 @@ class AssetController extends Controller
             'serial_number' => $asset->serial_number,
             'location' => $asset->location,
             'site_id' => $asset->site_id,
+            'client_id' => $asset->client_id,
             'site' => $asset->site ? ['id' => $asset->site->id, 'name' => $asset->site->name] : null,
             'client' => $asset->client ? ['id' => $asset->client->id, 'name' => trim(($asset->client->first_name ?? '') . ' ' . ($asset->client->last_name ?? ''))] : null,
             'category_ref' => $asset->categoryRef ? ['id' => $asset->categoryRef->id, 'name' => $asset->categoryRef->name, 'slug' => $asset->categoryRef->slug] : null,
@@ -415,28 +459,36 @@ class AssetController extends Controller
         return Inertia::render('fleet-assets/assets/show', [
             'asset' => $safeAsset,
             'timeline' => $timeline,
+            // Edit wizard (AssetWizardDialog) option lists — mirrors index/create.
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'clients' => Client::query()
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get(['id', 'first_name', 'last_name', 'site_id']),
+            'hr_asset' => $hrAsset ? [
+                'id' => $hrAsset->id,
+                'asset_tag' => $hrAsset->asset_tag,
+                'status' => $hrAsset->status,
+                'current_holder_name' => $hrAsset->currentAssignment?->employeeProfile?->user?->name,
+            ] : null,
+            'can_view_hr_assets' => (bool) $request->user()?->canDo('hr.assets.view'),
         ]);
     }
 
+    /**
+     * The full-page create form was replaced by the AssetWizardDialog on the
+     * index (?new=1 shim) — keep the route working for old links/bookmarks and
+     * carry any prefill seeds across.
+     */
     public function create(Request $request)
     {
-        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $categories = AssetCategory::orderBy('name')->get(['id', 'name', 'slug']);
-        $clients = Client::query()
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'site_id']);
-
-        return Inertia::render('fleet-assets/assets/create', [
-            'sites' => $sites,
-            'categories' => $categories,
-            'clients' => $clients,
-            'prefill' => [
-                'site_id' => $request->integer('site_id') ?: null,
-                'client_id' => $request->integer('client_id') ?: null,
-                'category' => $request->string('category')->toString() ?: null,
-            ],
+        $params = array_filter([
+            'site_id' => $request->integer('site_id') ?: null,
+            'client_id' => $request->integer('client_id') ?: null,
+            'category' => $request->string('category')->toString() ?: null,
         ]);
+
+        return redirect()->route('fleet-assets.assets.index', ['new' => 1] + $params);
     }
 
     public function store(Request $request)
@@ -501,47 +553,25 @@ class AssetController extends Controller
             'client_id' => $asset->client_id,
         ]);
 
+        // The AssetWizardDialog submits with _modal so we land back on the
+        // index (dialog stays mounted via preserveState) with the created id
+        // available to its success pane.
+        if ($request->boolean('_modal')) {
+            return redirect()->route('fleet-assets.assets.index', ['created' => $asset->id])
+                ->with('success', 'Asset created successfully.');
+        }
+
         return redirect()->route('fleet-assets.assets.show', $asset)
             ->with('success', 'Asset created successfully.');
     }
 
+    /**
+     * The full-page edit form was replaced by the AssetWizardDialog on the
+     * show page (?edit=1 shim) — keep the route working for old links.
+     */
     public function edit(Request $request, Asset $asset)
     {
-        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
-        $categories = AssetCategory::orderBy('name')->get(['id', 'name', 'slug']);
-
-        $editableAsset = [
-            'id' => $asset->id,
-            'name' => $asset->name,
-            'asset_tag' => $asset->asset_tag,
-            'category' => $asset->category,
-            'asset_category_id' => $asset->asset_category_id,
-            'status' => $asset->status,
-            'description' => $asset->description,
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-            'registration_number' => $asset->registration_number ?? null,
-            'fuel_type' => $asset->fuel_type ?? null,
-            'odometer_km' => $asset->odometer_km ?? null,
-            'home_site_id' => $asset->home_site_id ?? null,
-            'primary_driver_user_id' => $asset->primary_driver_user_id ?? null,
-            'purchase_date' => optional($asset->purchase_date)->toDateString(),
-            'purchase_price' => $asset->purchase_price,
-            'warranty_expires_at' => optional($asset->warranty_expires_at)->toDateString(),
-            'wof_expires_at' => optional($asset->wof_expires_at)->toDateString(),
-            'registration_expires_at' => optional($asset->registration_expires_at)->toDateString(),
-            'cof_expires_at' => optional($asset->cof_expires_at)->toDateString(),
-            'insurance_expires_at' => optional($asset->insurance_expires_at)->toDateString(),
-            'notes' => $asset->notes,
-            'requires_maintenance' => $asset->requires_maintenance ?? false,
-            'maintenance_due_at' => optional($asset->maintenance_due_at)->toDateString(),
-        ];
-
-        return Inertia::render('fleet-assets/assets/edit', [
-            'asset' => $editableAsset,
-            'sites' => $sites,
-            'categories' => $categories,
-        ]);
+        return redirect()->route('fleet-assets.assets.show', ['asset' => $asset, 'edit' => 1]);
     }
 
     public function update(Request $request, Asset $asset)

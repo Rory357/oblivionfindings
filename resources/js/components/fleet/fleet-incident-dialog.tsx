@@ -3,6 +3,7 @@ import { useState, type ComponentType, type FormEvent } from 'react';
 import {
     AlertTriangle,
     Box,
+    Briefcase,
     Calendar,
     CheckCircle2,
     CircleSlash,
@@ -54,7 +55,15 @@ export interface FleetIncidentDetail {
     resolution_notes: string | null;
     resolved_at: string | null;
 
-    asset: { id: number; name: string; registration_number: string | null; category: string | null; site: { id: number; name: string } | null } | null;
+    asset: {
+        id: number;
+        name: string;
+        registration_number: string | null;
+        category: string | null;
+        site: { id: number; name: string } | null;
+        /** HR-register wrapper of the asset (federation) + its current holder. */
+        hr_asset?: { id: number; holder_name: string | null } | null;
+    } | null;
     reported_by: Ref;
     driver: Ref;
     supervisor: Ref;
@@ -155,7 +164,7 @@ export interface FleetIncidentDetail {
     client_incidents: Array<{ id: number; client: { id: number; name: string } | null; severity: string | null; status: string | null; type: string | null }>;
     hs_event: { id: number; reference: string | null; status: string | null; control_room_alert_id: number | null } | null;
 
-    can: { manage: boolean };
+    can: { manage: boolean; view_hr_assets?: boolean };
 }
 
 type UserOption = { id: number; name: string };
@@ -657,6 +666,28 @@ function LinkedSection({ d }: { d: FleetIncidentDetail }) {
             ) : null}
             {d.asset ? (
                 <LinkedRow icon={Truck} title="Asset register" sub={`${d.asset.name}${d.asset.registration_number ? ` · ${d.asset.registration_number}` : ''}`} href={`/fleet-assets/assets/${d.asset.id}`} />
+            ) : null}
+            {d.asset?.hr_asset ? (
+                d.can.view_hr_assets ? (
+                    <LinkedRow
+                        icon={Briefcase}
+                        title="HR asset record"
+                        sub={d.asset.hr_asset.holder_name ? `HR: assigned to ${d.asset.hr_asset.holder_name}` : 'Tracked in HR Asset Register'}
+                        href={`/hr/assets/${d.asset.hr_asset.id}`}
+                    />
+                ) : (
+                    <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                            <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground">HR asset record</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                                {d.asset.hr_asset.holder_name ? `HR: assigned to ${d.asset.hr_asset.holder_name}` : 'Tracked in HR Asset Register'}
+                            </p>
+                        </div>
+                    </div>
+                )
             ) : null}
             {d.client_incidents.map((ci) => (
                 <LinkedRow key={ci.id} icon={User} title="Client incident (resident aboard)" sub={`${ci.client?.name ?? 'Resident'} · ${titleCase(ci.status)} · ${titleCase(ci.type)}`} href={`/incidents?incident=${ci.id}`} />

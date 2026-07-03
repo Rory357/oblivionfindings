@@ -12,7 +12,7 @@ import {
     HeroSegmented,
     fmt,
     type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
+} from '../components/fleet-hero-kit';
 import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import {
     EntityFilter,
@@ -33,6 +33,7 @@ import {
     AlertTriangle,
     Bell,
     Box,
+    Briefcase,
     Calendar,
     CheckCircle2,
     CircleDot,
@@ -63,6 +64,8 @@ type IncidentRow = {
     id: number;
     reference: string;
     asset: { id: number; name: string; registration_number: string | null; category: string | null } | null;
+    /** HR-register wrapper of the asset (federation) + its current holder. */
+    hr_asset: { id: number; holder_name: string | null } | null;
     reported_by: { id: number; name: string } | null;
     driver: { id: number; name: string } | null;
     incident_type: string;
@@ -126,9 +129,10 @@ type Props = {
         injury_severities: string[];
         damage_classifications: string[];
     };
-    can: { manage: boolean };
+    can: { manage: boolean; view_hr_assets: boolean };
     detail: FleetIncidentDetail | null;
     report: string | null;
+    report_asset_id: string | number | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -193,6 +197,7 @@ export default function FleetIncidentsIndex({
     can,
     detail,
     report,
+    report_asset_id,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [launcherOpen, setLauncherOpen] = useState(false);
@@ -316,6 +321,14 @@ export default function FleetIncidentsIndex({
                 : []),
             { sep: true },
             ...(i.asset ? [{ icon: <Truck className="h-3.5 w-3.5" />, label: 'View vehicle / asset', sub: i.asset.name, onClick: () => router.visit(`/fleet-assets/assets/${i.asset!.id}`) } satisfies ShiftCtxItem] : []),
+            ...(i.hr_asset
+                ? [{
+                      icon: <Briefcase className="h-3.5 w-3.5" />,
+                      label: i.hr_asset.holder_name ? `HR: assigned to ${i.hr_asset.holder_name}` : 'HR asset record',
+                      sub: can.view_hr_assets ? 'Open in HR Asset Register' : undefined,
+                      onClick: can.view_hr_assets ? () => router.visit(`/hr/assets/${i.hr_asset!.id}`) : undefined,
+                  } satisfies ShiftCtxItem]
+                : []),
             ...(i.driver ? [{ icon: <User className="h-3.5 w-3.5" />, label: 'View driver', sub: i.driver.name, onClick: () => router.visit(`/fleet-assets/drivers/${i.driver!.id}`) } satisfies ShiftCtxItem] : []),
             ...(i.flags.alert_linked ? [{ icon: <RadioTower className="h-3.5 w-3.5" />, label: 'View Control Room alert', onClick: () => openDetail(i.id) } satisfies ShiftCtxItem] : []),
             ...(can.manage && !isClosed
@@ -504,6 +517,7 @@ export default function FleetIncidentsIndex({
                     open
                     mode={reportMode}
                     formOptions={formOptions}
+                    initialAssetId={report_asset_id}
                     onClose={() => setReportMode(null)}
                     onOpenIncident={(id) => {
                         setReportMode(null);
@@ -622,7 +636,11 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                         <Calendar className="h-3 w-3" />
                                         {i.occurred_at ? formatDateTime(i.occurred_at) : '—'}
                                     </div>
-                                    <div className="mt-0.5 font-mono text-[11px] text-muted-foreground/60">{i.reference}</div>
+                                    <div className="mt-0.5">
+                                        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                            {i.reference}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-2">

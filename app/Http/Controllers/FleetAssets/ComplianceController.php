@@ -110,8 +110,33 @@ class ComplianceController extends Controller
             return false;
         })->count();
 
+        // Hero — per-document due-in-30 counts + vehicles already expired. Computed
+        // from the loaded collection (the page already fetches every vehicle).
+        $dueWithin30 = function (string $field) use ($vehicles, $hasFleetFields, $now) {
+            if (!$hasFleetFields) return 0;
+            return $vehicles->filter(function ($v) use ($field, $now) {
+                $date = $v->$field;
+                return $date && !$date->isPast() && $now->diffInDays($date, false) <= 30;
+            })->count();
+        };
+        $hasInsuranceColumn = $hasFleetFields && Schema::hasColumn('assets', 'insurance_expires_at');
+        $expiredNow = $hasFleetFields
+            ? $vehicles->filter(function ($v) use ($hasInsuranceColumn) {
+                foreach (['registration_expires_at', 'wof_expires_at', 'cof_expires_at'] as $field) {
+                    if ($v->$field && $v->$field->isPast()) return true;
+                }
+                return $hasInsuranceColumn && $v->insurance_expires_at && $v->insurance_expires_at->isPast();
+            })->count()
+            : 0;
+
         return Inertia::render('fleet-assets/compliance/index', [
             'vehicles' => $vehiclesData->values(),
+            'hero' => [
+                'wof_due_30' => $dueWithin30('wof_expires_at'),
+                'rego_due_30' => $dueWithin30('registration_expires_at'),
+                'cof_due_30' => $dueWithin30('cof_expires_at'),
+                'expired_now' => $expiredNow,
+            ],
             'summary' => [
                 'total' => $allVehicles,
                 'expired_wof' => $expiredWof,

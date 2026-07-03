@@ -144,13 +144,14 @@ class ReportController extends Controller
             ')
             ->first();
 
-        // Trip distribution by day of week (real data)
+        // Trip distribution by day of week (real data) — same vehicle filter
+        // and period window as the sibling stats above.
         $tripDistribution = $hasTripsTable
             ? FleetTrip::query()
+                ->whereIn('asset_id', $vehicleIds)
                 ->where('status', 'closed')
                 ->when($filterPersonal, fn($q) => $q->where('is_personal', false))
-                ->whereMonth('started_at', now()->month)
-                ->whereYear('started_at', now()->year)
+                ->where('started_at', '>=', $startDate)
                 ->selectRaw("DAYOFWEEK(started_at) as dow, COUNT(*) as count")
                 ->groupBy('dow')
                 ->pluck('count', 'dow')

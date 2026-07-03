@@ -187,19 +187,22 @@ export function FleetIncidentReportDialog({
     mode,
     formOptions,
     onOpenIncident,
+    initialAssetId,
 }: {
     open: boolean;
     onClose: () => void;
     mode: ReportMode;
     formOptions: FormOptions;
     onOpenIncident?: (id: number) => void;
+    /** Pre-selects the asset when arriving via ?report=…&asset_id=… (dashboard / vehicle quick actions). */
+    initialAssetId?: string | number | null;
 }) {
     const page = usePage().props as { flash?: { created_fleet_incident_id?: number; created_fleet_incident_reference?: string; error?: string } };
     const [stepIndex, setStepIndex] = useState(0);
     const [submitted, setSubmitted] = useState(false);
 
     const form = useForm<FleetReportForm>({
-        asset_id: '',
+        asset_id: initialAssetId != null && initialAssetId !== '' ? String(initialAssetId) : '',
         incident_type: mode === 'near_miss' ? 'near_miss' : mode === 'asset' ? 'damage' : 'collision',
         severity: mode === 'near_miss' ? 'minor' : 'moderate',
         occurred_at: localNow(),

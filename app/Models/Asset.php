@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Hr\Models\HrAsset;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -272,6 +273,15 @@ class Asset extends Model
         return $this->hasMany(FleetIncident::class);
     }
 
+    /**
+     * The HR-register wrapper row that federates to this canonical Fleet
+     * asset (inverse of HrAsset::fleetAsset()).
+     */
+    public function hrAsset(): HasOne
+    {
+        return $this->hasOne(HrAsset::class, 'fleet_asset_id');
+    }
+
     public function fleetHandovers(): HasMany
     {
         return $this->hasMany(FleetShiftHandover::class);
@@ -303,7 +313,11 @@ class Asset extends Model
 
     public function scopeVehicles($query)
     {
-        return $query->where('category', 'vehicle')
-            ->orWhereHas('categoryRef', fn($q) => $q->where('slug', 'vehicle'));
+        // Grouped so the orWhereHas branch can't escape and poison constraints
+        // chained onto the scope (status/site filters etc.).
+        return $query->where(function ($q) {
+            $q->where('category', 'vehicle')
+                ->orWhereHas('categoryRef', fn ($qq) => $qq->where('slug', 'vehicle'));
+        });
     }
 }

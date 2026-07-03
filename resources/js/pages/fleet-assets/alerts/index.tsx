@@ -1,7 +1,13 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { PageHero } from '@/components/page';
-import { FleetStatCard } from '@/components/fleet-stat-card';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,9 +39,7 @@ import {
     ChevronUp,
     ChevronsUpDown,
     ExternalLink,
-    ShieldAlert,
     X,
-    Zap,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -68,6 +72,12 @@ type AssetAlert = {
 };
 
 type Props = {
+    hero?: {
+        unresolved: number;
+        critical: number;
+        acknowledged_today: number;
+        resolved_7d: number;
+    };
     control_room_alerts: {
         data: ControlRoomAlert[];
         links?: Array<{ url: string | null; label: string; active: boolean }>;
@@ -128,11 +138,18 @@ function statusVariant(
 }
 
 export default function AlertsIndex({
+    hero: rawHero,
     control_room_alerts: rawCrAlerts,
     archived_asset_alerts: rawArchivedAssetAlerts,
     filters: rawFilters,
     can,
 }: Props) {
+    const hero = rawHero ?? {
+        unresolved: 0,
+        critical: 0,
+        acknowledged_today: 0,
+        resolved_7d: 0,
+    };
     const crAlerts = rawCrAlerts?.data ?? [];
     const crMeta = rawCrAlerts?.meta ?? {
         current_page: 1,
@@ -329,51 +346,58 @@ export default function AlertsIndex({
         >
             <Head title="Alerts" />
             <PageShell>
-                <PageHero
-                    title="Alerts"
-                    description="Active fleet and asset operations alerts from Control Room, with archived legacy asset alert history kept separately below."
-                    actions={
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/control-room">
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                Control Room
-                            </Link>
-                        </Button>
-                    }
-                />
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Bell} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Fleet alerts · Control Room feed</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Alerts</h1>
+                            <p className="mt-0.5 max-w-xl text-[13px] text-primary-foreground/75">
+                                Active fleet and asset operations alerts from
+                                Control Room, with archived legacy asset alert
+                                history kept separately below.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts"
+                                label="Unresolved"
+                                value={fmt(hero.unresolved)}
+                                caption="need action"
+                                tone={hero.unresolved > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts?severity=critical"
+                                label="Critical"
+                                value={fmt(hero.critical)}
+                                caption="immediate attention"
+                                tone={hero.critical > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts?status=ack"
+                                label="Acknowledged today"
+                                value={fmt(hero.acknowledged_today)}
+                                caption="picked up by the team"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts?status=resolved"
+                                label="Resolved 7d"
+                                value={fmt(hero.resolved_7d)}
+                                caption="closed this week"
+                                tone={hero.resolved_7d > 0 ? 'success' : 'neutral'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href="/control-room" icon={ExternalLink}>
+                            Control Room
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
-                {/* Dark KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard
-                        label="TOTAL OPEN"
-                        value={unresolvedOperationalAlerts.length}
-                        icon={Bell}
-                        subtitle="Operational Control Room alerts"
-                    />
-                    <FleetStatCard
-                        label="CRITICAL"
-                        value={criticalCount}
-                        icon={Zap}
-                        color="red"
-                        valueClassName="text-status-critical"
-                        subtitle="Immediate attention"
-                    />
-                    <FleetStatCard
-                        label="HIGH"
-                        value={highCount}
-                        icon={ShieldAlert}
-                        color="amber"
-                        valueClassName="text-status-warning"
-                        subtitle="High priority"
-                    />
-                    <FleetStatCard
-                        label="MEDIUM"
-                        value={mediumCount}
-                        icon={AlertTriangle}
-                        color="amber"
-                        valueClassName="text-status-warning"
-                        subtitle="Medium severity"
-                    />
+                {/* Severity distribution (current page of results) */}
+                <div className="grid gap-3">
                     {severityTotal > 0 && (
                         <Card className="border bg-primary/10 sm:col-span-2 md:col-span-3 lg:col-span-4 dark:bg-primary/20">
                             <CardContent className="p-4">
@@ -643,9 +667,6 @@ export default function AlertsIndex({
                                     alert workflow.
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/assets/alerts">Open Archive</Link>
-                            </Button>
                         </div>
 
                         {archivedAssetAlerts.length > 0 ? (

@@ -1,8 +1,13 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,17 +24,18 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
+import {
+    AssetWizardDialog,
+    type AssetWizardPrefill,
+} from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    Activity,
-    AlertTriangle,
     Download,
     MapPin,
     Package,
     Plus,
     Search,
     Wifi,
-    WifiOff,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -49,6 +55,12 @@ type Asset = {
 };
 
 type Props = {
+    hero: {
+        total: number;
+        active: number;
+        maintenance: number;
+        inspections_due: number;
+    };
     assets: {
         data: Asset[];
         links: Array<{ url: string | null; label: string; active: boolean }>;
@@ -66,6 +78,14 @@ type Props = {
     };
     sites: Array<{ id: number; name: string }>;
     categories: string[];
+    clients?: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        site_id?: number | null;
+    }>;
+    prefill?: AssetWizardPrefill | null;
+    created_asset_id?: number | null;
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -94,14 +114,29 @@ function categoryColor(category: string): string {
     }
 }
 
-export default function AssetsIndex({ assets, filters, sites, categories }: Props) {
+export default function AssetsIndex({ hero, assets, filters, sites, categories, clients, prefill }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
 
+    // /fleet-assets/assets/create now redirects here with ?new=1 — open the
+    // create wizard on mount (the hero action links to the same shim).
+    const [wizardOpen, setWizardOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('new'),
+    );
+
+    const closeWizard = () => {
+        setWizardOpen(false);
+        // Strip the shim params so a refresh doesn't reopen the wizard.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('new');
+            url.searchParams.delete('created');
+            window.history.replaceState({}, '', url);
+        }
+    };
+
     const allAssets = assets?.data ?? [];
-    const totalAssets = assets?.meta?.total ?? allAssets.length;
-    const activeCount = allAssets.filter((a) => a.status === 'active').length;
-    const maintenanceCount = allAssets.filter((a) => a.status === 'out_of_service').length;
-    const offlineCount = allAssets.filter((a) => a.status === 'retired').length;
 
     const applyFilters = (newFilters: Partial<typeof filters>) => {
         router.get('/fleet-assets/assets', {
@@ -124,34 +159,56 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
         >
             <Head title="Assets" />
             <PageShell>
-                <PageHero
-                    title="Assets"
-                    description="Manage all organisational assets including vehicles, equipment, and property."
-                    actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <a href="/fleet-assets/assets?export=csv">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export CSV
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <Link href="/fleet-assets/assets/create">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create Asset
-                                </Link>
-                            </Button>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Package} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Asset register · live</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Assets</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Manage all organisational assets including vehicles, equipment, and property.
+                            </p>
                         </div>
-                    }
-                />
-
-                {/* Dark KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard label="TOTAL ASSETS" value={totalAssets} icon={Package} subtitle="All registered assets" />
-                    <FleetStatCard label="ACTIVE" value={activeCount} icon={Activity} subtitle="Currently in use" />
-                    <FleetStatCard label="IN MAINTENANCE" value={maintenanceCount} icon={AlertTriangle} subtitle="Out of service" />
-                    <FleetStatCard label="OFFLINE" value={offlineCount} icon={WifiOff} subtitle="Retired assets" />
-                </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-2xl lg:ml-auto">
+                            <HeroClusterTile
+                                href="/fleet-assets/assets"
+                                label="Total assets"
+                                value={fmt(hero.total)}
+                                caption="all registered"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/assets?status=active"
+                                label="Active"
+                                value={fmt(hero.active)}
+                                caption="currently in use"
+                                tone={hero.active > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/assets?status=out_of_service"
+                                label="In maintenance"
+                                value={fmt(hero.maintenance)}
+                                caption="out of service"
+                                tone={hero.maintenance > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/inspections"
+                                label="Inspections due"
+                                value={fmt(hero.inspections_due)}
+                                caption="within 30 days"
+                                tone={hero.inspections_due > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href="/fleet-assets/assets?new=1" icon={Plus} emphasis>
+                            New asset
+                        </FleetHeroAction>
+                        <FleetHeroAction href="/fleet-assets/assets?export=csv" icon={Download} external>
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {/* Category Tabs */}
                 <Tabs
@@ -264,7 +321,7 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
                         ))}
                     </div>
                 ) : (
-                    <FleetEmptyState icon={Package} title="No assets found" description="Add assets to start tracking." actionLabel="Create Asset" actionHref="/fleet-assets/assets/create" />
+                    <FleetEmptyState icon={Package} title="No assets found" description="Add assets to start tracking." actionLabel="Create Asset" actionHref="/fleet-assets/assets?new=1" />
                 )}
 
                 {/* Pagination */}
@@ -282,6 +339,14 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
                         ))}
                     </div>
                 )}
+
+                <AssetWizardDialog
+                    open={wizardOpen}
+                    onClose={closeWizard}
+                    sites={sites ?? []}
+                    clients={clients}
+                    prefill={prefill}
+                />
             </PageShell>
         </AppLayout>
     );

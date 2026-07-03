@@ -53,6 +53,18 @@ class DriverController extends Controller
                     ->where('licence_expires_at', '>=', now())
                     ->where('licence_expires_at', '<=', now()->addDays(60))
                 );
+            } elseif ($status === 'expiring_30') {
+                // Hero tile drill-down: licences expiring inside 30 days.
+                $query->whereHas('hrDriverEligibility', fn ($q) => $q
+                    ->where('licence_expires_at', '>=', now())
+                    ->where('licence_expires_at', '<=', now()->addDays(30))
+                );
+            } elseif ($status === 'at_risk') {
+                // Hero tile drill-down: suspended/expired status OR licence past its date.
+                $query->whereHas('hrDriverEligibility', fn ($q) => $q->where(fn ($q2) => $q2
+                    ->whereIn('status', ['suspended', 'expired'])
+                    ->orWhere('licence_expires_at', '<', now())
+                ));
             } else {
                 $query->whereHas('hrDriverEligibility', fn ($q) => $q->where('status', $status));
             }
@@ -81,7 +93,35 @@ class DriverController extends Controller
             ->groupBy('user_id')
             ->pluck('session_count', 'user_id');
 
+        // Hero band stats — whole-table (not page-scoped) licence compliance
+        // aggregate; the demo story here is licence status.
+        $now = now()->toDateTimeString();
+        $in30 = now()->addDays(30)->toDateTimeString();
+        $heroRow = HrDriverEligibility::query()
+            ->selectRaw(
+                'COUNT(*) as total, ' .
+                "SUM(CASE WHEN status = 'eligible' AND (licence_expires_at IS NULL OR licence_expires_at >= ?) THEN 1 ELSE 0 END) as active, " .
+                'SUM(CASE WHEN licence_expires_at >= ? AND licence_expires_at <= ? THEN 1 ELSE 0 END) as expiring_30, ' .
+                "SUM(CASE WHEN status IN ('suspended', 'expired') OR licence_expires_at < ? THEN 1 ELSE 0 END) as at_risk, " .
+                'SUM(CASE WHEN licence_expires_at IS NOT NULL AND licence_expires_at < ? THEN 1 ELSE 0 END) as licence_expired',
+                [$now, $now, $in30, $now, $now]
+            )
+            ->first();
+
+        $sessionsToday = FleetDriverSession::query()
+            ->where('started_at', '>=', now()->startOfDay())
+            ->where('started_at', '<=', now()->endOfDay())
+            ->count();
+
         return Inertia::render('fleet-assets/drivers/index', [
+            'hero' => [
+                'total' => (int) ($heroRow->total ?? 0),
+                'active' => (int) ($heroRow->active ?? 0),
+                'expiring_30' => (int) ($heroRow->expiring_30 ?? 0),
+                'at_risk' => (int) ($heroRow->at_risk ?? 0),
+                'licence_expired' => (int) ($heroRow->licence_expired ?? 0),
+                'sessions_today' => $sessionsToday,
+            ],
             'drivers' => [
                 'data' => $drivers->getCollection()->map(fn ($user) => [
                     'id' => $user->id,
@@ -175,13 +215,37 @@ class DriverController extends Controller
             'sessions' => $sessions,
             'driving_metrics' => $drivingMetrics,
             'recent_trips' => $recentTrips,
+            // Scorecard tab payload — several aggregate queries, so it is only
+            // computed when the tab is actually open: eager on a full load with
+            // ?tab=scorecard, otherwise deferred behind a partial reload.
+            'scorecard' => $request->input('tab') === 'scorecard'
+                ? $this->scorecardData($user, $request)
+                : Inertia::optional(fn () => $this->scorecardData($user, $request)),
         ]);
     }
 
+    /**
+     * Legacy GET /drivers/{user}/scorecard shim — the scorecard is now a tab on
+     * the driver profile. Redirect there, preserving the period selection.
+     */
     public function scorecard(Request $request, User $user)
     {
-        $user->load('hrDriverEligibility');
+        $params = ['tab' => 'scorecard'];
+        if ($request->filled('period')) {
+            $params['period'] = (string) (int) $request->input('period');
+        }
 
+        return redirect('/fleet-assets/drivers/' . $user->id . '?' . http_build_query($params));
+    }
+
+    /**
+     * Safety-score payload for the Scorecard tab (formerly the standalone
+     * scorecard page — computation preserved exactly).
+     *
+     * @return array<string, mixed>
+     */
+    private function scorecardData(User $user, Request $request): array
+    {
         $period = $request->input('period', '30');
         $days = (int) $period;
         $periodStart = now()->subDays($days)->startOfDay();
@@ -233,12 +297,7 @@ class DriverController extends Controller
                 'asset_id' => $s->asset_id,
             ])->values();
 
-        return Inertia::render('fleet-assets/drivers/scorecard', [
-            'driver' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
+        return [
             'period' => $period,
             'score' => round($currentScore),
             'previous_score' => round($previousScore),
@@ -251,6 +310,6 @@ class DriverController extends Controller
                 'total_distance_km' => round((float) $totalDistance, 1),
             ],
             'recent_events' => $recentEvents,
-        ]);
+        ];
     }
 }

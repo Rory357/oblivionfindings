@@ -1,23 +1,64 @@
-import { PageHero } from '@/components/page';
+import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Car,
     Clock,
     ExternalLink,
     Gauge,
+    Loader2,
+    Minus,
     Route,
     Shield,
+    Timer,
+    TrendingDown,
+    TrendingUp,
     User,
+    Zap,
 } from 'lucide-react';
-import { formatDate, formatDateTime } from '@/lib/fleet-utils';
+import { useState } from 'react';
+import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
 
+
+type Scorecard = {
+    period: string;
+    score: number;
+    previous_score: number;
+    fleet_avg_score: number;
+    metrics: {
+        harsh_brakes: number;
+        hard_accels: number;
+        speeding_events: number;
+        idle_minutes: number;
+        total_distance_km: number;
+    };
+    recent_events: Array<{
+        id: number;
+        type: string;
+        severity: string | null;
+        occurred_at: string | null;
+        asset_id: number;
+    }>;
+};
 
 type Props = {
     driver: {
@@ -64,6 +105,9 @@ type Props = {
         distance_km: number;
         status: string;
     }>;
+    /** Deferred — present on full loads with ?tab=scorecard, otherwise fetched
+     *  via partial reload when the Scorecard tab is opened. */
+    scorecard?: Scorecard | null;
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -94,13 +138,47 @@ const statusBannerColors: Record<string, string> = {
     unknown: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
-export default function DriverShow({ driver, assigned_vehicles, sessions, driving_metrics, recent_trips }: Props) {
+function scoreColor(score: number): string {
+    if (score >= 80) return FLEET_COLORS.primary;
+    if (score >= 60) return FLEET_COLORS.warning;
+    return FLEET_COLORS.danger;
+}
+
+function eventIcon(type: string) {
+    switch (type) {
+        case 'harsh_brake': return <AlertTriangle className="h-4 w-4 text-status-warning" />;
+        case 'harsh_accel': return <Zap className="h-4 w-4 text-status-warning" />;
+        case 'speeding': return <Gauge className="h-4 w-4 text-status-critical" />;
+        case 'idle': return <Timer className="h-4 w-4 text-status-info" />;
+        default: return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
+    }
+}
+
+export default function DriverShow({ driver, assigned_vehicles, sessions, driving_metrics, recent_trips, scorecard }: Props) {
     const eligibility = driver?.eligibility ?? {};
     const driverStatus = eligibility.status ?? 'unknown';
     const safeAssignedVehicles = assigned_vehicles ?? [];
     const safeSessions = sessions ?? [];
     const safeDrivingMetrics = driving_metrics ?? [];
     const safeRecentTrips = recent_trips ?? [];
+
+    // Honour ?tab=scorecard on arrival (the legacy /scorecard route redirects
+    // here with it, and the controller eager-loads the payload for that case).
+    const [activeTab, setActiveTab] = useState<string>(() => {
+        if (typeof window === 'undefined') return 'overview';
+        return new URLSearchParams(window.location.search).get('tab') === 'scorecard' ? 'scorecard' : 'overview';
+    });
+
+    const openTab = (tab: string) => {
+        setActiveTab(tab);
+        if (tab === 'scorecard' && !scorecard) {
+            router.reload({ only: ['scorecard'], data: { tab: 'scorecard' } });
+        }
+    };
+
+    const changeScorecardPeriod = (newPeriod: string) => {
+        router.reload({ only: ['scorecard'], data: { tab: 'scorecard', period: newPeriod } });
+    };
 
     const expiryDays = getLicenceExpiryDays(eligibility.licence_expires_at);
     const isExpired = expiryDays !== null && expiryDays < 0;
@@ -147,11 +225,9 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild className="bg-white/50 dark:bg-black/20">
-                                <Link href={`/fleet-assets/drivers/${driver?.id}/scorecard`}>
-                                    <Gauge className="mr-2 h-4 w-4" />
-                                    Scorecard
-                                </Link>
+                            <Button variant="outline" size="sm" onClick={() => openTab('scorecard')} className="bg-white/50 dark:bg-black/20">
+                                <Gauge className="mr-2 h-4 w-4" />
+                                Scorecard
                             </Button>
                             <Button variant="outline" size="sm" asChild className="bg-white/50 dark:bg-black/20">
                                 <Link href={`/hr/staff/${driver?.id}`}>
@@ -192,6 +268,15 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                         </div>
                     </div>
                 )}
+
+                {/* Tabs: Overview / Scorecard */}
+                <Tabs value={activeTab} onValueChange={openTab}>
+                    <TabsList className="h-auto flex-wrap gap-1 p-1">
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="overview" className="space-y-6">
 
                 {/* 2-Column Layout: License & Metrics */}
                 <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
@@ -430,6 +515,181 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                         </CardContent>
                     </Card>
                 )}
+                    </TabsContent>
+
+                    {/* Scorecard tab — folded in from the retired standalone scorecard page. */}
+                    <TabsContent value="scorecard" className="space-y-6">
+                        {!scorecard ? (
+                            <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <p className="text-sm">Loading scorecard…</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm text-muted-foreground">Safety score and driving behavior analysis.</p>
+                                    <Select value={scorecard.period} onValueChange={changeScorecardPeriod}>
+                                        <SelectTrigger className="w-36">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="7">Last 7 days</SelectItem>
+                                            <SelectItem value="30">Last 30 days</SelectItem>
+                                            <SelectItem value="90">Last 90 days</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="grid gap-4 lg:grid-cols-[auto,1fr]">
+                                    {/* Score Gauge */}
+                                    <Card className="flex flex-col items-center justify-center px-8 py-6">
+                                        <CardHeader className="pt-0 pb-2">
+                                            <CardTitle className="text-center text-base">Overall Safety Score</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col items-center justify-center pb-2">
+                                            <HalfMoonGauge
+                                                value={scorecard.score}
+                                                label={`${scorecard.score} / 100`}
+                                                size={200}
+                                                color={scoreColor(scorecard.score)}
+                                            />
+
+                                            {/* Trend */}
+                                            <div className="mt-4 flex items-center gap-2">
+                                                {scorecard.score - scorecard.previous_score > 0 ? (
+                                                    <Badge variant="default" className="bg-primary/10 text-primary dark:bg-primary dark:text-primary/70">
+                                                        <TrendingUp className="mr-1 h-3 w-3" />
+                                                        +{scorecard.score - scorecard.previous_score} vs last period
+                                                    </Badge>
+                                                ) : scorecard.score - scorecard.previous_score < 0 ? (
+                                                    <Badge variant="destructive">
+                                                        <TrendingDown className="mr-1 h-3 w-3" />
+                                                        {scorecard.score - scorecard.previous_score} vs last period
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">
+                                                        <Minus className="mr-1 h-3 w-3" />
+                                                        No change vs last period
+                                                    </Badge>
+                                                )}
+                                            </div>
+
+                                            {/* Fleet comparison */}
+                                            <div className="mt-3 text-sm text-muted-foreground">
+                                                Fleet average: <span className="font-medium">{scorecard.fleet_avg_score}</span>
+                                                {scorecard.score - scorecard.fleet_avg_score > 0 && <span className="ml-1 text-primary">(+{scorecard.score - scorecard.fleet_avg_score} above)</span>}
+                                                {scorecard.score - scorecard.fleet_avg_score < 0 && <span className="ml-1 text-status-critical">({scorecard.score - scorecard.fleet_avg_score} below)</span>}
+                                                {scorecard.score - scorecard.fleet_avg_score === 0 && <span className="ml-1 text-muted-foreground">(at average)</span>}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Metrics Grid */}
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                                    Harsh Braking
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-3xl font-bold text-status-warning">{scorecard.metrics.harsh_brakes}</div>
+                                                <p className="mt-1 text-xs text-muted-foreground">events this period</p>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <Zap className="h-4 w-4 text-status-warning" />
+                                                    Hard Acceleration
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-3xl font-bold text-status-warning">{scorecard.metrics.hard_accels}</div>
+                                                <p className="mt-1 text-xs text-muted-foreground">events this period</p>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <Gauge className="h-4 w-4 text-status-critical" />
+                                                    Speeding Events
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-3xl font-bold text-status-critical">{scorecard.metrics.speeding_events}</div>
+                                                <p className="mt-1 text-xs text-muted-foreground">events this period</p>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <Timer className="h-4 w-4 text-status-info" />
+                                                    Idle Time
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-3xl font-bold">{Math.round(scorecard.metrics.idle_minutes / 60 * 10) / 10}h</div>
+                                                <p className="mt-1 text-xs text-muted-foreground">{scorecard.metrics.idle_minutes} minutes total</p>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-sm">
+                                                    <Route className="h-4 w-4 text-primary" />
+                                                    Total Distance
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="text-3xl font-bold">{formatDistance(scorecard.metrics.total_distance_km)}</div>
+                                                <p className="mt-1 text-xs text-muted-foreground">driven this period</p>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </div>
+
+                                {/* Recent Driving Events */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Recent Driving Events</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {(scorecard.recent_events ?? []).length > 0 ? (
+                                            <div className="space-y-2">
+                                                {scorecard.recent_events.map((event) => (
+                                                    <div key={event.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                                                        <div className="flex items-center gap-3">
+                                                            {eventIcon(event.type)}
+                                                            <div>
+                                                                <span className="font-medium capitalize">{(event.type ?? '').replace(/_/g, ' ')}</span>
+                                                                {event.severity && (
+                                                                    <Badge variant="outline" className="ml-2 text-[10px]">{event.severity}</Badge>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {event.occurred_at ? formatDateTime(event.occurred_at) : '---'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                                <Shield className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                                                <p className="text-sm text-muted-foreground">No driving events recorded for this period.</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
+                        )}
+                    </TabsContent>
+                </Tabs>
             </PageShell>
         </AppLayout>
     );

@@ -203,6 +203,12 @@ class ResidentTransportController extends Controller
                     'avg_duration_minutes' => 0,
                     'most_active_vehicle' => null,
                 ],
+                'hero' => [
+                    'today' => 0,
+                    'in_progress' => 0,
+                    'completed_7d' => 0,
+                    'with_medications_7d' => 0,
+                ],
             ]);
         }
 
@@ -356,6 +362,20 @@ class ResidentTransportController extends Controller
                 'residents_this_month' => $residentsThisMonth,
                 'avg_duration_minutes' => round((float) ($avgDuration ?? 0), 1),
                 'most_active_vehicle' => $mostActiveVehicleName,
+            ],
+            'hero' => [
+                'today' => FleetResidentTransport::query()->whereDate('departed_at', today())->count(),
+                'in_progress' => FleetResidentTransport::query()->where('status', 'in_progress')->count(),
+                'completed_7d' => FleetResidentTransport::query()
+                    ->where('status', 'completed')
+                    ->where('departed_at', '>=', now()->subDays(7))
+                    ->count(),
+                'with_medications_7d' => Schema::hasTable('fleet_medication_transit_logs')
+                    ? FleetMedicationTransitLog::query()
+                        ->where('created_at', '>=', now()->subDays(7))
+                        ->distinct('transport_id')
+                        ->count('transport_id')
+                    : 0,
             ],
         ]);
     }

@@ -34,6 +34,13 @@ class HandoverController extends Controller
             'handovers' => collect(),
             'vehicles' => $vehicles,
             'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
+            'stats' => [
+                'total' => 0,
+                'pending' => 0,
+                'disputed' => 0,
+                'completed_7d' => 0,
+            ],
+            'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess) : null,
             'can' => [
                 'manage' => (bool) $auth?->canDo('fleet.manage'),
             ],
@@ -104,21 +111,52 @@ class HandoverController extends Controller
             ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
             ->values();
 
+        // Hero stats — same site scope as the list.
+        $statsBase = FleetShiftHandover::query();
+        $siteAccess->applyFleetHandoverScope($statsBase, $auth, self::BYPASS_PERMISSIONS);
+
+        $stats = [
+            'total' => (clone $statsBase)->count(),
+            'pending' => (clone $statsBase)->where('status', 'pending_acceptance')->count(),
+            'disputed' => (clone $statsBase)->where('status', 'disputed')->count(),
+            'completed_7d' => (clone $statsBase)
+                ->where('status', 'accepted')
+                ->where('accepted_at', '>=', now()->subDays(7))
+                ->count(),
+        ];
+
         return Inertia::render('fleet-assets/handovers/index', [
             'handovers' => $handovers,
             'vehicles' => $vehicles,
             'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
+            'stats' => $stats,
+            // New-handover wizard payload (retired /handovers/create page) —
+            // only when opened via ?new=1.
+            'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess) : null,
             'can' => [
                 'manage' => (bool) $auth?->canDo('fleet.manage'),
             ],
         ]);
     }
 
+    /**
+     * The standalone create page is retired — deep links reopen the wizard on
+     * the index via ?new=1.
+     */
     public function create(Request $request)
     {
-        $auth = $request->user();
-        $siteAccess = app(UserSiteAccessService::class);
+        return redirect()->route(
+            'fleet-assets.handovers.index',
+            array_merge($request->query(), ['new' => 1]),
+        );
+    }
 
+    /**
+     * Options for the new-handover wizard modal (ported from the retired
+     * create page).
+     */
+    protected function wizardPayload(User $auth, UserSiteAccessService $siteAccess): array
+    {
         $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
         $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
 
@@ -139,14 +177,11 @@ class HandoverController extends Controller
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
             ->values();
 
-        return Inertia::render('fleet-assets/handovers/create', [
+        return [
             'vehicles' => $vehicles,
             'users' => $users,
             'current_user_id' => $auth->id,
-            'can' => [
-                'manage' => (bool) $auth?->canDo('fleet.manage'),
-            ],
-        ]);
+        ];
     }
 
     public function store(Request $request)

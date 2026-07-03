@@ -4,12 +4,14 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetDriverSession;
 use App\Models\FleetFuelLog;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetSignal;
 use App\Models\FleetTrip;
 use App\Models\FleetIncident;
+use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\Site;
 use App\Models\User;
@@ -112,7 +114,62 @@ class VehicleController extends Controller
 
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
+        // Hero stats — whole-fleet counts (independent of filters/pagination).
+        $heroTotal = Asset::query()->where(fn ($q) => $q->vehicles())->count();
+        $heroMaintenance = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereIn('status', ['maintenance', 'out_of_service'])
+            ->count();
+        $heroInUse = Schema::hasTable('fleet_vehicle_bookings')
+            ? FleetVehicleBooking::query()
+                ->where('status', 'checked_out')
+                ->distinct('asset_id')
+                ->count('asset_id')
+            : 0;
+
+        // Compliance chips — efficient COUNT queries over the vehicle set.
+        $wofDue = Asset::query()->where(fn ($q) => $q->vehicles())->wofExpiring(30)->count();
+        $wofExpired = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('wof_expires_at')
+            ->where('wof_expires_at', '<', now())
+            ->count();
+        $regoDue = Asset::query()->where(fn ($q) => $q->vehicles())->registrationExpiring(30)->count();
+        $cofDue = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->whereNotNull('cof_expires_at')
+            ->where('cof_expires_at', '<=', now()->addDays(30))
+            ->where('cof_expires_at', '>=', now())
+            ->count();
+        $insuranceExpiring = Schema::hasColumn('assets', 'insurance_expires_at')
+            ? Asset::query()
+                ->where(fn ($q) => $q->vehicles())
+                ->whereNotNull('insurance_expires_at')
+                ->where('insurance_expires_at', '<=', now()->addDays(30))
+                ->count()
+            : null;
+        $openAlerts = ControlRoomAlert::query()->whereNotIn('status', ['closed', 'resolved'])->count();
+        $criticalAlerts = ControlRoomAlert::query()
+            ->whereNotIn('status', ['closed', 'resolved'])
+            ->where('severity', 'critical')
+            ->count();
+
         return Inertia::render('fleet-assets/vehicles/index', [
+            'hero' => [
+                'total' => $heroTotal,
+                'available' => max(0, $heroTotal - $heroMaintenance - $heroInUse),
+                'in_use' => $heroInUse,
+                'maintenance' => $heroMaintenance,
+            ],
+            'compliance' => [
+                'wof_due' => $wofDue,
+                'wof_expired' => $wofExpired,
+                'rego_due' => $regoDue,
+                'cof_due' => $cofDue,
+                'insurance_expiring' => $insuranceExpiring,
+                'open_alerts' => $openAlerts,
+                'critical_alerts' => $criticalAlerts,
+            ],
             'vehicles' => [
                 'data' => $vehicles->getCollection()->map(fn ($v) => [
                     'id' => $v->id,
@@ -587,6 +644,19 @@ class VehicleController extends Controller
             $distanceTrend = [];
         }
 
+        // Hero stats — whole-fleet counts (independent of filters/pagination),
+        // matching the vehicles-index hero convention. After-hours mirrors the
+        // dashboard definition (before 8am / after 6pm, last 7 days).
+        $todayStart = now()->startOfDay();
+        $hero = [
+            'trips_today' => FleetTrip::where('started_at', '>=', $todayStart)->count(),
+            'distance_today_km' => round((float) FleetTrip::where('started_at', '>=', $todayStart)->sum('distance_km'), 1),
+            'active_now' => FleetTrip::whereIn('status', ['open', 'in_progress'])->count(),
+            'after_hours_7d' => FleetTrip::where('started_at', '>=', now()->subDays(7))
+                ->afterHours()
+                ->count(),
+        ];
+
         // Sorting
         $allowedSorts = ['started_at', 'distance_km', 'duration_s', 'status'];
         $sort = $request->input('sort', 'started_at');
@@ -646,6 +716,7 @@ class VehicleController extends Controller
             ],
             'vehicles' => $vehicles,
             'filters' => $request->only(['date_from', 'date_to', 'vehicle_id', 'status', 'search']),
+            'hero' => $hero,
             'summary' => $summary,
             'trips_by_day' => $tripsByDay,
             'top_vehicles' => $topVehicles,
@@ -708,6 +779,9 @@ class VehicleController extends Controller
         $totalLitres = round((float) (clone $mtdQuery)->sum('quantity_litres'), 1);
         $totalCost = round((float) (clone $mtdQuery)->sum('total_cost'), 2);
         $avgCostPerLitre = $totalLitres > 0 ? round($totalCost / $totalLitres, 3) : 0;
+
+        // Hero — whole-fleet, independent of filters (MTD spend/litres + 30-day entry count).
+        $entries30d = FleetFuelLog::where('logged_at', '>=', now()->subDays(30))->count();
 
         // Per-vehicle efficiency (batch-query trip distances to avoid N+1)
         $fuelByAsset = FleetFuelLog::query()
@@ -787,6 +861,12 @@ class VehicleController extends Controller
             ],
             'vehicles' => $vehicles,
             'filters' => $request->only(['date_from', 'date_to', 'asset_id']),
+            'hero' => [
+                'spend_month' => $totalCost,
+                'litres_month' => $totalLitres,
+                'entries_30d' => $entries30d,
+                'avg_cost_per_litre' => $avgCostPerLitre,
+            ],
             'summary' => [
                 'total_fill_ups' => $totalFillUps,
                 'total_litres' => $totalLitres,

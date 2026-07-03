@@ -1,54 +1,47 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Fleet\FleetDashboardController;
-use App\Http\Controllers\Fleet\FleetVehicleController;
-use App\Http\Controllers\Fleet\FleetTripController;
-use App\Http\Controllers\Fleet\FleetDriverSessionController;
-use App\Http\Controllers\Fleet\FleetFuelController;
-use App\Http\Controllers\Fleet\FleetReportController;
-use App\Http\Controllers\Fleet\FleetMapUsageController;
 use App\Http\Controllers\Fleet\FleetMapUsageDashboardController;
+use App\Http\Controllers\Fleet\FleetTripController;
+use Illuminate\Support\Facades\Route;
 
 /**
- * Fleet Management Routes
+ * Legacy Fleet Management Routes
  *
- * Vehicle tracking, trips, fuel logs, driver sessions, and reporting.
+ * `/fleet-assets/*` (routes/fleet-assets.php) is the canonical fleet & asset
+ * shell. The legacy GET pages that used to live here are permanently
+ * redirected to their canonical equivalents. What remains live:
+ *
+ * - Trip write endpoints (update/close/destroy) — called by the trip
+ *   playback page (`fleet-assets/trips/playback`).
+ * - The map-usage dashboard — `fleet_map_usage_logs` is still written by
+ *   the reverse-geocode pipeline (ReverseGeocodeService), so the read-only
+ *   dashboard stays.
  */
+
+// Permanent redirects from retired legacy pages to the canonical shell.
+Route::permanentRedirect('/fleet-management', '/fleet-assets')->name('fleet.index');
+Route::permanentRedirect('/fleet/fuel', '/fleet-assets/fuel')->name('fleet.fuel.index');
+Route::permanentRedirect('/fleet/reports', '/fleet-assets/reports')->name('fleet.reports.index');
+Route::get('/fleet/vehicles/{asset}', fn (int $asset) => redirect("/fleet-assets/vehicles/{$asset}", 301))
+    ->whereNumber('asset')
+    ->name('fleet.vehicles.show');
+// The legacy trip page moved to the canonical shell as trip playback.
+Route::get('/fleet/trips/{trip}', fn (int $trip) => redirect("/fleet-assets/trips/{$trip}/playback", 301))
+    ->whereNumber('trip')
+    ->name('fleet.trips.show');
+// Old JSON playback endpoint → new data endpoint (fetch() follows redirects).
+Route::get('/fleet/trips/{trip}/playback', fn (int $trip) => redirect("/fleet-assets/trips/{$trip}/playback/data", 301))
+    ->whereNumber('trip')
+    ->name('fleet.trips.playback');
+
 Route::middleware(['auth'])->group(function () {
-    // Legacy child/detail routes retained intentionally while `/fleet-assets/*`
-    // remains the unified operator shell for fleet and asset workflows.
-    // These routes still own trip playback, map usage capture, and report links.
+    // Maps usage dashboard (read-only; log rows come from reverse geocoding).
     Route::middleware('permission:fleet.viewAny')->group(function () {
-        // Dashboard
-        Route::get('/fleet-management', FleetDashboardController::class)
-            ->name('fleet.index');
-
-        // Vehicles
-        Route::get('/fleet/vehicles/{asset}', [FleetVehicleController::class, 'show'])
-            ->whereNumber('asset')
-            ->name('fleet.vehicles.show');
-
-        // Trips
-        Route::get('/fleet/trips/{trip}', [FleetTripController::class, 'show'])
-            ->whereNumber('trip')
-            ->name('fleet.trips.show');
-        Route::get('/fleet/trips/{trip}/playback', [FleetTripController::class, 'playback'])
-            ->whereNumber('trip')
-            ->name('fleet.trips.playback');
-
-        // Fuel logs (view)
-        Route::get('/fleet/fuel', [FleetFuelController::class, 'index'])
-            ->name('fleet.fuel.index');
-
-        // Maps usage
         Route::get('/fleet-management/maps-usage', FleetMapUsageDashboardController::class)
             ->name('fleet.maps.usage-dashboard');
-        Route::post('/fleet/maps/usage', [FleetMapUsageController::class, 'store'])
-            ->name('fleet.maps.usage');
     });
 
-    // Trip management
+    // Trip management — still called by the trip playback page.
     Route::middleware('permission:fleet.trips.manage')->group(function () {
         Route::put('/fleet/trips/{trip}', [FleetTripController::class, 'update'])
             ->whereNumber('trip')
@@ -59,36 +52,5 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/fleet/trips/{trip}', [FleetTripController::class, 'destroy'])
             ->whereNumber('trip')
             ->name('fleet.trips.destroy');
-    });
-
-    // Fuel management
-    Route::middleware('permission:fleet.fuel.manage')->group(function () {
-        Route::post('/fleet/vehicles/{asset}/fuel', [FleetFuelController::class, 'store'])
-            ->whereNumber('asset')
-            ->name('fleet.fuel.store');
-        Route::put('/fleet/fuel/{fuelLog}', [FleetFuelController::class, 'update'])
-            ->whereNumber('fuelLog')
-            ->name('fleet.fuel.update');
-        Route::delete('/fleet/fuel/{fuelLog}', [FleetFuelController::class, 'destroy'])
-            ->whereNumber('fuelLog')
-            ->name('fleet.fuel.destroy');
-    });
-
-    // Driver sessions
-    Route::middleware('permission:fleet.driverSessions.manage')->group(function () {
-        Route::post('/fleet/vehicles/{asset}/driver-sessions', [FleetDriverSessionController::class, 'store'])
-            ->whereNumber('asset')
-            ->name('fleet.driver-sessions.store');
-        Route::post('/fleet/driver-sessions/{session}/end', [FleetDriverSessionController::class, 'end'])
-            ->whereNumber('session')
-            ->name('fleet.driver-sessions.end');
-    });
-
-    // Reports
-    Route::middleware('permission:fleet.reports.view')->group(function () {
-        Route::get('/fleet/reports', [FleetReportController::class, 'index'])
-            ->name('fleet.reports.index');
-        Route::get('/fleet/reports/export', [FleetReportController::class, 'export'])
-            ->name('fleet.reports.export');
     });
 });

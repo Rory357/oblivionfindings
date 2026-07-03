@@ -77,30 +77,6 @@ class InspectionController extends Controller
         $vehicles = Asset::query()
             ->where('category', 'vehicle')
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
-            ->values();
-
-        return Inertia::render('fleet-assets/inspections/index', [
-            'inspections' => $inspections,
-            'vehicles' => $vehicles,
-            'filters' => $request->only(['search', 'vehicle_id', 'result', 'date_from', 'date_to']),
-            'can' => [
-                'manage' => $canManage,
-            ],
-        ]);
-    }
-
-    /**
-     * Show the inspection creation form.
-     */
-    public function create(Request $request)
-    {
-        $canManage = $this->canManageMaintenance($request);
-
-        $vehicles = Asset::query()
-            ->where('category', 'vehicle')
-            ->orderBy('name')
             ->get(['id', 'name', 'registration_number'])
             ->map(fn ($a) => [
                 'id' => $a->id,
@@ -109,7 +85,25 @@ class InspectionController extends Controller
             ])
             ->values();
 
-        // If booking_id provided, load pre-trip inspection for comparison
+        // Hero band stats — efficient COUNTs over the last 30 days (all inspections,
+        // independent of the current filters)
+        $since30 = now()->subDays(30);
+        $statsBase = fn () => FleetChecklistRun::query()
+            ->whereHas('template', function ($q) {
+                $q->where('name', 'like', '%inspection%')
+                    ->orWhere('type', 'inspection');
+            })
+            ->where('created_at', '>=', $since30);
+        $runs30 = $statsBase()->count();
+        $failed30 = $statsBase()->where('passed', false)->count();
+        $stats = [
+            'runs_30d' => $runs30,
+            'failed_30d' => $failed30,
+            'pass_rate' => $runs30 > 0 ? (int) round((($runs30 - $failed30) / $runs30) * 100) : null,
+        ];
+
+        // Create-wizard prefill (modal lives on this page — ?new=1 shim). If a booking is
+        // referenced, surface its latest pre-trip run for the post-trip comparison panel.
         $preTrip = null;
         $booking = null;
         if ($request->filled('booking_id')) {
@@ -125,8 +119,11 @@ class InspectionController extends Controller
             }
         }
 
-        return Inertia::render('fleet-assets/inspections/create', [
+        return Inertia::render('fleet-assets/inspections/index', [
+            'inspections' => $inspections,
             'vehicles' => $vehicles,
+            'filters' => $request->only(['search', 'vehicle_id', 'result', 'date_from', 'date_to']),
+            'stats' => $stats,
             'preselected_asset_id' => $request->input('asset_id') ?? $booking?->asset_id,
             'preselected_type' => $request->input('type', 'pre-trip'),
             'booking_id' => $request->input('booking_id'),
@@ -149,6 +146,17 @@ class InspectionController extends Controller
                 'manage' => $canManage,
             ],
         ]);
+    }
+
+    /** Legacy full-page create — the wizard now lives on the index as a modal (?new=1 shim). */
+    public function create(Request $request)
+    {
+        return redirect()->to('/fleet-assets/inspections?' . http_build_query(array_filter([
+            'new' => 1,
+            'asset_id' => $request->input('asset_id'),
+            'type' => $request->input('type'),
+            'booking_id' => $request->input('booking_id'),
+        ])));
     }
 
     /**

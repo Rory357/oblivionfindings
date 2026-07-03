@@ -1,8 +1,15 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,6 +83,12 @@ type Props = {
         avg_duration_minutes: number;
         most_active_vehicle: string | null;
     };
+    hero?: {
+        today: number;
+        in_progress: number;
+        completed_7d: number;
+        with_medications_7d: number;
+    };
 };
 
 const TRANSPORT_TYPE_COLORS: Record<string, string> = {
@@ -120,7 +133,14 @@ export default function TransportsIndex({
     filters: rawFilters,
     vehicles: rawVehicles,
     stats: rawStats,
+    hero: rawHero,
 }: Props) {
+    const hero = rawHero ?? {
+        today: 0,
+        in_progress: 0,
+        completed_7d: 0,
+        with_medications_7d: 0,
+    };
     const transports = useMemo(() => rawTransports?.data ?? [], [rawTransports?.data]);
     const meta = rawTransports?.meta ?? {
         current_page: 1,
@@ -178,26 +198,63 @@ export default function TransportsIndex({
         >
             <Head title="Transport Logs" />
             <PageShell>
-                <PageHero
-                    title="Resident Transport Logs"
-                    description="Track and manage resident transport activities."
-                    actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <a href="/fleet-assets/transports?export=csv">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export CSV
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <Link href="/fleet-assets/transports/create">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Log Transport
-                                </Link>
-                            </Button>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Truck} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Resident transports · duty of care</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Resident Transport Logs
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Track and manage resident transport activities.
+                            </p>
                         </div>
-                    }
-                />
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                label="Today's transports"
+                                value={fmt(hero.today)}
+                                caption="departed today"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="In progress"
+                                value={fmt(hero.in_progress)}
+                                caption="on the road now"
+                                tone={hero.in_progress > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Completed 7d"
+                                value={fmt(hero.completed_7d)}
+                                caption="this week"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/transports/medications"
+                                label="With medications"
+                                value={fmt(hero.with_medications_7d)}
+                                caption="med transit · 7d"
+                                tone={hero.with_medications_7d > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction
+                            href="/fleet-assets/transports/create"
+                            icon={Plus}
+                            emphasis
+                        >
+                            Log transport
+                        </FleetHeroAction>
+                        <FleetHeroAction
+                            href="/fleet-assets/transports?export=csv"
+                            icon={Download}
+                            external
+                        >
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {/* Dark KPI Cards with icons + MiniBarChart */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">

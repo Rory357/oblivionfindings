@@ -1,7 +1,15 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroCluster,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +33,7 @@ import {
     Route,
     Settings,
     ShieldAlert,
+    ShieldCheck,
     Smartphone,
     UserSearch,
     Wrench,
@@ -76,6 +85,9 @@ type Props = {
         outings_past_return: number;
         upcoming_maintenance_count: number;
         trips_today: number;
+        vehicles_in_maintenance: number;
+        wof_due_30: number;
+        rego_due_30: number;
         tracked_residents?: number;
         active_outings?: number;
     };
@@ -344,6 +356,7 @@ export default function FleetAssetsDashboard({
         total_devices: 0, online_devices: 0,
         recent_bookings_count: 0, upcoming_maintenance_count: 0,
         trips_today: 0,
+        vehicles_in_maintenance: 0, wof_due_30: 0, rego_due_30: 0,
     };
 
     const vsb = vehicle_status_breakdown ?? {};
@@ -352,6 +365,9 @@ export default function FleetAssetsDashboard({
 
     // Map tab filter
     const [mapFilter, setMapFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+    // Live-sync timestamp for the hero status pill.
+    const [lastUpdated, setLastUpdated] = useState<Date>(() => new Date());
 
     // 30-second auto-refresh
     useEffect(() => {
@@ -363,6 +379,7 @@ export default function FleetAssetsDashboard({
                     'vehicle_status_breakdown', 'asset_status_breakdown',
                     'maintenance_stats', 'recent_alerts',
                 ],
+                onFinish: () => setLastUpdated(new Date()),
             });
         }, 30000);
         return () => window.clearInterval(interval);
@@ -449,24 +466,139 @@ export default function FleetAssetsDashboard({
         >
             <Head title="Fleet & Assets" />
             <PageShell>
-                <PageHero
-                    title="Fleet & Assets"
-                    description="Real-time fleet tracking, asset management, and operational insights."
-                    icon={<Car className="h-7 w-7" />}
-                    stats={[
-                        { label: 'Vehicles', value: stats.total_vehicles },
-                        { label: 'Online', value: stats.online_count },
-                        { label: 'Alerts', value: stats.active_alerts },
-                        { label: 'Trips Today', value: stats.trips_today },
-                    ]}
-                    actions={
-                        <Button variant="ghost" size="icon" className="text-white/70 hover:bg-white/10 hover:text-white" asChild>
-                            <Link href="/fleet-assets/settings/notifications">
+                <HeroShell
+                    footer={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                Quick actions
+                            </span>
+                            <FleetHeroAction href="/fleet-assets/bookings?new=1" icon={Bookmark} emphasis>
+                                Book vehicle
+                            </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/fuel" icon={Fuel}>
+                                Log fuel
+                            </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/incidents?report=vehicle" icon={ShieldAlert}>
+                                Report incident
+                            </FleetHeroAction>
+                            <FleetHeroAction href="/fleet-assets/maintenance/work-orders?new=1" icon={Wrench}>
+                                New work order
+                            </FleetHeroAction>
+                            <Link
+                                href="/fleet-assets/settings/notifications"
+                                className="ml-auto inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                                aria-label="Fleet notification settings"
+                            >
                                 <Settings className="h-4 w-4" />
                             </Link>
-                        </Button>
+                        </div>
                     }
-                />
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Car} />
+                        <div className="min-w-0 flex-1">
+                            <HeroStatusPill>
+                                Fleet command · updated{' '}
+                                {lastUpdated.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-[28px]">Fleet & Assets</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Real-time fleet tracking, asset management, and operational insights.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr]">
+                        <HeroCluster title="Fleet status" icon={Car}>
+                            <HeroClusterTile
+                                href="/fleet-assets/vehicles?status=online"
+                                label="Online"
+                                value={fmt(stats.online_count)}
+                                caption="reporting live"
+                                tone={stats.online_count > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings"
+                                label="In use"
+                                value={fmt(stats.checked_out_count)}
+                                caption="checked out"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/maintenance/work-orders"
+                                label="Maintenance"
+                                value={fmt(stats.vehicles_in_maintenance)}
+                                caption="in the workshop"
+                                tone={stats.vehicles_in_maintenance > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/vehicles?status=offline"
+                                label="Offline"
+                                value={fmt(stats.offline_count)}
+                                caption="no recent signal"
+                                tone="neutral"
+                            />
+                        </HeroCluster>
+
+                        <HeroCluster title="Today" icon={Calendar}>
+                            <HeroClusterTile
+                                href="/fleet-assets/trips"
+                                label="Trips today"
+                                value={fmt(stats.trips_today)}
+                                caption="journeys logged"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/bookings"
+                                label="Bookings"
+                                value={fmt(stats.recent_bookings_count)}
+                                caption="pending + approved"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/outings"
+                                label="Outings"
+                                value={fmt(stats.active_outings)}
+                                caption="planned or underway"
+                                tone="neutral"
+                            />
+                        </HeroCluster>
+
+                        <HeroCluster title="Compliance" icon={ShieldCheck}>
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance"
+                                label="WOF due 30d"
+                                value={fmt(stats.wof_due_30)}
+                                caption="book inspections"
+                                tone={stats.wof_due_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance"
+                                label="Rego due 30d"
+                                value={fmt(stats.rego_due_30)}
+                                caption="renew registration"
+                                tone={stats.rego_due_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/alerts"
+                                label="Alerts"
+                                value={fmt(stats.active_alerts)}
+                                caption={
+                                    (stats.critical_alerts ?? 0) > 0
+                                        ? `${stats.critical_alerts} critical`
+                                        : 'unresolved'
+                                }
+                                tone={
+                                    (stats.critical_alerts ?? 0) > 0
+                                        ? 'critical'
+                                        : stats.active_alerts > 0
+                                          ? 'warning'
+                                          : 'success'
+                                }
+                            />
+                        </HeroCluster>
+                    </div>
+                </HeroShell>
 
                 {/* ============================================================ */}
                 {/*  ALERT BANNER                                                 */}
@@ -507,13 +639,12 @@ export default function FleetAssetsDashboard({
                 {/* ============================================================ */}
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="Vehicles" value={stats.total_vehicles ?? 0} icon={Car} />
-                    <FleetStatCard label="Bookings" value={stats.recent_bookings_count ?? 0} icon={Bookmark} color="blue" />
-                    {(stats.checked_out_count > 0 || stats.overdue_count > 0) && (
+                    {stats.overdue_count > 0 && (
                         <FleetStatCard
-                            label={stats.overdue_count > 0 ? 'Overdue Returns' : 'Checked Out'}
-                            value={stats.overdue_count > 0 ? stats.overdue_count : stats.checked_out_count}
+                            label="Overdue Returns"
+                            value={stats.overdue_count}
                             icon={Car}
-                            color={stats.overdue_count > 0 ? 'red' : 'amber'}
+                            color="red"
                             href="/fleet-assets/bookings"
                         />
                     )}
@@ -541,9 +672,6 @@ export default function FleetAssetsDashboard({
                     <FleetStatCard label="Fuel MTD" value={formatCurrency(stats.fuel_cost_mtd ?? 0)} icon={Fuel} />
                     {(stats.tracked_residents ?? 0) > 0 && (
                         <FleetStatCard label="Tracked Residents" value={stats.tracked_residents ?? 0} icon={UserSearch} color="purple" />
-                    )}
-                    {(stats.active_outings ?? 0) > 0 && (
-                        <FleetStatCard label="Active Outings" value={stats.active_outings ?? 0} icon={MapPin} color="blue" />
                     )}
                 </div>
 
@@ -590,7 +718,7 @@ export default function FleetAssetsDashboard({
                                     <QuickActionTile icon={MapPin} label="Map" href="/fleet-assets/map" color="#6366f1" />
                                     <QuickActionTile icon={UserSearch} label="Residents" href="/fleet-assets/resident-tracking" count={stats.tracked_residents ?? 0} color="#7c3aed" />
                                     <QuickActionTile icon={MapPin} label="Outings" href="/fleet-assets/outings" color="#06b6d4" />
-                                    <QuickActionTile icon={ShieldAlert} label="Wandering" href="/fleet-assets/wandering-alerts" color="#ef4444" />
+                                    <QuickActionTile icon={ShieldAlert} label="Wandering" href="/fleet-assets/resident-tracking?tab=wandering" color="#ef4444" />
                                     <QuickActionTile icon={Receipt} label="Mileage" href="/fleet-assets/mileage" color="#f59e0b" />
                                 </div>
                             </CardContent>
@@ -774,7 +902,7 @@ export default function FleetAssetsDashboard({
                                             </Badge>
                                         </div>
                                         <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] shrink-0" asChild>
-                                            <Link href={`/fleet-assets/bookings/create?asset_id=${v.id}`}>Book</Link>
+                                            <Link href={`/fleet-assets/bookings?new=1&asset_id=${v.id}`}>Book</Link>
                                         </Button>
                                     </div>
                                 ))}

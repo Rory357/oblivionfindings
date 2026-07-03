@@ -165,7 +165,37 @@ class ResidentTrackingController extends Controller
             $focusClientId = null;
         }
 
+        // Hero alert stats (safety command centre band).
+        $activeAlertCount = 0;
+        $wandering7d = 0;
+        $panic7d = 0;
+        try {
+            if (Schema::hasTable('control_room_alerts')) {
+                $alertBase = ControlRoomAlert::query()
+                    ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
+                    ->whereNotNull('client_id');
+                $activeAlertCount = (clone $alertBase)->whereNotIn('status', ['closed', 'resolved'])->count();
+                $wandering7d = (clone $alertBase)
+                    ->whereIn('alert_type', ['geofence_breach', 'wandering'])
+                    ->where('triggered_at', '>=', now()->subDays(7))
+                    ->count();
+                $panic7d = (clone $alertBase)
+                    ->where(function ($q) {
+                        $q->whereIn('alert_type', ['sos', 'panic', 'man_down'])
+                            ->orWhere('alert_type', 'like', '%panic%')
+                            ->orWhere('alert_type', 'like', '%sos%');
+                    })
+                    ->where('triggered_at', '>=', now()->subDays(7))
+                    ->count();
+            }
+        } catch (\Throwable) {
+            // hero counts stay zero when the alerts table is unavailable
+        }
+
+        $tab = $request->input('tab') === 'wandering' ? 'wandering' : 'tracking';
+
         return Inertia::render('fleet-assets/resident-tracking/index', [
+            'tab' => $tab,
             'residents' => $residents,
             'stats' => [
                 'tracked' => $totalTracked, 'online' => $online, 'offline' => $offline,
@@ -174,20 +204,139 @@ class ResidentTrackingController extends Controller
                 'in_geofence' => $inGeofence, 'outside_geofence' => $outsideGeofence,
                 'low_battery' => $lowBattery, 'safety_score' => $safetyScore, 'avg_battery' => $avgBattery,
                 'panic_active' => $residents->filter(fn ($r) => $r['panic_active'] ?? false)->count(),
+                'active_alerts' => $activeAlertCount,
+                'wandering_7d' => $wandering7d,
+                'panic_7d' => $panic7d,
             ],
             'recent_alerts' => $recentAlerts,
             'active_outings' => $activeOutings,
             'geofences' => $mapGeofences,
             'focus_client_id' => $focusClientId,
+            // Wandering-alerts tab payload (merged from the retired
+            // /fleet-assets/wandering-alerts page) — only when the tab is open.
+            'wandering' => $tab === 'wandering' ? $this->wanderingPayload($request) : null,
+            // Assign-tracker modal payload (retired /resident-tracking/assign
+            // page) — only when opened via ?new=1.
+            'assign' => $request->boolean('new') ? $this->assignPayload($user) : null,
             'can' => [
                 'manage' => (bool) $user?->canDo('fleet.manage'),
+                'manage_alerts' => (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.alerts.manage')),
             ],
         ]);
     }
 
+    /**
+     * Wandering-alerts tab payload — ported from the retired
+     * WanderingAlertController index.
+     */
+    private function wanderingPayload(Request $request): array
+    {
+        if (! Schema::hasTable('control_room_alerts')) {
+            return [
+                'alerts' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
+                'stats' => ['active_alerts' => 0, 'resolved_today' => 0, 'total_this_week' => 0],
+                'filters' => $request->only(['status']),
+            ];
+        }
+
+        $query = ControlRoomAlert::query()
+            ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
+            ->whereNotNull('client_id');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        } else {
+            $query->whereNotIn('status', ['closed', 'resolved']);
+        }
+
+        $alerts = $query->latest('triggered_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        // Load client data.
+        $clientIds = $alerts->getCollection()->pluck('client_id')->unique()->filter();
+        $clients = Client::whereIn('id', $clientIds)->get()->keyBy('id');
+
+        // Canonical tracking devices assigned to these clients for last-known location.
+        $devicesByClient = Device::query()
+            ->where('domain', 'tracking')
+            ->whereHas('assignments', function ($q) use ($clientIds) {
+                $q->active()
+                    ->where('assignable_type', 'client')
+                    ->whereIn('assignable_id', $clientIds);
+            })
+            ->with(['assignments' => fn ($q) => $q->active()->where('assignable_type', 'client')])
+            ->get()
+            ->keyBy(fn (Device $d) => $d->assignments->first()?->assignable_id);
+
+        $alertData = $alerts->getCollection()->map(function ($alert) use ($clients, $devicesByClient) {
+            $client = $clients->get($alert->client_id);
+            $device = $devicesByClient->get($alert->client_id);
+            $meta = $device?->meta ?? [];
+            $context = $alert->context ?? [];
+
+            return [
+                'id' => $alert->id,
+                'alert_type' => $alert->alert_type,
+                'severity' => $alert->severity,
+                'status' => $alert->status,
+                'triggered_at' => optional($alert->triggered_at)->toISOString(),
+                'acknowledged_at' => optional($alert->acknowledged_at)->toISOString(),
+                'resolved_at' => optional($alert->resolved_at)->toISOString(),
+                'notes' => $alert->notes,
+                'context' => $context,
+                'client' => $client ? [
+                    'id' => $client->id,
+                    'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+                    'photo' => $client->profile_photo_url,
+                    'house' => $client->site?->name ?? 'Unknown',
+                ] : null,
+                'last_lat' => $device?->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? $context['lat'] ?? null,
+                'last_lng' => $device?->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? $context['lng'] ?? null,
+                'geofence_name' => $context['geofence_name'] ?? $context['zone_name'] ?? null,
+            ];
+        })->values();
+
+        $alertBase = ControlRoomAlert::query()
+            ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
+            ->whereNotNull('client_id');
+
+        return [
+            'alerts' => [
+                'data' => $alertData,
+                'links' => $alerts->linkCollection()->toArray(),
+                'meta' => [
+                    'current_page' => $alerts->currentPage(),
+                    'last_page' => $alerts->lastPage(),
+                    'total' => $alerts->total(),
+                ],
+            ],
+            'stats' => [
+                'active_alerts' => (clone $alertBase)->whereNotIn('status', ['closed', 'resolved'])->count(),
+                'resolved_today' => (clone $alertBase)->where('status', 'resolved')->whereDate('resolved_at', today())->count(),
+                'total_this_week' => (clone $alertBase)->where('triggered_at', '>=', now()->startOfWeek())->count(),
+            ],
+            'filters' => $request->only(['status']),
+        ];
+    }
+
+    /**
+     * The standalone assign page is retired — deep links reopen the modal on
+     * the tracking index via ?new=1.
+     */
     public function assignPage(Request $request)
     {
-        $user = $request->user();
+        return redirect()->route(
+            'fleet-assets.resident-tracking.index',
+            array_merge($request->query(), ['new' => 1]),
+        );
+    }
+
+    /**
+     * Assign-tracker modal payload — ported from the retired assign page.
+     */
+    private function assignPayload($user): array
+    {
         $authorizedClientIds = $this->getAuthorizedClientIds($user);
 
         // Clients already tracked (have an active tracking device assignment).
@@ -257,14 +406,11 @@ class ResidentTrackingController extends Controller
             ];
         });
 
-        return Inertia::render('fleet-assets/resident-tracking/assign', [
+        return [
             'clients' => $availableClients,
             'available_trackers' => $availableTrackers,
             'assigned_trackers' => $assignedTrackers,
-            'can' => [
-                'manage' => (bool) $user?->canDo('fleet.manage'),
-            ],
-        ]);
+        ];
     }
 
     public function assign(Request $request)
@@ -301,7 +447,7 @@ class ResidentTrackingController extends Controller
             return back()->withErrors(['tracker_id' => $e->getMessage()]);
         }
 
-        return redirect()->route('fleet-assets.resident-tracking.assign')
+        return redirect()->route('fleet-assets.resident-tracking.index', ['new' => 1])
             ->with('success', 'Tracker assigned to resident.');
     }
 
@@ -309,7 +455,7 @@ class ResidentTrackingController extends Controller
     {
         $this->assignmentService->release($device, auth()->id());
 
-        return redirect()->route('fleet-assets.resident-tracking.assign')
+        return redirect()->route('fleet-assets.resident-tracking.index', ['new' => 1])
             ->with('success', 'Tracker unassigned from resident.');
     }
 

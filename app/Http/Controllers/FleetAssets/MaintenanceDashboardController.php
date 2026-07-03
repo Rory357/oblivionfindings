@@ -26,6 +26,15 @@ class MaintenanceDashboardController extends Controller
                     'avg_cost' => 0,
                     'overdue_schedules' => 0,
                 ],
+                'hero' => [
+                    'wo_open' => 0,
+                    'wo_overdue' => 0,
+                    'wo_in_progress' => 0,
+                    'service_due_7d' => 0,
+                    'service_due_30d' => 0,
+                    'service_overdue' => 0,
+                    'month_cost' => 0,
+                ],
                 'cost_by_vehicle' => [],
                 'cost_by_month' => [],
                 'cost_by_priority' => [],
@@ -48,6 +57,25 @@ class MaintenanceDashboardController extends Controller
             ->whereNotNull('next_due_at')
             ->where('next_due_at', '<', now())
             ->count();
+
+        // Command-centre hero counts (state-of-the-world, not period-scoped)
+        $woOpen = FleetWorkOrder::where('status', 'open')->count();
+        $woInProgress = FleetWorkOrder::where('status', 'in_progress')->count();
+        $woOverdue = FleetWorkOrder::whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+        $serviceDue7d = FleetServiceSchedule::where('is_active', true)
+            ->whereNotNull('next_due_at')
+            ->whereBetween('next_due_at', [now(), now()->addDays(7)])
+            ->count();
+        $serviceDue30d = FleetServiceSchedule::where('is_active', true)
+            ->whereNotNull('next_due_at')
+            ->whereBetween('next_due_at', [now(), now()->addDays(30)])
+            ->count();
+        $monthCost = (float) FleetWorkOrder::where('created_at', '>=', now()->startOfMonth())
+            ->whereNotNull('actual_cost')
+            ->sum('actual_cost');
 
         // Cost by vehicle (top 10)
         $costByVehicle = FleetWorkOrder::query()
@@ -109,6 +137,7 @@ class MaintenanceDashboardController extends Controller
             ->get()
             ->map(fn ($wo) => [
                 'id' => $wo->id,
+                'reference_number' => $wo->reference_number,
                 'title' => $wo->title,
                 'status' => $wo->status,
                 'priority' => $wo->priority,
@@ -193,6 +222,15 @@ class MaintenanceDashboardController extends Controller
                 'total_spend' => round((float) $totalSpend, 2),
                 'avg_cost' => $avgCost,
                 'overdue_schedules' => $overdueSchedules,
+            ],
+            'hero' => [
+                'wo_open' => $woOpen,
+                'wo_overdue' => $woOverdue,
+                'wo_in_progress' => $woInProgress,
+                'service_due_7d' => $serviceDue7d,
+                'service_due_30d' => $serviceDue30d,
+                'service_overdue' => $overdueSchedules,
+                'month_cost' => round($monthCost, 2),
             ],
             'cost_by_vehicle' => $costByVehicle,
             'cost_by_month' => $costByMonth,

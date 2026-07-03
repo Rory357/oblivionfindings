@@ -43,6 +43,7 @@ use App\Jobs\DetectCrDeviceOfflineJob;
 use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
+use App\Jobs\FleetAutoAlertJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\PrivacyDeadlineRemindersJob;
@@ -202,6 +203,13 @@ app(Schedule::class)
     ->job(new ShiftAutoAlertJob)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
+
+// Fleet compliance sweep — overdue bookings, WOF/rego expiry thresholds,
+// maintenance overdue, low battery → FleetSignals + manager notifications
+app(Schedule::class)
+    ->job(new FleetAutoAlertJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:00');
 
 // Timed shift task reminders for My Day, email, in-app, and push delivery.
 app(Schedule::class)

@@ -1,8 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -11,7 +10,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
 import { Head, router } from '@inertiajs/react';
-import { Calendar, Clock, Download, MapPin, Target, Users } from 'lucide-react';
+import { Calendar, Download, Users } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -79,12 +78,27 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
         >
             <Head title="Community Access Analytics" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Fleet reports · last ${days} days`}
                     title="Community Access Analytics"
-                    description="Track resident community participation, outings, and transport usage for MSD/MOH compliance."
                     backHref="/fleet-assets/reports"
-                    backLabel="Back to Reports"
+                    backLabel="Reports"
+                    stats={
+                        <>
+                            <CompactHeroStat
+                                label="Outings"
+                                value={String(stats.total_outings)}
+                                tone={stats.total_outings > 0 ? 'success' : 'neutral'}
+                            />
+                            <CompactHeroStat label="Residents" value={String(stats.residents_participating)} tone="neutral" />
+                            <CompactHeroStat label="Avg hrs / resident" value={String(stats.avg_hours_per_resident)} tone="neutral" />
+                            <CompactHeroStat label="Community hrs" value={String(stats.total_hours)} tone="neutral" />
+                        </>
+                    }
                 />
+                <p className="text-sm text-muted-foreground">
+                    Track resident community participation, outings, and transport usage for MSD/MOH compliance.
+                </p>
 
                 {/* Period Selector + Export */}
                 <div className="flex items-center justify-between">
@@ -103,14 +117,6 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                     <Button variant="outline" size="sm" onClick={handleExport}>
                         <Download className="mr-1.5 h-3.5 w-3.5" /> Export CSV
                     </Button>
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <FleetStatCard label="Total Outings" value={stats.total_outings} icon={MapPin} subtitle={`Last ${days} days`} />
-                    <FleetStatCard label="Residents Participating" value={stats.residents_participating} icon={Users} />
-                    <FleetStatCard label="Avg Hours / Resident" value={stats.avg_hours_per_resident} icon={Clock} subtitle="Hours in community" />
-                    <FleetStatCard label="Community Hours" value={stats.total_hours} icon={Target} subtitle="Total hours" />
                 </div>
 
                 {/* Charts Row */}

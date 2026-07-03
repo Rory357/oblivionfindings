@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -428,11 +428,11 @@ export default function TransportCreate({
         >
             <Head title="Log Transport" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Resident transports · new entry"
                     title="Log Resident Transport"
-                    description="Record a resident transport trip."
                     backHref="/fleet-assets/transports"
-                    backLabel="Back to Transport Logs"
+                    backLabel="Transport Logs"
                 />
 
                 <form onSubmit={handleSubmit} className="space-y-6">

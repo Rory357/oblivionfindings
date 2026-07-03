@@ -18,7 +18,7 @@ class AssetQrController extends Controller
         $asset = Asset::query()->where('qr_token', $token)->firstOrFail();
         $this->authorize('view', $asset);
 
-        return redirect()->route('assets.show', $asset);
+        return redirect()->route('fleet-assets.assets.show', $asset);
     }
 
     public function png(Request $request, Asset $asset)

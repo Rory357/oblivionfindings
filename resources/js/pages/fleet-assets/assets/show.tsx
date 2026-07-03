@@ -1,6 +1,6 @@
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { AssetWizardDialog } from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -37,9 +38,11 @@ import {
     Cpu,
     Download,
     Edit,
+    ExternalLink,
     FileText,
     Info,
     MapPin,
+    Package,
     Radio,
     Shield,
     Upload,
@@ -179,6 +182,22 @@ type Props = {
         [key: string]: any;
     };
     timeline: TimelineEvent[];
+    /** HR-register wrapper federating to this canonical Fleet asset, if any. */
+    hr_asset: {
+        id: number;
+        asset_tag: string | null;
+        status: string | null;
+        current_holder_name: string | null;
+    } | null;
+    can_view_hr_assets: boolean;
+    /** Option lists for the edit wizard. */
+    sites?: Array<{ id: number; name: string }>;
+    clients?: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        site_id?: number | null;
+    }>;
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -216,8 +235,29 @@ function isExpired(dateStr: string | null): boolean {
 export default function AssetShow({
     asset,
     timeline,
+    hr_asset,
+    can_view_hr_assets,
+    sites,
+    clients,
 }: Props) {
     const [activeTab, setActiveTab] = useState('overview');
+    // /fleet-assets/assets/{id}/edit now redirects here with ?edit=1 — open the
+    // edit wizard on mount (the Edit button opens the same dialog).
+    const [editOpen, setEditOpen] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            new URLSearchParams(window.location.search).has('edit'),
+    );
+
+    const closeEdit = () => {
+        setEditOpen(false);
+        // Strip the shim param so a refresh doesn't reopen the wizard.
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit');
+            window.history.replaceState({}, '', url);
+        }
+    };
     const linkedDevices: LinkedDevice[] = asset?.trackers ?? [];
     // Legacy alias for map marker logic and existing references.
     const trackers = linkedDevices;
@@ -323,6 +363,13 @@ export default function AssetShow({
         >
             <Head title={`Asset: ${asset.name}`} />
             <PageShell>
+                <FleetCompactHero
+                    pill={`Asset register · ${asset.category}`}
+                    title={asset.name}
+                    backHref="/fleet-assets/assets"
+                    backLabel="Assets"
+                />
+
                 {/* Header Banner Card */}
                 <div className={cn(
                     'rounded-lg border px-5 py-4',
@@ -351,6 +398,25 @@ export default function AssetShow({
                                         Risk: {asset.risk_level}
                                     </Badge>
                                 )}
+                                {hr_asset && (
+                                    can_view_hr_assets ? (
+                                        <Link
+                                            href={`/hr/assets/${hr_asset.id}`}
+                                            className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-white/50 px-2.5 py-1 text-xs font-semibold hover:bg-white/70 dark:bg-black/20 dark:hover:bg-black/30"
+                                        >
+                                            <Package className="h-3.5 w-3.5" />
+                                            Also tracked in HR Assets
+                                            {hr_asset.current_holder_name ? ` · with ${hr_asset.current_holder_name}` : ''}
+                                            <ExternalLink className="h-3 w-3" />
+                                        </Link>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-white/50 px-2.5 py-1 text-xs font-semibold dark:bg-black/20">
+                                            <Package className="h-3.5 w-3.5" />
+                                            Also tracked in HR Assets
+                                            {hr_asset.current_holder_name ? ` · with ${hr_asset.current_holder_name}` : ''}
+                                        </span>
+                                    )
+                                )}
                             </div>
                             {/* Key metrics row */}
                             <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -367,11 +433,14 @@ export default function AssetShow({
                         </div>
                         <div className="flex items-center gap-2">
                             {can_edit && (
-                                <Button variant="outline" size="sm" asChild className="bg-white/50 dark:bg-black/20">
-                                    <Link href={`/fleet-assets/assets/${asset.id}/edit`}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        Edit
-                                    </Link>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-white/50 dark:bg-black/20"
+                                    onClick={() => setEditOpen(true)}
+                                >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
                                 </Button>
                             )}
                             <Button variant="outline" size="sm" className="bg-white/50 dark:bg-black/20" onClick={() => setActiveTab('assignments')}>
@@ -1190,6 +1259,42 @@ export default function AssetShow({
                         </div>
                     </TabsContent>
                 </Tabs>
+
+                <AssetWizardDialog
+                    open={editOpen}
+                    onClose={closeEdit}
+                    sites={sites ?? []}
+                    clients={clients}
+                    asset={{
+                        id: asset.id,
+                        name: asset.name,
+                        asset_tag: asset.asset_tag,
+                        category: asset.category,
+                        status: asset.status,
+                        risk_level: asset.risk_level,
+                        site_id: asset.site_id ?? null,
+                        home_site_id: asset.home_site_id ?? null,
+                        client_id: asset.client_id ?? asset.client?.id ?? null,
+                        location: asset.location,
+                        manufacturer: asset.manufacturer,
+                        model: asset.model,
+                        serial_number: asset.serial_number,
+                        description: asset.description,
+                        registration_number: asset.registration_number,
+                        registration_expires_at: asset.registration_expires_at,
+                        wof_expires_at: asset.wof_expires_at,
+                        cof_expires_at: asset.cof_expires_at,
+                        fuel_type: asset.fuel_type,
+                        odometer_km: asset.odometer_km,
+                        purchase_date: asset.purchase_date,
+                        warranty_expires_at: asset.warranty_expires_at,
+                        requires_inspection: asset.requires_inspection,
+                        inspection_due_at: asset.inspection_due_at,
+                        requires_maintenance: asset.requires_maintenance,
+                        maintenance_due_at: asset.maintenance_due_at,
+                        notes: asset.notes,
+                    }}
+                />
             </PageShell>
         </AppLayout>
     );

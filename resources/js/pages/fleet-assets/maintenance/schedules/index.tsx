@@ -5,8 +5,6 @@ import {
     MiniBarChart,
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { PageHero } from '@/components/page';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +14,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,20 +25,26 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDistance } from '@/lib/fleet-utils';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Calendar,
+    CalendarClock,
     Check,
-    CheckCircle,
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
     Clock,
     Loader2,
     Plus,
-    Timer,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -75,6 +78,11 @@ type Props = {
     schedules_per_vehicle: Array<{ label: string; value: number }>;
     monthly_completions: Array<{ label: string; value: number }>;
     upcoming_timeline: TimelineItem[];
+    stats?: {
+        due_7d: number;
+        overdue: number;
+        active: number;
+    };
     can: {
         manage: boolean;
     };
@@ -124,6 +132,60 @@ function kmProgressPct(schedule: ServiceSchedule): number | null {
     return Math.round(progress);
 }
 
+function SchedulesHero({
+    stats,
+    canManage,
+    onCreate,
+}: {
+    stats: { due_7d: number; overdue: number; active: number };
+    canManage: boolean;
+    onCreate: () => void;
+}) {
+    return (
+        <HeroShell>
+            <div className="flex flex-wrap items-center gap-4">
+                <HeroMedallion icon={CalendarClock} />
+                <div className="min-w-0">
+                    <HeroStatusPill>Maintenance · service schedules</HeroStatusPill>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        Service Schedules
+                    </h1>
+                    <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                        Recurring service and maintenance schedules for assets.
+                    </p>
+                </div>
+                <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
+                    <HeroClusterTile
+                        label="Due 7d"
+                        value={fmt(stats.due_7d)}
+                        caption="services this week"
+                        tone={stats.due_7d > 0 ? 'warning' : 'success'}
+                    />
+                    <HeroClusterTile
+                        label="Overdue"
+                        value={fmt(stats.overdue)}
+                        caption="past due date"
+                        tone={stats.overdue > 0 ? 'critical' : 'success'}
+                    />
+                    <HeroClusterTile
+                        label="Active"
+                        value={fmt(stats.active)}
+                        caption="schedules running"
+                        tone="neutral"
+                    />
+                </div>
+            </div>
+            {canManage ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <HeroActionButton onClick={onCreate} icon={Plus} emphasis>
+                        Create schedule
+                    </HeroActionButton>
+                </div>
+            ) : null}
+        </HeroShell>
+    );
+}
+
 export default function SchedulesIndex({
     schedules,
     assets,
@@ -131,6 +193,7 @@ export default function SchedulesIndex({
     schedules_per_vehicle,
     monthly_completions,
     upcoming_timeline,
+    stats,
     can,
 }: Props) {
     const allSchedules = schedules ?? [];
@@ -242,6 +305,108 @@ export default function SchedulesIndex({
         return `Due in ${item.days_until} days`;
     }
 
+    const heroStats = stats ?? {
+        due_7d: dueSoonCount,
+        overdue: overdueCount,
+        active: totalCount,
+    };
+
+    // Create dialog — rendered once, controlled (opened from the hero quick action
+    // and the empty state).
+    const createScheduleDialog = can.manage ? (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Create Service Schedule</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreate} className="grid gap-4">
+                    <div>
+                        <label className="text-sm font-medium">Name *</label>
+                        <Input
+                            value={form.data.name}
+                            onChange={(e) =>
+                                form.setData('name', e.target.value)
+                            }
+                            placeholder="e.g. Oil Change"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">Asset *</label>
+                        <Select
+                            value={form.data.asset_id}
+                            onValueChange={(v) => form.setData('asset_id', v)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select asset" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(assets ?? []).map((a) => (
+                                    <SelectItem key={a.id} value={String(a.id)}>
+                                        {a.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">
+                            Interval (km)
+                        </label>
+                        <Input
+                            type="number"
+                            value={form.data.interval_km}
+                            onChange={(e) =>
+                                form.setData('interval_km', e.target.value)
+                            }
+                            placeholder="e.g. 10000"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">
+                            Interval (days)
+                        </label>
+                        <Input
+                            type="number"
+                            value={form.data.interval_days}
+                            onChange={(e) =>
+                                form.setData('interval_days', e.target.value)
+                            }
+                            placeholder="e.g. 180"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium">
+                            Next Due Date
+                        </label>
+                        <Input
+                            type="date"
+                            value={form.data.next_due_at}
+                            onChange={(e) =>
+                                form.setData('next_due_at', e.target.value)
+                            }
+                        />
+                    </div>
+                    {form.errors.name && (
+                        <p className="mt-1 text-xs text-destructive">
+                            {form.errors.name}
+                        </p>
+                    )}
+                    {form.errors.asset_id && (
+                        <p className="mt-1 text-xs text-destructive">
+                            {form.errors.asset_id}
+                        </p>
+                    )}
+                    <Button type="submit" disabled={form.processing}>
+                        {form.processing && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Create Schedule
+                    </Button>
+                </form>
+            </DialogContent>
+        </Dialog>
+    ) : null;
+
     if (totalCount === 0) {
         return (
             <AppLayout
@@ -255,161 +420,21 @@ export default function SchedulesIndex({
             >
                 <Head title="Service Schedules" />
                 <PageShell>
-                    <PageHero
-                        title="Service Schedules"
-                        description="Manage recurring service and maintenance schedules for assets."
-                        actions={
-                            can.manage ? (
-                                <Dialog
-                                    open={dialogOpen}
-                                    onOpenChange={setDialogOpen}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button>
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Create Schedule
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Create Service Schedule
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <form
-                                            onSubmit={handleCreate}
-                                            className="grid gap-4"
-                                        >
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Name *
-                                                </label>
-                                                <Input
-                                                    value={form.data.name}
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'name',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. Oil Change"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Asset *
-                                                </label>
-                                                <Select
-                                                    value={form.data.asset_id}
-                                                    onValueChange={(v) =>
-                                                        form.setData(
-                                                            'asset_id',
-                                                            v,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select asset" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(assets ?? []).map(
-                                                            (a) => (
-                                                                <SelectItem
-                                                                    key={a.id}
-                                                                    value={String(
-                                                                        a.id,
-                                                                    )}
-                                                                >
-                                                                    {a.name}
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Interval (km)
-                                                </label>
-                                                <Input
-                                                    type="number"
-                                                    value={
-                                                        form.data.interval_km
-                                                    }
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'interval_km',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. 10000"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Interval (days)
-                                                </label>
-                                                <Input
-                                                    type="number"
-                                                    value={
-                                                        form.data.interval_days
-                                                    }
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'interval_days',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="e.g. 180"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Next Due Date
-                                                </label>
-                                                <Input
-                                                    type="date"
-                                                    value={
-                                                        form.data.next_due_at
-                                                    }
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'next_due_at',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                            {form.errors.name && (
-                                                <p className="mt-1 text-xs text-destructive">
-                                                    {form.errors.name}
-                                                </p>
-                                            )}
-                                            {form.errors.asset_id && (
-                                                <p className="mt-1 text-xs text-destructive">
-                                                    {form.errors.asset_id}
-                                                </p>
-                                            )}
-                                            <Button
-                                                type="submit"
-                                                disabled={form.processing}
-                                            >
-                                                {form.processing && (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                )}
-                                                Create Schedule
-                                            </Button>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            ) : undefined
-                        }
+                    <SchedulesHero
+                        stats={heroStats}
+                        canManage={can.manage}
+                        onCreate={() => setDialogOpen(true)}
                     />
                     <FleetEmptyState
                         icon={Clock}
                         title="No service schedules"
                         description="Set up recurring maintenance reminders to keep your fleet in top condition."
+                        actionLabel={can.manage ? 'Create Schedule' : undefined}
+                        onAction={
+                            can.manage ? () => setDialogOpen(true) : undefined
+                        }
                     />
+                    {createScheduleDialog}
                 </PageShell>
             </AppLayout>
         );
@@ -427,172 +452,14 @@ export default function SchedulesIndex({
         >
             <Head title="Service Schedules" />
             <PageShell>
-                <PageHero
-                    title="Service Schedules"
-                    description="Manage recurring service and maintenance schedules for assets."
-                    actions={
-                        can.manage ? (
-                            <Dialog
-                                open={dialogOpen}
-                                onOpenChange={setDialogOpen}
-                            >
-                                <DialogTrigger asChild>
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Create Schedule
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Create Service Schedule
-                                        </DialogTitle>
-                                    </DialogHeader>
-                                    <form
-                                        onSubmit={handleCreate}
-                                        className="grid gap-4"
-                                    >
-                                        <div>
-                                            <label className="text-sm font-medium">
-                                                Name *
-                                            </label>
-                                            <Input
-                                                value={form.data.name}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'name',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. Oil Change"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium">
-                                                Asset *
-                                            </label>
-                                            <Select
-                                                value={form.data.asset_id}
-                                                onValueChange={(v) =>
-                                                    form.setData('asset_id', v)
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select asset" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {(assets ?? []).map((a) => (
-                                                        <SelectItem
-                                                            key={a.id}
-                                                            value={String(a.id)}
-                                                        >
-                                                            {a.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium">
-                                                Interval (km)
-                                            </label>
-                                            <Input
-                                                type="number"
-                                                value={form.data.interval_km}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'interval_km',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. 10000"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium">
-                                                Interval (days)
-                                            </label>
-                                            <Input
-                                                type="number"
-                                                value={form.data.interval_days}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'interval_days',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. 180"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium">
-                                                Next Due Date
-                                            </label>
-                                            <Input
-                                                type="date"
-                                                value={form.data.next_due_at}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'next_due_at',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        {form.errors.name && (
-                                            <p className="mt-1 text-xs text-destructive">
-                                                {form.errors.name}
-                                            </p>
-                                        )}
-                                        {form.errors.asset_id && (
-                                            <p className="mt-1 text-xs text-destructive">
-                                                {form.errors.asset_id}
-                                            </p>
-                                        )}
-                                        <Button
-                                            type="submit"
-                                            disabled={form.processing}
-                                        >
-                                            {form.processing && (
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            )}
-                                            Create Schedule
-                                        </Button>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
-                        ) : undefined
-                    }
+                <SchedulesHero
+                    stats={heroStats}
+                    canManage={can.manage}
+                    onCreate={() => setDialogOpen(true)}
                 />
 
-                {/* KPI Row */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                    <FleetStatCard
-                        label="TOTAL SCHEDULES"
-                        value={totalCount}
-                        icon={Calendar}
-                        subtitle="All schedules"
-                    />
-                    <FleetStatCard
-                        label="OVERDUE"
-                        value={overdueCount}
-                        icon={AlertTriangle}
-                        color="red"
-                        subtitle="Past due date"
-                    />
-                    <FleetStatCard
-                        label="DUE SOON"
-                        value={dueSoonCount}
-                        icon={Timer}
-                        color="amber"
-                        subtitle="Within 14 days"
-                    />
-                    <FleetStatCard
-                        label="ON TRACK"
-                        value={onTrackCount}
-                        icon={CheckCircle}
-                        subtitle="Up to date"
-                    />
+                {/* Charts Row */}
+                <div className="grid gap-4 lg:grid-cols-3">
                     <Card className="flex items-center justify-center border bg-primary/10 transition-shadow hover:shadow-md dark:bg-primary/30">
                         <CardContent className="flex items-center justify-center p-4">
                             <HalfMoonGauge
@@ -604,10 +471,6 @@ export default function SchedulesIndex({
                             />
                         </CardContent>
                     </Card>
-                </div>
-
-                {/* Charts Row */}
-                <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium">
@@ -925,6 +788,8 @@ export default function SchedulesIndex({
                         </tbody>
                     </table>
                 </div>
+
+                {createScheduleDialog}
             </PageShell>
         </AppLayout>
     );

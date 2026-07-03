@@ -1,8 +1,15 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,6 +73,12 @@ type Props = {
         avg_duration_minutes: number;
         upcoming: number;
     };
+    hero?: {
+        planned_today: number;
+        active_now: number;
+        residents_out_now: number;
+        completed_7d: number;
+    };
     chart_data: ChartItem[];
     can: {
         manage: boolean;
@@ -87,11 +100,12 @@ const PURPOSE_LABELS: Record<string, string> = {
     shopping: 'Shopping',
 };
 
-export default function OutingsIndex({ outings, filters, stats, chart_data, can }: Props) {
+export default function OutingsIndex({ outings, filters, stats, hero, chart_data, can }: Props) {
     const safeOutings = outings?.data ?? [];
     const safeMeta = outings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeLinks = outings?.links ?? [];
     const safeStats = stats ?? { outings_this_week: 0, residents_this_week: 0, avg_duration_minutes: 0, upcoming: 0 };
+    const safeHero = hero ?? { planned_today: 0, active_now: 0, residents_out_now: 0, completed_7d: 0 };
     const safeChartData = chart_data ?? [];
 
     const [search, setSearch] = useState(filters?.search ?? '');
@@ -112,18 +126,57 @@ export default function OutingsIndex({ outings, filters, stats, chart_data, can 
         >
             <Head title="Community Outings" />
             <PageShell>
-                <PageHero
-                    title="Community Outings"
-                    description="Plan and manage resident outings and community access trips."
-                    actions={can.manage ? (
-                        <Button asChild>
-                            <Link href="/fleet-assets/outings/create">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Plan Outing
-                            </Link>
-                        </Button>
-                    ) : undefined}
-                />
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={MapPin} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Community access · outings</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Community Outings
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Plan and manage resident outings and community access trips.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                label="Planned today"
+                                value={fmt(safeHero.planned_today)}
+                                caption="departing today"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Active now"
+                                value={fmt(safeHero.active_now)}
+                                caption="out in the community"
+                                tone={safeHero.active_now > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Residents out now"
+                                value={fmt(safeHero.residents_out_now)}
+                                caption="not yet returned"
+                                tone={safeHero.residents_out_now > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Completed 7d"
+                                value={fmt(safeHero.completed_7d)}
+                                caption="this week"
+                                tone="neutral"
+                            />
+                        </div>
+                    </div>
+                    {can.manage && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <FleetHeroAction
+                                href="/fleet-assets/outings/create"
+                                icon={Plus}
+                                emphasis
+                            >
+                                Plan outing
+                            </FleetHeroAction>
+                        </div>
+                    )}
+                </HeroShell>
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

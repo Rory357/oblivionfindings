@@ -53,9 +53,10 @@ class IncidentController extends Controller
                 'tabCounts' => [],
                 'stats' => $this->emptyStats(),
                 'formOptions' => $this->formOptions(),
-                'can' => ['manage' => $this->userCanManage()],
+                'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
                 'detail' => null,
                 'report' => $request->input('report'),
+                'report_asset_id' => $request->input('asset_id'),
             ]);
         }
 
@@ -79,7 +80,7 @@ class IncidentController extends Controller
             'stats' => fn () => $this->stats((clone $base)),
             'filters' => $request->only($filterKeys),
             'formOptions' => fn () => $this->formOptions(),
-            'can' => ['manage' => $this->userCanManage()],
+            'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
             'detail' => function () use ($incidentParam) {
                 if (! $incidentParam) {
                     return null;
@@ -89,6 +90,7 @@ class IncidentController extends Controller
                 return $found ? $this->buildDetailPayload($found) : null;
             },
             'report' => $request->input('report'),
+            'report_asset_id' => $request->input('asset_id'),
         ]);
     }
 
@@ -98,6 +100,8 @@ class IncidentController extends Controller
         $listQuery = $base
             ->with([
                 'asset:id,name,registration_number,category',
+                'asset.hrAsset:id,fleet_asset_id,asset_tag',
+                'asset.hrAsset.currentAssignment.employeeProfile.user:id,name',
                 'reportedBy:id,name',
                 'driver:id,name',
             ])
@@ -124,8 +128,11 @@ class IncidentController extends Controller
     {
         // Legacy full-page create is retired in Step 5 (redirects to the list +
         // opens the wizard). Kept here so a direct hit still works meanwhile.
+        // The index only opens the dialog for report ∈ {vehicle, asset,
+        // near_miss}, so default to the vehicle flow while honouring an
+        // explicit mode from the caller; asset_id pre-selects the asset.
         return redirect()->route('fleet-assets.incidents.index', array_filter([
-            'report' => 1,
+            'report' => $request->input('report', 'vehicle'),
             'asset_id' => $request->input('asset_id'),
         ]));
     }
@@ -485,6 +492,10 @@ class IncidentController extends Controller
                 'registration_number' => $i->asset->registration_number,
                 'category' => $i->asset->category,
             ] : null,
+            'hr_asset' => $i->asset?->hrAsset ? [
+                'id' => $i->asset->hrAsset->id,
+                'holder_name' => $i->asset->hrAsset->currentAssignment?->employeeProfile?->user?->name,
+            ] : null,
             'reported_by' => $i->reportedBy ? ['id' => $i->reportedBy->id, 'name' => $i->reportedBy->name] : null,
             'driver' => $i->driver ? ['id' => $i->driver->id, 'name' => $i->driver->name] : null,
             'incident_type' => $i->incident_type,
@@ -563,6 +574,8 @@ class IncidentController extends Controller
         $incident->load([
             'asset:id,name,registration_number,category,site_id',
             'asset.site:id,name',
+            'asset.hrAsset:id,fleet_asset_id,asset_tag',
+            'asset.hrAsset.currentAssignment.employeeProfile.user:id,name',
             'reportedBy:id,name',
             'driver:id,name',
             'supervisor:id,name',
@@ -599,6 +612,10 @@ class IncidentController extends Controller
                 'registration_number' => $incident->asset->registration_number,
                 'category' => $incident->asset->category,
                 'site' => $incident->asset->site ? ['id' => $incident->asset->site->id, 'name' => $incident->asset->site->name] : null,
+                'hr_asset' => $incident->asset->hrAsset ? [
+                    'id' => $incident->asset->hrAsset->id,
+                    'holder_name' => $incident->asset->hrAsset->currentAssignment?->employeeProfile?->user?->name,
+                ] : null,
             ] : null,
             'reported_by' => $this->userRef($incident->reportedBy),
             'driver' => $this->userRef($incident->driver),
@@ -748,7 +765,7 @@ class IncidentController extends Controller
                 'control_room_alert_id' => $hsEvent->control_room_alert_id ?? null,
             ] : null,
 
-            'can' => ['manage' => $this->userCanManage()],
+            'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
         ];
     }
 
@@ -1033,6 +1050,14 @@ class IncidentController extends Controller
         $user = request()->user();
 
         return $user ? ((bool) $user->canDo('fleet.manage') || (bool) $user->canDo('fleet.incidents.manage')) : false;
+    }
+
+    /** HR Asset Register routes are gated hr.assets.view — mirror it for the cross-link. */
+    private function userCanViewHrAssets(): bool
+    {
+        $user = request()->user();
+
+        return $user ? (bool) $user->canDo('hr.assets.view') : false;
     }
 
     private function formOptions(): array

@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -151,11 +151,11 @@ export default function TransportPreCheck({
         >
             <Head title={`Pre-Check - Transport #${t.id ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Transport #${t.id ?? ''} · ${t.resident_name ?? '---'}`}
                     title="Pre-Transport Safety Check"
-                    subtitle={`Transport #${t.id ?? ''} - ${t.resident_name ?? '---'}`}
                     backHref={`/fleet-assets/transports/${t.id}`}
-                    backLabel="Back to Transport"
+                    backLabel="Transport"
                 />
 
                 {pre_check_completed && (

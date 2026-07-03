@@ -1,8 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,7 +11,7 @@ import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/componen
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
 import { Head, router } from '@inertiajs/react';
-import { Building2, Car, DollarSign, Download, PieChart, Users } from 'lucide-react';
+import { Building2, Download, PieChart, Users } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -159,12 +158,23 @@ export default function CostAllocation({ by_site: rawSite, by_resident: rawResid
         >
             <Head title="Cost Allocation" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Fleet reports · last ${days} days`}
                     title="Cost Allocation"
-                    description="Analyse fleet costs allocated by house/site and by resident."
                     backHref="/fleet-assets/reports"
-                    backLabel="Back to Reports"
+                    backLabel="Reports"
+                    stats={
+                        <>
+                            <CompactHeroStat label="Fleet cost" value={formatCurrency(stats.total_fleet_cost)} tone="neutral" />
+                            <CompactHeroStat label="Per vehicle" value={formatCurrency(stats.cost_per_vehicle)} tone="neutral" />
+                            <CompactHeroStat label="Per resident" value={formatCurrency(stats.cost_per_resident)} tone="neutral" />
+                            <CompactHeroStat label="Per house" value={formatCurrency(stats.cost_per_house)} tone="neutral" />
+                        </>
+                    }
                 />
+                <p className="text-sm text-muted-foreground">
+                    Analyse fleet costs allocated by house/site and by resident.
+                </p>
 
                 {/* Period Selector */}
                 <div className="flex items-center gap-3">
@@ -178,14 +188,6 @@ export default function CostAllocation({ by_site: rawSite, by_resident: rawResid
                             <SelectItem value="365">Last 12 months</SelectItem>
                         </SelectContent>
                     </Select>
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <FleetStatCard label="Total Fleet Cost" value={formatCurrency(stats.total_fleet_cost)} icon={DollarSign} />
-                    <FleetStatCard label="Cost per Vehicle" value={formatCurrency(stats.cost_per_vehicle)} icon={Car} subtitle="Average" />
-                    <FleetStatCard label="Cost per Resident" value={formatCurrency(stats.cost_per_resident)} icon={Users} subtitle="Average" />
-                    <FleetStatCard label="Cost per House" value={formatCurrency(stats.cost_per_house)} icon={Building2} subtitle="Average" />
                 </div>
 
                 {/* Main Content */}

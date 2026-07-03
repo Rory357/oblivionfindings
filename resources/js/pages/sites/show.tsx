@@ -2127,7 +2127,7 @@ export default function SiteShow({
                                             size="sm"
                                         >
                                             <Link
-                                                href={`/fleet-assets/assets/create?site_id=${site.id}`}
+                                                href={`/fleet-assets/assets?new=1&site_id=${site.id}`}
                                             >
                                                 Add Asset
                                             </Link>
@@ -2210,7 +2210,7 @@ export default function SiteShow({
                                                             </td>
                                                             <td className="px-4 py-3 text-right">
                                                                 <Link
-                                                                    href={`/assets/${a.id}`}
+                                                                    href={`/fleet-assets/assets/${a.id}`}
                                                                     className="text-primary/70 hover:text-primary/70"
                                                                 >
                                                                     View

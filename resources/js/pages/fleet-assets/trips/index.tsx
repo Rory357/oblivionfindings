@@ -5,8 +5,15 @@ import {
     SparklineChart,
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +33,7 @@ import {
     formatDistance,
     formatDuration,
 } from '@/lib/fleet-utils';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     Car,
@@ -38,6 +45,7 @@ import {
     Download,
     Gauge,
     MapPin,
+    Play,
     Route,
     Search,
     User,
@@ -107,6 +115,12 @@ type Props = {
         avg_distance_km: number;
         active_trips: number;
     };
+    hero?: {
+        trips_today: number;
+        distance_today_km: number;
+        active_now: number;
+        after_hours_7d: number;
+    };
     trips_by_day?: Array<{ label: string; value: number }>;
     top_vehicles?: Array<{ label: string; value: number }>;
     distance_trend?: number[];
@@ -137,6 +151,7 @@ export default function TripsIndex({
     vehicles: rawVehicles,
     filters: rawFilters,
     summary: rawSummary,
+    hero: rawHero,
     trips_by_day: rawTripsByDay,
     top_vehicles: rawTopVehicles,
     distance_trend: rawDistanceTrend,
@@ -159,6 +174,21 @@ export default function TripsIndex({
     const topVehicles = rawTopVehicles ?? [];
     const distanceTrend = rawDistanceTrend ?? [];
     const canManage = can?.manage ?? false;
+    const hero = rawHero ?? {
+        trips_today: 0,
+        distance_today_km: 0,
+        active_now: 0,
+        after_hours_7d: 0,
+    };
+
+    // Local-date strings for the hero tile drill-down links.
+    const localDay = (offset = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() - offset);
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    };
+    const todayHref = `/fleet-assets/trips?date_from=${localDay()}&date_to=${localDay()}`;
+    const weekHref = `/fleet-assets/trips?date_from=${localDay(7)}`;
 
     const [expandedTrip, setExpandedTrip] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search ?? '');
@@ -220,7 +250,7 @@ export default function TripsIndex({
         applyFilters({ search: searchValue || undefined });
     };
 
-    const handleExport = () => {
+    const csvHref = () => {
         const params = new URLSearchParams();
         if (filters.date_from) params.set('date_from', filters.date_from);
         if (filters.date_to) params.set('date_to', filters.date_to);
@@ -228,7 +258,7 @@ export default function TripsIndex({
         if (filters.status) params.set('status', filters.status);
         if (filters.search) params.set('search', filters.search);
         params.set('export', 'csv');
-        window.location.href = `/fleet-assets/trips?${params.toString()}`;
+        return `/fleet-assets/trips?${params.toString()}`;
     };
 
     const toggleTrip = (tripId: number) => {
@@ -275,20 +305,55 @@ export default function TripsIndex({
         >
             <Head title="Trip History" />
             <PageShell>
-                <PageHero
-                    title="Trip History"
-                    description="View and analyse all vehicle trips across your fleet."
-                    actions={
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleExport}
-                        >
-                            <Download className="mr-2 h-4 w-4" />
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Route} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Trip history · live feed</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Trip History
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                View and analyse all vehicle trips across your
+                                fleet.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href={todayHref}
+                                label="Trips today"
+                                value={fmt(hero.trips_today)}
+                                caption="journeys logged"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href={todayHref}
+                                label="Distance today"
+                                value={fmt(hero.distance_today_km, ' km')}
+                                caption="kilometres driven"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Active now"
+                                value={fmt(hero.active_now)}
+                                caption="open or in progress"
+                                tone={hero.active_now > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                href={weekHref}
+                                label="After-hours 7d"
+                                value={fmt(hero.after_hours_7d)}
+                                caption="before 8am / after 6pm"
+                                tone={hero.after_hours_7d > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction href={csvHref()} icon={Download} external>
                             Export CSV
-                        </Button>
-                    }
-                />
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {/* KPI Row */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -621,6 +686,20 @@ function TripRow({
                                 Personal
                             </Badge>
                         )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title="Trip playback"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Link
+                                href={`/fleet-assets/trips/${trip.id}/playback`}
+                            >
+                                <Play className="h-4 w-4 text-muted-foreground" />
+                            </Link>
+                        </Button>
                         {canManage && (
                             <Button
                                 variant="ghost"

@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -247,11 +247,11 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
             >
                 <Head title="Plan Outing" />
                 <PageShell>
-                    <PageHero
+                    <FleetCompactHero
+                        pill="Community outings · view only"
                         title="Plan Community Outing"
-                        description="Create a new outing for residents."
                         backHref="/fleet-assets/outings"
-                        backLabel="Back to Outings"
+                        backLabel="Outings"
                     />
                     <Card>
                         <CardHeader>
@@ -278,11 +278,11 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
         >
             <Head title="Plan Outing" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Community outings · new plan"
                     title="Plan Community Outing"
-                    description="Create a new outing for residents."
                     backHref="/fleet-assets/outings"
-                    backLabel="Back to Outings"
+                    backLabel="Outings"
                 />
 
                 {/* Step Indicators */}

@@ -1,4 +1,4 @@
-import { PageHero } from '@/components/page';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,11 +84,11 @@ export default function ChecklistRun({ templates, assets, can }: Props) {
             >
                 <Head title="Run Checklist" />
                 <PageShell>
-                    <PageHero
+                    <FleetCompactHero
+                        pill="Maintenance checklist · view only"
                         title="Run Checklist"
-                        description="Complete a checklist inspection or maintenance run."
                         backHref="/fleet-assets/maintenance/checklists"
-                        backLabel="Back to Checklists"
+                        backLabel="Checklists"
                     />
                     <Card>
                         <CardHeader>
@@ -115,12 +115,15 @@ export default function ChecklistRun({ templates, assets, can }: Props) {
         >
             <Head title="Run Checklist" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Maintenance checklist · new run"
                     title="Run Checklist"
-                    description="Complete a checklist inspection or maintenance run."
                     backHref="/fleet-assets/maintenance/checklists"
-                    backLabel="Back to Checklists"
+                    backLabel="Checklists"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Complete a checklist inspection or maintenance run.
+                </p>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>

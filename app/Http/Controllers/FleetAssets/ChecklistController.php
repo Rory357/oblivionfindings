@@ -45,9 +45,20 @@ class ChecklistController extends Controller
                 'created_at' => optional($r->created_at)->toISOString(),
             ])->values();
 
+        // Hero band stats — efficient COUNTs over the whole tables
+        $since30 = now()->subDays(30);
+        $stats = [
+            'templates' => FleetChecklistTemplate::count(),
+            'runs_30d' => FleetChecklistRun::where('created_at', '>=', $since30)->count(),
+            'failed_30d' => FleetChecklistRun::where('created_at', '>=', $since30)
+                ->where('passed', false)
+                ->count(),
+        ];
+
         return Inertia::render('fleet-assets/maintenance/checklists/index', [
             'templates' => $templates,
             'recent_runs' => $recentRuns,
+            'stats' => $stats,
             'can' => [
                 'manage' => $canManage,
             ],

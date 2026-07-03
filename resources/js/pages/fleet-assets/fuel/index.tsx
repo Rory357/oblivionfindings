@@ -1,6 +1,13 @@
 import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import { FleetStatCard } from '@/components/fleet-stat-card';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +18,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,18 +33,14 @@ import {
     formatCurrency,
     formatDate,
     formatDistance,
-    formatNumber,
 } from '@/lib/fleet-utils';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
-    DollarSign,
     Download,
-    Droplets,
     Fuel,
-    Gauge,
     Plus,
     TrendingDown,
     TrendingUp,
@@ -92,6 +94,12 @@ type Props = {
         best_efficiency: EfficiencyRow | null;
         worst_efficiency: EfficiencyRow | null;
     };
+    hero?: {
+        spend_month: number;
+        litres_month: number;
+        entries_30d: number;
+        avg_cost_per_litre: number;
+    };
     efficiency: EfficiencyRow[];
     can: {
         log_fuel: boolean;
@@ -103,6 +111,7 @@ export default function FuelIndex({
     vehicles: rawVehicles,
     filters: rawFilters,
     summary: rawSummary,
+    hero: rawHero,
     efficiency: rawEfficiency,
     can,
 }: Props) {
@@ -124,6 +133,26 @@ export default function FuelIndex({
         worst_efficiency: null,
     };
     const efficiency = rawEfficiency ?? [];
+    const hero = rawHero ?? {
+        spend_month: 0,
+        litres_month: 0,
+        entries_30d: 0,
+        avg_cost_per_litre: 0,
+    };
+
+    // Local-date strings for the hero tile drill-down links.
+    const localDay = (offset = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() - offset);
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    };
+    const monthStartStr = () => {
+        const d = new Date();
+        d.setDate(1);
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    };
+    const monthHref = `/fleet-assets/fuel?date_from=${monthStartStr()}`;
+    const last30Href = `/fleet-assets/fuel?date_from=${localDay(30)}`;
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [sortField, setSortField] = useState<string>('');
@@ -194,13 +223,13 @@ export default function FuelIndex({
         );
     };
 
-    const handleExport = () => {
+    const csvHref = () => {
         const params = new URLSearchParams();
         if (filters.date_from) params.set('date_from', filters.date_from);
         if (filters.date_to) params.set('date_to', filters.date_to);
         if (filters.asset_id) params.set('asset_id', filters.asset_id);
         params.set('export', 'csv');
-        window.location.href = `/fleet-assets/fuel?${params.toString()}`;
+        return `/fleet-assets/fuel?${params.toString()}`;
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -222,31 +251,69 @@ export default function FuelIndex({
         >
             <Head title="Fuel Management" />
             <PageShell>
-                <PageHero
-                    title="Fuel Management"
-                    description="Track fuel consumption, costs, and vehicle efficiency."
-                    actions={
-                        <div className="flex items-center gap-2">
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Fuel} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Fuel register · this month</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Fuel Management
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Track fuel consumption, costs, and vehicle
+                                efficiency.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href={monthHref}
+                                label="Spend this month"
+                                value={formatCurrency(hero.spend_month)}
+                                caption="fuel purchases (NZD)"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href={monthHref}
+                                label="Litres this month"
+                                value={fmt(hero.litres_month, ' L')}
+                                caption="fuel consumed"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href={last30Href}
+                                label="Entries 30d"
+                                value={fmt(hero.entries_30d)}
+                                caption="fill-ups logged"
+                                tone={hero.entries_30d > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                label="Avg $/L"
+                                value={`$${(hero.avg_cost_per_litre ?? 0).toFixed(3)}`}
+                                caption="month to date"
+                                tone="neutral"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {can.log_fuel && (
                             <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={handleExport}
+                                className="bg-primary-foreground font-extrabold text-primary shadow-sm hover:bg-primary-foreground/90"
+                                onClick={() => setDialogOpen(true)}
                             >
-                                <Download className="mr-2 h-4 w-4" />
-                                Export CSV
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Log fuel
                             </Button>
-                            {can.log_fuel && (
-                                <Dialog
-                                    open={dialogOpen}
-                                    onOpenChange={setDialogOpen}
-                                >
-                                    <DialogTrigger asChild>
-                                        <Button size="sm">
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Log Fuel
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-lg">
+                        )}
+                        <FleetHeroAction href={csvHref()} icon={Download} external>
+                            Export CSV
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
+
+                {can.log_fuel && (
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogContent className="sm:max-w-lg">
                                         <DialogHeader>
                                             <DialogTitle>
                                                 Log Fuel Fill-up
@@ -541,12 +608,9 @@ export default function FuelIndex({
                                                 </Button>
                                             </DialogFooter>
                                         </form>
-                                    </DialogContent>
-                                </Dialog>
-                            )}
-                        </div>
-                    }
-                />
+                        </DialogContent>
+                    </Dialog>
+                )}
 
                 {/* Dark KPI Cards - 2 rows of 3 */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -555,24 +619,6 @@ export default function FuelIndex({
                         value={summary.total_fill_ups ?? 0}
                         icon={Fuel}
                         subtitle="This month"
-                    />
-                    <FleetStatCard
-                        label="TOTAL LITRES"
-                        value={`${formatNumber(summary.total_litres ?? 0)} L`}
-                        icon={Droplets}
-                        subtitle="Fuel consumed"
-                    />
-                    <FleetStatCard
-                        label="TOTAL COST"
-                        value={formatCurrency(summary.total_cost ?? 0)}
-                        icon={DollarSign}
-                        subtitle="Fuel spend"
-                    />
-                    <FleetStatCard
-                        label="AVG COST/LITRE"
-                        value={`$${(summary.avg_cost_per_litre ?? 0).toFixed(3)}`}
-                        icon={Gauge}
-                        subtitle="Average rate"
                     />
                     <FleetStatCard
                         label="BEST EFFICIENCY"

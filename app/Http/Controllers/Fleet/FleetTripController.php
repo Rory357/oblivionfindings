@@ -30,7 +30,7 @@ class FleetTripController extends Controller
             ->limit(10)
             ->get();
 
-        return Inertia::render('fleet-management/trip', [
+        return Inertia::render('fleet-assets/trips/playback', [
             'trip' => [
                 'id' => $trip->id,
                 'asset_id' => $trip->asset_id,
@@ -154,6 +154,6 @@ class FleetTripController extends Controller
 
         $trip->delete();
 
-        return redirect()->route('fleet.index')->with('success', 'Trip deleted.');
+        return redirect()->route('fleet-assets.trips.index')->with('success', 'Trip deleted.');
     }
 }

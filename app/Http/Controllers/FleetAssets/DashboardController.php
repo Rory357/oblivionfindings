@@ -45,6 +45,20 @@ class DashboardController extends Controller
         $onlineVehicles = $vehicles->filter(fn ($v) => $v->fleetState?->status === 'online')->count();
         $offlineVehicles = $totalVehicles - $onlineVehicles;
 
+        // Vehicles currently under maintenance (either status convention) — from the
+        // already-loaded collection, no extra query.
+        $vehiclesInMaintenance = $vehicles->whereIn('status', ['maintenance', 'out_of_service'])->count();
+
+        // Compliance horizon for the hero — WOF / rego due within 30 days.
+        $wofDue30 = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->wofExpiring(30)
+            ->count();
+        $regoDue30 = Asset::query()
+            ->where(fn ($q) => $q->vehicles())
+            ->registrationExpiring(30)
+            ->count();
+
         // Vehicle status breakdown from fleet state snapshots
         $vehicleStatusBreakdown = Schema::hasTable('fleet_vehicle_state_snapshots')
             ? FleetVehicleStateSnapshot::query()
@@ -241,14 +255,11 @@ class DashboardController extends Controller
             ];
         })->filter(fn ($s) => $s['vehicle_count'] > 0)->values();
 
-        // After-hours trips (before 8am or after 6pm, last 7 days)
+        // After-hours trips (before 8am or after 6pm worker-timezone, last 7 days)
         $afterHoursTrips = $hasTripsTable
             ? FleetTrip::query()
                 ->where('started_at', '>=', now()->subDays(7))
-                ->where(function ($q) {
-                    $q->whereRaw('HOUR(started_at) < 8')
-                      ->orWhereRaw('HOUR(started_at) >= 18');
-                })
+                ->afterHours()
                 ->with('asset:id,name', 'driverSession.user:id,name')
                 ->latest('started_at')
                 ->limit(10)->get()
@@ -389,6 +400,9 @@ class DashboardController extends Controller
                     : 0,
                 'upcoming_maintenance_count' => $upcomingMaintenanceCount,
                 'trips_today' => $tripsToday,
+                'vehicles_in_maintenance' => $vehiclesInMaintenance,
+                'wof_due_30' => $wofDue30,
+                'rego_due_30' => $regoDue30,
                 'tracked_residents' => $trackedResidents,
                 'active_outings' => $activeOutings,
             ],

@@ -1,5 +1,7 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +15,8 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero } from '@/components/page';
-import { CheckCircle, Clock, MapPin, Route, Trash2, User } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Trip {
@@ -50,7 +50,7 @@ interface Props {
     can: { manage: boolean };
 }
 
-export default function FleetTrip({ trip, driver_sessions, can }: Props) {
+export default function FleetTripPlayback({ trip, driver_sessions, can }: Props) {
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
@@ -60,7 +60,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     useEffect(() => {
-        fetch(`/fleet/trips/${trip.id}/playback`)
+        fetch(`/fleet-assets/trips/${trip.id}/playback/data`)
             .then((res) => res.json())
             .then((data) => {
                 const rows = (data.points ?? [])
@@ -112,17 +112,17 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Fleet Management', href: '/fleet-management' },
-                { title: trip.asset?.name || 'Vehicle', href: `/fleet/vehicles/${trip.asset_id}` },
+                { title: 'Fleet & Assets', href: '/fleet-assets' },
+                { title: 'Trips', href: '/fleet-assets/trips' },
                 { title: `Trip #${trip.id}`, href: '#' },
             ]}
         >
             <Head title={`Trip #${trip.id}`} />
             <PageShell>
-                <PageHero
-                    icon={Route}
-                    backHref={`/fleet/vehicles/${trip.asset_id}`}
-                    backLabel="Back to vehicle"
+                <FleetCompactHero
+                    pill={`Trip playback · ${trip.asset?.name || 'Unknown vehicle'}`}
+                    backHref="/fleet-assets/trips"
+                    backLabel="Trips"
                     title={
                         <div className="flex items-center gap-3">
                             <span>Trip #{trip.id}</span>
@@ -136,22 +136,19 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                             )}
                         </div>
                     }
-                    description={trip.asset?.name || 'Unknown Vehicle'}
-                    stats={[
-                        {
-                            label: 'Distance',
-                            value: trip.distance_km
-                                ? `${trip.distance_km} km`
-                                : '-',
-                        },
-                        {
-                            label: 'Duration',
-                            value: formatDuration(trip.duration_s),
-                        },
-                        { label: 'Route points', value: points.length },
-                    ]}
+                    stats={
+                        <>
+                            <CompactHeroStat
+                                label="Distance"
+                                value={trip.distance_km ? `${trip.distance_km} km` : '-'}
+                                tone="neutral"
+                            />
+                            <CompactHeroStat label="Duration" value={formatDuration(trip.duration_s)} tone="neutral" />
+                            <CompactHeroStat label="Route points" value={String(points.length)} tone="neutral" />
+                        </>
+                    }
                     actions={
-                        <div className="flex gap-2">
+                        <>
                             {can.manage && trip.status === 'open' && (
                                 <Button
                                     variant="default"
@@ -174,7 +171,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                                     Delete
                                 </Button>
                             )}
-                        </div>
+                        </>
                     }
                 />
 

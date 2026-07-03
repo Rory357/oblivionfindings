@@ -1,4 +1,3 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import {
     Select,
@@ -19,13 +17,22 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
+    ClipboardCheck,
     ClipboardList,
     Loader2,
     Plus,
-    User,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -56,13 +63,23 @@ type ChecklistRun = {
 type Props = {
     templates: Template[];
     recent_runs: ChecklistRun[];
+    stats?: {
+        templates: number;
+        runs_30d: number;
+        failed_30d: number;
+    };
     can: {
         manage: boolean;
     };
 };
 
-export default function ChecklistsIndex({ templates, recent_runs, can }: Props) {
+export default function ChecklistsIndex({ templates, recent_runs, stats, can }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
+    const heroStats = stats ?? {
+        templates: (templates ?? []).length,
+        runs_30d: 0,
+        failed_30d: 0,
+    };
     const templateForm = useForm({
         name: '',
         items: [{ label: '', type: 'checkbox', options: null, required: true }] as Array<{ label: string; type: string; options: string[] | null; required: boolean }>,
@@ -87,25 +104,63 @@ export default function ChecklistsIndex({ templates, recent_runs, can }: Props) 
         >
             <Head title="Checklists" />
             <PageShell>
-                <PageHero
-                    title="Checklists"
-                    description="Inspection and maintenance checklist templates and runs."
-                    actions={can.manage ? (
-                        <div className="flex gap-2">
-                            <Button variant="outline" asChild>
-                                <Link href="/fleet-assets/maintenance/checklists/run">
-                                    <ClipboardList className="mr-2 h-4 w-4" />
-                                    Run Checklist
-                                </Link>
-                            </Button>
-                            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Create Template
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={ClipboardList} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>
+                                Maintenance · checklists
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Checklists
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Inspection and maintenance checklist templates and runs.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
+                            <HeroClusterTile
+                                label="Templates"
+                                value={fmt(heroStats.templates)}
+                                caption="ready to run"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Runs 30d"
+                                value={fmt(heroStats.runs_30d)}
+                                caption="checks completed"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Failed 30d"
+                                value={fmt(heroStats.failed_30d)}
+                                caption="need follow-up"
+                                tone={heroStats.failed_30d > 0 ? 'critical' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    {can.manage ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <FleetHeroAction
+                                href="/fleet-assets/maintenance/checklists/run"
+                                icon={ClipboardCheck}
+                                emphasis
+                            >
+                                Run checklist
+                            </FleetHeroAction>
+                            <HeroActionButton
+                                onClick={() => setDialogOpen(true)}
+                                icon={Plus}
+                            >
+                                Create template
+                            </HeroActionButton>
+                        </div>
+                    ) : null}
+                </HeroShell>
+
+                {can.manage ? (
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>Create Checklist Template</DialogTitle>
                                     </DialogHeader>
@@ -166,11 +221,9 @@ export default function ChecklistsIndex({ templates, recent_runs, can }: Props) 
                                             Create Template
                                         </Button>
                                     </form>
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    ) : undefined}
-                />
+                        </DialogContent>
+                    </Dialog>
+                ) : null}
 
                 {/* Templates */}
                 <Card>

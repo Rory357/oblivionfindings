@@ -1,9 +1,10 @@
 import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelativeTime } from '@/lib/fleet-utils';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Car,
@@ -50,9 +51,10 @@ type Props = {
     vehicle_markers: VehicleMarker[];
     house_markers: HouseMarker[];
     geofences: GeofenceData[];
+    open_alerts: number;
 };
 
-export default function FleetAssetsMap({ vehicle_markers, house_markers, geofences }: Props) {
+export default function FleetAssetsMap({ vehicle_markers, house_markers, geofences, open_alerts }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [showVehicles, setShowVehicles] = useState(true);
     const [showHouses, setShowHouses] = useState(true);
@@ -95,6 +97,20 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
             };
         }
     }, []);
+
+    // Fleet-wide hero counts — unfiltered (search only narrows the list/map, not the truth),
+    // merged with any live WebSocket position overrides.
+    const heroStats = useMemo(() => {
+        const merged = (vehicle_markers ?? []).map((v) => {
+            const rt = realtimePositions[v.id];
+            return rt ? { ...v, ...rt } : v;
+        });
+        return {
+            online: merged.filter((v) => v.status === 'online').length,
+            moving: merged.filter((v) => (v.speed_kph ?? 0) > 0).length,
+            idle: merged.filter((v) => v.status === 'idle').length,
+        };
+    }, [vehicle_markers, realtimePositions]);
 
     const filteredVehicles = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
@@ -203,18 +219,46 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
             ]}
         >
             <Head title="Live Map" />
-            <div className="relative" style={{ height: 'calc(100vh - 4rem)' }}>
-                <LeafletMap
-                    center={center}
-                    zoom={12}
-                    markers={markers}
-                    geofences={mapGeofences}
-                    height="100%"
-                    onMarkerClick={handleMarkerClick}
+            <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 4rem)' }}>
+                {/* Slim command band — the map keeps the vertical space below. */}
+                <FleetCompactHero
+                    pill="Live map · real-time"
+                    title="Live Map"
+                    stats={
+                        <>
+                            <CompactHeroStat
+                                label="Online now"
+                                value={fmt(heroStats.online)}
+                                tone={heroStats.online > 0 ? 'success' : 'neutral'}
+                            />
+                            <CompactHeroStat label="Moving" value={fmt(heroStats.moving)} tone="neutral" />
+                            <CompactHeroStat
+                                label="Idle"
+                                value={fmt(heroStats.idle)}
+                                tone={heroStats.idle > 0 ? 'warning' : 'neutral'}
+                            />
+                            <CompactHeroStat
+                                label="Alerts"
+                                value={fmt(open_alerts)}
+                                tone={open_alerts > 0 ? 'critical' : 'success'}
+                                href="/fleet-assets/alerts"
+                            />
+                        </>
+                    }
                 />
 
-                {/* Sidebar Overlay */}
-                <aside className="absolute left-4 top-4 z-[1000] w-80 rounded-lg border bg-card p-4 shadow-lg" style={{ maxHeight: 'calc(100vh - 8rem)', overflowY: 'auto' }}>
+                <div className="relative min-h-0 flex-1">
+                    <LeafletMap
+                        center={center}
+                        zoom={12}
+                        markers={markers}
+                        geofences={mapGeofences}
+                        height="100%"
+                        onMarkerClick={handleMarkerClick}
+                    />
+
+                    {/* Sidebar Overlay */}
+                    <aside className="absolute left-4 top-4 z-[1000] w-80 rounded-lg border bg-card p-4 shadow-lg" style={{ maxHeight: 'calc(100vh - 14rem)', overflowY: 'auto' }}>
                     <div className="mb-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -335,7 +379,8 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                             </div>
                         </div>
                     )}
-                </aside>
+                    </aside>
+                </div>
             </div>
         </AppLayout>
     );

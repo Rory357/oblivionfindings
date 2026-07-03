@@ -1,9 +1,15 @@
-import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -44,6 +50,12 @@ type Vehicle = {
 
 type Props = {
     vehicles: Vehicle[];
+    hero?: {
+        wof_due_30: number;
+        rego_due_30: number;
+        cof_due_30: number;
+        expired_now: number;
+    };
     summary: {
         total: number;
         expired_wof: number;
@@ -94,7 +106,8 @@ function statusBadge(status: string): { variant: 'default' | 'secondary' | 'dest
     }
 }
 
-export default function ComplianceIndex({ vehicles, summary, filters }: Props) {
+export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filters }: Props) {
+    const hero = rawHero ?? { wof_due_30: 0, rego_due_30: 0, cof_due_30: 0, expired_now: 0 };
     const [search, setSearch] = useState(filters.search ?? '');
 
     const applyFilters = (newFilters: Partial<typeof filters>) => {
@@ -126,62 +139,60 @@ export default function ComplianceIndex({ vehicles, summary, filters }: Props) {
         >
             <Head title="Compliance & Registrations" />
             <PageShell>
-                <PageHero
-                    title="Compliance & Registrations"
-                    description="Track vehicle registrations, WOF, and COF expiry dates."
-                />
-
-                {/* Top: KPI Cards + Gauge */}
-                <div className="grid gap-4 lg:grid-cols-[1fr,1fr,1fr,1fr,auto]">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired WOF</CardTitle>
-                            <XCircle className="h-4 w-4 text-status-critical" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-status-critical dark:text-status-critical">{summary.expired_wof}</div>
-                            <p className="text-xs text-muted-foreground">vehicles need attention</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired Rego</CardTitle>
-                            <XCircle className="h-4 w-4 text-status-critical" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-status-critical dark:text-status-critical">{summary.expired_rego}</div>
-                            <p className="text-xs text-muted-foreground">vehicles need attention</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring 30d</CardTitle>
-                            <AlertTriangle className="h-4 w-4 text-status-warning" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-status-warning dark:text-status-warning">{summary.expiring_30}</div>
-                            <p className="text-xs text-muted-foreground">upcoming renewals</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring 60d</CardTitle>
-                            <Clock className="h-4 w-4 text-status-warning" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-status-warning dark:text-status-warning">{summary.expiring_60}</div>
-                            <p className="text-xs text-muted-foreground">plan ahead</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="flex items-center justify-center px-6">
-                        <HalfMoonGauge
-                            value={compliancePct}
-                            label="Compliance"
-                            size={120}
-                            color={compliancePct >= 80 ? FLEET_COLORS.primary : compliancePct >= 50 ? FLEET_COLORS.warning : FLEET_COLORS.danger}
-                        />
-                    </Card>
-                </div>
+                <HeroShell
+                    footer={
+                        <HeroSummaryStrip label="Fleet posture">
+                            <HeroSummaryMetric tone={compliancePct >= 80 ? 'success' : compliancePct >= 50 ? 'warning' : 'critical'}>
+                                {compliancePct}% of fleet compliant
+                            </HeroSummaryMetric>
+                            <HeroSummaryMetric tone={summary.expiring_60 > 0 ? 'warning' : 'success'}>
+                                {summary.expiring_60} renewal{summary.expiring_60 === 1 ? '' : 's'} in 31–60 days
+                            </HeroSummaryMetric>
+                            <HeroSummaryMetric tone="neutral">{summary.total} vehicles tracked</HeroSummaryMetric>
+                        </HeroSummaryStrip>
+                    }
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={ShieldCheck} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Compliance register · WOF / Rego / CoF</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Compliance & Registrations</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Track vehicle registrations, WOF, and COF expiry dates.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance?status=critical"
+                                label="WOF due 30d"
+                                value={fmt(hero.wof_due_30)}
+                                caption="book inspections"
+                                tone={hero.wof_due_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance?status=critical"
+                                label="Rego due 30d"
+                                value={fmt(hero.rego_due_30)}
+                                caption="renew registration"
+                                tone={hero.rego_due_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance?status=critical"
+                                label="CoF due 30d"
+                                value={fmt(hero.cof_due_30)}
+                                caption="certificate of fitness"
+                                tone={hero.cof_due_30 > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                href="/fleet-assets/compliance?status=expired"
+                                label="Expired now"
+                                value={fmt(hero.expired_now)}
+                                caption="off the road until renewed"
+                                tone={hero.expired_now > 0 ? 'critical' : 'success'}
+                            />
+                        </div>
+                    </div>
+                </HeroShell>
 
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

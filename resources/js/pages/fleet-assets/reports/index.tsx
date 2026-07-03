@@ -1,6 +1,12 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,11 +23,13 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Car,
+    ChevronRight,
     Clock,
     DollarSign,
     Download,
     FileBarChart,
     Fuel,
+    Globe,
     Route,
     Shield,
     TrendingDown,
@@ -151,6 +159,19 @@ export default function FleetReports({
         router.get('/fleet-assets/reports', { period: newPeriod }, { preserveState: true });
     };
 
+    const PERIOD_LABELS: Record<string, string> = {
+        '7d': 'last 7 days',
+        '30d': 'last 30 days',
+        '90d': 'last 90 days',
+        '1y': 'last year',
+    };
+    const periodLabel = PERIOD_LABELS[period] ?? 'last 30 days';
+    // Fuel cost per km over the selected period (fuel spend ÷ distance driven).
+    const costPerKm =
+        (trip_stats.total_distance_km ?? 0) > 0
+            ? (fuel_stats.total_cost ?? 0) / trip_stats.total_distance_km
+            : null;
+
     const handleExport = (type: string) => {
         window.location.href = `/fleet-assets/reports/export?period=${period}&type=${type}`;
     };
@@ -196,14 +217,14 @@ export default function FleetReports({
         >
             <Head title="Fleet Reports" />
             <PageShell>
-                <PageHero
-                    title="Fleet & Asset Reports"
-                    description="Analytics and reporting for fleet operations."
-                    icon={<FileBarChart className="h-7 w-7" />}
-                    actions={
+                <HeroShell
+                    footer={
                         <div className="flex flex-wrap items-center gap-2">
+                            <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                Period & exports
+                            </span>
                             <Select value={period} onValueChange={handlePeriodChange}>
-                                <SelectTrigger className="w-32 border-white/20 bg-white/10 text-white backdrop-blur-sm">
+                                <SelectTrigger className="h-[34px] w-32 border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -213,17 +234,79 @@ export default function FleetReports({
                                     <SelectItem value="1y">Last year</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button variant="ghost" size="sm" className="border border-white/20 text-white hover:bg-white/10" onClick={() => handleExport('trips')}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                onClick={() => handleExport('trips')}
+                            >
                                 <Download className="mr-2 h-4 w-4" />
                                 Trips CSV
                             </Button>
-                            <Button variant="ghost" size="sm" className="border border-white/20 text-white hover:bg-white/10" onClick={() => handleExport('fuel')}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                onClick={() => handleExport('fuel')}
+                            >
                                 <Download className="mr-2 h-4 w-4" />
                                 Fuel CSV
                             </Button>
                         </div>
                     }
-                />
+                >
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={FileBarChart} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Report hub · {periodLabel}</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Fleet & Asset Reports
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Analytics and reporting for fleet operations.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
+                            <HeroClusterTile
+                                label={`Total km · ${periodLabel}`}
+                                value={fmt(trip_stats.total_distance_km, ' km')}
+                                caption={`${trip_stats.total_trips ?? 0} trips`}
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label={`Fuel spend · ${periodLabel}`}
+                                value={formatCurrency(fuel_stats.total_cost ?? 0)}
+                                caption={`${fuel_stats.total_fill_ups ?? 0} fill-ups`}
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Cost/km"
+                                value={costPerKm !== null ? `$${costPerKm.toFixed(2)}` : '—'}
+                                caption="fuel spend per km"
+                                tone="neutral"
+                            />
+                        </div>
+                    </div>
+                </HeroShell>
+
+                {/* Report hub cross-link: geocoding & maps usage dashboard */}
+                <Link
+                    href="/fleet-management/maps-usage"
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                            <Globe className="h-4.5 w-4.5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">Geocoding & maps usage</p>
+                            <p className="text-xs text-muted-foreground">
+                                Provider quota, cache hit-rate and lookup volume behind the fleet maps.
+                            </p>
+                        </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
 
                 {/* Row 1: KPI Cards with sparklines */}
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

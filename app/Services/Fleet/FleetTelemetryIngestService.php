@@ -200,6 +200,16 @@ class FleetTelemetryIngestService
                     $meta['last_location_at'] = $occurredAt instanceof Carbon
                         ? $occurredAt->toISOString()
                         : now()->toISOString();
+                } elseif ($consentBlocked) {
+                    // Consent blocked: never retain or surface coordinates on the
+                    // canonical device — null the columns and strip location meta
+                    // so a stale position can't leak through device surfaces.
+                    $deviceUpdates['latitude'] = null;
+                    $deviceUpdates['longitude'] = null;
+
+                    foreach (['lat', 'latitude', 'lng', 'longitude', 'speed', 'heading', 'accuracy', 'altitude', 'last_location_at'] as $locationKey) {
+                        unset($meta[$locationKey]);
+                    }
                 }
 
                 $deviceUpdates['meta'] = $meta;
@@ -267,7 +277,13 @@ class FleetTelemetryIngestService
                 // branch must take precedence to avoid mislabelling a worker SOS as resident.
                 $loneWorkerUserId = $this->resolveLoneWorkerUserId($device, $asset);
                 if ($loneWorkerUserId !== null) {
-                    $this->routeLoneWorkerPanic($loneWorkerUserId, $normalized, $occurredAt, $event, $asset, $tracker, $device);
+                    // Consent-blocked frames must not write coordinates anywhere,
+                    // including the lone-worker session location snapshot.
+                    $panicFrame = $consentBlocked
+                        ? array_merge($normalized, ['latitude' => null, 'longitude' => null])
+                        : $normalized;
+
+                    $this->routeLoneWorkerPanic($loneWorkerUserId, $panicFrame, $occurredAt, $event, $asset, $tracker, $device);
                 } elseif ($this->isResidentSafetyTracker($asset)) {
                     $this->signals->emit([
                         'asset_id' => $asset->id,

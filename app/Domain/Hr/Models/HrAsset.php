@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Asset;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\FleetIncident;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -90,6 +91,12 @@ class HrAsset extends Model
     public function fleetAsset(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'fleet_asset_id');
+    }
+
+    /** Fleet incidents recorded against the linked canonical Fleet asset. */
+    public function fleetIncidents(): HasMany
+    {
+        return $this->hasMany(FleetIncident::class, 'asset_id', 'fleet_asset_id');
     }
 
     /** A row that points at the canonical Fleet register rather than owning the record. */

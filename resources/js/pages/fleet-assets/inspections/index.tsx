@@ -1,6 +1,3 @@
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,11 +14,24 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
+import {
+    InspectionCreateWizard,
+    type WizardPreTripResult,
+    type WizardVehicle,
+} from '@/pages/fleet-assets/inspections/create-wizard';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle, ClipboardCheck, Eye, FileCheck, Plus, Search, XCircle,
+    CheckCircle, ClipboardCheck, Eye, Plus, Search, XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate, formatDistance } from '@/lib/fleet-utils';
 
 
@@ -38,11 +48,9 @@ type Inspection = {
     created_at: string | null;
 };
 
-type Vehicle = { id: number; name: string };
-
 type Props = {
     inspections: Inspection[];
-    vehicles: Vehicle[];
+    vehicles: WizardVehicle[];
     filters: {
         search?: string;
         vehicle_id?: string;
@@ -50,6 +58,15 @@ type Props = {
         date_from?: string;
         date_to?: string;
     };
+    stats?: {
+        runs_30d: number;
+        failed_30d: number;
+        pass_rate: number | null;
+    };
+    preselected_asset_id?: number | string | null;
+    preselected_type?: string;
+    booking_id?: number | string | null;
+    pre_trip_results?: WizardPreTripResult | null;
     can: {
         manage: boolean;
     };
@@ -69,12 +86,31 @@ function typeBadge(type: string) {
     return <Badge variant="outline">{type}</Badge>;
 }
 
-export default function InspectionsIndex({ inspections, vehicles, filters, can }: Props) {
+export default function InspectionsIndex({
+    inspections,
+    vehicles,
+    filters,
+    stats,
+    preselected_asset_id,
+    preselected_type,
+    booking_id,
+    pre_trip_results,
+    can,
+}: Props) {
     const allInspections = inspections ?? [];
-    const totalCount = allInspections.length;
-    const passedCount = allInspections.filter((i) => i.passed).length;
-    const failedCount = allInspections.filter((i) => !i.passed).length;
-    const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
+    const heroStats = stats ?? { runs_30d: 0, failed_30d: 0, pass_rate: null };
+
+    const [wizardOpen, setWizardOpen] = useState(false);
+
+    // Deep-link shim: /create redirects here with ?new=1 (opens the wizard modal).
+    useEffect(() => {
+        if (
+            can.manage &&
+            new URLSearchParams(window.location.search).get('new') === '1'
+        ) {
+            setWizardOpen(true);
+        }
+    }, [can.manage]);
 
     const [search, setSearch] = useState(filters?.search ?? '');
     const [vehicleId, setVehicleId] = useState(filters?.vehicle_id ?? '');
@@ -103,29 +139,59 @@ export default function InspectionsIndex({ inspections, vehicles, filters, can }
         >
             <Head title="Vehicle Inspections" />
             <PageShell>
-                <PageHero
-                    title="Vehicle Inspections"
-                    actions={can.manage ? (
-                        <Button asChild>
-                            <Link href="/fleet-assets/inspections/create">
-                                <Plus className="mr-2 h-4 w-4" /> New Inspection
-                            </Link>
-                        </Button>
-                    ) : undefined}
-                />
-
-                {/* Dark KPI Cards + ProgressRing */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                    <FleetStatCard label="TOTAL INSPECTIONS" value={totalCount} icon={ClipboardCheck} subtitle="All inspections" />
-                    <FleetStatCard label="PASSED" value={passedCount} icon={CheckCircle} color="amber" valueClassName="text-status-success" subtitle="Passed inspections" />
-                    <FleetStatCard label="FAILED" value={failedCount} icon={XCircle} color="red" valueClassName="text-status-critical" subtitle="Failed inspections" />
-                    <FleetStatCard label="PENDING" value={0} icon={FileCheck} subtitle="Awaiting review" />
-                    <Card className="border bg-primary/10 dark:bg-primary/20">
-                        <CardContent className="flex items-center justify-center p-4">
-                            <ProgressRing value={passRate} size={80} color={FLEET_COLORS.primary} label="Pass Rate" />
-                        </CardContent>
-                    </Card>
-                </div>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={ClipboardCheck} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>
+                                Maintenance · inspections
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Vehicle Inspections
+                            </h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Pre-trip and post-trip vehicle checks.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
+                            <HeroClusterTile
+                                label="Runs 30d"
+                                value={fmt(heroStats.runs_30d)}
+                                caption="inspections logged"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Failed 30d"
+                                value={fmt(heroStats.failed_30d)}
+                                caption="need follow-up"
+                                tone={heroStats.failed_30d > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Pass rate"
+                                value={fmt(heroStats.pass_rate, '%')}
+                                caption="last 30 days"
+                                tone={
+                                    heroStats.pass_rate === null
+                                        ? 'neutral'
+                                        : heroStats.pass_rate >= 90
+                                          ? 'success'
+                                          : 'warning'
+                                }
+                            />
+                        </div>
+                    </div>
+                    {can.manage ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <HeroActionButton
+                                onClick={() => setWizardOpen(true)}
+                                icon={Plus}
+                                emphasis
+                            >
+                                New inspection
+                            </HeroActionButton>
+                        </div>
+                    ) : null}
+                </HeroShell>
 
                 {/* Filters */}
                 <Card>
@@ -225,6 +291,18 @@ export default function InspectionsIndex({ inspections, vehicles, filters, can }
                         </Table>
                     </CardContent>
                 </Card>
+
+                {can.manage ? (
+                    <InspectionCreateWizard
+                        open={wizardOpen}
+                        onClose={() => setWizardOpen(false)}
+                        vehicles={vehicles ?? []}
+                        preselectedAssetId={preselected_asset_id}
+                        preselectedType={preselected_type}
+                        bookingId={booking_id}
+                        preTripResults={pre_trip_results}
+                    />
+                ) : null}
             </PageShell>
         </AppLayout>
     );

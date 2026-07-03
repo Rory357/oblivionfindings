@@ -61,6 +61,7 @@ class TaskAggregator
             new Providers\SafeguardingActionPlanProvider(),
             new Providers\ControlRoomAlertProvider(),
             new Providers\FleetIncidentProvider(),
+            new Providers\FleetMaintenanceProvider(),
             new Providers\MedicationErrorProvider(),
             new Providers\CdLossReportProvider(),
             new Providers\DataBreachProvider(),

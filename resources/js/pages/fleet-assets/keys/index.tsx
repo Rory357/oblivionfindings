@@ -1,6 +1,3 @@
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,10 +11,17 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeftRight, Car, Key, Lock, LogIn, LogOut, Search, Unlock } from 'lucide-react';
+import { ArrowLeftRight, Key, KeyRound, LogIn, LogOut, Search } from 'lucide-react';
 import { useState } from 'react';
-import { formatDate, formatDateTime } from '@/lib/fleet-utils';
+import { formatDate } from '@/lib/fleet-utils';
 
 
 type KeyHolder = {
@@ -48,6 +52,12 @@ type UserOption = { id: number; name: string };
 type VehicleOption = { id: number; name: string; asset_tag: string | null };
 
 type Props = {
+    hero: {
+        tracked: number;
+        checked_out: number;
+        in_safe: number;
+        activity_today: number;
+    };
     current_holders: KeyHolder[];
     recent_logs: KeyLogEntry[];
     users: UserOption[];
@@ -73,6 +83,7 @@ function actionBadge(action: string) {
 // Using shared formatDateTime from fleet-utils
 
 export default function KeyManagement({
+    hero,
     current_holders: rawHolders,
     recent_logs: rawLogs,
     users,
@@ -81,16 +92,7 @@ export default function KeyManagement({
 }: Props) {
     const current_holders = rawHolders ?? [];
     const recent_logs = rawLogs ?? [];
-
-    const totalVehicles = current_holders.length;
-    const keysOut = current_holders.filter((h) => h.status === 'checked_out').length;
-    const keysInSafe = current_holders.filter((h) => h.status === 'returned' || h.location === 'key_safe').length;
-    const transfersToday = recent_logs.filter((l) => {
-        if (!l.created_at) return false;
-        const today = new Date();
-        const logDate = new Date(l.created_at);
-        return logDate.toDateString() === today.toDateString();
-    }).length;
+    const heroStats = hero ?? { tracked: 0, checked_out: 0, in_safe: 0, activity_today: 0 };
 
     const [search, setSearch] = useState('');
     const [showCheckout, setShowCheckout] = useState(false);
@@ -149,15 +151,44 @@ export default function KeyManagement({
         >
             <Head title="Key Management" />
             <PageShell>
-                <PageHero title="Key Management" description="Track vehicle key check-outs, returns, and transfers." />
-
-                {/* Dark KPI Cards */}
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard label="TOTAL VEHICLES" value={totalVehicles} icon={Car} subtitle="Tracked vehicles" />
-                    <FleetStatCard label="KEYS OUT" value={keysOut} icon={Unlock} color="amber" valueClassName="text-status-warning" subtitle="Currently checked out" />
-                    <FleetStatCard label="KEYS IN SAFE" value={keysInSafe} icon={Lock} color="amber" valueClassName="text-status-success" subtitle="Returned to safe" />
-                    <FleetStatCard label="TRANSFERS TODAY" value={transfersToday} icon={ArrowLeftRight} subtitle="Activity today" />
-                </div>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={KeyRound} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Key ledger · live</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Key Management</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Track vehicle key check-outs, returns, and transfers.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile
+                                label="Keys tracked"
+                                value={fmt(heroStats.tracked)}
+                                caption="vehicles in the ledger"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Checked out"
+                                value={fmt(heroStats.checked_out)}
+                                caption="with drivers now"
+                                tone={heroStats.checked_out > 0 ? 'warning' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="In key safe"
+                                value={fmt(heroStats.in_safe)}
+                                caption="returned and secured"
+                                tone="success"
+                            />
+                            <HeroClusterTile
+                                label="Activity today"
+                                value={fmt(heroStats.activity_today)}
+                                caption="ledger entries logged"
+                                tone="neutral"
+                            />
+                        </div>
+                    </div>
+                </HeroShell>
 
                 {/* Action Buttons */}
                 {can.manage ? (

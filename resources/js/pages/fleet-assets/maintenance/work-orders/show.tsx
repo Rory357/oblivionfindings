@@ -1,5 +1,6 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { RefChip } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import { formatCurrency, formatDate } from '@/lib/fleet-utils';
 type Props = {
     work_order: {
         id: number;
+        reference_number?: string | null;
         title: string;
         description: string | null;
         asset: { id: number; name: string; asset_tag: string | null; category: string | null; status: string | null } | null;
@@ -76,7 +78,7 @@ export default function WorkOrderShow({ work_order }: Props) {
 
     const updateForm = useForm({
         status: wo.status ?? 'open',
-        notes: '',
+        notes: wo.notes ?? '',
         actual_cost: wo.actual_cost != null ? String(wo.actual_cost) : '',
     });
 
@@ -109,10 +111,11 @@ export default function WorkOrderShow({ work_order }: Props) {
         >
             <Head title={`Work Order: ${wo.title ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Work order · ${(wo.status ?? 'open').replace(/_/g, ' ')}`}
                     title={wo.title ?? 'Work Order'}
                     backHref="/fleet-assets/maintenance/work-orders"
-                    backLabel="Back to Work Orders"
+                    backLabel="Work Orders"
                 />
 
                 {/* Priority Banner */}
@@ -120,6 +123,7 @@ export default function WorkOrderShow({ work_order }: Props) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Wrench className="h-5 w-5" />
+                            <RefChip value={wo.reference_number ?? `#${wo.id}`} />
                             <span className="font-medium">{wo.title}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -231,13 +235,13 @@ export default function WorkOrderShow({ work_order }: Props) {
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
                                         <div className="text-xs text-muted-foreground">Estimated</div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.estimated_cost != null ? `{formatCurrency((wo.estimated_cost))}` : '---'}
+                                            {wo.estimated_cost != null ? formatCurrency(wo.estimated_cost) : '---'}
                                         </div>
                                     </div>
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
                                         <div className="text-xs text-muted-foreground">Actual</div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.actual_cost != null ? `{formatCurrency((wo.actual_cost))}` : '---'}
+                                            {wo.actual_cost != null ? formatCurrency(wo.actual_cost) : '---'}
                                         </div>
                                     </div>
                                 </div>
@@ -249,8 +253,8 @@ export default function WorkOrderShow({ work_order }: Props) {
                                             : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
                                     )}>
                                         {wo.actual_cost <= wo.estimated_cost
-                                            ? `{formatCurrency((wo.estimated_cost - wo.actual_cost))} under budget`
-                                            : `{formatCurrency((wo.actual_cost - wo.estimated_cost))} over budget`
+                                            ? `${formatCurrency(wo.estimated_cost - wo.actual_cost)} under budget`
+                                            : `${formatCurrency(wo.actual_cost - wo.estimated_cost)} over budget`
                                         }
                                     </div>
                                 )}

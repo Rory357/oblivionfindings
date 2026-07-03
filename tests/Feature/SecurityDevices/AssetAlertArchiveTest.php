@@ -29,24 +29,18 @@ class AssetAlertArchiveTest extends TestCase
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
     }
 
-    public function test_asset_alert_archive_page_is_read_only_and_legacy_action_routes_are_removed(): void
+    public function test_legacy_asset_alert_archive_redirects_and_legacy_action_routes_are_removed(): void
     {
         $asset = Asset::factory()->create(['name' => 'Archive Asset']);
         $alert = $this->createAssetAlert($asset, [
             'status' => 'open',
         ]);
 
-        $response = $this->actingAs($this->admin)->get('/assets/alerts');
-
-        $response->assertOk();
-        $response->assertInertia(function ($page) use ($alert) {
-            $props = $page->toArray()['props'];
-
-            $this->assertSame('read_only', $props['archive']['mode']);
-            $this->assertSame('/fleet-assets/alerts', $props['archive']['replacement_url']);
-            $this->assertCount(1, $props['alerts']['data']);
-            $this->assertSame($alert->id, $props['alerts']['data'][0]['id']);
-        });
+        // The standalone archive page was retired; `/fleet-assets/alerts`
+        // renders the archived asset alerts inline (see test below).
+        $this->actingAs($this->admin)
+            ->get('/assets/alerts')
+            ->assertRedirect('/fleet-assets/alerts');
 
         $this->actingAs($this->admin)
             ->post("/assets/alerts/{$alert->id}/acknowledge")
@@ -57,25 +51,13 @@ class AssetAlertArchiveTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_asset_detail_exposes_archived_alerts_under_archived_alerts_key(): void
+    public function test_legacy_asset_detail_redirects_to_fleet_assets(): void
     {
         $asset = Asset::factory()->create(['name' => 'Asset Detail Archive']);
-        $this->createAssetAlert($asset, [
-            'alert_type' => 'tamper',
-            'severity' => 'high',
-        ]);
 
-        $response = $this->actingAs($this->admin)->get("/assets/{$asset->id}");
-
-        $response->assertOk();
-        $response->assertInertia(function ($page) {
-            $props = $page->toArray()['props'];
-
-            $this->assertArrayHasKey('archived_alerts', $props);
-            $this->assertArrayNotHasKey('alerts', $props);
-            $this->assertCount(1, $props['archived_alerts']);
-            $this->assertSame('tamper', $props['archived_alerts'][0]['alert_type']);
-        });
+        $this->actingAs($this->admin)
+            ->get("/assets/{$asset->id}")
+            ->assertRedirect("/fleet-assets/assets/{$asset->id}");
     }
 
     public function test_fleet_alert_index_keeps_archived_asset_alerts_separate_from_operational_alerts(): void

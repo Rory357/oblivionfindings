@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -188,12 +188,15 @@ export default function NotificationSettings() {
         >
             <Head title="Notification Settings" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Fleet settings · delivery channels"
                     title="Notification Settings"
-                    description="Configure which fleet events trigger notifications and how they are delivered."
                     backHref="/fleet-assets"
-                    backLabel="Back to Dashboard"
+                    backLabel="Dashboard"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Configure which fleet events trigger notifications and how they are delivered.
+                </p>
 
                 <div className="space-y-6">
                     {Object.entries(sections).map(([sectionName, items]) => {

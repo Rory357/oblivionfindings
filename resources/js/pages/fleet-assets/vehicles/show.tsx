@@ -1,8 +1,9 @@
 import { SparklineChart, ProgressRing, FLEET_COLORS } from '@/components/fleet-charts';
 import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
 import FleetTimeline, { type TimelineEntry } from '@/components/fleet-timeline';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { FleetHeroAction } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -248,7 +249,8 @@ export default function VehicleShow({
         >
             <Head title={`Vehicle: ${vehicle.name}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Vehicle · ${state?.status ?? 'offline'}`}
                     title={
                         <div className="flex flex-wrap items-center gap-2">
                             <Car className="h-5 w-5" />
@@ -259,21 +261,16 @@ export default function VehicleShow({
                         </div>
                     }
                     backHref="/fleet-assets/vehicles"
-                    backLabel="Back to Vehicles"
+                    backLabel="Vehicles"
                     actions={
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/fleet-assets/vehicles/${vehicle.id}/alerts-config`}>
-                                    <AlertTriangle className="mr-2 h-4 w-4" />
-                                    Configure Alerts
-                                </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/fleet-assets/assets/${vehicle.id}`}>
-                                    View Full Profile
-                                </Link>
-                            </Button>
-                        </div>
+                        <>
+                            <FleetHeroAction href={`/fleet-assets/vehicles/${vehicle.id}/alerts-config`} icon={AlertTriangle}>
+                                Configure Alerts
+                            </FleetHeroAction>
+                            <FleetHeroAction href={`/fleet-assets/assets/${vehicle.id}`} icon={Car} emphasis>
+                                View Full Profile
+                            </FleetHeroAction>
+                        </>
                     }
                 />
 
@@ -607,7 +604,7 @@ export default function VehicleShow({
                     <Card>
                         <CardHeader className="pb-2 flex flex-row items-center justify-between">
                             <CardTitle className="text-sm">Recent Incidents</CardTitle>
-                            <Button variant="ghost" size="sm" className="h-6 text-[10px]" asChild><Link href={`/fleet-assets/incidents/create?asset_id=${vehicle.id}`}>Report</Link></Button>
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px]" asChild><Link href={`/fleet-assets/incidents?report=vehicle&asset_id=${vehicle.id}`}>Report</Link></Button>
                         </CardHeader>
                         <CardContent>
                             {(incidents ?? []).length > 0 ? (
