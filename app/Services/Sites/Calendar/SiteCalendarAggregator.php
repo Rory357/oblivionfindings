@@ -11,6 +11,7 @@ use App\Services\Sites\Calendar\Providers\CredentialReminderProvider;
 use App\Services\Sites\Calendar\Providers\DamageObligationProvider;
 use App\Services\Sites\Calendar\Providers\DrillObligationProvider;
 use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
+use App\Services\Sites\Calendar\Providers\FleetServiceScheduleObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
@@ -68,6 +69,7 @@ class SiteCalendarAggregator
             new VendorReminderProvider(),
             new CredentialReminderProvider(),
             new AssetMaintenanceObligationProvider(),
+            new FleetServiceScheduleObligationProvider(),
             new EmergencyPlanObligationProvider(),
             new DrillObligationProvider(),
             new PpeObligationProvider(),

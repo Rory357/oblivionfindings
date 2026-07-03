@@ -5,13 +5,18 @@ namespace App\Jobs;
 use App\Models\Asset;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
+use App\Models\User;
+use App\Notifications\Fleet\FleetComplianceDueNotification;
 use App\Notifications\Fleet\FleetVehicleOverdueNotification;
 use App\Services\Fleet\FleetSignalService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class FleetAutoAlertJob implements ShouldQueue
 {
@@ -19,6 +24,9 @@ class FleetAutoAlertJob implements ShouldQueue
 
     public $timeout = 300;
     public $tries = 2;
+
+    /** @var Collection<int, User>|null memoised fleet-manager recipients */
+    private ?Collection $fleetManagers = null;
 
     public function handle(FleetSignalService $signalService): void
     {
@@ -94,6 +102,8 @@ class FleetAutoAlertJob implements ShouldQueue
                         'days_remaining' => $days,
                     ],
                 ]);
+
+                $this->notifyComplianceDue($asset, 'wof', $asset->wof_expires_at, $severity, $days);
             }
         }
 
@@ -115,6 +125,8 @@ class FleetAutoAlertJob implements ShouldQueue
                     'days_overdue' => $asset->wof_expires_at->diffInDays(now()),
                 ],
             ]);
+
+            $this->notifyComplianceDue($asset, 'wof', $asset->wof_expires_at, 'high', null);
         }
     }
 
@@ -144,6 +156,8 @@ class FleetAutoAlertJob implements ShouldQueue
                         'days_remaining' => $days,
                     ],
                 ]);
+
+                $this->notifyComplianceDue($asset, 'rego', $asset->registration_expires_at, $severity, $days);
             }
         }
     }
@@ -168,7 +182,55 @@ class FleetAutoAlertJob implements ShouldQueue
                     'days_overdue' => $asset->maintenance_due_at->diffInDays(now()),
                 ],
             ]);
+
+            $this->notifyComplianceDue($asset, 'maintenance', $asset->maintenance_due_at, 'high', null);
         }
+    }
+
+    /**
+     * Notify fleet managers that a compliance date is due, alongside the
+     * signal just emitted for the same threshold.
+     *
+     * The signal layer dedupes by idempotency key; notifications dedupe here
+     * by "already sent today for this asset+kind" so a re-run of the job (or
+     * an asset matching both a threshold and the expired scan across runs)
+     * can't spam inboxes.
+     */
+    private function notifyComplianceDue(
+        Asset $asset,
+        string $kind,
+        ?Carbon $dueAt,
+        string $severity,
+        ?int $daysRemaining,
+    ): void {
+        $alreadySentToday = DatabaseNotification::query()
+            ->where('type', FleetComplianceDueNotification::class)
+            ->where('data->asset_id', $asset->id)
+            ->where('data->kind', $kind)
+            ->whereDate('created_at', now()->toDateString())
+            ->exists();
+
+        if ($alreadySentToday) {
+            return;
+        }
+
+        $this->fleetManagers()->each->notify(
+            new FleetComplianceDueNotification($asset, $kind, $dueAt, $severity, $daysRemaining),
+        );
+    }
+
+    /**
+     * Recipients who manage the fleet — same role-permission resolution the
+     * fleet incident notification uses (IncidentController@store), keyed on
+     * the module's manage permission. Memoised for the run.
+     *
+     * @return Collection<int, User>
+     */
+    private function fleetManagers(): Collection
+    {
+        return $this->fleetManagers ??= User::whereHas('roles', function ($q) {
+            $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.manage'));
+        })->get();
     }
 
     private function checkLowBattery(FleetSignalService $signalService): void

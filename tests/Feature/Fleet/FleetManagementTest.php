@@ -35,114 +35,111 @@ class FleetManagementTest extends TestCase
     }
 
     // ──────────────────────────────────────
-    // Fleet Dashboard - Auth & Access
+    // Legacy routes redirect to /fleet-assets
     // ──────────────────────────────────────
 
-    public function test_fleet_dashboard_requires_authentication(): void
+    public function test_legacy_fleet_dashboard_redirects_to_fleet_assets(): void
     {
-        $this->get('/fleet-management')->assertRedirect('/login');
+        $this->get('/fleet-management')->assertRedirect('/fleet-assets');
     }
 
-    public function test_fleet_dashboard_accessible_by_admin(): void
+    public function test_legacy_vehicle_show_redirects_to_fleet_assets(): void
     {
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+
+        $this->get("/fleet/vehicles/{$vehicle->id}")
+            ->assertRedirect("/fleet-assets/vehicles/{$vehicle->id}");
+    }
+
+    public function test_legacy_fuel_index_redirects_to_fleet_assets(): void
+    {
+        $this->get('/fleet/fuel')->assertRedirect('/fleet-assets/fuel');
+    }
+
+    public function test_legacy_reports_index_redirects_to_fleet_assets(): void
+    {
+        $this->get('/fleet/reports')->assertRedirect('/fleet-assets/reports');
+    }
+
+    public function test_legacy_trip_show_redirects_to_playback(): void
+    {
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
+
+        $this->get("/fleet/trips/{$trip->id}")
+            ->assertRedirect("/fleet-assets/trips/{$trip->id}/playback");
+    }
+
+    public function test_legacy_playback_endpoint_redirects_to_playback_data(): void
+    {
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
+
+        $this->get("/fleet/trips/{$trip->id}/playback")
+            ->assertRedirect("/fleet-assets/trips/{$trip->id}/playback/data");
+    }
+
+    // ──────────────────────────────────────
+    // Trip Playback (canonical shell)
+    // ──────────────────────────────────────
+
+    public function test_trip_playback_page_requires_authentication(): void
+    {
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
+
+        $this->get("/fleet-assets/trips/{$trip->id}/playback")->assertRedirect('/login');
+    }
+
+    public function test_trip_playback_page_accessible_by_admin(): void
+    {
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
+
         $this->actingAs($this->admin)
-            ->get('/fleet-management')
-            ->assertOk();
+            ->get("/fleet-assets/trips/{$trip->id}/playback")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('fleet-assets/trips/playback')
+                ->has('trip')
+                ->has('driver_sessions')
+                ->has('can')
+            );
     }
 
-    public function test_fleet_dashboard_accessible_by_coordinator(): void
+    public function test_trip_playback_page_blocked_for_user_without_permission(): void
     {
-        $this->actingAs($this->coordinator)
-            ->get('/fleet-management')
-            ->assertOk();
-    }
+        $site = Site::factory()->create();
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
+        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
 
-    public function test_fleet_dashboard_accessible_by_support_worker(): void
-    {
-        $this->actingAs($this->supportWorker)
-            ->get('/fleet-management')
-            ->assertOk();
-    }
-
-    public function test_fleet_dashboard_blocked_for_user_without_permission(): void
-    {
         $noPermUser = User::factory()->create(['approved_at' => now()]);
 
         $this->actingAs($noPermUser)
-            ->get('/fleet-management')
+            ->get("/fleet-assets/trips/{$trip->id}/playback")
             ->assertForbidden();
     }
 
-    // ──────────────────────────────────────
-    // Fleet Dashboard - Data
-    // ──────────────────────────────────────
-
-    public function test_fleet_dashboard_returns_inertia_page(): void
-    {
-        $this->actingAs($this->admin)
-            ->get('/fleet-management')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('fleet-management/index')
-            );
-    }
-
-    // ──────────────────────────────────────
-    // Vehicle Show
-    // ──────────────────────────────────────
-
-    public function test_vehicle_show_requires_authentication(): void
-    {
-        $site = Site::factory()->create();
-        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
-        $this->get("/fleet/vehicles/{$vehicle->id}")->assertRedirect('/login');
-    }
-
-    public function test_vehicle_show_accessible_by_admin(): void
-    {
-        $site = Site::factory()->create();
-        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
-
-        $this->actingAs($this->admin)
-            ->get("/fleet/vehicles/{$vehicle->id}")
-            ->assertOk();
-    }
-
-    public function test_vehicle_show_returns_inertia_page(): void
-    {
-        $site = Site::factory()->create();
-        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
-
-        $this->actingAs($this->admin)
-            ->get("/fleet/vehicles/{$vehicle->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('fleet-management/vehicle')
-            );
-    }
-
-    // ──────────────────────────────────────
-    // Trip Management
-    // ──────────────────────────────────────
-
-    public function test_trip_show_requires_authentication(): void
-    {
-        $site = Site::factory()->create();
-        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
-        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
-        $this->get("/fleet/trips/{$trip->id}")->assertRedirect('/login');
-    }
-
-    public function test_trip_show_accessible_by_admin(): void
+    public function test_trip_playback_data_returns_json(): void
     {
         $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
         $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
 
         $this->actingAs($this->admin)
-            ->get("/fleet/trips/{$trip->id}")
-            ->assertOk();
+            ->getJson("/fleet-assets/trips/{$trip->id}/playback/data")
+            ->assertOk()
+            ->assertJsonStructure(['points']);
     }
+
+    // ──────────────────────────────────────
+    // Trip Management (write endpoints kept)
+    // ──────────────────────────────────────
 
     public function test_trip_close_by_admin(): void
     {
@@ -180,7 +177,7 @@ class FleetManagementTest extends TestCase
 
         $this->actingAs($this->admin)
             ->delete("/fleet/trips/{$trip->id}")
-            ->assertRedirect();
+            ->assertRedirect(route('fleet-assets.trips.index'));
 
         $this->assertDatabaseMissing('fleet_trips', ['id' => $trip->id]);
     }
@@ -202,18 +199,6 @@ class FleetManagementTest extends TestCase
 
         $trip->refresh();
         $this->assertEquals('closed', $trip->status);
-    }
-
-    public function test_trip_playback_returns_json(): void
-    {
-        $site = Site::factory()->create();
-        $vehicle = Asset::factory()->vehicle()->forSite($site)->create();
-        $trip = FleetTrip::factory()->create(['asset_id' => $vehicle->id]);
-
-        $this->actingAs($this->admin)
-            ->getJson("/fleet/trips/{$trip->id}/playback")
-            ->assertOk()
-            ->assertJsonStructure(['points']);
     }
 
     // ──────────────────────────────────────

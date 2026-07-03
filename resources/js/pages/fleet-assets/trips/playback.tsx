@@ -1,4 +1,6 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap from '@/components/leaflet-map';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,9 +15,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero } from '@/components/page';
+import { Head, router } from '@inertiajs/react';
 import { CheckCircle, Clock, MapPin, Route, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -50,7 +50,7 @@ interface Props {
     can: { manage: boolean };
 }
 
-export default function FleetTrip({ trip, driver_sessions, can }: Props) {
+export default function FleetTripPlayback({ trip, driver_sessions, can }: Props) {
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
@@ -60,7 +60,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     useEffect(() => {
-        fetch(`/fleet/trips/${trip.id}/playback`)
+        fetch(`/fleet-assets/trips/${trip.id}/playback/data`)
             .then((res) => res.json())
             .then((data) => {
                 const rows = (data.points ?? [])
@@ -112,8 +112,8 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Fleet Management', href: '/fleet-management' },
-                { title: trip.asset?.name || 'Vehicle', href: `/fleet/vehicles/${trip.asset_id}` },
+                { title: 'Fleet & Assets', href: '/fleet-assets' },
+                { title: 'Trips', href: '/fleet-assets/trips' },
                 { title: `Trip #${trip.id}`, href: '#' },
             ]}
         >
@@ -121,8 +121,8 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
             <PageShell>
                 <PageHero
                     icon={Route}
-                    backHref={`/fleet/vehicles/${trip.asset_id}`}
-                    backLabel="Back to vehicle"
+                    backHref="/fleet-assets/trips"
+                    backLabel="Back to trips"
                     title={
                         <div className="flex items-center gap-3">
                             <span>Trip #{trip.id}</span>

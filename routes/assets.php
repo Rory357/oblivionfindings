@@ -8,7 +8,6 @@ use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetQrController;
 use App\Http\Controllers\AssetTrackerController;
 use App\Http\Controllers\AssetTelemetryIngestController;
-use App\Http\Controllers\AssetAlertController;
 use App\Http\Controllers\AssetScanEventController;
 use App\Http\Controllers\AssetOwnershipController;
 use App\Http\Controllers\AssetAssignmentController;
@@ -139,15 +138,15 @@ Route::middleware(['auth'])->group(function () {
             ->name('sites.unarchive');
     });
 
-    // Assets
-    Route::middleware('permission:assets.viewAny|assets.viewAssigned')->group(function () {
-        Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
-        Route::get('/assets/{asset}', [AssetController::class, 'show'])
-            ->whereNumber('asset')
-            ->name('assets.show');
-        Route::get('/assets/alerts', [AssetAlertController::class, 'index'])
-            ->name('assets.alerts.index');
+    // Assets — the legacy index/show/alerts pages moved to the canonical
+    // `/fleet-assets` shell; these permanent redirects keep old links alive.
+    Route::permanentRedirect('/assets', '/fleet-assets/assets')->name('assets.index');
+    Route::permanentRedirect('/assets/alerts', '/fleet-assets/alerts')->name('assets.alerts.index');
+    Route::get('/assets/{asset}', fn (int $asset) => redirect("/fleet-assets/assets/{$asset}", 301))
+        ->whereNumber('asset')
+        ->name('assets.show');
 
+    Route::middleware('permission:assets.viewAny|assets.viewAssigned')->group(function () {
         // QR code redirect (public-ish, but auth required)
         Route::get('/assets/qr/{token}', [AssetQrController::class, 'redirectByToken'])
             ->name('assets.qr.redirect');

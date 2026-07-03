@@ -38,7 +38,7 @@ class AssetControllerTest extends TestCase
     }
 
     // ──────────────────────────────────────
-    // Index - Authentication & Authorization
+    // Legacy index/show/alerts redirect to /fleet-assets
     // ──────────────────────────────────────
 
     public function test_asset_index_requires_authentication(): void
@@ -46,134 +46,18 @@ class AssetControllerTest extends TestCase
         $this->get('/assets')->assertRedirect('/login');
     }
 
-    public function test_asset_index_accessible_by_admin(): void
+    public function test_asset_index_redirects_to_fleet_assets(): void
     {
         $this->actingAs($this->admin)
             ->get('/assets')
-            ->assertOk();
+            ->assertRedirect('/fleet-assets/assets');
     }
 
-    public function test_asset_index_accessible_by_coordinator(): void
-    {
-        $this->actingAs($this->coordinator)
-            ->get('/assets')
-            ->assertOk();
-    }
-
-    public function test_asset_index_blocked_for_user_without_permission(): void
-    {
-        $noPermUser = User::factory()->create(['approved_at' => now()]);
-
-        $this->actingAs($noPermUser)
-            ->get('/assets')
-            ->assertForbidden();
-    }
-
-    // ──────────────────────────────────────
-    // Index - Data & Filtering
-    // ──────────────────────────────────────
-
-    public function test_asset_index_returns_inertia_page(): void
+    public function test_asset_alerts_redirects_to_fleet_assets_alerts(): void
     {
         $this->actingAs($this->admin)
-            ->get('/assets')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('assets/index')
-                ->has('assets')
-                ->has('sites')
-                ->has('clients')
-                ->has('filters')
-                ->has('can')
-            );
-    }
-
-    public function test_asset_index_paginates_results(): void
-    {
-        Asset::factory()->count(30)->forSite($this->site)->create();
-
-        $this->actingAs($this->admin)
-            ->get('/assets')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 25)
-            );
-    }
-
-    public function test_asset_index_filter_by_site(): void
-    {
-        $otherSite = Site::factory()->create();
-        Asset::factory()->count(3)->forSite($this->site)->create();
-        Asset::factory()->count(2)->forSite($otherSite)->create();
-
-        $this->actingAs($this->admin)
-            ->get("/assets?site_id={$this->site->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 3)
-            );
-    }
-
-    public function test_asset_index_filter_by_status(): void
-    {
-        Asset::factory()->active()->count(3)->forSite($this->site)->create();
-        Asset::factory()->retired()->count(2)->forSite($this->site)->create();
-
-        $this->actingAs($this->admin)
-            ->get('/assets?status=active')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 3)
-            );
-    }
-
-    public function test_asset_index_filter_by_risk(): void
-    {
-        Asset::factory()->highRisk()->count(2)->forSite($this->site)->create();
-        Asset::factory()->count(3)->forSite($this->site)->create();
-
-        $this->actingAs($this->admin)
-            ->get('/assets?risk=high')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 2)
-            );
-    }
-
-    public function test_asset_index_search_by_name(): void
-    {
-        Asset::factory()->forSite($this->site)->create(['name' => 'Unique Wheelchair']);
-        Asset::factory()->forSite($this->site)->create(['name' => 'Laptop']);
-
-        $this->actingAs($this->admin)
-            ->get('/assets?search=Wheelchair')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 1)
-            );
-    }
-
-    public function test_asset_index_search_by_asset_tag(): void
-    {
-        Asset::factory()->forSite($this->site)->create(['asset_tag' => 'TAG-UNIQUE-123']);
-        Asset::factory()->forSite($this->site)->create(['asset_tag' => 'TAG-OTHER-456']);
-
-        $this->actingAs($this->admin)
-            ->get('/assets?search=UNIQUE')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets.data', 1)
-            );
-    }
-
-    public function test_asset_index_admin_can_create(): void
-    {
-        $this->actingAs($this->admin)
-            ->get('/assets')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('can.create', true)
-            );
+            ->get('/assets/alerts')
+            ->assertRedirect('/fleet-assets/alerts');
     }
 
     // ──────────────────────────────────────
@@ -323,7 +207,7 @@ class AssetControllerTest extends TestCase
     }
 
     // ──────────────────────────────────────
-    // Show
+    // Show (legacy URL redirects)
     // ──────────────────────────────────────
 
     public function test_asset_show_requires_authentication(): void
@@ -332,43 +216,13 @@ class AssetControllerTest extends TestCase
         $this->get("/assets/{$asset->id}")->assertRedirect('/login');
     }
 
-    public function test_asset_show_accessible_by_admin(): void
+    public function test_asset_show_redirects_to_fleet_assets(): void
     {
         $asset = Asset::factory()->forSite($this->site)->create();
 
         $this->actingAs($this->admin)
             ->get("/assets/{$asset->id}")
-            ->assertOk();
-    }
-
-    public function test_asset_show_returns_inertia_page(): void
-    {
-        $asset = Asset::factory()->forSite($this->site)->create();
-
-        $this->actingAs($this->admin)
-            ->get("/assets/{$asset->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('assets/show')
-                ->has('asset')
-                ->has('inspections')
-                ->has('maintenance')
-                ->has('documents')
-                // The legacy `alerts` prop was renamed to `archived_alerts`
-                // when ControlRoomAlert became the canonical operational alert
-                // surface — see AssetAlertArchiveTest for the contract.
-                ->has('archived_alerts')
-                ->has('scan_events')
-                ->has('geofences')
-                ->has('can')
-            );
-    }
-
-    public function test_asset_show_returns_404_for_nonexistent(): void
-    {
-        $this->actingAs($this->admin)
-            ->get('/assets/99999')
-            ->assertNotFound();
+            ->assertRedirect("/fleet-assets/assets/{$asset->id}");
     }
 
     // ──────────────────────────────────────
@@ -430,7 +284,7 @@ class AssetControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->delete("/assets/{$asset->id}")
-            ->assertRedirect(route('assets.index'));
+            ->assertRedirect(route('fleet-assets.assets.index'));
 
         $this->assertDatabaseMissing('assets', ['id' => $asset->id]);
     }

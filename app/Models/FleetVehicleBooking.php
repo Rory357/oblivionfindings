@@ -12,8 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class FleetVehicleBooking extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
+    use Concerns\HasReferenceNumber;
+
+    public const REFERENCE_PREFIX = 'BK';
 
     protected $fillable = [
+        'reference_number',
         'tenant_id',
         'asset_id',
         'user_id',

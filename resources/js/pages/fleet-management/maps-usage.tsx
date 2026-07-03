@@ -11,7 +11,7 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Fleet Management', href: '/fleet-management' },
+                { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Map Usage', href: '/fleet-management/maps-usage' },
             ]}
         >
@@ -19,7 +19,7 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
             <PageShell>
                 <PageHero
                     icon={Map}
-                    backHref="/fleet-management"
+                    backHref="/fleet-assets"
                     title="Fleet Map Usage"
                     description="Basic counts for Google Maps usage by context."
                     stats={[

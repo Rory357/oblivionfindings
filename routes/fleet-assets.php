@@ -10,6 +10,7 @@ use App\Http\Controllers\FleetAssets\DailyCheckController;
 use App\Http\Controllers\FleetAssets\DashboardController;
 use App\Http\Controllers\FleetAssets\DeviceController;
 use App\Http\Controllers\FleetAssets\DriverController;
+use App\Http\Controllers\Fleet\FleetTripController;
 use App\Http\Controllers\FleetAssets\GeofenceController;
 use App\Http\Controllers\FleetAssets\HandoverController;
 use App\Http\Controllers\FleetAssets\IncidentController;
@@ -52,6 +53,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/vehicles/{asset}', [VehicleController::class, 'show'])->whereNumber('asset')->name('fleet-assets.vehicles.show');
         Route::get('/vehicles/{asset}/alerts-config', [VehicleController::class, 'alertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config');
         Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');
+        Route::get('/trips/{trip}/playback', [FleetTripController::class, 'show'])->whereNumber('trip')->name('fleet-assets.trips.playback');
+        Route::get('/trips/{trip}/playback/data', [FleetTripController::class, 'playback'])->whereNumber('trip')->name('fleet-assets.trips.playback.data');
         Route::get('/fuel', [VehicleController::class, 'fuel'])->name('fleet-assets.fuel.index');
     });
 
@@ -326,10 +329,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     });
 });
 
-// NOTE: a `/fleet-management → /fleet-assets` redirect lived here previously
-// but was removed because it shadowed the legacy fleet dashboard route in
-// `routes/fleet.php` (which still owns `FleetDashboardController` and the
-// `fleet-management/index` Inertia page). Consolidation is tracked under
-// `docs/fleet-assets-security-devices-production-readiness-plan.md` PR FA6;
-// when the legacy dashboard is retired, reinstate the redirect or delete the
-// route + page together.
+// NOTE: the legacy fleet dashboard (`/fleet-management`) has been retired.
+// `routes/fleet.php` now only carries permanent redirects to this shell,
+// the trip write endpoints used by the trip playback page, and the
+// read-only map-usage dashboard.

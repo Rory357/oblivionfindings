@@ -11,8 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class FleetWorkOrder extends Model
 {
     use AuditableChanges, HasFactory;
+    use Concerns\HasReferenceNumber;
+
+    public const REFERENCE_PREFIX = 'WO';
 
     protected $fillable = [
+        'reference_number',
         'tenant_id',
         'asset_id',
         'reported_by_user_id',
