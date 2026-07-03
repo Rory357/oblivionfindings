@@ -653,10 +653,7 @@ class VehicleController extends Controller
             'distance_today_km' => round((float) FleetTrip::where('started_at', '>=', $todayStart)->sum('distance_km'), 1),
             'active_now' => FleetTrip::whereIn('status', ['open', 'in_progress'])->count(),
             'after_hours_7d' => FleetTrip::where('started_at', '>=', now()->subDays(7))
-                ->where(function ($q) {
-                    $q->whereRaw('HOUR(started_at) < 8')
-                        ->orWhereRaw('HOUR(started_at) >= 18');
-                })
+                ->afterHours()
                 ->count(),
         ];
 

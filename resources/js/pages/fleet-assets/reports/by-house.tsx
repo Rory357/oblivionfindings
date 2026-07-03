@@ -1,8 +1,8 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -60,12 +60,15 @@ export default function ReportByHouse({
         >
             <Head title="Usage by House" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Fleet reports · usage by house"
                     title="Vehicle Usage by House"
-                    description="Compare vehicle usage, costs, and transport activity across houses."
                     backHref="/fleet-assets/reports"
-                    backLabel="Back to Reports"
+                    backLabel="Reports"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Compare vehicle usage, costs, and transport activity across houses.
+                </p>
 
                 {/* Month & House Selectors */}
                 <div className="flex flex-wrap items-center gap-4">

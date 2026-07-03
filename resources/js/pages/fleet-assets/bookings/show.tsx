@@ -1,4 +1,4 @@
-import { PageHero } from '@/components/page';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,10 +92,11 @@ export default function BookingShow({ booking, can }: Props) {
         >
             <Head title={`Booking #${b.id ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Vehicle booking · ${(b.status ?? 'pending').replace(/_/g, ' ')}`}
                     title={`Booking #${b.id ?? ''}`}
                     backHref="/fleet-assets/bookings"
-                    backLabel="Back to Bookings"
+                    backLabel="Bookings"
                 />
 
                 {/* Status Banner */}
@@ -104,7 +105,7 @@ export default function BookingShow({ booking, can }: Props) {
                         <div className="flex items-center gap-3">
                             <Badge className="text-sm capitalize">{(b.status ?? '').replace(/_/g, ' ')}</Badge>
                             <span className="font-medium">Booking #{b.id}</span>
-                            <span className="inline-flex items-center rounded-md border border-current/25 bg-white/50 px-2 py-0.5 font-mono text-xs font-semibold dark:bg-black/20">
+                            <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
                                 {b.reference_number ?? '—'}
                             </span>
                         </div>

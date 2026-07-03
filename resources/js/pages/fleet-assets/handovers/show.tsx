@@ -1,4 +1,4 @@
-import { PageHero } from '@/components/page';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -118,10 +118,11 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
         >
             <Head title={`Handover #${h.id}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Shift handover · ${(h.status ?? '').replace(/_/g, ' ') || 'record'}`}
                     title={`Shift Handover #${h.id}`}
                     backHref="/fleet-assets/handovers"
-                    backLabel="Back to Handovers"
+                    backLabel="Handovers"
                 />
 
                 {/* Status Banner */}

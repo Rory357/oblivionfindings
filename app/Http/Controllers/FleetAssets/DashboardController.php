@@ -255,14 +255,11 @@ class DashboardController extends Controller
             ];
         })->filter(fn ($s) => $s['vehicle_count'] > 0)->values();
 
-        // After-hours trips (before 8am or after 6pm, last 7 days)
+        // After-hours trips (before 8am or after 6pm worker-timezone, last 7 days)
         $afterHoursTrips = $hasTripsTable
             ? FleetTrip::query()
                 ->where('started_at', '>=', now()->subDays(7))
-                ->where(function ($q) {
-                    $q->whereRaw('HOUR(started_at) < 8')
-                      ->orWhereRaw('HOUR(started_at) >= 18');
-                })
+                ->afterHours()
                 ->with('asset:id,name', 'driverSession.user:id,name')
                 ->latest('started_at')
                 ->limit(10)->get()

@@ -3,13 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelativeTime } from '@/lib/fleet-utils';
-import { cn } from '@/lib/utils';
-import {
-    DOT_CLASS,
-    fmt,
-    HeroStatusPill,
-    type Tone,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Car,
@@ -17,7 +12,7 @@ import {
     Layers,
     Search,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type VehicleMarker = {
     id: number;
@@ -58,50 +53,6 @@ type Props = {
     geofences: GeofenceData[];
     open_alerts: number;
 };
-
-/** Slim variant of the hero shell — same app-primary gradient chrome as HeroShell but a
- *  single compact band (~80px) so the map keeps the vertical space. Local to the map page;
- *  the shared HeroShell stays the one full-height shell. */
-function SlimHeroShell({ children }: { children: ReactNode }) {
-    return (
-        <div className="relative shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 text-primary-foreground shadow-[0_24px_60px_-28px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
-            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute -top-20 -right-16 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                <div className="absolute -bottom-24 left-1/3 h-40 w-40 rounded-full bg-primary-foreground/5" />
-            </div>
-            <div className="relative px-5 py-3.5">{children}</div>
-        </div>
-    );
-}
-
-/** Compact dot-led metric for the slim map hero — the map stays dominant, so no tiles. */
-function SlimStat({
-    label,
-    value,
-    tone,
-    href,
-}: {
-    label: string;
-    value: string;
-    tone: Tone;
-    href?: string;
-}) {
-    const inner = (
-        <>
-            <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_CLASS[tone])} />
-            <span className="text-lg leading-none font-bold tabular-nums text-primary-foreground">{value}</span>
-            <span className="text-[10.5px] font-semibold tracking-wide text-primary-foreground/70 uppercase">{label}</span>
-        </>
-    );
-    const base = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1';
-    return href ? (
-        <Link href={href} className={cn(base, 'transition-colors hover:bg-primary-foreground/15')}>
-            {inner}
-        </Link>
-    ) : (
-        <span className={base}>{inner}</span>
-    );
-}
 
 export default function FleetAssetsMap({ vehicle_markers, house_markers, geofences, open_alerts }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -270,31 +221,31 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
             <Head title="Live Map" />
             <div className="flex flex-col gap-3 p-3" style={{ height: 'calc(100vh - 4rem)' }}>
                 {/* Slim command band — the map keeps the vertical space below. */}
-                <SlimHeroShell>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <HeroStatusPill>Live map · real-time</HeroStatusPill>
-                        <h1 className="text-lg leading-none font-bold tracking-tight">Live Map</h1>
-                        <div className="ml-auto flex flex-wrap items-center gap-1">
-                            <SlimStat
+                <FleetCompactHero
+                    pill="Live map · real-time"
+                    title="Live Map"
+                    stats={
+                        <>
+                            <CompactHeroStat
                                 label="Online now"
                                 value={fmt(heroStats.online)}
                                 tone={heroStats.online > 0 ? 'success' : 'neutral'}
                             />
-                            <SlimStat label="Moving" value={fmt(heroStats.moving)} tone="neutral" />
-                            <SlimStat
+                            <CompactHeroStat label="Moving" value={fmt(heroStats.moving)} tone="neutral" />
+                            <CompactHeroStat
                                 label="Idle"
                                 value={fmt(heroStats.idle)}
                                 tone={heroStats.idle > 0 ? 'warning' : 'neutral'}
                             />
-                            <SlimStat
+                            <CompactHeroStat
                                 label="Alerts"
                                 value={fmt(open_alerts)}
                                 tone={open_alerts > 0 ? 'critical' : 'success'}
                                 href="/fleet-assets/alerts"
                             />
-                        </div>
-                    </div>
-                </SlimHeroShell>
+                        </>
+                    }
+                />
 
                 <div className="relative min-h-0 flex-1">
                     <LeafletMap

@@ -20,6 +20,7 @@ import {
     HeroMedallion,
     HeroShell,
     HeroStatusPill,
+    RefChip,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import {
@@ -446,10 +447,12 @@ export default function WorkOrdersIndex({
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <Wrench className="h-4 w-4 text-muted-foreground" />
-                                                <span className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
-                                                    {wo.reference_number ??
-                                                        `#${wo.id}`}
-                                                </span>
+                                                <RefChip
+                                                    value={
+                                                        wo.reference_number ??
+                                                        `#${wo.id}`
+                                                    }
+                                                />
                                                 <span className="font-medium">
                                                     {wo.title}
                                                 </span>

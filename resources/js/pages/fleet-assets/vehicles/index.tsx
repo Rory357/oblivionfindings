@@ -229,7 +229,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, hero, comp
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href="/fleet-assets/bookings/create" icon={Bookmark} emphasis>
+                        <FleetHeroAction href="/fleet-assets/bookings?new=1" icon={Bookmark} emphasis>
                             Book vehicle
                         </FleetHeroAction>
                         <FleetHeroAction href="/fleet-assets/daily-check" icon={ClipboardCheck}>

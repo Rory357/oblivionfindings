@@ -12,7 +12,7 @@ import {
     HeroSegmented,
     fmt,
     type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
+} from '../components/fleet-hero-kit';
 import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import {
     EntityFilter,
@@ -132,6 +132,7 @@ type Props = {
     can: { manage: boolean; view_hr_assets: boolean };
     detail: FleetIncidentDetail | null;
     report: string | null;
+    report_asset_id: string | number | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -196,6 +197,7 @@ export default function FleetIncidentsIndex({
     can,
     detail,
     report,
+    report_asset_id,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [launcherOpen, setLauncherOpen] = useState(false);
@@ -515,6 +517,7 @@ export default function FleetIncidentsIndex({
                     open
                     mode={reportMode}
                     formOptions={formOptions}
+                    initialAssetId={report_asset_id}
                     onClose={() => setReportMode(null)}
                     onOpenIncident={(id) => {
                         setReportMode(null);
@@ -633,7 +636,11 @@ function IncidentTable({ rows, onRowCtx, onOpen }: { rows: IncidentRow[]; onRowC
                                         <Calendar className="h-3 w-3" />
                                         {i.occurred_at ? formatDateTime(i.occurred_at) : '—'}
                                     </div>
-                                    <div className="mt-0.5 font-mono text-[11px] text-muted-foreground/60">{i.reference}</div>
+                                    <div className="mt-0.5">
+                                        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                            {i.reference}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-2">

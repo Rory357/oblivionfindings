@@ -71,4 +71,21 @@ class FleetTrip extends Model
     {
         return $this->belongsTo(User::class, 'marked_personal_by');
     }
+
+    /**
+     * Trips that started before 8am or after 6pm in the worker timezone.
+     *
+     * started_at is stored UTC (NZ 8am ≈ 20:00 UTC), so the hour extraction
+     * shifts by the zone's current UTC offset first. A single current offset
+     * is acceptable for the rolling short-window stats this feeds.
+     */
+    public function scopeAfterHours($query)
+    {
+        $offsetMinutes = now(config('app.worker_timezone', 'Pacific/Auckland'))->utcOffset();
+
+        return $query->where(function ($q) use ($offsetMinutes) {
+            $q->whereRaw('HOUR(DATE_ADD(started_at, INTERVAL ? MINUTE)) < 8', [$offsetMinutes])
+                ->orWhereRaw('HOUR(DATE_ADD(started_at, INTERVAL ? MINUTE)) >= 18', [$offsetMinutes]);
+        });
+    }
 }

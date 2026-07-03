@@ -37,7 +37,6 @@ import {
     Check,
     CheckCircle,
     ClipboardList,
-    Clock,
     DollarSign,
     Download,
     FileCheck2,
@@ -262,7 +261,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                 </HeroShell>
 
                 {/* KPI Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
                     <FleetStatCard
                         label="Trips This Month"
                         value={safeStats.trips_this_month}
@@ -283,13 +282,6 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                         icon={DollarSign}
                         color="purple"
                         subtitle="This month"
-                    />
-                    <FleetStatCard
-                        label="Pending Approval"
-                        value={safeStats.pending_approval}
-                        icon={Clock}
-                        color="amber"
-                        subtitle="Awaiting review"
                     />
                 </div>
 

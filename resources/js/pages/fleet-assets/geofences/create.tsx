@@ -1,6 +1,6 @@
 import GeofenceDrawMap, { type GeofenceShape } from '@/components/geofence-draw-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,12 +131,15 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
         >
             <Head title="Create Geofence" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Geofences · new boundary"
                     title="Create Geofence"
-                    description="Draw a boundary on the map. Use the toolbar on the map to draw a circle or polygon."
                     backHref="/fleet-assets/geofences"
-                    backLabel="Back to Geofences"
+                    backLabel="Geofences"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Draw a boundary on the map. Use the toolbar on the map to draw a circle or polygon.
+                </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Drawing Map Component (includes mode tabs, controls, and status) */}

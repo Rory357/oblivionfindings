@@ -32,6 +32,7 @@ class FleetWorkOrder extends Model
         'estimated_cost',
         'actual_cost',
         'completion_notes',
+        'notes',
         'journal_id',
     ];
 

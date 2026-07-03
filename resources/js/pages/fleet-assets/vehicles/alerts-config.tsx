@@ -1,5 +1,5 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -171,12 +171,15 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
         >
             <Head title={`Alerts: ${asset.name}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Vehicle alerts · configuration"
                     title={`Alert Configuration: ${asset.name}`}
-                    description="Configure alert rules and thresholds for this vehicle."
                     backHref={`/fleet-assets/vehicles/${asset.id}`}
-                    backLabel="Back to Vehicle"
+                    backLabel="Vehicle"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Configure alert rules and thresholds for this vehicle.
+                </p>
 
                 <div className="space-y-4">
                     {ALERT_TYPES.map(({ key, label, description, icon: Icon, thresholdLabel, thresholdType }) => {

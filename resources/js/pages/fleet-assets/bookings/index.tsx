@@ -201,6 +201,13 @@ export default function BookingsIndex({
         return new URLSearchParams(window.location.search).has('new');
     });
 
+    // Pre-select the vehicle when the caller passed one (dashboard per-vehicle
+    // "Book" arrives as ?new=1&asset_id=…).
+    const [initialVehicleId] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        return new URLSearchParams(window.location.search).get('asset_id');
+    });
+
     const closeWizard = () => {
         setWizardOpen(false);
         // Strip the shim + conflict-check params so a refresh doesn't reopen
@@ -320,7 +327,7 @@ export default function BookingsIndex({
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Car className="h-4 w-4 text-muted-foreground" />
                                             <span className="text-sm font-semibold">{booking.asset?.name ?? 'No vehicle'}</span>
-                                            <span className="inline-flex items-center rounded-md border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                            <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
                                                 {booking.reference_number ?? '—'}
                                             </span>
                                             <Badge variant={statusVariant(booking.status)}>{booking.status.replace(/_/g, ' ')}</Badge>
@@ -350,6 +357,7 @@ export default function BookingsIndex({
                 <BookVehicleWizard
                     open={wizardOpen}
                     onClose={closeWizard}
+                    initialVehicleId={initialVehicleId}
                     options={booking_options}
                     conflicts={booking_conflicts}
                     vehicleStatus={booking_vehicle_status}

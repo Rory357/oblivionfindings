@@ -1,6 +1,6 @@
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -363,6 +363,13 @@ export default function AssetShow({
         >
             <Head title={`Asset: ${asset.name}`} />
             <PageShell>
+                <FleetCompactHero
+                    pill={`Asset register · ${asset.category}`}
+                    title={asset.name}
+                    backHref="/fleet-assets/assets"
+                    backLabel="Assets"
+                />
+
                 {/* Header Banner Card */}
                 <div className={cn(
                     'rounded-lg border px-5 py-4',

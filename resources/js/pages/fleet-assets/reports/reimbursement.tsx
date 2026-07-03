@@ -1,7 +1,7 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,10 +67,15 @@ export default function MileageReimbursement() {
         >
             <Head title="Mileage Reimbursement" />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Fleet reports · payroll export"
                     title="Mileage Reimbursement"
-                    description="Calculate staff mileage reimbursement based on trip data and the NZ IRD rate."
+                    backHref="/fleet-assets/reports"
+                    backLabel="Reports"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Calculate staff mileage reimbursement based on trip data and the NZ IRD rate.
+                </p>
 
                 {/* Dark KPI Cards (visible when data is loaded) */}
                 {data !== null && data.length > 0 && (

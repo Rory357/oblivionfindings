@@ -1,9 +1,8 @@
 import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
-import { PageHero } from '@/components/page';
+import { CompactHeroStat, FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head } from '@inertiajs/react';
-import { Map } from 'lucide-react';
 
 export default function FleetMapsUsage({ rows, reverse_geocode }) {
     const totalUsage =
@@ -17,20 +16,26 @@ export default function FleetMapsUsage({ rows, reverse_geocode }) {
         >
             <Head title="Fleet Map Usage" />
             <PageShell>
-                <PageHero
-                    icon={Map}
-                    backHref="/fleet-assets"
+                <FleetCompactHero
+                    pill="Fleet reports · Google Maps usage"
                     title="Fleet Map Usage"
-                    description="Basic counts for Google Maps usage by context."
-                    stats={[
-                        { label: 'Total calls', value: totalUsage },
-                        { label: 'Contexts', value: rows?.length ?? 0 },
-                        {
-                            label: 'Reverse geocode',
-                            value: reverse_geocode?.enabled ? 'On' : 'Off',
-                        },
-                    ]}
+                    backHref="/fleet-assets/reports"
+                    backLabel="Reports"
+                    stats={
+                        <>
+                            <CompactHeroStat label="Total calls" value={String(totalUsage)} tone="neutral" />
+                            <CompactHeroStat label="Contexts" value={String(rows?.length ?? 0)} tone="neutral" />
+                            <CompactHeroStat
+                                label="Reverse geocode"
+                                value={reverse_geocode?.enabled ? 'On' : 'Off'}
+                                tone={reverse_geocode?.enabled ? 'success' : 'neutral'}
+                            />
+                        </>
+                    }
                 />
+                <p className="text-sm text-muted-foreground">
+                    Basic counts for Google Maps usage by context.
+                </p>
                 <div className="rounded-md border p-4 text-sm">
                     <div className="mb-2 text-sm font-medium">
                         Reverse geocoding

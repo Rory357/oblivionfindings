@@ -472,16 +472,16 @@ export default function FleetAssetsDashboard({
                             <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
                                 Quick actions
                             </span>
-                            <FleetHeroAction href="/fleet-assets/bookings/create" icon={Bookmark} emphasis>
+                            <FleetHeroAction href="/fleet-assets/bookings?new=1" icon={Bookmark} emphasis>
                                 Book vehicle
                             </FleetHeroAction>
                             <FleetHeroAction href="/fleet-assets/fuel" icon={Fuel}>
                                 Log fuel
                             </FleetHeroAction>
-                            <FleetHeroAction href="/fleet-assets/incidents/create" icon={ShieldAlert}>
+                            <FleetHeroAction href="/fleet-assets/incidents?report=vehicle" icon={ShieldAlert}>
                                 Report incident
                             </FleetHeroAction>
-                            <FleetHeroAction href="/fleet-assets/maintenance/work-orders/create" icon={Wrench}>
+                            <FleetHeroAction href="/fleet-assets/maintenance/work-orders?new=1" icon={Wrench}>
                                 New work order
                             </FleetHeroAction>
                             <Link
@@ -639,13 +639,12 @@ export default function FleetAssetsDashboard({
                 {/* ============================================================ */}
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="Vehicles" value={stats.total_vehicles ?? 0} icon={Car} />
-                    <FleetStatCard label="Bookings" value={stats.recent_bookings_count ?? 0} icon={Bookmark} color="blue" />
-                    {(stats.checked_out_count > 0 || stats.overdue_count > 0) && (
+                    {stats.overdue_count > 0 && (
                         <FleetStatCard
-                            label={stats.overdue_count > 0 ? 'Overdue Returns' : 'Checked Out'}
-                            value={stats.overdue_count > 0 ? stats.overdue_count : stats.checked_out_count}
+                            label="Overdue Returns"
+                            value={stats.overdue_count}
                             icon={Car}
-                            color={stats.overdue_count > 0 ? 'red' : 'amber'}
+                            color="red"
                             href="/fleet-assets/bookings"
                         />
                     )}
@@ -673,9 +672,6 @@ export default function FleetAssetsDashboard({
                     <FleetStatCard label="Fuel MTD" value={formatCurrency(stats.fuel_cost_mtd ?? 0)} icon={Fuel} />
                     {(stats.tracked_residents ?? 0) > 0 && (
                         <FleetStatCard label="Tracked Residents" value={stats.tracked_residents ?? 0} icon={UserSearch} color="purple" />
-                    )}
-                    {(stats.active_outings ?? 0) > 0 && (
-                        <FleetStatCard label="Active Outings" value={stats.active_outings ?? 0} icon={MapPin} color="blue" />
                     )}
                 </div>
 
@@ -722,7 +718,7 @@ export default function FleetAssetsDashboard({
                                     <QuickActionTile icon={MapPin} label="Map" href="/fleet-assets/map" color="#6366f1" />
                                     <QuickActionTile icon={UserSearch} label="Residents" href="/fleet-assets/resident-tracking" count={stats.tracked_residents ?? 0} color="#7c3aed" />
                                     <QuickActionTile icon={MapPin} label="Outings" href="/fleet-assets/outings" color="#06b6d4" />
-                                    <QuickActionTile icon={ShieldAlert} label="Wandering" href="/fleet-assets/wandering-alerts" color="#ef4444" />
+                                    <QuickActionTile icon={ShieldAlert} label="Wandering" href="/fleet-assets/resident-tracking?tab=wandering" color="#ef4444" />
                                     <QuickActionTile icon={Receipt} label="Mileage" href="/fleet-assets/mileage" color="#f59e0b" />
                                 </div>
                             </CardContent>
@@ -906,7 +902,7 @@ export default function FleetAssetsDashboard({
                                             </Badge>
                                         </div>
                                         <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] shrink-0" asChild>
-                                            <Link href={`/fleet-assets/bookings/create?asset_id=${v.id}`}>Book</Link>
+                                            <Link href={`/fleet-assets/bookings?new=1&asset_id=${v.id}`}>Book</Link>
                                         </Button>
                                     </div>
                                 ))}

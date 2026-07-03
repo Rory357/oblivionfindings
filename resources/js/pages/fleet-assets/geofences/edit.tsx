@@ -1,6 +1,6 @@
 import LeafletMap, { MapGeofence } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -223,12 +223,15 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
         >
             <Head title={`Edit Geofence - ${geofence?.name ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill="Geofences · edit boundary"
                     title={`Edit: ${geofence?.name ?? 'Geofence'}`}
-                    description="Modify the geofence boundary and settings."
                     backHref="/fleet-assets/geofences"
-                    backLabel="Back to Geofences"
+                    backLabel="Geofences"
                 />
+                <p className="text-sm text-muted-foreground">
+                    Modify the geofence boundary and settings.
+                </p>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Map + Drawing */}

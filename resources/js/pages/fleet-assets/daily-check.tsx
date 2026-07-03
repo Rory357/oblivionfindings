@@ -1,16 +1,22 @@
-import { ProgressRing, FLEET_COLORS } from '@/components/fleet-charts';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Car,
     CheckCircle,
+    ClipboardCheck,
     Clock,
     XCircle,
 } from 'lucide-react';
@@ -72,57 +78,39 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
         >
             <Head title="Daily Vehicle Checks" />
             <PageShell>
-                <PageHero
-                    title="Daily Vehicle Checks"
-                    description="Complete a quick visual check for each vehicle at your site."
-                />
-
-                {/* Grid: ProgressRing (left) + KPI cards (right) */}
-                <div className="grid gap-4 lg:grid-cols-[auto,1fr]">
-                    <Card className="flex items-center justify-center px-8 py-6">
-                        <ProgressRing
-                            value={checkedPercentage}
-                            size={140}
-                            color={checkedPercentage === 100 ? FLEET_COLORS.primary : checkedPercentage >= 50 ? FLEET_COLORS.secondary : FLEET_COLORS.danger}
-                            label="Completion"
-                        />
-                    </Card>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                    <Car className="h-4 w-4" />
-                                    Total Vehicles
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">{summary.total}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary">
-                                    <CheckCircle className="h-4 w-4" />
-                                    Checked Today
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold text-primary">{summary.checked}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-status-critical">
-                                    <XCircle className="h-4 w-4" />
-                                    Not Checked
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold text-status-critical">{summary.unchecked}</div>
-                            </CardContent>
-                        </Card>
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={ClipboardCheck} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>Daily vehicle checks · today</HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Daily Vehicle Checks</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                Complete a quick visual check for each vehicle at your site.
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
+                            <HeroClusterTile label="Vehicles" value={fmt(summary.total)} caption="at your site" tone="neutral" />
+                            <HeroClusterTile
+                                label="Checked today"
+                                value={fmt(summary.checked)}
+                                caption="done"
+                                tone={summary.checked > 0 ? 'success' : 'neutral'}
+                            />
+                            <HeroClusterTile
+                                label="Not checked"
+                                value={fmt(summary.unchecked)}
+                                caption="still due"
+                                tone={summary.unchecked > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Completion"
+                                value={`${checkedPercentage}%`}
+                                caption="of today's checks"
+                                tone={checkedPercentage === 100 ? 'success' : checkedPercentage >= 50 ? 'warning' : 'critical'}
+                            />
+                        </div>
                     </div>
-                </div>
+                </HeroShell>
 
                 {/* Progress Bar */}
                 <div className="space-y-1">

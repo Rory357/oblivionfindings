@@ -361,7 +361,7 @@ export default function ClientLocationTab({
                             </p>
                         </div>
                         <Link
-                            href="/fleet-assets/resident-tracking/assign"
+                            href="/fleet-assets/resident-tracking?new=1"
                             className="inline-flex items-center gap-1 rounded-md border border-status-info/30 bg-card px-3 py-1.5 text-xs font-medium text-status-info hover:bg-status-info-bg"
                         >
                             Assign Tracker

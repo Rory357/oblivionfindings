@@ -1,6 +1,4 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import { PageHero } from '@/components/page';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +23,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
     toMedicationScanPayload,
@@ -36,13 +42,12 @@ import { applyFormRequestErrors } from '@/lib/form-request-errors';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowLeft,
     ArrowLeftRight,
     Check,
     Download,
-    Package,
     Pill,
     Search,
-    Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import { formatDateTime } from '@/lib/fleet-utils';
@@ -356,24 +361,56 @@ export default function MedicationTransitIndex({
         >
             <Head title="Medication Transit" />
             <PageShell>
-                <PageHero
-                    title="Medication-in-Transit"
-                    description={
-                        transportScope
-                            ? `Medication workflow for transport #${transportScope.id}. Controlled drug audit trail stays scoped to this trip.`
-                            : 'Track medications packed for resident transport. Controlled drug audit trail for NZ compliance.'
-                    }
-                    backHref={
-                        transportScope
-                            ? `/fleet-assets/transports/${transportScope.id}`
-                            : '/fleet-assets/transports'
-                    }
-                    backLabel={
-                        transportScope
-                            ? 'Back to This Transport'
-                            : 'Back to Transport Logs'
-                    }
-                />
+                <HeroShell>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HeroMedallion icon={Pill} />
+                        <div className="min-w-0">
+                            <HeroStatusPill>
+                                {transportScope
+                                    ? `Medication transit · transport #${transportScope.id}`
+                                    : 'Medication transit · all trips'}
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Medication-in-Transit</h1>
+                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
+                                {transportScope
+                                    ? `Medication workflow for transport #${transportScope.id}. Controlled drug audit trail stays scoped to this trip.`
+                                    : 'Track medications packed for resident transport. Controlled drug audit trail for NZ compliance.'}
+                            </p>
+                        </div>
+                        <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-3 lg:ml-auto lg:max-w-xl">
+                            <HeroClusterTile
+                                label="Packed today"
+                                value={fmt(safeStats.total_packed_today)}
+                                caption="for transit today"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                label="Controlled out"
+                                value={fmt(safeStats.controlled_drugs_out)}
+                                caption="CDs in transit"
+                                tone={safeStats.controlled_drugs_out > 0 ? 'critical' : 'success'}
+                            />
+                            <HeroClusterTile
+                                label="Awaiting return"
+                                value={fmt(safeStats.awaiting_return)}
+                                caption="not back at house"
+                                tone={safeStats.awaiting_return > 0 ? 'warning' : 'success'}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FleetHeroAction
+                            href={
+                                transportScope
+                                    ? `/fleet-assets/transports/${transportScope.id}`
+                                    : '/fleet-assets/transports'
+                            }
+                            icon={ArrowLeft}
+                        >
+                            {transportScope ? 'Back to this transport' : 'Back to transport logs'}
+                        </FleetHeroAction>
+                    </div>
+                </HeroShell>
 
                 {transportScope && (
                     <Card className="mb-6 border-primary/20 bg-primary/5">
@@ -424,30 +461,6 @@ export default function MedicationTransitIndex({
                         </CardContent>
                     </Card>
                 )}
-
-                <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                    <FleetStatCard
-                        label="Packed Today"
-                        value={safeStats.total_packed_today}
-                        icon={Package}
-                        color="purple"
-                        subtitle="Medications packed for transit today"
-                    />
-                    <FleetStatCard
-                        label="Controlled Drugs Out"
-                        value={safeStats.controlled_drugs_out}
-                        icon={Shield}
-                        color="red"
-                        subtitle="Controlled drugs currently in transit"
-                    />
-                    <FleetStatCard
-                        label="Awaiting Return"
-                        value={safeStats.awaiting_return}
-                        icon={ArrowLeftRight}
-                        color="amber"
-                        subtitle="Medications not yet returned to house"
-                    />
-                </div>
 
                 <Card className="mb-6">
                     <CardContent className="p-4">

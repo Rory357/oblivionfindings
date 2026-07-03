@@ -313,7 +313,11 @@ class Asset extends Model
 
     public function scopeVehicles($query)
     {
-        return $query->where('category', 'vehicle')
-            ->orWhereHas('categoryRef', fn($q) => $q->where('slug', 'vehicle'));
+        // Grouped so the orWhereHas branch can't escape and poison constraints
+        // chained onto the scope (status/site filters etc.).
+        return $query->where(function ($q) {
+            $q->where('category', 'vehicle')
+                ->orWhereHas('categoryRef', fn ($qq) => $qq->where('slug', 'vehicle'));
+        });
     }
 }

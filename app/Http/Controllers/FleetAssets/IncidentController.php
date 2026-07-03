@@ -56,6 +56,7 @@ class IncidentController extends Controller
                 'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
                 'detail' => null,
                 'report' => $request->input('report'),
+                'report_asset_id' => $request->input('asset_id'),
             ]);
         }
 
@@ -89,6 +90,7 @@ class IncidentController extends Controller
                 return $found ? $this->buildDetailPayload($found) : null;
             },
             'report' => $request->input('report'),
+            'report_asset_id' => $request->input('asset_id'),
         ]);
     }
 
@@ -126,8 +128,11 @@ class IncidentController extends Controller
     {
         // Legacy full-page create is retired in Step 5 (redirects to the list +
         // opens the wizard). Kept here so a direct hit still works meanwhile.
+        // The index only opens the dialog for report ∈ {vehicle, asset,
+        // near_miss}, so default to the vehicle flow while honouring an
+        // explicit mode from the caller; asset_id pre-selects the asset.
         return redirect()->route('fleet-assets.incidents.index', array_filter([
-            'report' => 1,
+            'report' => $request->input('report', 'vehicle'),
             'asset_id' => $request->input('asset_id'),
         ]));
     }

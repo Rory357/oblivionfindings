@@ -183,6 +183,26 @@ export function FleetComplianceBadges({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Reference chip                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Monospace reference-number chip (e.g. WO-2026-0001) — the single canonical
+ *  rendering for stored fleet reference numbers on light surfaces. Renders '—'
+ *  when the record has no reference. */
+export function RefChip({ value, className }: { value: string | null | undefined; className?: string }) {
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground',
+                className,
+            )}
+        >
+            {value ?? '—'}
+        </span>
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Quick actions (on-dark)                                            */
 /* ------------------------------------------------------------------ */
 

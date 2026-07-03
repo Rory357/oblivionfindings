@@ -1,5 +1,6 @@
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { RefChip } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,10 +111,11 @@ export default function WorkOrderShow({ work_order }: Props) {
         >
             <Head title={`Work Order: ${wo.title ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Work order · ${(wo.status ?? 'open').replace(/_/g, ' ')}`}
                     title={wo.title ?? 'Work Order'}
                     backHref="/fleet-assets/maintenance/work-orders"
-                    backLabel="Back to Work Orders"
+                    backLabel="Work Orders"
                 />
 
                 {/* Priority Banner */}
@@ -121,9 +123,7 @@ export default function WorkOrderShow({ work_order }: Props) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Wrench className="h-5 w-5" />
-                            <span className="inline-flex items-center rounded border border-border bg-background/60 px-2 py-0.5 font-mono text-xs font-bold tracking-wide">
-                                {wo.reference_number ?? `#${wo.id}`}
-                            </span>
+                            <RefChip value={wo.reference_number ?? `#${wo.id}`} />
                             <span className="font-medium">{wo.title}</span>
                         </div>
                         <div className="flex items-center gap-2">

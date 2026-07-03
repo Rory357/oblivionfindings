@@ -1,6 +1,6 @@
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -169,10 +169,11 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
         >
             <Head title={`Outing: ${safeOuting.title ?? ''}`} />
             <PageShell>
-                <PageHero
+                <FleetCompactHero
+                    pill={`Outing · ${statusConfig.label}`}
                     title={safeOuting.title ?? 'Outing Details'}
                     backHref="/fleet-assets/outings"
-                    backLabel="Back to Outings"
+                    backLabel="Outings"
                     actions={
                         canManage ? (
                         <div className="flex gap-2">

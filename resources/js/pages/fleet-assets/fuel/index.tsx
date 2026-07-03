@@ -33,18 +33,14 @@ import {
     formatCurrency,
     formatDate,
     formatDistance,
-    formatNumber,
 } from '@/lib/fleet-utils';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     ChevronDown,
     ChevronUp,
     ChevronsUpDown,
-    DollarSign,
     Download,
-    Droplets,
     Fuel,
-    Gauge,
     Plus,
     TrendingDown,
     TrendingUp,
@@ -623,24 +619,6 @@ export default function FuelIndex({
                         value={summary.total_fill_ups ?? 0}
                         icon={Fuel}
                         subtitle="This month"
-                    />
-                    <FleetStatCard
-                        label="TOTAL LITRES"
-                        value={`${formatNumber(summary.total_litres ?? 0)} L`}
-                        icon={Droplets}
-                        subtitle="Fuel consumed"
-                    />
-                    <FleetStatCard
-                        label="TOTAL COST"
-                        value={formatCurrency(summary.total_cost ?? 0)}
-                        icon={DollarSign}
-                        subtitle="Fuel spend"
-                    />
-                    <FleetStatCard
-                        label="AVG COST/LITRE"
-                        value={`$${(summary.avg_cost_per_litre ?? 0).toFixed(3)}`}
-                        icon={Gauge}
-                        subtitle="Average rate"
                     />
                     <FleetStatCard
                         label="BEST EFFICIENCY"

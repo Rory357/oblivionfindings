@@ -2,16 +2,48 @@
  * on thick form/detail pages (transport create/show, outing create) where the
  * page content should keep the vertical space. Same app-primary gradient
  * chrome as HeroShell / the map page's slim band; semantic tokens only. */
-import { HeroStatusPill } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { cn } from '@/lib/utils';
+import { DOT_CLASS, HeroStatusPill, type Tone } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { type ReactNode } from 'react';
+
+/** Compact dot-led metric for the `stats` slot of FleetCompactHero — value-first,
+ *  no tile chrome, so the band stays a single slim row. `href` makes it a link. */
+export function CompactHeroStat({
+    label,
+    value,
+    tone,
+    href,
+}: {
+    label: string;
+    value: string;
+    tone: Tone;
+    href?: string;
+}) {
+    const inner = (
+        <>
+            <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_CLASS[tone])} />
+            <span className="text-lg leading-none font-bold tabular-nums text-primary-foreground">{value}</span>
+            <span className="text-[10.5px] font-semibold tracking-wide text-primary-foreground/70 uppercase">{label}</span>
+        </>
+    );
+    const base = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1';
+    return href ? (
+        <Link href={href} className={cn(base, 'transition-colors hover:bg-primary-foreground/15')}>
+            {inner}
+        </Link>
+    ) : (
+        <span className={base}>{inner}</span>
+    );
+}
 
 export function FleetCompactHero({
     pill,
     title,
     backHref,
     backLabel = 'Back',
+    stats,
     actions,
 }: {
     /** Contextual status-pill text (e.g. "Resident transports · new entry"). */
@@ -19,6 +51,8 @@ export function FleetCompactHero({
     title: ReactNode;
     backHref?: string;
     backLabel?: string;
+    /** Optional slim on-dark stat row (e.g. the live-map counts) — right-aligned before `actions`. */
+    stats?: ReactNode;
     /** Optional on-dark actions rendered at the end of the band. */
     actions?: ReactNode;
 }) {
@@ -40,8 +74,11 @@ export function FleetCompactHero({
                 )}
                 <HeroStatusPill>{pill}</HeroStatusPill>
                 <h1 className="text-lg leading-none font-bold tracking-tight">{title}</h1>
+                {stats && (
+                    <div className="ml-auto flex flex-wrap items-center gap-1">{stats}</div>
+                )}
                 {actions && (
-                    <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>
+                    <div className={cn('flex flex-wrap items-center gap-2', !stats && 'ml-auto')}>{actions}</div>
                 )}
             </div>
         </div>

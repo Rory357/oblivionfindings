@@ -200,6 +200,7 @@ export function BookVehicleWizard({
     conflicts,
     vehicleStatus,
     vehicleBookings,
+    initialVehicleId,
 }: {
     open: boolean;
     onClose: () => void;
@@ -208,6 +209,8 @@ export function BookVehicleWizard({
     conflicts: BookingConflict[] | undefined;
     vehicleStatus: string | null | undefined;
     vehicleBookings: WizardVehicleBooking[] | undefined;
+    /** Pre-selects a vehicle (dashboard per-vehicle "Book" arrives via ?new=1&asset_id=…). */
+    initialVehicleId?: string | null;
 }) {
     const { labels } = usePage().props as { labels?: Record<string, string> };
     const clientSingular = labels?.['client.singular'] ?? 'Client';
@@ -222,8 +225,11 @@ export function BookVehicleWizard({
 
     const [step, setStep] = useState(0);
 
+    // Baked into the form defaults so the open-reset below keeps the
+    // pre-selection, and the vehicle-selected effects (availability fetch)
+    // fire as soon as the modal opens.
     const form = useForm({
-        asset_id: '',
+        asset_id: initialVehicleId ?? '',
         client_id: '',
         purpose: '',
         destination: '',

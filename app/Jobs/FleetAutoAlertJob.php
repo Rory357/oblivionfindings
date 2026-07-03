@@ -192,9 +192,14 @@ class FleetAutoAlertJob implements ShouldQueue
      * signal just emitted for the same threshold.
      *
      * The signal layer dedupes by idempotency key; notifications dedupe here
-     * by "already sent today for this asset+kind" so a re-run of the job (or
-     * an asset matching both a threshold and the expired scan across runs)
-     * can't spam inboxes.
+     * so a re-run of the job (or an asset matching both a threshold and the
+     * expired scan across runs) can't spam inboxes:
+     *
+     * - threshold-crossing "expiring" notices ($daysRemaining set) dedupe
+     *   same-day — each threshold fires once on its day;
+     * - expired/overdue states ($daysRemaining null) have no threshold gating
+     *   and would otherwise re-notify every daily run forever, so they dedupe
+     *   on a 7-day window: first notice immediately, then a weekly reminder.
      */
     private function notifyComplianceDue(
         Asset $asset,
@@ -203,14 +208,18 @@ class FleetAutoAlertJob implements ShouldQueue
         string $severity,
         ?int $daysRemaining,
     ): void {
-        $alreadySentToday = DatabaseNotification::query()
+        $dedupeSince = $daysRemaining === null
+            ? now()->subDays(7)
+            : now()->startOfDay();
+
+        $alreadySent = DatabaseNotification::query()
             ->where('type', FleetComplianceDueNotification::class)
             ->where('data->asset_id', $asset->id)
             ->where('data->kind', $kind)
-            ->whereDate('created_at', now()->toDateString())
+            ->where('created_at', '>=', $dedupeSince)
             ->exists();
 
-        if ($alreadySentToday) {
+        if ($alreadySent) {
             return;
         }
 

@@ -164,7 +164,11 @@ class VehicleBookingController extends Controller
      */
     public function create(Request $request)
     {
-        return redirect('/fleet-assets/bookings?new=1');
+        // Preserve the caller's query (dashboard per-vehicle "Book" passes
+        // asset_id) so the wizard can pre-select the vehicle.
+        return redirect()->to('/fleet-assets/bookings?' . http_build_query(
+            array_merge($request->query(), ['new' => 1]),
+        ));
     }
 
     /**
