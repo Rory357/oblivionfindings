@@ -61,13 +61,28 @@ interface Filters {
     ticket_priority: string | null;
 }
 
+interface MyTicketRow {
+    id: number;
+    title: string;
+    description: string | null;
+    category: string;
+    priority: string;
+    status: string;
+    assignee: string | null;
+    age: string | null;
+    resolved: string | null;
+}
+
 interface Props {
-    requests: RequestRow[];
-    tickets: TicketRow[];
-    stats: Stats;
-    assignees: AssigneeOption[];
-    filters: Filters;
-    can: { manage: boolean };
+    /** Agent-only props — absent from self-service (requester) payloads. */
+    requests?: RequestRow[];
+    tickets?: TicketRow[];
+    stats?: Stats;
+    assignees?: AssigneeOption[];
+    filters?: Filters;
+    /** The viewer's own tickets — present for anyone with it.request. */
+    myTickets: MyTicketRow[];
+    can: { view: boolean; manage: boolean; request: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'IT & Provisioning', href: '/it' }];
@@ -114,26 +129,53 @@ const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function ItIndex({ requests, tickets, stats, assignees, filters, can }: Props) {
-    const [tab, setTab] = useHrTab('provisioning');
+export default function ItIndex({
+    requests = [],
+    tickets = [],
+    stats,
+    assignees = [],
+    filters,
+    myTickets,
+    can,
+}: Props) {
+    const [tab, setTab] = useHrTab(can.view ? 'provisioning' : 'my-tickets');
     const [modal, setModal] = useState<ItModal | null>(null);
     const ctx = useLeaveContextMenu();
 
+    const myOpen = myTickets.filter(
+        (t) => t.status === 'open' || t.status === 'in_progress',
+    ).length;
+
     const tabItems: HrTabItem[] = [
-        {
-            id: 'provisioning',
-            label: 'Provisioning',
-            icon: Server,
-            tone: 'primary',
-            badge: stats.requests_pending + stats.requests_in_progress,
-        },
-        {
-            id: 'tickets',
-            label: 'Tickets',
-            icon: Ticket,
-            tone: 'info',
-            badge: stats.tickets_open,
-        },
+        ...(can.view
+            ? ([
+                  {
+                      id: 'provisioning',
+                      label: 'Provisioning',
+                      icon: Server,
+                      tone: 'primary',
+                      badge: (stats?.requests_pending ?? 0) + (stats?.requests_in_progress ?? 0),
+                  },
+                  {
+                      id: 'tickets',
+                      label: 'Tickets',
+                      icon: Ticket,
+                      tone: 'info',
+                      badge: stats?.tickets_open ?? 0,
+                  },
+              ] as HrTabItem[])
+            : []),
+        ...(can.request
+            ? ([
+                  {
+                      id: 'my-tickets',
+                      label: 'My tickets',
+                      icon: Inbox,
+                      tone: 'success',
+                      badge: myOpen,
+                  },
+              ] as HrTabItem[])
+            : []),
     ];
 
     const applyFilter = (key: keyof Filters, value: string) =>
@@ -141,7 +183,7 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
             '/it',
             {
                 ...Object.fromEntries(
-                    Object.entries(filters).filter(([, v]) => v !== null && v !== ''),
+                    Object.entries(filters ?? {}).filter(([, v]) => v !== null && v !== ''),
                 ),
                 [key]: value === ALL ? undefined : value,
                 tab,
@@ -279,23 +321,35 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                 </p>
                             </div>
                         </div>
-                        {can.manage ? (
+                        {can.manage || can.request ? (
                             <Button
                                 onClick={() => setModal({ type: 'ticket' })}
                                 className="bg-white/15 text-primary-foreground hover:bg-white/25"
                             >
-                                <Plus className="h-4 w-4" /> Log ticket
+                                <Plus className="h-4 w-4" />{' '}
+                                {can.manage ? 'Log ticket' : 'Raise a ticket'}
                             </Button>
                         ) : null}
                     </div>
                     <div className="mt-6 flex flex-wrap gap-2.5">
-                        {[
-                            { label: 'Pending requests', value: stats.requests_pending },
-                            { label: 'In progress', value: stats.requests_in_progress },
-                            { label: 'Fulfilled · 30d', value: stats.requests_done_30d },
-                            { label: 'Open tickets', value: stats.tickets_open },
-                            { label: 'Urgent', value: stats.tickets_urgent },
-                        ].map((s) => (
+                        {(can.view && stats
+                            ? [
+                                  { label: 'Pending requests', value: stats.requests_pending },
+                                  { label: 'In progress', value: stats.requests_in_progress },
+                                  { label: 'Fulfilled · 30d', value: stats.requests_done_30d },
+                                  { label: 'Open tickets', value: stats.tickets_open },
+                                  { label: 'Urgent', value: stats.tickets_urgent },
+                              ]
+                            : [
+                                  { label: 'My open tickets', value: myOpen },
+                                  {
+                                      label: 'Resolved',
+                                      value: myTickets.filter(
+                                          (t) => t.status === 'resolved' || t.status === 'closed',
+                                      ).length,
+                                  },
+                              ]
+                        ).map((s) => (
                             <div
                                 key={s.label}
                                 className="rounded-xl border border-white/15 bg-white/10 px-3.5 py-2"
@@ -311,26 +365,26 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
 
                 <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
 
-                {/* ── Provisioning queue ── */}
-                {tab === 'provisioning' && (
+                {/* ── Provisioning queue (agents) ── */}
+                {can.view && tab === 'provisioning' && (
                     <>
                         <div className="flex flex-wrap items-center gap-2">
                             <FilterSelect
                                 ariaLabel="Filter by status"
-                                value={filters.status ?? ALL}
+                                value={filters?.status ?? ALL}
                                 onChange={(v) => applyFilter('status', v)}
                                 allLabel="All statuses"
                                 options={REQUEST_STATUSES}
                             />
                             <FilterSelect
                                 ariaLabel="Filter by type"
-                                value={filters.type ?? ALL}
+                                value={filters?.type ?? ALL}
                                 onChange={(v) => applyFilter('type', v)}
                                 allLabel="All types"
                                 options={REQUEST_TYPES}
                             />
                             <AssigneeFilter
-                                value={filters.assignee != null ? String(filters.assignee) : ALL}
+                                value={filters?.assignee != null ? String(filters.assignee) : ALL}
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
@@ -427,26 +481,26 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                     </>
                 )}
 
-                {/* ── Ticket queue ── */}
-                {tab === 'tickets' && (
+                {/* ── Ticket queue (agents) ── */}
+                {can.view && tab === 'tickets' && (
                     <>
                         <div className="flex flex-wrap items-center gap-2">
                             <FilterSelect
                                 ariaLabel="Filter by ticket status"
-                                value={filters.ticket_status ?? ALL}
+                                value={filters?.ticket_status ?? ALL}
                                 onChange={(v) => applyFilter('ticket_status', v)}
                                 allLabel="All statuses"
                                 options={TICKET_STATUSES}
                             />
                             <FilterSelect
                                 ariaLabel="Filter by priority"
-                                value={filters.ticket_priority ?? ALL}
+                                value={filters?.ticket_priority ?? ALL}
                                 onChange={(v) => applyFilter('ticket_priority', v)}
                                 allLabel="All priorities"
                                 options={TICKET_PRIORITIES}
                             />
                             <AssigneeFilter
-                                value={filters.assignee != null ? String(filters.assignee) : ALL}
+                                value={filters?.assignee != null ? String(filters.assignee) : ALL}
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
@@ -532,6 +586,85 @@ export default function ItIndex({ requests, tickets, stats, assignees, filters, 
                                             ? 'Log the first helpdesk ticket with the button above.'
                                             : 'The helpdesk queue is clear.'
                                     }
+                                />
+                            ) : null}
+                        </div>
+                    </>
+                )}
+
+                {/* ── My tickets (everyone with it.request) ── */}
+                {can.request && tab === 'my-tickets' && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[12.5px] text-muted-foreground">
+                                Tickets you’ve raised — IT sees new ones instantly.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="ml-auto"
+                                onClick={() => setModal({ type: 'ticket' })}
+                            >
+                                <Plus className="h-3.5 w-3.5" /> Raise a ticket
+                            </Button>
+                        </div>
+
+                        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                            <div className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                <span>Ticket</span>
+                                <span>Assignee</span>
+                                <span>Priority</span>
+                                <span>Status</span>
+                                <span>Raised</span>
+                            </div>
+                            {myTickets.map((t) => (
+                                <div
+                                    key={t.id}
+                                    className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0"
+                                >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
+                                            <Ticket className="h-3.5 w-3.5" />
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-[13px] font-semibold">
+                                                {t.title}
+                                            </span>
+                                            <span className="block truncate text-[11px] text-muted-foreground">
+                                                {label(t.category)}
+                                                {t.description ? ` · ${t.description}` : ''}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <span className="truncate text-[12.5px] text-muted-foreground">
+                                        {t.assignee ?? 'With IT for triage'}
+                                    </span>
+                                    <span>
+                                        <StatusBadge
+                                            variant={priorityVariant[t.priority] ?? 'neutral'}
+                                            size="sm"
+                                        >
+                                            {label(t.priority)}
+                                        </StatusBadge>
+                                    </span>
+                                    <span>
+                                        <StatusBadge
+                                            variant={ticketStatusVariant[t.status] ?? 'neutral'}
+                                            size="sm"
+                                        >
+                                            {label(t.status)}
+                                        </StatusBadge>
+                                    </span>
+                                    <span className="text-[12px] text-muted-foreground">
+                                        {t.age ?? '—'}
+                                    </span>
+                                </div>
+                            ))}
+                            {myTickets.length === 0 ? (
+                                <EmptyState
+                                    icon={Inbox}
+                                    title="No tickets yet"
+                                    blurb="Broken phone? Locked out? Raise it here — IT sees it instantly and you can track progress on this tab."
                                 />
                             ) : null}
                         </div>

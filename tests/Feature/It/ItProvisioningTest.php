@@ -50,13 +50,31 @@ beforeEach(function () {
     $this->svc = app(OnboardingService::class);
 });
 
-test('the /it hub is gated on it.view', function () {
+test('the /it hub is gated on it permissions', function () {
+    // No role at all → no it.request/it.view → no page.
+    $outsider = User::factory()->create(['approved_at' => now()]);
+    $this->actingAs($outsider)->get('/it')->assertForbidden();
+
+    // Self-service: support workers hold it.request and get the requester
+    // view — their own tickets only, never the agent queues.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
 
-    $this->actingAs($worker)->get('/it')->assertForbidden();
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('it/index')
+            ->has('myTickets')
+            ->missing('requests')
+            ->missing('tickets')
+            ->missing('stats')
+            ->missing('assignees')
+            ->where('can.view', false)
+            ->where('can.manage', false)
+            ->where('can.request', true));
 
     $this->actingAs($this->hr)
         ->get('/it')
@@ -66,6 +84,8 @@ test('the /it hub is gated on it.view', function () {
             ->has('requests')
             ->has('tickets')
             ->has('stats')
+            ->has('myTickets')
+            ->where('can.view', true)
             ->has('can.manage'));
 });
 
@@ -187,16 +207,16 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
     expect($ticket->status)->toBe('resolved');
     expect($ticket->resolved_at)->not->toBeNull();
 
-    // Mutations are gated on it.manage.
+    // Triage mutations stay gated on it.manage — a requester can raise
+    // tickets (self-service) but never work the queue.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
     $this->actingAs($worker)
-        ->post('/it/tickets', [
-            'title' => 'Nope',
-            'category' => 'other',
-            'priority' => 'low',
-        ])
+        ->patch("/it/tickets/{$ticket->id}", ['status' => 'open'])
+        ->assertForbidden();
+    $this->actingAs($worker)
+        ->post("/it/tickets/{$ticket->id}/resolve")
         ->assertForbidden();
 });

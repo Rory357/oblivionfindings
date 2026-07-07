@@ -139,16 +139,20 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
-// IT & Provisioning — onboarding-driven provisioning queue + helpdesk
-// tickets. Built from docs/IT_PROVISIONING_WIREFRAME.md.
-Route::middleware(['auth', 'permission:it.view'])->group(function () {
+// IT & Provisioning — self-service helpdesk (everyone on staff raises and
+// tracks their own tickets) + the agent provisioning/ticket queues. Built
+// from docs/IT_PROVISIONING_WIREFRAME.md; ticketing per
+// docs/IT_TICKETING_GAP_ANALYSIS.md.
+Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    // Self-service: raising a ticket needs it.request (or it.manage for
+    // agents logging on behalf of others) — enforced via ItTicketPolicy.
+    Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
 
     Route::middleware('permission:it.manage')->group(function () {
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
-        Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
     });

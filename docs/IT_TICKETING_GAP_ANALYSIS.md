@@ -30,7 +30,7 @@
 ## Build order (master checklist)
 
 - [x] 1. §A audit pass → seed this gap doc (pass 0). *(2026-07-07: findings above; attachment decision recorded — docs/IT_TICKETING_GAP_ANALYSIS.md)*
-- [ ] 2. §P.9 + §B permissions: `it.request` migration/seeder, sidebar gate, route regrouping (`it.tickets.store` out of manage), `ItTicketPolicy` + authz tests.
+- [x] 2. §P.9 + §B permissions: `it.request` migration/seeder, sidebar gate, route regrouping (`it.tickets.store` out of manage), `ItTicketPolicy` + authz tests. *(2026-07-07: `2026_07_07_100001` grant migration + RbacSeeder augment (staff roles only — client/next_of_kin excluded, see IT_TICKETING_QUESTIONS.md §1); routes regrouped `it.request|it.view`; ItTicketPolicy (view/comment/reopen/update/resolve/close/delete); controller capability-split payloads + `myTicketRows` + triage-fields-agent-only on store; `can.it.request` in HandleInertiaRequests (cache v4); sidebar OR-gate; minimal My-tickets tab + requester hero chips + assignee field hidden for requesters (full §B UI lands in item 5). Existing gate test updated to the new spec (worker 200 + requester payload; roleless 403); 10/10 Pest, types/lint/build clean.)*
 - [ ] 3. §P.1–3, 5, 8, 10 migrations + model/relationship/constant updates (+ factories) — schema lands early, in one pass, tested.
 - [ ] 4. Reference generation + backfill; controller pagination + the new server summary payload + saved-view params.
 - [ ] 5. §B My tickets tab + Raise-a-ticket quick modal + created-receipt notification.

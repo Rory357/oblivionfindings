@@ -302,17 +302,21 @@ function CreateTicketWizard({
                                 options={[...PRIORITY_OPTIONS]}
                             />
                         </Field>
-                        <Field label="Assign to" hint="optional — leave unassigned for triage" error={form.errors.assigned_to_user_id}>
-                            <SelectInput
-                                value={form.data.assigned_to_user_id}
-                                onChange={(v) => form.setData('assigned_to_user_id', v)}
-                                placeholder="Unassigned"
-                                options={[
-                                    { value: UNASSIGNED, label: 'Unassigned' },
-                                    ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
-                                ]}
-                            />
-                        </Field>
+                        {/* Triage is agent work — self-service requesters get no
+                            assignee list from the server, so the field hides. */}
+                        {assignees.length > 0 ? (
+                            <Field label="Assign to" hint="optional — leave unassigned for triage" error={form.errors.assigned_to_user_id}>
+                                <SelectInput
+                                    value={form.data.assigned_to_user_id}
+                                    onChange={(v) => form.setData('assigned_to_user_id', v)}
+                                    placeholder="Unassigned"
+                                    options={[
+                                        { value: UNASSIGNED, label: 'Unassigned' },
+                                        ...assignees.map((a) => ({ value: String(a.id), label: a.name })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
                     </div>
                 </WizardStepPane>
             )}
@@ -338,7 +342,9 @@ function CreateTicketWizard({
                                 label="Priority"
                                 value={PRIORITY_OPTIONS.find((p) => p.key === form.data.priority)?.label}
                             />
-                            <ReviewRow label="Assign to" value={assignee?.name} />
+                            {assignees.length > 0 ? (
+                                <ReviewRow label="Assign to" value={assignee?.name} />
+                            ) : null}
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

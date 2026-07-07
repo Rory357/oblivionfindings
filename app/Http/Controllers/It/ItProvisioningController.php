@@ -38,7 +38,9 @@ class ItProvisioningController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.view'), 403);
+        $isAgent = $user && $user->canDo('it.view');
+        $canRequest = $user && $user->canDo('it.request');
+        abort_unless($isAgent || $canRequest, 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
@@ -50,14 +52,23 @@ class ItProvisioningController extends Controller
             'ticket_priority' => $this->cleanFilter($request->query('ticket_priority'), ItTicket::PRIORITIES),
         ];
 
-        return Inertia::render('it/index', [
+        // Requesters get ONLY their own tickets — the agent queues, stats and
+        // staff directory never reach a self-service payload.
+        $agentProps = $isAgent ? [
             'requests' => $this->requestRows($tenantId, $filters),
             'tickets' => $this->ticketRows($tenantId, $filters),
             'stats' => $this->stats($tenantId),
             'assignees' => $this->tenantUserOptions($tenantId),
             'filters' => $filters,
+        ] : [];
+
+        return Inertia::render('it/index', [
+            ...$agentProps,
+            'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user->id) : [],
             'can' => [
-                'manage' => $user->canDo('it.manage'),
+                'view' => $isAgent,
+                'manage' => (bool) ($user && $user->canDo('it.manage')),
+                'request' => $canRequest,
             ],
         ]);
     }
@@ -192,8 +203,11 @@ class ItProvisioningController extends Controller
     public function storeTicket(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
+        abort_unless((bool) $user, 403);
+        $this->authorize('create', ItTicket::class);
         $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $isAgent = $user->canDo('it.manage');
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -206,15 +220,19 @@ class ItProvisioningController extends Controller
             ],
         ]);
 
+        // Triage fields are agent-only: a self-service requester cannot pick
+        // an assignee, whatever the request body says.
+        $assigneeId = $isAgent ? ($validated['assigned_to_user_id'] ?? null) : null;
+
         ItTicket::create([
             'tenant_id' => $tenantId,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'requester_user_id' => $user->id,
-            'assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null,
+            'assigned_to_user_id' => $assigneeId,
             'category' => $validated['category'],
             'priority' => $validated['priority'],
-            'status' => ! empty($validated['assigned_to_user_id']) ? 'in_progress' : 'open',
+            'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
 
         return redirect()->back()->with('success', 'Ticket logged.');
@@ -224,6 +242,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
+        $this->authorize('update', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -253,6 +272,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
+        $this->authorize('resolve', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -342,6 +362,40 @@ class ItProvisioningController extends Controller
                 'status' => $t->status,
                 'requester' => $t->requester?->name ?? 'Unknown',
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
+                'age' => $t->created_at?->diffForHumans(short: true),
+                'resolved' => $t->resolved_at?->diffForHumans(short: true),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The requester's own tickets — the ONLY ticket rows a self-service
+     * payload may carry. No requester column (it is always "you") and no
+     * assignee identity beyond a name, mirroring what a helpdesk shows the
+     * person who raised the ticket.
+     */
+    private function myTicketRows(int $tenantId, int $userId): array
+    {
+        if (! Schema::hasTable('it_tickets')) {
+            return [];
+        }
+
+        return ItTicket::query()
+            ->forTenant($tenantId)
+            ->where('requester_user_id', $userId)
+            ->with('assignee:id,name')
+            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END")
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (ItTicket $t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'description' => $t->description,
+                'category' => $t->category,
+                'priority' => $t->priority,
+                'status' => $t->status,
+                'assignee' => $t->assignee?->name,
                 'age' => $t->created_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
             ])

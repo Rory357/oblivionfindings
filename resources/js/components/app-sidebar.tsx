@@ -569,8 +569,9 @@ function buildIconNavItems({
     }
 
     // IT & Provisioning — the account/access/equipment request queue fed by
-    // onboarding IT tasks, plus the helpdesk ticket queue.
-    if (can?.it?.view) {
+    // onboarding IT tasks, plus the helpdesk. Requesters (everyone on staff)
+    // see it too: they raise and track their own tickets there.
+    if (can?.it?.view || can?.it?.request) {
         items.push({
             id: 'it-provisioning',
             icon: Server,
