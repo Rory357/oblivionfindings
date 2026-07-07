@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
 import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import {
+    ConfirmDialog,
     FundingStreamDialog,
     type EditableFundingStream,
     type FundingStreamRevenueAccount,
@@ -60,16 +61,21 @@ const funderTypeLabels: Record<string, string> = Object.fromEntries(
 export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, canManage = false }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editStream, setEditStream] = useState<EditableFundingStream | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<FundingStream | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Funding Streams', href: '/finance/funding-streams' },
     ];
 
-    function handleDelete(id: number) {
-        if (confirm('Are you sure you want to delete this funding stream?')) {
-            router.delete(`/finance/funding-streams/${id}`);
-        }
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        router.delete(`/finance/funding-streams/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     }
 
     const openEdit = (fs: FundingStream) =>
@@ -182,7 +188,7 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                                             variant="ghost"
                                                             size="icon"
                                                             aria-label={`Delete ${fs.name}`}
-                                                            onClick={() => handleDelete(fs.id)}
+                                                            onClick={() => setDeleteTarget(fs)}
                                                         >
                                                             <Trash2 className="h-4 w-4 text-destructive" />
                                                         </Button>
@@ -215,6 +221,25 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                     revenueAccounts={revenueAccounts}
                 />
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete funding stream?"
+                description={
+                    <>
+                        This permanently deletes the funding stream{' '}
+                        <span className="font-medium text-foreground">
+                            {deleteTarget?.code} — {deleteTarget?.name}
+                        </span>
+                        . This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete funding stream"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

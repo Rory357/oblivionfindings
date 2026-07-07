@@ -2,7 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { AuditExportDialog, TaxTabsFooter } from '@/components/finance';
+import { AuditExportDialog, ConfirmDialog, TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -84,11 +84,16 @@ const getSections = (exp: AuditExport): string[] => {
 
 export default function AuditExportsIndex({ exports: exportData, canManage = false }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<AuditExport | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
-    const handleDelete = (exportItem: AuditExport) => {
-        if (confirm(`Are you sure you want to delete "${exportItem.export_name}"?`)) {
-            router.delete(`/finance/audit-exports/${exportItem.id}`);
-        }
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+        router.delete(`/finance/audit-exports/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     };
 
     const completedCount = exportData.data.filter((e) => e.status === 'completed').length;
@@ -201,7 +206,7 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 aria-label={`Delete ${exp.export_name}`}
-                                                                onClick={() => handleDelete(exp)}
+                                                                onClick={() => setDeleteTarget(exp)}
                                                             >
                                                                 <Trash2 className="w-4 h-4 text-destructive" />
                                                             </Button>
@@ -237,6 +242,25 @@ export default function AuditExportsIndex({ exports: exportData, canManage = fal
             {canManage && (
                 <AuditExportDialog open={createOpen} onClose={() => setCreateOpen(false)} />
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete audit export?"
+                description={
+                    <>
+                        This permanently deletes{' '}
+                        <span className="font-medium text-foreground">
+                            &ldquo;{deleteTarget?.export_name}&rdquo;
+                        </span>{' '}
+                        and its generated file. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete export"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

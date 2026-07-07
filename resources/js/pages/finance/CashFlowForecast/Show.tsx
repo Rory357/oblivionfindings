@@ -15,6 +15,7 @@ import { Printer, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpDown } fr
 import { useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/finance';
 import { type BreadcrumbItem } from '@/types';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -107,6 +108,8 @@ const periodTypeLabels: Record<string, string> = {
 
 export default function CashFlowForecastShow({ forecast, chartData }: PageProps) {
     const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -127,10 +130,11 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
             ? forecast.scenarios.find((s) => s.id === selectedScenario)?.name ?? 'Base'
             : 'Base Forecast';
 
-    function handleDelete() {
-        if (confirm('Are you sure you want to delete this forecast?')) {
-            router.delete(`/finance/cash-flow-forecast/${forecast.id}`);
-        }
+    function confirmDelete() {
+        router.delete(`/finance/cash-flow-forecast/${forecast.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+        });
     }
 
     // Build Recharts data from active forecast data
@@ -198,7 +202,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                     Print
                                 </Button>
                                 {isDraft && (
-                                    <Button variant="destructive" onClick={handleDelete}>
+                                    <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Delete
                                     </Button>
@@ -490,6 +494,23 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title="Delete forecast?"
+                description={
+                    <>
+                        This permanently deletes the forecast{' '}
+                        <span className="font-medium text-foreground">{forecast.name}</span> and its
+                        scenarios. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete forecast"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

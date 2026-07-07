@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/finance';
+import { useState } from 'react';
 
 type TaxRate = {
     id: number;
@@ -197,11 +199,15 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
 
     const status = statusConfig[gstReturn.status] ?? statusConfig.draft;
     const isDraft = gstReturn.status === 'draft';
+    const [fileOpen, setFileOpen] = useState(false);
+    const [filing, setFiling] = useState(false);
 
-    function handleFile() {
-        if (confirm('Are you sure you want to mark this return as filed? This action cannot be undone.')) {
-            router.post(`/finance/gst-returns/${gstReturn.id}/file`);
-        }
+    function confirmFile() {
+        router.post(`/finance/gst-returns/${gstReturn.id}/file`, {}, {
+            onStart: () => setFiling(true),
+            onFinish: () => setFiling(false),
+            onSuccess: () => setFileOpen(false),
+        });
     }
 
     function handlePrint() {
@@ -245,7 +251,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                     Print
                                 </Button>
                                 {isDraft && (
-                                    <Button onClick={handleFile}>
+                                    <Button onClick={() => setFileOpen(true)}>
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Mark as Filed
                                     </Button>
@@ -421,6 +427,22 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={fileOpen}
+                onOpenChange={setFileOpen}
+                title="Mark GST return as filed?"
+                description={
+                    <>
+                        This marks the GST return for IRD period{' '}
+                        <span className="font-medium text-foreground">{gstReturn.ird_period}</span>{' '}
+                        as filed and locks it. This action can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Mark as filed"
+                processing={filing}
+                onConfirm={confirmFile}
+            />
         </AppLayout>
     );
 }

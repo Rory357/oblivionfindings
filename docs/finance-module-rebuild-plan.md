@@ -574,12 +574,24 @@ vendor, receipt) — the mould for C2.
     `->name('finance.')` group collide on `route:cache`.
   - **[~] C2b (agent running):** quote C/E · credit-note C · fixed-asset C/E + disposal · donor-fund C +
     receipt/expenditure transaction modals (post trust journals → PostingPreview) · funding-stream inline→modal.
-  - **[ ] C2c:** the 16 native `confirm()` → ConfirmDialog/alert-dialog (audit-exports, bank-feeds, bills/Show,
-    CashFlowForecast, Consolidation/Show, cost-centres, currencies, funding-streams, fx-reval post, gst-returns
-    mark-filed, invoices send/mark-paid, IrdFilings submit, match-rules, PO approve/convert, payment-run
-    approve/process); period-close guarded impact-preview modal; GST Prepare → wizard ending in the return.
-  *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked; zero native confirm(); every new
-  modal browser-smoked.*
+  - **[x] C2c (confirm sweep):** shared `components/finance/confirm-dialog.tsx` (`ConfirmDialog` wrapping
+    shadcn AlertDialog; `variant` destructive|default, `processing` guard) replaces **all 16 native `confirm()`
+    sites** — audit-exports, bank-feeds, bills/Show, CashFlowForecast (Index+Show), Consolidation/Show,
+    cost-centres, currencies, funding-streams, fx-reval post, gst-returns mark-filed, invoices send + mark-paid,
+    IrdFilings submit, match-rules, PO approve + convert, payment-run approve + process. `grep confirm(` under
+    pages/finance = **0**. **PLUS a guarded period-close impact modal** (fiscal-periods/Index — closing a period
+    previously fired on a single click with NO confirmation; now a destructive ConfirmDialog spelling out that no
+    further journals can post to a closed period). ⚠️ Fixed 3 defects in the sub-agent's partial work: it hit its
+    session limit having (a) DELETED both payment-run confirmations without replacing them (approve/process fired
+    unguarded — a regression), (b) left invoices/Show with the send + mark-paid triggers but NO dialog renders
+    (dead buttons), (c) left 3 confirm() stragglers (PO ×2, IRD ×1). All fixed + re-verified: every touched file
+    renders its dialog and every trigger opens it. types/eslint/build green.
+  - **[ ] C2c leftover — GST Prepare page → wizard.** `gst-returns/Prepare.tsx` is still a full page (frequency
+    + period selection → creates the return). It WORKS (no dead button) — this is purely an idiom upgrade to a
+    WizardShell dialog on the gst-returns index, deferred as a small follow-up (lower priority than banking the
+    verified conversion + confirm sweep).
+  *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked (except GST-Prepare, tracked above);
+  zero native confirm() ✓; every new modal browser-smoked.*
 - **[ ] C3 — Consistency sweep** (mechanical, per-hub ticks, screenshot-diff each): money.tsx migration (~80
   files); StatusBadge adoption (~25); shared `chart-palette.ts` reading CSS vars (kill hex in 10+ files);
   EmptyState/EmptySearch + Skeleton adoption; **count badges wired on every hub tab** (controllers pass counts);

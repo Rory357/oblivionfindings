@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
+import { ConfirmDialog } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type GstReturn = {
@@ -108,18 +110,19 @@ export default function IrdFilingShow({ filing }: PageProps) {
     const amount = Number(filing.total_amount);
     const isRefund = amount < 0;
 
+    const [confirmSubmit, setConfirmSubmit] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
     function handleValidate() {
         router.post(`/finance/ird-filings/${filing.id}/validate`);
     }
 
     function handleSubmit() {
-        if (
-            confirm(
-                'Are you sure you want to submit this filing to IRD? This will transmit the data to Inland Revenue.',
-            )
-        ) {
-            router.post(`/finance/ird-filings/${filing.id}/submit`);
-        }
+        router.post(`/finance/ird-filings/${filing.id}/submit`, {}, {
+            onStart: () => setSubmitting(true),
+            onFinish: () => setSubmitting(false),
+            onSuccess: () => setConfirmSubmit(false),
+        });
     }
 
     return (
@@ -158,7 +161,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                     </Button>
                                 )}
                                 {canSubmit && (
-                                    <Button onClick={handleSubmit}>
+                                    <Button onClick={() => setConfirmSubmit(true)}>
                                         <Send className="mr-2 h-4 w-4" />
                                         Submit to IRD
                                     </Button>
@@ -357,6 +360,16 @@ export default function IrdFilingShow({ filing }: PageProps) {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmSubmit}
+                onOpenChange={setConfirmSubmit}
+                title="Submit filing to IRD?"
+                description="This transmits the filing data to Inland Revenue. Only simulated submissions are made unless a live IRD gateway is configured."
+                confirmLabel="Submit to IRD"
+                processing={submitting}
+                onConfirm={handleSubmit}
+            />
         </AppLayout>
     );
 }

@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeftRight, Plus, TrendingUp, TrendingDown, Globe } from 'lucide-react';
+import { useState } from 'react';
 
 type Revaluation = {
     id: number;
@@ -48,10 +49,16 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function FxRevaluationsIndex({ revaluations }: PageProps) {
-    function handlePost(id: number) {
-        if (confirm('Are you sure you want to post this revaluation to the General Ledger? This will create a journal entry.')) {
-            router.post(`/finance/fx-revaluations/${id}/post`);
-        }
+    const [postTarget, setPostTarget] = useState<Revaluation | null>(null);
+    const [posting, setPosting] = useState(false);
+
+    function confirmPost() {
+        if (!postTarget) return;
+        router.post(`/finance/fx-revaluations/${postTarget.id}/post`, {}, {
+            onStart: () => setPosting(true),
+            onFinish: () => setPosting(false),
+            onSuccess: () => setPostTarget(null),
+        });
     }
 
     // Compute KPI: total gain/loss across all revaluations on current page
@@ -185,7 +192,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => handlePost(reval.id)}
+                                                                onClick={() => setPostTarget(reval)}
                                                             >
                                                                 Post to GL
                                                             </Button>
@@ -216,6 +223,25 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!postTarget}
+                onOpenChange={(open) => !open && setPostTarget(null)}
+                title="Post revaluation to the General Ledger?"
+                description={
+                    <>
+                        This posts the FX revaluation dated{' '}
+                        <span className="font-medium text-foreground">
+                            {postTarget ? formatDate(postTarget.revaluation_date) : ''}
+                        </span>{' '}
+                        and creates the journal entry for the unrealised gain/loss. Once posted it
+                        can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Post to GL"
+                processing={posting}
+                onConfirm={confirmPost}
+            />
         </AppLayout>
     );
 }

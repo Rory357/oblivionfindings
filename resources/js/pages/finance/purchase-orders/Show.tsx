@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ConfirmDialog } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type Account = { id: number; code: string; name: string };
@@ -68,17 +70,23 @@ export default function PurchaseOrderShow() {
     const canApprove = po.status === 'draft';
     const canEdit = po.status === 'draft';
     const canConvert = ['approved', 'partially_received', 'received'].includes(po.status);
+    const [confirmAction, setConfirmAction] = useState<'approve' | 'convert' | null>(null);
+    const [processing, setProcessing] = useState(false);
 
     function handleApprove() {
-        if (confirm('Are you sure you want to approve this purchase order?')) {
-            router.post(`/finance/purchase-orders/${po.id}/approve`);
-        }
+        router.post(`/finance/purchase-orders/${po.id}/approve`, {}, {
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => setConfirmAction(null),
+        });
     }
 
     function handleConvertToBill() {
-        if (confirm('Convert this purchase order to a bill?')) {
-            router.post(`/finance/purchase-orders/${po.id}/convert-to-bill`);
-        }
+        router.post(`/finance/purchase-orders/${po.id}/convert-to-bill`, {}, {
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => setConfirmAction(null),
+        });
     }
 
     return (
@@ -104,10 +112,10 @@ export default function PurchaseOrderShow() {
                                     </Link>
                                 )}
                                 {canApprove && (
-                                    <Button onClick={handleApprove}>Approve</Button>
+                                    <Button onClick={() => setConfirmAction('approve')}>Approve</Button>
                                 )}
                                 {canConvert && (
-                                    <Button variant="outline" onClick={handleConvertToBill}>Convert to Bill</Button>
+                                    <Button variant="outline" onClick={() => setConfirmAction('convert')}>Convert to Bill</Button>
                                 )}
                             </>
                         }
@@ -244,6 +252,25 @@ export default function PurchaseOrderShow() {
                     </Card>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmAction === 'approve'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Approve purchase order?"
+                description={`This approves ${po.po_number} so it can be received and converted to a bill.`}
+                confirmLabel="Approve PO"
+                processing={processing}
+                onConfirm={handleApprove}
+            />
+            <ConfirmDialog
+                open={confirmAction === 'convert'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Convert to bill?"
+                description={`This creates a draft supplier bill from ${po.po_number}. You can review and edit the bill before approving it.`}
+                confirmLabel="Convert to bill"
+                processing={processing}
+                onConfirm={handleConvertToBill}
+            />
         </AppLayout>
     );
 }

@@ -8,6 +8,7 @@ export * from './audit-export-dialog';
 export * from './bank-account-dialog';
 export * from './banking-hub';
 export * from './cash-flow-forecast-dialog';
+export * from './confirm-dialog';
 export * from './credit-note-dialog';
 export * from './donor-fund-dialog';
 export * from './donor-fund-transaction-dialog';

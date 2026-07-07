@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { CashFlowForecastDialog, ReportsTabsFooter } from '@/components/finance';
+import { CashFlowForecastDialog, ConfirmDialog, ReportsTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,11 +67,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function CashFlowForecastIndex({ forecasts, canManage = false }: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<Forecast | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
-    function handleDelete(id: number) {
-        if (confirm('Are you sure you want to delete this forecast?')) {
-            router.delete(`/finance/cash-flow-forecast/${id}`);
-        }
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        router.delete(`/finance/cash-flow-forecast/${deleteTarget.id}`, {
+            onStart: () => setDeleting(true),
+            onFinish: () => setDeleting(false),
+            onSuccess: () => setDeleteTarget(null),
+        });
     }
 
     return (
@@ -187,7 +192,7 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                                                 size="icon"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleDelete(forecast.id);
+                                                                    setDeleteTarget(forecast);
                                                                 }}
                                                             >
                                                                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -223,6 +228,25 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
             {canManage && (
                 <CashFlowForecastDialog open={createOpen} onClose={() => setCreateOpen(false)} />
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+                title="Delete forecast?"
+                description={
+                    <>
+                        This permanently deletes the forecast{' '}
+                        <span className="font-medium text-foreground">
+                            {deleteTarget?.name}
+                        </span>{' '}
+                        and its scenarios. This can&rsquo;t be undone.
+                    </>
+                }
+                confirmLabel="Delete forecast"
+                variant="destructive"
+                processing={deleting}
+                onConfirm={confirmDelete}
+            />
         </AppLayout>
     );
 }

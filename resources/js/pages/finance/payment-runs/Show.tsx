@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
 import { Banknote, CheckCircle, Download, FileText, Play } from 'lucide-react';
+import { ConfirmDialog } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { useState } from 'react';
 
@@ -57,6 +58,7 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 export default function PaymentRunShow({ paymentRun }: PageProps) {
     const [approving, setApproving] = useState(false);
     const [processingRun, setProcessingRun] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<'approve' | 'process' | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -69,6 +71,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         router.post(`/finance/payment-runs/${paymentRun.id}/approve`, {}, {
             preserveScroll: true,
             onFinish: () => setApproving(false),
+            onSuccess: () => setConfirmAction(null),
         });
     };
 
@@ -77,6 +80,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         router.post(`/finance/payment-runs/${paymentRun.id}/process`, {}, {
             preserveScroll: true,
             onFinish: () => setProcessingRun(false),
+            onSuccess: () => setConfirmAction(null),
         });
     };
 
@@ -96,13 +100,13 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                         actions={
                             <>
                                 {paymentRun.status === 'draft' && (
-                                    <Button onClick={handleApprove} disabled={approving} variant="outline">
+                                    <Button onClick={() => setConfirmAction('approve')} disabled={approving} variant="outline">
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         {approving ? 'Approving...' : 'Approve'}
                                     </Button>
                                 )}
                                 {paymentRun.status === 'approved' && (
-                                    <Button onClick={handleProcess} disabled={processingRun}>
+                                    <Button onClick={() => setConfirmAction('process')} disabled={processingRun}>
                                         <Play className="mr-2 h-4 w-4" />
                                         {processingRun ? 'Processing...' : 'Process'}
                                     </Button>
@@ -269,6 +273,25 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={confirmAction === 'approve'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Approve payment run?"
+                description="This approves the payment run so it can be processed. You can still process or cancel it afterwards."
+                confirmLabel="Approve run"
+                processing={approving}
+                onConfirm={handleApprove}
+            />
+            <ConfirmDialog
+                open={confirmAction === 'process'}
+                onOpenChange={(open) => !open && setConfirmAction(null)}
+                title="Process payment run?"
+                description="This posts the payment run to the general ledger and generates the bank payment file. This can't be undone."
+                confirmLabel="Process run"
+                processing={processingRun}
+                onConfirm={handleProcess}
+            />
         </AppLayout>
     );
 }

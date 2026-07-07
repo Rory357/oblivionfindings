@@ -33,6 +33,7 @@ import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } fr
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/finance';
 import { type BreadcrumbItem } from '@/types';
 
 type Entity = {
@@ -285,10 +286,16 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
         { title: group.name, href: `/finance/consolidation/${group.id}` },
     ];
 
-    function handleRemoveEntity(entityId: number) {
-        if (confirm('Are you sure you want to remove this entity from the group?')) {
-            router.delete(`/finance/consolidation/${group.id}/entities/${entityId}`);
-        }
+    const [removeTarget, setRemoveTarget] = useState<Entity | null>(null);
+    const [removing, setRemoving] = useState(false);
+
+    function confirmRemoveEntity() {
+        if (!removeTarget) return;
+        router.delete(`/finance/consolidation/${group.id}/entities/${removeTarget.id}`, {
+            onStart: () => setRemoving(true),
+            onFinish: () => setRemoving(false),
+            onSuccess: () => setRemoveTarget(null),
+        });
     }
 
     // KPI calculations
@@ -420,7 +427,8 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => handleRemoveEntity(entity.id)}
+                                                    aria-label={`Remove ${entity.entity_name}`}
+                                                    onClick={() => setRemoveTarget(entity)}
                                                 >
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
@@ -497,6 +505,26 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!removeTarget}
+                onOpenChange={(open) => !open && setRemoveTarget(null)}
+                title="Remove entity from group?"
+                description={
+                    <>
+                        This removes{' '}
+                        <span className="font-medium text-foreground">
+                            {removeTarget?.entity_name}
+                        </span>{' '}
+                        from this consolidation group. Its account mappings will no longer be
+                        included in future runs.
+                    </>
+                }
+                confirmLabel="Remove entity"
+                variant="destructive"
+                processing={removing}
+                onConfirm={confirmRemoveEntity}
+            />
         </AppLayout>
     );
 }

@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, ConfirmDialog } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -106,6 +106,8 @@ export default function BankFeedsIndex({
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [syncing, setSyncing] = useState<number | null>(null);
     const [syncingAll, setSyncingAll] = useState(false);
+    const [disconnectTarget, setDisconnectTarget] = useState<BankFeed | null>(null);
+    const [disconnecting, setDisconnecting] = useState(false);
 
     const form = useForm({
         bank_account_id: '',
@@ -141,9 +143,13 @@ export default function BankFeedsIndex({
         });
     };
 
-    const handleDelete = (feedId: number) => {
-        if (!confirm('Are you sure you want to disconnect this bank feed?')) return;
-        router.delete(`/finance/bank-feeds/${feedId}`);
+    const confirmDisconnect = () => {
+        if (!disconnectTarget) return;
+        router.delete(`/finance/bank-feeds/${disconnectTarget.id}`, {
+            onStart: () => setDisconnecting(true),
+            onFinish: () => setDisconnecting(false),
+            onSuccess: () => setDisconnectTarget(null),
+        });
     };
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -383,7 +389,7 @@ export default function BankFeedsIndex({
                                             <Button
                                                 variant="destructive"
                                                 size="sm"
-                                                onClick={() => handleDelete(feed.id)}
+                                                onClick={() => setDisconnectTarget(feed)}
                                             >
                                                 <Trash2 className="w-4 h-4 mr-1" />
                                                 Disconnect
@@ -402,6 +408,25 @@ export default function BankFeedsIndex({
                     </div>
                 )}
             </PageLayout>
+
+            <ConfirmDialog
+                open={!!disconnectTarget}
+                onOpenChange={(open) => !open && setDisconnectTarget(null)}
+                title="Disconnect bank feed?"
+                description={
+                    <>
+                        This disconnects the automated feed for{' '}
+                        <span className="font-medium text-foreground">
+                            {disconnectTarget?.bank_account_name}
+                        </span>
+                        . Transactions will stop importing until you reconnect it.
+                    </>
+                }
+                confirmLabel="Disconnect feed"
+                variant="destructive"
+                processing={disconnecting}
+                onConfirm={confirmDisconnect}
+            />
         </AppLayout>
     );
 }
