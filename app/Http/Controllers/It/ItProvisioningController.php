@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Domain\It\ItStaffDirectory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItProvisioningRequest;
@@ -257,7 +258,7 @@ class ItProvisioningController extends Controller
         // the agents working the queue — never to the actor themselves.
         $user->notify(new TicketCreatedNotification($ticket, 'receipt'));
         if ($ticket->priority === 'urgent') {
-            $agents = $this->usersWithItManage($tenantId)
+            $agents = ItStaffDirectory::agents($tenantId)
                 ->reject(fn (User $agent) => $agent->id === $user->id);
             NotificationFacade::send($agents, new TicketCreatedNotification($ticket, 'urgent_alert'));
         }
@@ -670,29 +671,4 @@ class ItProvisioningController extends Controller
         return in_array($value, $allowed, true) ? $value : null;
     }
 
-    /**
-     * Tenant users holding it.manage (role grant or allow-override, minus
-     * deny-overrides) — the audience for queue alerts. Mirrors the proven
-     * HrNotificationService::getUsersWithPermission query shape.
-     *
-     * @return \Illuminate\Support\Collection<int, User>
-     */
-    private function usersWithItManage(int $tenantId)
-    {
-        return User::query()
-            // Users are tenanted by organization_id; a NULL means the default
-            // tenant on this single-tenant install — don't silently drop them.
-            ->where(fn ($q) => $q->where('organization_id', $tenantId)->orWhereNull('organization_id'))
-            ->where(function ($query) {
-                $query->whereHas('roles.permissions', fn ($q) => $q->where('key', 'it.manage'))
-                    ->orWhereHas('permissionOverrides', fn ($q) => $q
-                        ->where('permissions.key', 'it.manage')
-                        ->where('permission_user.allowed', true));
-            })
-            ->whereDoesntHave('permissionOverrides', fn ($q) => $q
-                ->where('permissions.key', 'it.manage')
-                ->where('permission_user.allowed', false))
-            ->distinct()
-            ->get();
-    }
 }

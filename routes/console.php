@@ -79,6 +79,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:10');
 
+// IT helpdesk SLA watchdog: hourly at-risk/breach transitions plus the
+// unassigned-urgent escalation (idempotent — one notification per transition).
+app(Schedule::class)
+    ->command('it:check-sla')
+    ->timezone('Pacific/Auckland')
+    ->hourly();
+
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)
     ->command('followups:remind-overdue')
