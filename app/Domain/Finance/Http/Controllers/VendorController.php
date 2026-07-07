@@ -56,6 +56,50 @@ class VendorController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) vendor list as a sanitised CSV. Mirrors the index's
+     * search/type/active filters so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinVendor::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $vendors = FinVendor::query()
+            ->forOrganization($orgId)
+            ->with('defaultExpenseAccount:id,code,name')
+            ->when($request->search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->vendor_type, function ($query, $type) {
+                $query->where('vendor_type', $type);
+            })
+            ->when($request->has('is_active') && $request->is_active !== '', function ($query) use ($request) {
+                $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+            })
+            ->orderBy('name')
+            ->get();
+
+        $rows = $vendors->map(fn (FinVendor $v) => [
+            $v->name,
+            $v->vendor_type,
+            $v->email,
+            $v->phone,
+            optional($v->defaultExpenseAccount)->name,
+            $v->is_active ? 'Yes' : 'No',
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'vendors-'.now()->format('Y-m-d').'.csv',
+            ['Name', 'Type', 'Email', 'Phone', 'Default Account', 'Active'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $this->authorize('create', FinVendor::class);

@@ -39,7 +39,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash } from 'lucide-react';
+import { Pencil, Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash, Download } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
 interface FixedAsset {
@@ -194,6 +194,12 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <a href={`/finance/fixed-assets/export?${new URLSearchParams(Object.entries({ category: filters.category ?? '', status: filters.status ?? '', search: filters.search ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
                                 <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
                                     <DialogTrigger asChild>
                                         <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">

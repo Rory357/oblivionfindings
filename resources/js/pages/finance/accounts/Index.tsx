@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/collapsible';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Plus, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronRight, DollarSign, Download, Plus, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -226,12 +226,20 @@ export default function AccountsIndex({
                             { label: 'Account types', value: accountTypes.length },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Account
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href="/finance/accounts/export">
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Account
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<LedgerTabsFooter active="accounts" />}
                     />

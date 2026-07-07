@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -57,6 +58,11 @@ class FinCreditNote extends Model
     public function bill(): BelongsTo
     {
         return $this->belongsTo(FinBill::class, 'bill_id');
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
     }
 
     public function journal(): BelongsTo

@@ -52,6 +52,42 @@ class PaymentRunController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) payment-run list as a sanitised CSV. Mirrors the
+     * index's status filter so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $orgId = $request->user()->organization_id;
+
+        $query = FinPaymentRun::forOrganization($orgId)
+            ->with('bankAccount:id,name,bank_name')
+            ->withCount('items')
+            ->orderByDesc('payment_date')
+            ->orderByDesc('created_at');
+
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+
+        $rows = $query->get()->map(fn (FinPaymentRun $run) => [
+            $run->run_number,
+            optional($run->payment_date)->format('Y-m-d'),
+            $run->bankAccount
+                ? trim($run->bankAccount->name.' ('.$run->bankAccount->bank_name.')')
+                : null,
+            (string) $run->items_count,
+            number_format((float) $run->total_amount, 2, '.', ''),
+            $run->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'payment-runs-'.now()->format('Y-m-d').'.csv',
+            ['Run #', 'Payment Date', 'Bank Account', 'Item Count', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
     public function create(Request $request)
     {
         $orgId = $request->user()->organization_id;

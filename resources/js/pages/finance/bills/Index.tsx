@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine } from 'lucide-react';
+import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -131,12 +131,20 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                             { label: 'Due this week', value: formatMoney(summary.due_this_week) },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewBillOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Bill
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/bills/export?${new URLSearchParams(Object.entries({ status, vendor_id: vendorId, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewBillOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Bill
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="bills" />}
                     />

@@ -64,6 +64,34 @@ class DonorFundController extends Controller
         ]);
     }
 
+    /**
+     * Stream the donor-fund list as a sanitised CSV. The index has no filters,
+     * so this mirrors its ordering and exports every fund for the organisation.
+     */
+    public function export(Request $request)
+    {
+        $orgId = $request->user()->organization_id;
+
+        $rows = FinDonorFund::forOrganization($orgId)
+            ->orderBy('fund_name')
+            ->get()
+            ->map(fn (FinDonorFund $fund) => [
+                $fund->fund_code,
+                $fund->fund_name,
+                $fund->donor_name,
+                number_format((float) $fund->total_received, 2, '.', ''),
+                number_format((float) $fund->total_spent, 2, '.', ''),
+                number_format((float) $fund->available_balance, 2, '.', ''),
+                $fund->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'donor-funds-'.now()->format('Y-m-d').'.csv',
+            ['Fund Code', 'Name', 'Donor', 'Total Received', 'Total Spent', 'Balance', 'Status'],
+            $rows,
+        );
+    }
+
     /** Active liability/equity GL accounts for the donor-fund modal. */
     private function fundGlAccounts(?int $orgId)
     {

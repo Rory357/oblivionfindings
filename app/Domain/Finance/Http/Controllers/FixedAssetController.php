@@ -88,6 +88,51 @@ class FixedAssetController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) fixed-asset list as a sanitised CSV. Honours the same
+     * category/status/search filters as the index. Book value uses the model's
+     * getBookValue() accessor (purchase cost − accumulated depreciation).
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinFixedAsset::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinFixedAsset::forOrganization($orgId);
+
+        if ($request->filled('category')) {
+            $query->ofCategory($request->input('category'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('asset_name', 'like', "%{$search}%")
+                ->orWhere('asset_tag', 'like', "%{$search}%"));
+        }
+
+        $rows = $query->orderBy('asset_name')
+            ->get()
+            ->map(fn (FinFixedAsset $asset) => [
+                $asset->asset_tag,
+                $asset->asset_name,
+                $asset->category,
+                optional($asset->purchase_date)->format('Y-m-d'),
+                number_format((float) $asset->purchase_cost, 2, '.', ''),
+                number_format((float) $asset->accumulated_depreciation, 2, '.', ''),
+                number_format($asset->getBookValue(), 2, '.', ''),
+                $asset->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'fixed-assets-'.now()->format('Y-m-d').'.csv',
+            ['Asset Tag', 'Name', 'Category', 'Purchase Date', 'Purchase Cost', 'Accumulated Depreciation', 'Book Value', 'Status'],
+            $rows,
+        );
+    }
+
     /** Active GL accounts of a type for the fixed-asset modal pickers. */
     private function glAccounts(?int $orgId, string $type)
     {

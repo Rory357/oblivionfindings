@@ -71,6 +71,44 @@ class IrdFilingController extends Controller
     }
 
     /**
+     * Stream the (filtered) IRD-filing list as a sanitised CSV. Honours the same
+     * filing_type/status filters as the index so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $orgId = $request->user()->organization_id;
+
+        $query = FinIrdFiling::forOrganization($orgId);
+
+        if ($request->filled('filing_type')) {
+            $query->ofType($request->input('filing_type'));
+        }
+
+        if ($request->filled('status')) {
+            $query->ofStatus($request->input('status'));
+        }
+
+        $rows = $query->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (FinIrdFiling $f) => [
+                $f->filing_type,
+                optional($f->period_from)->format('Y-m-d'),
+                optional($f->period_to)->format('Y-m-d'),
+                number_format((float) $f->total_amount, 2, '.', ''),
+                $f->status,
+                optional($f->submitted_at)->format('Y-m-d H:i'),
+                $f->ird_reference,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'ird-filings-'.now()->format('Y-m-d').'.csv',
+            ['Filing Type', 'Period From', 'Period To', 'Total Amount', 'Status', 'Submitted At', 'IRD Reference'],
+            $rows,
+        );
+    }
+
+    /**
      * Create a filing from an existing GST return.
      */
     public function createFromGst(Request $request, FinGstReturn $gstReturn)

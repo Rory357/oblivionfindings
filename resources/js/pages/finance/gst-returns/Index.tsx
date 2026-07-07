@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
+import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download } from 'lucide-react';
 import { useMemo } from 'react';
 
 type GstReturn = {
@@ -101,12 +101,20 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                             { label: 'Drafts', value: kpis.draftCount },
                         ]}
                         actions={
-                            <Link href={'/finance/gst-returns/prepare'}>
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Prepare Return
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/gst-returns/export?${new URLSearchParams(Object.entries({ status: filters.status ?? '', year: filters.year ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            </Link>
+                                <Link href={'/finance/gst-returns/prepare'}>
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Prepare Return
+                                    </Button>
+                                </Link>
+                            </div>
                         }
                         footer={<TaxTabsFooter active="gst-returns" />}
                     />

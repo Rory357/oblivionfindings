@@ -48,6 +48,45 @@ class GstReturnController extends Controller
     }
 
     /**
+     * Stream the (filtered) GST-return list as a sanitised CSV. Honours the same
+     * status/year filters as the index so "Export" respects the current view.
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinGstReturn::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinGstReturn::forOrganization($orgId);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('year')) {
+            $query->whereYear('period_end', (int) $request->input('year'));
+        }
+
+        $rows = $query->orderByDesc('period_end')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (FinGstReturn $r) => [
+                optional($r->period_start)->format('Y-m-d').' – '.optional($r->period_end)->format('Y-m-d'),
+                $r->ird_period,
+                optional($r->period_start)->format('Y-m-d'),
+                optional($r->period_end)->format('Y-m-d'),
+                number_format((float) $r->gst_payable, 2, '.', ''),
+                $r->status,
+            ]);
+
+        return $this->streamSanitizedCsv(
+            'gst-returns-'.now()->format('Y-m-d').'.csv',
+            ['Period', 'IRD Period', 'Period Start', 'Period End', 'GST Payable', 'Status'],
+            $rows,
+        );
+    }
+
+    /**
      * Show the form to prepare a new GST return.
      */
     public function prepare(Request $request)

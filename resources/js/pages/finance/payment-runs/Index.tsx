@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, Plus, Send } from 'lucide-react';
+import { Banknote, Plus, Send, Download } from 'lucide-react';
 
 type PaymentRun = {
     id: number;
@@ -70,12 +70,20 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                             { label: 'Drafts', value: draftCount },
                         ]}
                         actions={
-                            <Link href="/finance/payment-runs/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Payment Run
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/payment-runs/export?${new URLSearchParams(Object.entries({ status: filters.status }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            </Link>
+                                <Link href="/finance/payment-runs/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Payment Run
+                                    </Button>
+                                </Link>
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="payment-runs" />}
                     />

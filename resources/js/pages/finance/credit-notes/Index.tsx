@@ -16,7 +16,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Plus, FileMinus } from 'lucide-react';
+import { FileText, Plus, FileMinus, Download } from 'lucide-react';
 import { useState } from 'react';
 
 interface CreditNote {
@@ -101,12 +101,20 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                             { label: 'AR', value: receivableCount },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Credit Note
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/credit-notes/export?${new URLSearchParams(Object.entries({ type, status }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Credit Note
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="credit-notes" />}
                     />

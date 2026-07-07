@@ -104,6 +104,27 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->name('clients.financials')
         ->middleware('permission:finance.dashboard');
 
+    // ── CSV list exports (C3d) ───────────────────────────────────────────
+    // Registered BEFORE the resource routes so "/x/export" is matched ahead of
+    // "/x/{param}" (Laravel matches in registration order). Each streams the
+    // filtered list via the controller's export() + SanitizesCsvOutput trait.
+    // Permission mirrors each list's index route. (invoices.export lives inline
+    // in the AR block — the reference implementation.)
+    Route::get('/bills/export', [BillController::class, 'export'])->name('bills.export')->middleware('permission:finance.ap.view');
+    Route::get('/purchase-orders/export', [PurchaseOrderController::class, 'export'])->name('purchase-orders.export')->middleware('permission:finance.ap.view');
+    Route::get('/payment-runs/export', [PaymentRunController::class, 'export'])->name('payment-runs.export')->middleware('permission:finance.ap.view');
+    Route::get('/vendors/export', [VendorController::class, 'export'])->name('vendors.export')->middleware('permission:finance.ap.view');
+    Route::get('/credit-notes/export', [CreditNoteController::class, 'export'])->name('credit-notes.export')->middleware('permission:finance.ap.view');
+    Route::get('/quotes/export', [QuoteController::class, 'export'])->name('quotes.export')->middleware('permission:finance.ar.view');
+    Route::get('/journals/export', [JournalController::class, 'export'])->name('journals.export')->middleware('permission:finance.ledger.view');
+    Route::get('/accounts/export', [ChartOfAccountsController::class, 'export'])->name('accounts.export')->middleware('permission:finance.ledger.view');
+    Route::get('/fixed-assets/export', [FixedAssetController::class, 'export'])->name('fixed-assets.export')->middleware('permission:finance.assets.view');
+    Route::get('/gst-returns/export', [GstReturnController::class, 'export'])->name('gst-returns.export')->middleware('permission:finance.tax.view');
+    Route::get('/ird-filings/export', [IrdFilingController::class, 'export'])->name('ird-filings.export')->middleware('permission:finance.tax.manage');
+    Route::get('/donor-funds/export', [DonorFundController::class, 'export'])->name('donor-funds.export')->middleware('permission:finance.reports.view');
+    Route::get('/bank-transactions/export', [BankTransactionController::class, 'export'])->name('bank-transactions.export')->middleware('permission:finance.bank.view');
+    Route::get('/petty-cash/export', [PettyCashController::class, 'export'])->name('petty-cash.export')->middleware('permission:finance.petty_cash.view');
+
     // ── General Ledger hub ──────────────────────────────────────────────
     // /finance/ledger is the hub entry point; it redirects to the first ledger
     // tab the user can open. The tabs themselves are the routes below.

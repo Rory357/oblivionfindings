@@ -57,6 +57,52 @@ class CreditNoteController extends Controller
         ]);
     }
 
+    /**
+     * Stream the (filtered) credit-note list as a sanitised CSV. Mirrors the
+     * index's type/status filters so "Export" respects the current view. Party
+     * resolves to the client (receivable) or the vendor (payable).
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('viewAny', FinCreditNote::class);
+
+        $orgId = $request->user()->organization_id;
+
+        $query = FinCreditNote::forOrganization($orgId)
+            ->with(['vendor:id,name', 'client:id,first_name,last_name'])
+            ->orderBy('credit_date', 'desc');
+
+        if ($request->filled('type')) {
+            if ($request->input('type') === 'payable') {
+                $query->payable();
+            } elseif ($request->input('type') === 'receivable') {
+                $query->receivable();
+            }
+        }
+        if ($request->filled('status')) {
+            $query->withStatus($request->input('status'));
+        }
+
+        $rows = $query->get()->map(fn (FinCreditNote $cn) => [
+            $cn->credit_note_number,
+            $cn->type,
+            $cn->type === 'receivable'
+                ? optional($cn->client)->full_name
+                : optional($cn->vendor)->name,
+            optional($cn->credit_date)->format('Y-m-d'),
+            number_format((float) $cn->subtotal, 2, '.', ''),
+            number_format((float) $cn->gst_amount, 2, '.', ''),
+            number_format((float) $cn->total_amount, 2, '.', ''),
+            $cn->status,
+        ]);
+
+        return $this->streamSanitizedCsv(
+            'credit-notes-'.now()->format('Y-m-d').'.csv',
+            ['Credit Note #', 'Type', 'Party', 'Date', 'Subtotal', 'GST', 'Total', 'Status'],
+            $rows,
+        );
+    }
+
     /** Active vendors for the credit-note modal. */
     private function vendorOptions(?int $orgId)
     {

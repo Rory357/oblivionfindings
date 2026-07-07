@@ -8,7 +8,7 @@ import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wallet, Coins } from 'lucide-react';
+import { Plus, Wallet, Coins, Download } from 'lucide-react';
 import { useState } from 'react';
 
 interface Fund {
@@ -56,12 +56,20 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                             { label: 'Total balance', value: formatMoney(totalBalance) },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Fund
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href="/finance/petty-cash/export">
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Fund
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<BankingTabsFooter active="petty-cash" />}
                     />

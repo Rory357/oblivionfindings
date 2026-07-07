@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2 } from 'lucide-react';
+import { Plus, Search, Building2, Download } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
 interface Vendor {
@@ -112,12 +112,20 @@ export default function VendorsIndex({ vendors, filters, canManage, expenseAccou
                             { label: 'Active (this page)', value: activeCount },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewVendorOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    Add Vendor
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/vendors/export?${new URLSearchParams(Object.entries({ search, vendor_type: filters.vendor_type, is_active: filters.is_active }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewVendorOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        Add Vendor
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="vendors" />}
                     />

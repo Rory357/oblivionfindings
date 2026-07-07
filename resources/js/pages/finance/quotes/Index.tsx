@@ -22,7 +22,7 @@ import {
 } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Download, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 const ANY = '__ANY__';
@@ -110,6 +110,14 @@ export default function QuotesIndex({
                     { label: 'Accepted', value: stats?.accepted ?? 0 },
                     { label: 'Converted', value: stats?.converted ?? 0 },
                 ]}
+                actions={
+                    <Button size="sm" variant="outline" asChild>
+                        <a href={`/finance/quotes/export?${new URLSearchParams(Object.entries({ status: filters?.status ?? '' }).filter(([, v]) => v)).toString()}`}>
+                            <Download className="mr-1.5 h-4 w-4" />
+                            Export CSV
+                        </a>
+                    </Button>
+                }
                 footer={<ReceivablesTabsFooter active="quotes" />}
             />
             <PageShell>

@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { Plus, Heart, AlertTriangle, HandHeart } from 'lucide-react';
+import { Plus, Heart, AlertTriangle, HandHeart, Download } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
 
@@ -104,12 +104,20 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                             { label: 'Expiring soon', value: summary.expiring_soon },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Fund
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href="/finance/donor-funds/export">
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Fund
+                                    </Button>
+                                )}
+                            </div>
                         }
                     />
                 }

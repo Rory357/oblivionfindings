@@ -16,7 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, BookOpen } from 'lucide-react';
+import { Plus, Search, BookOpen, Download } from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -145,12 +145,20 @@ export default function JournalsIndex({
                             { label: 'Drafts (this page)', value: draftCount },
                         ]}
                         actions={
-                            canManage ? (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Journal
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/journals/export?${new URLSearchParams(Object.entries({ status, type, date_from: dateFrom, date_to: dateTo, search }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            ) : undefined
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Journal
+                                    </Button>
+                                )}
+                            </div>
                         }
                     />
                 }

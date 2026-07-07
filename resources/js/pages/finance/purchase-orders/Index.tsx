@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingCart } from 'lucide-react';
+import { Plus, ShoppingCart, Download } from 'lucide-react';
 import { useState } from 'react';
 
 type Vendor = { id: number; name: string };
@@ -63,12 +63,20 @@ export default function PurchaseOrderIndex() {
                             { label: 'Total', value: purchaseOrders?.total ?? rows.length },
                         ]}
                         actions={
-                            canManage && (
-                                <Button size="sm" onClick={() => setNewPoOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
-                                    New Purchase Order
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/purchase-orders/export?${new URLSearchParams(Object.entries({ status: current.status, vendor_id: current.vendor_id, search: current.search }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="w-4 h-4 mr-1.5" />
+                                        Export CSV
+                                    </a>
                                 </Button>
-                            )
+                                {canManage && (
+                                    <Button size="sm" onClick={() => setNewPoOpen(true)}>
+                                        <Plus className="w-4 h-4 mr-1.5" />
+                                        New Purchase Order
+                                    </Button>
+                                )}
+                            </div>
                         }
                         footer={<PayablesTabsFooter active="purchase-orders" />}
                     />

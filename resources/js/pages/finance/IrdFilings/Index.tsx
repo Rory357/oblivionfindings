@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark } from 'lucide-react';
+import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark, Download } from 'lucide-react';
 import { useState } from 'react';
 
 type Filing = {
@@ -146,10 +146,18 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                             { label: 'Total filed', value: formatMoney(totalFiledAmount) },
                         ]}
                         actions={
-                            <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
-                                <Send className="mr-1.5 h-4 w-4" />
-                                New Filing
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={`/finance/ird-filings/export?${new URLSearchParams(Object.entries({ filing_type: filters.filing_type ?? '', status: filters.status ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                        <Download className="mr-1.5 h-4 w-4" />
+                                        Export CSV
+                                    </a>
+                                </Button>
+                                <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
+                                    <Send className="mr-1.5 h-4 w-4" />
+                                    New Filing
+                                </Button>
+                            </div>
                         }
                         footer={<TaxTabsFooter active="ird-filings" />}
                     />
