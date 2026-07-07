@@ -598,14 +598,24 @@ vendor, receipt) — the mould for C2.
     verified conversion + confirm sweep).
   *Acceptance: zero `<Create|Edit>.tsx` full-page finance flows still linked (except GST-Prepare, tracked above);
   zero native confirm() ✓; every new modal browser-smoked.*
-- **[ ] C3 — Consistency sweep** (mechanical, per-hub ticks, screenshot-diff each): money.tsx migration (~80
-  files); StatusBadge adoption (~25); shared `chart-palette.ts` reading CSS vars (kill hex in 10+ files);
-  EmptyState/EmptySearch + Skeleton adoption; **count badges wired on every hub tab** (controllers pass counts);
-  command layer per list tab (search+filter chips synced to URL, sort, CSV export endpoints where missing);
-  right-click context menus on rows (shift-context-menu mould); axe pass per hub; fold Intercompany under
-  Consolidation tab; bring site-dashboard + clients/Financials + donor-funds on-contract (donor-funds loses
-  `ui/tabs`, gains hub footer under C4's Funding hub — interim: Reports? no — leave orphan until C4, but
-  contract-polish now).
+- **[~] C3 — Consistency sweep** (mechanical, per-hub ticks). Split into sub-batches:
+  - **[x] C3a — format/token sweep (branch finance/c3-consistency, 4 parallel agents, verified).** 68 finance
+    pages migrated off inline `Intl.NumberFormat`/local `formatCurrency`/`formatNZD`/fleet-utils → canonical
+    `formatMoney`/`formatMoneyCompact` (components/finance/money.tsx). 16 files' hardcoded hex `CHART_COLORS`
+    arrays → `chart-palette.ts` (`chartColor(i)` / `CHART_PALETTE`); semantic red/green recharts fills kept as
+    `var(--status-success|critical)` (meaning preserved, still no literal hex). The last `ui/tabs` straggler
+    (donor-funds/Show.tsx) → canonical `FinanceTabs` (controlled state, same two sections). Module-wide greps:
+    `Intl.NumberFormat`=0, `#rrggbb`=0, `@/components/ui/tabs`=0, fleet-utils=0. Gates: types 0, eslint clean on
+    all 68, build clean, Finance suite green (frontend-only). Browser-verified: report themed charts, index
+    money, donor-funds tabs. (One kept wrapper: Consolidation `formatCurrencyStr(v,currency)` delegates to
+    `formatMoney` for multi-currency — on-contract.) ⚠️ AGENT VERIFY LESSON: grep the module globally after
+    parallel agents (a half-migrated sibling file showed as a transient tsc error mid-run — cleared when its
+    owning agent finished; don't gate until ALL agents land).
+  - **[ ] C3b — StatusBadge + EmptyState + skeleton adoption** (~25 pages hand-roll `statusConfig` colour maps
+    → `@/components/ui/status-badge`; EmptyState/EmptySearch on empty lists; skeleton loaders).
+  - **[ ] C3d — command layer** (search + filter chips synced to URL + sort + CSV export + pagination on every
+    list tab; right-click context menus (shift-context-menu mould); **tab count badges** wired from controllers).
+  - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +
   `operations/client-funds/**` (routes/operations.php:1117-1126) in; redirects; **⚠️ PAUSE-AND-ASK Chane on the

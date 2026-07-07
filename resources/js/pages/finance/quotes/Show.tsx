@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, CalendarDays, CheckCircle2, FileText, Mail, Pencil, Receipt, Send } from 'lucide-react';
@@ -47,10 +48,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_STEPS = ['draft', 'sent', 'accepted', 'converted'];
-
-function formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 2 }).format(n);
-}
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
@@ -149,9 +146,9 @@ export default function QuoteShow({ quote }: Props) {
                     <Card>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Quote Summary</CardTitle></CardHeader>
                         <CardContent className="space-y-1 text-xs">
-                            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{formatCurrency(quote.subtotal)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">GST (15%)</span><span className="tabular-nums">{formatCurrency(quote.tax)}</span></div>
-                            <div className="flex justify-between border-t pt-1 font-semibold"><span>Total (NZD)</span><span className="tabular-nums">{formatCurrency(quote.total)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{formatMoney(quote.subtotal)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">GST (15%)</span><span className="tabular-nums">{formatMoney(quote.tax)}</span></div>
+                            <div className="flex justify-between border-t pt-1 font-semibold"><span>Total (NZD)</span><span className="tabular-nums">{formatMoney(quote.total)}</span></div>
                         </CardContent>
                     </Card>
                 </div>
@@ -180,23 +177,23 @@ export default function QuoteShow({ quote }: Props) {
                                                 <td className="px-4 py-2 text-xs font-medium">{item.description}</td>
                                                 <td className="px-4 py-2 text-right text-xs tabular-nums">{item.quantity}</td>
                                                 <td className="px-4 py-2 text-xs capitalize text-muted-foreground">{item.unit}</td>
-                                                <td className="px-4 py-2 text-right text-xs tabular-nums">{formatCurrency(item.unit_price)}</td>
-                                                <td className="px-4 py-2 text-right text-xs font-medium tabular-nums">{formatCurrency(item.amount)}</td>
+                                                <td className="px-4 py-2 text-right text-xs tabular-nums">{formatMoney(item.unit_price)}</td>
+                                                <td className="px-4 py-2 text-right text-xs font-medium tabular-nums">{formatMoney(item.amount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                     <tfoot>
                                         <tr className="border-t">
                                             <td colSpan={4} className="px-4 py-2 text-right text-xs text-muted-foreground">Subtotal</td>
-                                            <td className="px-4 py-2 text-right text-xs tabular-nums">{formatCurrency(quote.subtotal)}</td>
+                                            <td className="px-4 py-2 text-right text-xs tabular-nums">{formatMoney(quote.subtotal)}</td>
                                         </tr>
                                         <tr>
                                             <td colSpan={4} className="px-4 py-1 text-right text-xs text-muted-foreground">GST (15%)</td>
-                                            <td className="px-4 py-1 text-right text-xs tabular-nums">{formatCurrency(quote.tax)}</td>
+                                            <td className="px-4 py-1 text-right text-xs tabular-nums">{formatMoney(quote.tax)}</td>
                                         </tr>
                                         <tr className="border-t font-semibold">
                                             <td colSpan={4} className="px-4 py-2 text-right text-xs">Total (NZD)</td>
-                                            <td className="px-4 py-2 text-right text-xs tabular-nums">{formatCurrency(quote.total)}</td>
+                                            <td className="px-4 py-2 text-right text-xs tabular-nums">{formatMoney(quote.total)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

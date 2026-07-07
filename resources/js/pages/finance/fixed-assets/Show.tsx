@@ -15,6 +15,7 @@ import {
 import {
     FixedAssetDialog,
     FixedAssetDisposeDialog,
+    formatMoney,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
 } from '@/components/finance';
@@ -108,9 +109,6 @@ interface Props {
     linkedAsset?: LinkedAssetInfo | null;
     linkedDevices?: LinkedDeviceHealth[];
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const categoryLabels: Record<string, string> = {
     vehicle: 'Vehicle',
@@ -237,7 +235,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                                 </div>
                                 <div>
                                     <dt className="text-muted-foreground">Residual Value</dt>
-                                    <dd className="font-medium font-mono">{formatNZD(asset.residual_value)}</dd>
+                                    <dd className="font-medium font-mono">{formatMoney(asset.residual_value)}</dd>
                                 </div>
                                 {asset.gl_asset_account && (
                                     <div>
@@ -272,7 +270,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                                 {asset.disposal_proceeds !== null && (
                                     <div>
                                         <dt className="text-muted-foreground">Disposal Proceeds</dt>
-                                        <dd className="font-medium font-mono">{formatNZD(asset.disposal_proceeds)}</dd>
+                                        <dd className="font-medium font-mono">{formatMoney(asset.disposal_proceeds)}</dd>
                                     </div>
                                 )}
                             </dl>
@@ -294,19 +292,19 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                             <div className="space-y-3">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Purchase Cost</span>
-                                    <span className="font-mono tabular-nums font-medium">{formatNZD(asset.purchase_cost)}</span>
+                                    <span className="font-mono tabular-nums font-medium">{formatMoney(asset.purchase_cost)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Accumulated Depreciation</span>
                                     <span className="font-mono tabular-nums font-medium text-status-warning">
-                                        -{formatNZD(asset.accumulated_depreciation)}
+                                        -{formatMoney(asset.accumulated_depreciation)}
                                     </span>
                                 </div>
                                 <hr />
                                 <div className="flex justify-between">
                                     <span className="font-medium">Book Value</span>
                                     <span className="text-xl font-bold font-mono tabular-nums">
-                                        {formatNZD(bookValue)}
+                                        {formatMoney(bookValue)}
                                     </span>
                                 </div>
                             </div>
@@ -428,13 +426,13 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                                                 {new Date(dep.depreciation_date).toLocaleDateString('en-NZ')}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {formatNZD(dep.amount)}
+                                                {formatMoney(dep.amount)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {formatNZD(dep.accumulated_total)}
+                                                {formatMoney(dep.accumulated_total)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                {formatNZD(dep.book_value_after)}
+                                                {formatMoney(dep.book_value_after)}
                                             </TableCell>
                                             <TableCell>
                                                 {dep.journal ? (
@@ -477,13 +475,13 @@ export default function FixedAssetShow({ asset, depreciationSchedule, hasDepreci
                                         <TableRow key={i}>
                                             <TableCell className="text-sm">{entry.month}</TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {formatNZD(entry.depreciation_amount)}
+                                                {formatMoney(entry.depreciation_amount)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                {formatNZD(entry.accumulated)}
+                                                {formatMoney(entry.accumulated)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                {formatNZD(entry.book_value)}
+                                                {formatMoney(entry.book_value)}
                                             </TableCell>
                                         </TableRow>
                                     ))}

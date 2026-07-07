@@ -13,10 +13,9 @@ import {
 } from '@/components/ui/table';
 import { BarChart3, DollarSign, TrendingDown, TrendingUp, Building2, Minus, ArrowLeftRight, Activity } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatMoney } from '@/components/finance/money';
+import { chartColor } from '@/components/finance/chart-palette';
 import { type BreadcrumbItem } from '@/types';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 type AccountDetail = {
     entity_id: number;
@@ -75,7 +74,7 @@ const statusColors: Record<string, string> = {
 };
 
 function formatCurrencyStr(value: string | number, currency: string = 'NZD'): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(value));
+    return formatMoney(value, { currency });
 }
 
 function SummaryCard({ title, value, icon: Icon, currency, colorClass }: { title: string; value: string; icon: any; currency: string; colorClass?: string }) {
@@ -122,11 +121,11 @@ export default function RunResults({ group, run }: PageProps) {
 
     // Bar chart data for financial totals
     const barChartData = [
-        { name: 'Revenue', value: Number(run.total_revenue), fill: '#10b981' },
-        { name: 'Expenses', value: Number(run.total_expenses), fill: '#ef4444' },
-        { name: 'Assets', value: Number(run.total_assets), fill: '#3b82f6' },
-        { name: 'Liabilities', value: Number(run.total_liabilities), fill: '#f59e0b' },
-        { name: 'Equity', value: Number(run.total_equity), fill: '#8b5cf6' },
+        { name: 'Revenue', value: Number(run.total_revenue), fill: 'var(--status-success)' },
+        { name: 'Expenses', value: Number(run.total_expenses), fill: 'var(--status-critical)' },
+        { name: 'Assets', value: Number(run.total_assets), fill: chartColor(0) },
+        { name: 'Liabilities', value: Number(run.total_liabilities), fill: chartColor(2) },
+        { name: 'Equity', value: Number(run.total_equity), fill: chartColor(4) },
     ];
 
     // Pie chart data - composition by entity
@@ -222,7 +221,7 @@ export default function RunResults({ group, run }: PageProps) {
                                                 return `$${value}`;
                                             }}
                                         />
-                                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                        <Tooltip formatter={(value) => formatMoney(Number(value))} />
                                         <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
                                             {barChartData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -256,10 +255,10 @@ export default function RunResults({ group, run }: PageProps) {
                                                 labelLine={true}
                                             >
                                                 {pieChartData.map((_entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                    <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                            <Tooltip formatter={(value) => formatMoney(Number(value))} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 ) : (

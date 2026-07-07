@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
 import {
+    formatMoney,
     QuoteDialog,
     ReceivablesTabsFooter,
     type EditableQuote,
@@ -25,8 +26,6 @@ import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil,
 import { useState } from 'react';
 
 const ANY = '__ANY__';
-
-const nzd = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' });
 
 type Quote = {
     id: number;
@@ -193,7 +192,7 @@ export default function QuotesIndex({
                                             {quote.status}
                                         </Badge>
                                         <span className="text-sm font-semibold text-status-success dark:text-status-success">
-                                            {nzd.format(quote.total_amount)}
+                                            {formatMoney(quote.total_amount)}
                                         </span>
                                     </div>
                                     <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">

@@ -2,7 +2,8 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,8 +31,6 @@ import { DollarSign, Clock, FileText, TrendingUp, ArrowUpFromLine } from 'lucide
 import { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-
 type InvoiceRow = {
     id: number;
     invoice_number: string;
@@ -55,9 +54,6 @@ type PageProps = {
     summary: Summary;
     invoices: InvoiceRow[];
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -85,7 +81,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
             <div className="space-y-1">
                 <Label>Invoice</Label>
                 <p className="text-sm text-muted-foreground">
-                    {invoice.invoice_number} — {invoice.client_name} — Outstanding: {formatNZD(invoice.amount_due)}
+                    {invoice.invoice_number} — {invoice.client_name} — Outstanding: {formatMoney(invoice.amount_due)}
                 </p>
             </div>
 
@@ -160,8 +156,8 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                         title="Receivables"
                         description="Accounts receivable dashboard for outstanding invoices and payments."
                         stats={[
-                            { label: 'Outstanding', value: formatNZD(summary.total_outstanding) },
-                            { label: 'Overdue', value: formatNZD(summary.total_overdue) },
+                            { label: 'Outstanding', value: formatMoney(summary.total_outstanding) },
+                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
                             { label: 'Unpaid invoices', value: summary.unpaid_count },
                         ]}
                         actions={
@@ -195,7 +191,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">
-                                {formatNZD(summary.total_outstanding)}
+                                {formatMoney(summary.total_outstanding)}
                             </div>
                         </CardContent>
                     </Card>
@@ -209,7 +205,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-destructive">
-                                {formatNZD(summary.total_overdue)}
+                                {formatMoney(summary.total_overdue)}
                             </div>
                         </CardContent>
                     </Card>
@@ -248,10 +244,10 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                             nameKey="name"
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={((value: number) => formatNZD(value)) as any} />
+                                        <Tooltip formatter={((value: number) => formatMoney(value)) as any} />
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="flex justify-center gap-3 text-xs">
@@ -259,7 +255,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                         <div key={entry.name} className="flex items-center gap-1">
                                             <div
                                                 className="h-2 w-2 rounded-full"
-                                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                                                style={{ backgroundColor: chartColor(index) }}
                                             />
                                             <span className="text-muted-foreground">{entry.name}</span>
                                         </div>
@@ -314,13 +310,13 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                             <TableCell>{invoice.issue_date}</TableCell>
                                             <TableCell>{invoice.due_date}</TableCell>
                                             <TableCell className="text-right">
-                                                {formatNZD(invoice.total_amount)}
+                                                {formatMoney(invoice.total_amount)}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatNZD(invoice.amount_paid)}
+                                                {formatMoney(invoice.amount_paid)}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {formatNZD(invoice.amount_due)}
+                                                {formatMoney(invoice.amount_due)}
                                             </TableCell>
                                             <TableCell>
                                                 {invoice.is_overdue ? (

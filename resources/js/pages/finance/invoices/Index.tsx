@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
+import { formatMoney, NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -72,9 +72,6 @@ interface Props extends PageProps {
     taxRates: TaxRateOption[];
 }
 
-const formatCurrency = (amount: string | number, currency = 'NZD') =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(amount));
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -140,10 +137,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         title="Invoices"
                         description="Manage and send invoices to clients"
                         stats={[
-                            { label: 'Outstanding', value: formatCurrency(summary.total_outstanding) },
-                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
+                            { label: 'Outstanding', value: formatMoney(summary.total_outstanding) },
+                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
                             { label: 'Drafts', value: summary.draft_count },
-                            { label: 'Paid this month', value: formatCurrency(summary.paid_this_month) },
+                            { label: 'Paid this month', value: formatMoney(summary.paid_this_month) },
                         ]}
                         actions={
                             canManage && (
@@ -159,10 +156,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatCurrency(summary.total_outstanding)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatMoney(summary.total_outstanding)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
                     <FinanceSummaryCard icon={FileText} tone="muted" label="Drafts" value={summary.draft_count} />
-                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatCurrency(summary.paid_this_month)} />
+                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatMoney(summary.paid_this_month)} />
                 </div>
 
                 {/* Filters */}
@@ -270,7 +267,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {formatCurrency(invoice.total_amount, invoice.currency_code)}
+                                            {formatMoney(invoice.total_amount, { currency: invoice.currency_code })}
                                         </TableCell>
                                         <TableCell>
                                             <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type Account = { id: number; code: string; name: string };
@@ -45,9 +45,6 @@ type PurchaseOrder = {
     funding_stream?: FundingStream | null;
     bills: Bill[];
 };
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground' },
@@ -182,10 +179,10 @@ export default function PurchaseOrderShow() {
                                     <TableRow key={line.id}>
                                         <TableCell>{line.description}</TableCell>
                                         <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.unit_price)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
                                         <TableCell className="text-right">{(Number(line.gst_rate) * 100).toFixed(0)}%</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.gst_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatNZD(line.line_total)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(line.line_total)}</TableCell>
                                         <TableCell>{line.account ? `${line.account.code} - ${line.account.name}` : '—'}</TableCell>
                                     </TableRow>
                                 ))}
@@ -197,15 +194,15 @@ export default function PurchaseOrderShow() {
                                 <div className="w-64 space-y-1 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Subtotal</span>
-                                        <span>{formatNZD(po.subtotal)}</span>
+                                        <span>{formatMoney(po.subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">GST</span>
-                                        <span>{formatNZD(po.gst_amount)}</span>
+                                        <span>{formatMoney(po.gst_amount)}</span>
                                     </div>
                                     <div className="flex justify-between border-t pt-1 font-semibold">
                                         <span>Total</span>
-                                        <span>{formatNZD(po.total_amount)}</span>
+                                        <span>{formatMoney(po.total_amount)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -240,7 +237,7 @@ export default function PurchaseOrderShow() {
                                                 </Link>
                                             </TableCell>
                                             <TableCell>{bill.bill_date}</TableCell>
-                                            <TableCell className="text-right">{formatNZD(bill.total_amount)}</TableCell>
+                                            <TableCell className="text-right">{formatMoney(bill.total_amount)}</TableCell>
                                             <TableCell>
                                                 <StatusBadge status={bill.status} />
                                             </TableCell>

@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -47,9 +47,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Payment Allocations', href: '/finance/payment-allocations' },
 ];
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -68,7 +65,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                         description="Track how incoming payments have been allocated across invoices and bills."
                         stats={[
                             { label: 'Allocations', value: allocations.total },
-                            { label: 'Total (this page)', value: formatCurrency(totalAllocated) },
+                            { label: 'Total (this page)', value: formatMoney(totalAllocated) },
                         ]}
                         actions={
                             <div className="w-44">
@@ -113,7 +110,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Total allocated</p>
                             <p className="text-2xl font-bold">
-                                {formatCurrency(
+                                {formatMoney(
                                     allocations.data.reduce((total, allocation) => total + allocation.amount, 0),
                                 )}
                             </p>
@@ -158,7 +155,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                                     {allocation.allocatable_id ? ` #${allocation.allocatable_id}` : ''}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatCurrency(allocation.amount)}
+                                                    {formatMoney(allocation.amount)}
                                                 </TableCell>
                                                 <TableCell className="max-w-sm truncate text-muted-foreground">
                                                     {allocation.notes || '-'}

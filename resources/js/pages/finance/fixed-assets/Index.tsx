@@ -4,6 +4,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     FixedAssetDialog,
     LedgerTabsFooter,
+    formatMoney,
     type EditableFixedAsset,
     type FixedAssetGlAccount,
 } from '@/components/finance';
@@ -90,9 +91,6 @@ interface Props {
     assetAccounts: FixedAssetGlAccount[];
     expenseAccounts: FixedAssetGlAccount[];
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const categoryLabels: Record<string, string> = {
     vehicle: 'Vehicle',
@@ -201,9 +199,9 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                         description="Manage your organisation's fixed asset register"
                         stats={[
                             { label: 'Total assets', value: summary.total_count },
-                            { label: 'Total cost', value: formatNZD(summary.total_cost) },
-                            { label: 'Depreciation', value: formatNZD(summary.total_depreciation) },
-                            { label: 'Book value', value: formatNZD(summary.net_book_value) },
+                            { label: 'Total cost', value: formatMoney(summary.total_cost) },
+                            { label: 'Depreciation', value: formatMoney(summary.total_depreciation) },
+                            { label: 'Book value', value: formatMoney(summary.net_book_value) },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
@@ -283,7 +281,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Cost</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_cost)}
+                                        {formatMoney(summary.total_cost)}
                                     </p>
                                 </div>
                             </div>
@@ -298,7 +296,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Depreciation</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_depreciation)}
+                                        {formatMoney(summary.total_depreciation)}
                                     </p>
                                 </div>
                             </div>
@@ -313,7 +311,7 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Book Value</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.net_book_value)}
+                                        {formatMoney(summary.net_book_value)}
                                     </p>
                                 </div>
                             </div>
@@ -439,13 +437,13 @@ export default function FixedAssetsIndex({ assets, summary, filters, canManage =
                                                     {new Date(asset.purchase_date).toLocaleDateString('en-NZ')}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatNZD(asset.purchase_cost)}
+                                                    {formatMoney(asset.purchase_cost)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm">
-                                                    {formatNZD(asset.accumulated_depreciation)}
+                                                    {formatMoney(asset.accumulated_depreciation)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums text-sm font-medium">
-                                                    {formatNZD(bookValue)}
+                                                    {formatMoney(bookValue)}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge

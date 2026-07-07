@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
 import {
+    formatMoney,
     ReceivablesTabsFooter,
     RecurringChargeDialog,
     type ChargeClientOption,
@@ -24,8 +25,6 @@ import { CalendarDays, DollarSign, Pencil, Plus, RefreshCw, Search } from 'lucid
 import { useState } from 'react';
 
 const ANY = '__ANY__';
-
-const nzd = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' });
 
 type RecurringCharge = {
     id: number;
@@ -101,7 +100,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                 description="Manage recurring billing charges for clients."
                 stats={[
                     { label: 'Active', value: stats?.active ?? 0 },
-                    { label: 'Monthly total', value: nzd.format(stats?.monthly_total ?? 0) },
+                    { label: 'Monthly total', value: formatMoney(stats?.monthly_total ?? 0) },
                     { label: 'Next due', value: stats?.next_due ?? 0 },
                 ]}
                 footer={<ReceivablesTabsFooter active="recurring-charges" />}
@@ -110,7 +109,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <OpsStatCard label="Active Charges" value={stats?.active ?? 0} icon={RefreshCw} color="indigo" />
-                    <OpsStatCard label="Monthly Total" value={nzd.format(stats?.monthly_total ?? 0)} icon={DollarSign} color="emerald" />
+                    <OpsStatCard label="Monthly Total" value={formatMoney(stats?.monthly_total ?? 0)} icon={DollarSign} color="emerald" />
                     <OpsStatCard label="Next Charges Due" value={stats?.next_due ?? 0} icon={CalendarDays} color="amber" />
                 </div>
 
@@ -180,7 +179,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                             <span>{charge.client.first_name} {charge.client.last_name}</span>
                                         )}
                                         <span className="font-semibold tabular-nums text-status-success dark:text-status-success">
-                                            {nzd.format(charge.amount)}
+                                            {formatMoney(charge.amount)}
                                         </span>
                                         {charge.next_charge_date && (
                                             <span className="flex items-center gap-1">

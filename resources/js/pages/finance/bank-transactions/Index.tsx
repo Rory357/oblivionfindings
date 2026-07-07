@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,9 +74,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const ALL = '__ALL__';
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (value: string | null) =>
     value
@@ -384,7 +381,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                     <Card>
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Total value on this page</p>
-                            <p className="text-2xl font-semibold font-mono tabular-nums">{formatCurrency(summary.total)}</p>
+                            <p className="text-2xl font-semibold font-mono tabular-nums">{formatMoney(summary.total)}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -512,7 +509,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                                             ) : (
                                                                 <ArrowUpFromLine className="h-4 w-4" />
                                                             )}
-                                                            {formatCurrency(transaction.amount)}
+                                                            {formatMoney(transaction.amount)}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

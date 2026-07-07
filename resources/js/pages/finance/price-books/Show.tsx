@@ -12,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { PriceBookDialog } from '@/components/finance';
+import { formatMoney, PriceBookDialog } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { CalendarDays, Pencil, Plus } from 'lucide-react';
@@ -42,10 +42,6 @@ type Props = {
     };
     canManage: boolean;
 };
-
-function formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 2 }).format(n);
-}
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
@@ -213,7 +209,7 @@ export default function PriceBookShow({ price_book, canManage = false }: Props) 
                                                     <td className="px-4 py-2 text-xs text-muted-foreground">{item.service_code ?? '-'}</td>
                                                     <td className="px-4 py-2 text-xs font-medium">{item.name}</td>
                                                     <td className="px-4 py-2 text-xs capitalize text-muted-foreground">{item.unit}</td>
-                                                    <td className="px-4 py-2 text-right text-xs tabular-nums">{formatCurrency(item.rate)}</td>
+                                                    <td className="px-4 py-2 text-right text-xs tabular-nums">{formatMoney(item.rate)}</td>
                                                     <td className="px-4 py-2 text-xs capitalize text-muted-foreground">{item.rate_type}</td>
                                                     <td className="px-4 py-2 text-xs text-muted-foreground">{item.category ?? '-'}</td>
                                                     <td className="px-4 py-2 text-center">

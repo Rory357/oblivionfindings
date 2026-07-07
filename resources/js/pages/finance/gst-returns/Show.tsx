@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { useState } from 'react';
 
 type TaxRate = {
@@ -118,9 +118,6 @@ type PageProps = {
     irdFormData: IrdFormData;
 };
 
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -183,7 +180,7 @@ function IrdFormBox({
                         : ''
                 }`}
             >
-                {formatNZD(Math.abs(amount))}
+                {formatMoney(Math.abs(amount))}
                 {highlight && amount < 0 ? ' (Refund)' : ''}
             </span>
         </div>
@@ -345,10 +342,10 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                                 {Number(item.rate)}%
                                             </td>
                                             <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatNZD(item.net_amount)}
+                                                {formatMoney(item.net_amount)}
                                             </td>
                                             <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                {formatNZD(item.gst_amount)}
+                                                {formatMoney(item.gst_amount)}
                                             </td>
                                             <td className="py-3 text-right">{item.line_count}</td>
                                         </tr>
@@ -408,10 +405,10 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                                                     {line.description || '-'}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatNZD(line.net_amount)}
+                                                    {formatMoney(line.net_amount)}
                                                 </td>
                                                 <td className="py-2 pr-4 text-right font-mono tabular-nums">
-                                                    {formatNZD(line.gst_amount)}
+                                                    {formatMoney(line.gst_amount)}
                                                 </td>
                                                 <td className="py-2 text-xs">
                                                     {line.tax_rate

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Printer, RefreshCw, DollarSign, TrendingUp, TrendingDown, Banknote } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatMoney } from '@/components/finance/money';
 import { useState, useMemo } from 'react';
 
 interface FundingStream {
@@ -36,9 +37,6 @@ interface Props extends PageProps {
     endDate: string;
     data: ReportData;
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatPct = (pct: number) => pct.toFixed(1) + '%';
 
@@ -83,9 +81,9 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                         title="Funding Stream Summary"
                         description="Revenue, expenses and margin by funding stream."
                         stats={[
-                            { label: 'Revenue', value: formatCurrency(data.totals.revenue) },
-                            { label: 'Expenses', value: formatCurrency(data.totals.expenses) },
-                            { label: 'Net Margin', value: formatCurrency(data.totals.net_margin) },
+                            { label: 'Revenue', value: formatMoney(data.totals.revenue) },
+                            { label: 'Expenses', value: formatMoney(data.totals.expenses) },
+                            { label: 'Net Margin', value: formatMoney(data.totals.net_margin) },
                             { label: 'Margin %', value: formatPct(overallMarginPct) },
                         ]}
                         actions={
@@ -137,7 +135,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Revenue</p>
-                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{formatCurrency(data.totals.revenue)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{formatMoney(data.totals.revenue)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <TrendingUp className="h-5 w-5 text-muted-foreground" />
@@ -150,7 +148,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Expenses</p>
-                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatCurrency(data.totals.expenses)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatMoney(data.totals.expenses)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <TrendingDown className="h-5 w-5 text-muted-foreground" />
@@ -166,7 +164,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                     <p className={`text-2xl font-bold tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                         {formatPct(overallMarginPct)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(data.totals.net_margin)} net</p>
+                                    <p className="text-xs text-muted-foreground">{formatMoney(data.totals.net_margin)} net</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -188,11 +186,11 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                     <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
                                         <Legend />
-                                        <Bar dataKey="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Revenue" fill="var(--status-success)" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Expenses" fill="var(--status-critical)" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -227,13 +225,13 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                             <TableRow key={idx}>
                                                 <TableCell className="font-medium">{stream.name}</TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatCurrency(stream.revenue)}
+                                                    {formatMoney(stream.revenue)}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatCurrency(stream.expenses)}
+                                                    {formatMoney(stream.expenses)}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono tabular-nums font-semibold ${stream.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
-                                                    {formatCurrency(stream.net_margin)}
+                                                    {formatMoney(stream.net_margin)}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                     {formatPct(stream.margin_pct)}
@@ -243,13 +241,13 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                         <TableRow className="border-t-2 font-bold">
                                             <TableCell>Totals</TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatCurrency(data.totals.revenue)}
+                                                {formatMoney(data.totals.revenue)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatCurrency(data.totals.expenses)}
+                                                {formatMoney(data.totals.expenses)}
                                             </TableCell>
                                             <TableCell className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
-                                                {formatCurrency(data.totals.net_margin)}
+                                                {formatMoney(data.totals.net_margin)}
                                             </TableCell>
                                             <TableCell className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                 {formatPct(overallMarginPct)}

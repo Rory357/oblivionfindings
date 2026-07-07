@@ -1,7 +1,7 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import { PayablesTabsFooter, formatMoney } from '@/components/finance';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,9 +34,6 @@ type PageProps = {
     paymentRuns: PaginatedData<PaymentRun>;
     filters: { status: string };
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
     draft: { label: 'Draft', variant: 'secondary' },
@@ -168,7 +165,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                                     </TableCell>
                                                     <TableCell className="text-center">{run.item_count}</TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatNZD(run.total_amount)}
+                                                        {formatMoney(run.total_amount)}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge variant={config.variant}>{config.label}</Badge>

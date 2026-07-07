@@ -11,15 +11,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CalendarDays, DollarSign, FileText, UserRound } from 'lucide-react';
 
 const ANY = '__ANY__';
-const nzd = new Intl.NumberFormat('en-NZ', {
-    style: 'currency',
-    currency: 'NZD',
-});
 
 type BillingEntry = {
     id: number;
@@ -189,7 +186,7 @@ export default function BillingEntriesPage({
                                 </p>
                                 <p className="inline-flex items-center gap-1 text-sm font-semibold text-status-success dark:text-status-success">
                                     <DollarSign className="h-3.5 w-3.5" />
-                                    {nzd.format(entry.amount ?? 0)}
+                                    {formatMoney(entry.amount ?? 0)}
                                 </p>
                                 <div className="flex justify-end">
                                     <Button

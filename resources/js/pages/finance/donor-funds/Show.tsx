@@ -8,21 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-// TODO(C3): this page still imports the ui/tabs shim — migrate to the shared TabStrip in C3. The
-// receipt/expenditure Selects moved into DonorFundTransactionDialog, so ui/select is no longer needed here.
-import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     DonorFundTransactionDialog,
+    FinanceTabs,
+    formatMoney,
     type DonorFundTxnAccount,
     type DonorFundTxnBankAccount,
     type DonorFundGlSummary,
 } from '@/components/finance';
-import { ArrowDownCircle, ArrowUpCircle, Download } from 'lucide-react';
+import { chartColor } from '@/components/finance/chart-palette';
+import { ArrowDownCircle, ArrowUpCircle, Download, ArrowLeftRight, FileBarChart } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface FundData {
     id: number;
@@ -93,9 +91,6 @@ interface Props extends PageProps {
     canManage: boolean;
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -128,6 +123,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
     const config = statusConfig[fund.status] ?? statusConfig.active;
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
     const [txnType, setTxnType] = useState<'receipt' | 'expenditure' | null>(null);
+    const [tab, setTab] = useState<'transactions' | 'reports'>('transactions');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -190,25 +186,25 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Received</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_received)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_received)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Spent</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_spent)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_spent)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Committed</p>
-                                <p className="text-xl font-bold">{formatCurrency(fund.total_committed)}</p>
+                                <p className="text-xl font-bold">{formatMoney(fund.total_committed)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Available Balance</p>
-                                <p className="text-xl font-bold text-status-success">{formatCurrency(fund.available_balance)}</p>
+                                <p className="text-xl font-bold text-status-success">{formatMoney(fund.available_balance)}</p>
                             </CardContent>
                         </Card>
                         {fund.budget_amount && (
@@ -218,7 +214,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                     <p className={`text-xl font-bold ${utilisation && utilisation > 90 ? 'text-destructive' : ''}`}>
                                         {utilisation}%
                                     </p>
-                                    <p className="text-xs text-muted-foreground">of {formatCurrency(fund.budget_amount)}</p>
+                                    <p className="text-xs text-muted-foreground">of {formatMoney(fund.budget_amount)}</p>
                                 </CardContent>
                             </Card>
                         )}
@@ -237,10 +233,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                                     <YAxis tick={{ fontSize: 12 }} />
-                                    <Tooltip formatter={((value: number) => formatCurrency(value)) as any} />
+                                    <Tooltip formatter={((value: number) => formatMoney(value)) as any} />
                                     <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                         {chartData.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                            <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -309,14 +305,19 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                 )}
 
                 {/* Actions Tabs */}
-                <TabsRoot defaultValue="transactions" className="space-y-4">
-                    <TabsList>
-                        <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                        <TabsTrigger value="reports">Reports</TabsTrigger>
-                    </TabsList>
+                <div className="space-y-4">
+                    <FinanceTabs
+                        value={tab}
+                        onChange={(next) => setTab(next as 'transactions' | 'reports')}
+                        ariaLabel="Donor fund views"
+                        items={[
+                            { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight, tone: 'primary' },
+                            { id: 'reports', label: 'Reports', icon: FileBarChart, tone: 'info' },
+                        ]}
+                    />
 
                     {/* Transactions Tab */}
-                    <TabsContent value="transactions">
+                    {tab === 'transactions' && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Transactions</CardTitle>
@@ -369,7 +370,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="text-right">
                                                             <span className={`font-medium ${typeConf.isInflow ? 'text-status-success' : 'text-destructive'}`}>
                                                                 {typeConf.isInflow ? '+' : '-'}
-                                                                {formatCurrency(txn.amount)}
+                                                                {formatMoney(txn.amount)}
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="font-mono text-sm">{txn.journal_number ?? '-'}</TableCell>
@@ -382,10 +383,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 )}
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    )}
 
                     {/* Reports Tab */}
-                    <TabsContent value="reports">
+                    {tab === 'reports' && (
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader>
@@ -444,15 +445,15 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="text-sm">
                                                             {formatDate(report.period_from)} - {formatDate(report.period_to)}
                                                         </TableCell>
-                                                        <TableCell className="text-right">{formatCurrency(report.opening_balance)}</TableCell>
+                                                        <TableCell className="text-right">{formatMoney(report.opening_balance)}</TableCell>
                                                         <TableCell className="text-right text-status-success">
-                                                            {formatCurrency(report.total_receipts)}
+                                                            {formatMoney(report.total_receipts)}
                                                         </TableCell>
                                                         <TableCell className="text-right text-destructive">
-                                                            {formatCurrency(report.total_expenditure)}
+                                                            {formatMoney(report.total_expenditure)}
                                                         </TableCell>
                                                         <TableCell className="text-right font-medium">
-                                                            {formatCurrency(report.closing_balance)}
+                                                            {formatMoney(report.closing_balance)}
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="outline">{report.status}</Badge>
@@ -477,8 +478,8 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 </Card>
                             )}
                         </div>
-                    </TabsContent>
-                </TabsRoot>
+                    )}
+                </div>
             </PageLayout>
 
             {canManage && txnType && (

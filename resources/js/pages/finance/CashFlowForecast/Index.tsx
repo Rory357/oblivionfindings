@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { CashFlowForecastDialog, ConfirmDialog, ReportsTabsFooter } from '@/components/finance';
+import { CashFlowForecastDialog, ConfirmDialog, ReportsTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,9 +42,6 @@ type PageProps = {
     forecasts: PaginatedData;
     canManage: boolean;
 };
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -169,7 +166,7 @@ export default function CashFlowForecastIndex({ forecasts, canManage = false }: 
                                                         {periodTypeLabels[forecast.period_type] ?? forecast.period_type}
                                                     </TableCell>
                                                     <TableCell className="text-right font-mono tabular-nums">
-                                                        {formatNZD(forecast.opening_balance)}
+                                                        {formatMoney(forecast.opening_balance)}
                                                     </TableCell>
                                                     <TableCell>{forecast.scenarios_count}</TableCell>
                                                     <TableCell>

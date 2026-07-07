@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { TaxTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,9 +40,6 @@ type PageProps = {
         year?: string;
     };
 };
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -104,9 +101,9 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         title="GST Returns"
                         description="Manage and file GST returns with IRD"
                         stats={[
-                            { label: 'GST collected', value: formatNZD(kpis.totalCollected) },
-                            { label: 'GST paid', value: formatNZD(kpis.totalPaid) },
-                            { label: 'Net payable', value: formatNZD(Math.abs(kpis.totalPayable)) },
+                            { label: 'GST collected', value: formatMoney(kpis.totalCollected) },
+                            { label: 'GST paid', value: formatMoney(kpis.totalPaid) },
+                            { label: 'Net payable', value: formatMoney(Math.abs(kpis.totalPayable)) },
                             { label: 'Drafts', value: kpis.draftCount },
                         ]}
                         actions={
@@ -131,7 +128,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Collected</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalCollected)}</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalCollected)}</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -144,7 +141,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Paid</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalPaid)}</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalPaid)}</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -158,7 +155,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Payable</p>
                                     <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}>
-                                        {formatNZD(Math.abs(kpis.totalPayable))}
+                                        {formatMoney(Math.abs(kpis.totalPayable))}
                                         {kpis.totalPayable < 0 ? ' (Refund)' : ''}
                                     </p>
                                 </div>
@@ -276,13 +273,13 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         {basisLabels[gstReturn.basis] ?? gstReturn.basis}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_sales)}
+                                                        {formatMoney(gstReturn.total_sales)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_gst_collected)}
+                                                        {formatMoney(gstReturn.total_gst_collected)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(gstReturn.total_gst_paid)}
+                                                        {formatMoney(gstReturn.total_gst_paid)}
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
@@ -290,7 +287,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         }`}
                                                     >
                                                         {isRefund ? '(' : ''}
-                                                        {formatNZD(Math.abs(payable))}
+                                                        {formatMoney(Math.abs(payable))}
                                                         {isRefund ? ')' : ''}
                                                     </td>
                                                     <td className="py-3">

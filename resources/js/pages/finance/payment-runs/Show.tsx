@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
 import { Banknote, CheckCircle, Download, FileText, Play } from 'lucide-react';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { useState } from 'react';
 
@@ -41,9 +41,6 @@ type PaymentRun = {
 type PageProps = {
     paymentRun: PaymentRun;
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
     draft: { label: 'Draft', variant: 'secondary' },
@@ -157,7 +154,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Amount</p>
                                 <p className="text-lg font-semibold font-mono tabular-nums">
-                                    {formatNZD(paymentRun.total_amount)}
+                                    {formatMoney(paymentRun.total_amount)}
                                 </p>
                             </div>
                             <div>
@@ -256,7 +253,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono tabular-nums">
-                                                    {formatNZD(item.amount)}
+                                                    {formatMoney(item.amount)}
                                                 </TableCell>
                                                 <TableCell className="font-mono text-muted-foreground">
                                                     {item.bank_account_number || '-'}

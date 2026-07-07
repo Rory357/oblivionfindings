@@ -11,8 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Printer, CheckCircle, AlertTriangle, Landmark, HandCoins, Scale } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
 
 interface AccountRow {
     account_code: string;
@@ -37,9 +37,6 @@ interface Props extends PageProps {
     filters: { as_of_date: string };
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
     { title: 'Reports' },
@@ -58,7 +55,7 @@ function SectionTable({ title, rows, total }: { title: string; rows: AccountRow[
                 <TableRow key={`${title}-${idx}`}>
                     <TableCell className="font-mono text-sm">{row.account_code || '-'}</TableCell>
                     <TableCell>{row.account_name}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(row.balance)}</TableCell>
+                    <TableCell className="text-right">{formatMoney(row.balance)}</TableCell>
                 </TableRow>
             ))}
             {rows.length === 0 && (
@@ -70,7 +67,7 @@ function SectionTable({ title, rows, total }: { title: string; rows: AccountRow[
             )}
             <TableRow className="border-t font-semibold">
                 <TableCell colSpan={2}>Total {title}</TableCell>
-                <TableCell className="text-right">{formatCurrency(total)}</TableCell>
+                <TableCell className="text-right">{formatMoney(total)}</TableCell>
             </TableRow>
         </>
     );
@@ -91,8 +88,6 @@ export default function BalanceSheet({ report, filters }: Props) {
         ].filter((d) => d.value > 0);
     }, [report.total_assets, report.total_liabilities, report.total_equity]);
 
-    const PIE_COLORS = ['#3b82f6', '#ef4444', '#f59e0b'];
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Balance Sheet" />
@@ -104,9 +99,9 @@ export default function BalanceSheet({ report, filters }: Props) {
                         title="Balance Sheet"
                         description="Financial position showing assets, liabilities, and equity."
                         stats={[
-                            { label: 'Assets', value: formatCurrency(report.total_assets) },
-                            { label: 'Liabilities', value: formatCurrency(report.total_liabilities) },
-                            { label: 'Equity', value: formatCurrency(report.total_equity) },
+                            { label: 'Assets', value: formatMoney(report.total_assets) },
+                            { label: 'Liabilities', value: formatMoney(report.total_liabilities) },
+                            { label: 'Equity', value: formatMoney(report.total_equity) },
                         ]}
                         actions={
                             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
@@ -128,7 +123,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Assets</p>
                                 <p className="text-2xl font-bold text-status-info dark:text-status-info">
-                                    {formatCurrency(report.total_assets)}
+                                    {formatMoney(report.total_assets)}
                                 </p>
                             </div>
                         </CardContent>
@@ -141,7 +136,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Liabilities</p>
                                 <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
-                                    {formatCurrency(report.total_liabilities)}
+                                    {formatMoney(report.total_liabilities)}
                                 </p>
                             </div>
                         </CardContent>
@@ -154,7 +149,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Equity</p>
                                 <p className="text-2xl font-bold text-status-warning dark:text-status-warning">
-                                    {formatCurrency(report.total_equity)}
+                                    {formatMoney(report.total_equity)}
                                 </p>
                             </div>
                         </CardContent>
@@ -200,10 +195,10 @@ export default function BalanceSheet({ report, filters }: Props) {
                                             }
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
+                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -266,7 +261,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                                 <TableRow className="border-t-2 text-lg font-bold">
                                     <TableCell colSpan={2}>Total Liabilities + Equity</TableCell>
                                     <TableCell className="text-right">
-                                        {formatCurrency(report.total_liabilities + report.total_equity)}
+                                        {formatMoney(report.total_liabilities + report.total_equity)}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>

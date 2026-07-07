@@ -12,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, DollarSign, FileText, Receipt, Search } from 'lucide-react';
@@ -65,10 +65,6 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
     paid: 'default',
 };
 
-function formatCurrency(n: number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n);
-}
-
 function formatDate(d: string): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -88,9 +84,9 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                 title="Billing"
                 description="Manage billing entries, revenue tracking, and payment status."
                 stats={[
-                    { label: 'Billed this month', value: formatCurrency(s.billed_this_month) },
-                    { label: 'Outstanding', value: formatCurrency(s.outstanding) },
-                    { label: 'Paid this month', value: formatCurrency(s.paid_this_month) },
+                    { label: 'Billed this month', value: formatMoney(s.billed_this_month) },
+                    { label: 'Outstanding', value: formatMoney(s.outstanding) },
+                    { label: 'Paid this month', value: formatMoney(s.paid_this_month) },
                     { label: 'Pending', value: s.pending_count },
                 ]}
                 footer={<ReceivablesTabsFooter active="billing" />}
@@ -98,9 +94,9 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard label="Billed This Month" value={formatCurrency(s.billed_this_month)} icon={DollarSign} color="indigo" />
-                    <OpsStatCard label="Outstanding" value={formatCurrency(s.outstanding)} icon={Receipt} color="amber" />
-                    <OpsStatCard label="Paid This Month" value={formatCurrency(s.paid_this_month)} icon={DollarSign} color="emerald" />
+                    <OpsStatCard label="Billed This Month" value={formatMoney(s.billed_this_month)} icon={DollarSign} color="indigo" />
+                    <OpsStatCard label="Outstanding" value={formatMoney(s.outstanding)} icon={Receipt} color="amber" />
+                    <OpsStatCard label="Paid This Month" value={formatMoney(s.paid_this_month)} icon={DollarSign} color="emerald" />
                     <OpsStatCard label="Pending Entries" value={s.pending_count} icon={FileText} color="blue" href="/finance/billing?status=pending" />
                 </div>
 
@@ -174,11 +170,11 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                                             </div>
                                             <div className="mt-0.5 flex items-center gap-3 text-[10px] text-muted-foreground">
                                                 <span>{formatDate(entry.service_date)}</span>
-                                                <span>{entry.hours}h @ {formatCurrency(entry.rate)}/h</span>
+                                                <span>{entry.hours}h @ {formatMoney(entry.rate)}/h</span>
                                                 {entry.staff && <span>{entry.staff.name}</span>}
                                             </div>
                                         </div>
-                                        <span className="text-sm font-semibold tabular-nums">{formatCurrency(entry.amount)}</span>
+                                        <span className="text-sm font-semibold tabular-nums">{formatMoney(entry.amount)}</span>
                                     </div>
                                 ))}
                             </div>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeftRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 
@@ -37,9 +38,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
     { title: 'New Revaluation', href: '/finance/fx-revaluations/create' },
 ];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatRate = (rate: number) => rate.toFixed(6);
 
@@ -132,7 +130,7 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                 }`}
                             >
                                 {isLoss ? '(' : ''}
-                                {formatCurrency(Math.abs(totalGainLoss))}
+                                {formatMoney(Math.abs(totalGainLoss))}
                                 {isLoss ? ')' : ''}
                             </div>
                         </div>
@@ -181,10 +179,10 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                         {formatRate(item.current_rate)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatCurrency(item.booked_base_value)}
+                                                        {formatMoney(item.booked_base_value)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatCurrency(item.current_base_value)}
+                                                        {formatMoney(item.current_base_value)}
                                                     </td>
                                                     <td
                                                         className={`py-3 text-right font-mono font-semibold tabular-nums ${
@@ -196,7 +194,7 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                         }`}
                                                     >
                                                         {itemLoss ? '(' : ''}
-                                                        {formatCurrency(Math.abs(item.gain_loss))}
+                                                        {formatMoney(Math.abs(item.gain_loss))}
                                                         {itemLoss ? ')' : ''}
                                                     </td>
                                                 </tr>

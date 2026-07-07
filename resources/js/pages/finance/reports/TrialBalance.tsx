@@ -11,8 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Printer, CheckCircle, AlertTriangle, ListChecks } from 'lucide-react';
 import { Fragment, useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
 
 interface TrialBalanceRow {
     account_code: string;
@@ -33,9 +33,6 @@ interface Props extends PageProps {
     report: Report;
     filters: { as_of_date: string };
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const typeLabels: Record<string, string> = {
     asset: 'Assets',
@@ -95,8 +92,8 @@ export default function TrialBalance({ report, filters }: Props) {
                         title="Trial Balance"
                         description="Summary of all account balances verifying debits equal credits."
                         stats={[
-                            { label: 'Total Debits', value: formatCurrency(report.total_debits) },
-                            { label: 'Total Credits', value: formatCurrency(report.total_credits) },
+                            { label: 'Total Debits', value: formatMoney(report.total_debits) },
+                            { label: 'Total Credits', value: formatMoney(report.total_credits) },
                             { label: 'Status', value: isBalanced ? 'Balanced' : 'Unbalanced' },
                         ]}
                         actions={
@@ -116,7 +113,7 @@ export default function TrialBalance({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Debits</p>
                                 <p className="text-2xl font-bold text-status-info dark:text-status-info">
-                                    {formatCurrency(report.total_debits)}
+                                    {formatMoney(report.total_debits)}
                                 </p>
                             </div>
                             {isBalanced ? (
@@ -137,14 +134,14 @@ export default function TrialBalance({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Credits</p>
                                 <p className="text-2xl font-bold text-primary dark:text-primary">
-                                    {formatCurrency(report.total_credits)}
+                                    {formatMoney(report.total_credits)}
                                 </p>
                             </div>
                             {!isBalanced && (
                                 <div className="text-right">
                                     <p className="text-xs text-muted-foreground">Difference</p>
                                     <p className="text-sm font-semibold text-status-critical dark:text-status-critical">
-                                        {formatCurrency(Math.abs(report.total_debits - report.total_credits))}
+                                        {formatMoney(Math.abs(report.total_debits - report.total_credits))}
                                     </p>
                                 </div>
                             )}
@@ -180,11 +177,11 @@ export default function TrialBalance({ report, filters }: Props) {
                                     <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
-                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
+                                        <YAxis tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
                                         <Legend />
-                                        <Bar dataKey="debit" name="Debit" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="credit" name="Credit" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="debit" name="Debit" fill={chartColor(0)} radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="credit" name="Credit" fill={chartColor(1)} radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -227,10 +224,10 @@ export default function TrialBalance({ report, filters }: Props) {
                                                 <TableCell className="font-mono text-sm">{row.account_code}</TableCell>
                                                 <TableCell>{row.account_name}</TableCell>
                                                 <TableCell className="text-right">
-                                                    {row.debit_balance > 0 ? formatCurrency(row.debit_balance) : ''}
+                                                    {row.debit_balance > 0 ? formatMoney(row.debit_balance) : ''}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {row.credit_balance > 0 ? formatCurrency(row.credit_balance) : ''}
+                                                    {row.credit_balance > 0 ? formatMoney(row.credit_balance) : ''}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -238,8 +235,8 @@ export default function TrialBalance({ report, filters }: Props) {
                                 ))}
                                 <TableRow className="border-t-2 font-bold">
                                     <TableCell colSpan={2}>Totals</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(report.total_debits)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(report.total_credits)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(report.total_debits)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(report.total_credits)}</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-center">
@@ -250,7 +247,7 @@ export default function TrialBalance({ report, filters }: Props) {
                                         ) : (
                                             <span className="font-medium text-status-critical dark:text-status-critical">
                                                 Warning: Trial balance is out of balance by{' '}
-                                                {formatCurrency(Math.abs(report.total_debits - report.total_credits))}.
+                                                {formatMoney(Math.abs(report.total_debits - report.total_credits))}.
                                             </span>
                                         )}
                                     </TableCell>

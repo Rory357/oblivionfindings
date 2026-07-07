@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { LedgerTabsFooter, NewJournalDialog } from '@/components/finance';
+import { LedgerTabsFooter, NewJournalDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,9 +65,6 @@ interface Props extends PageProps {
     costCentres?: RefItem[];
     fundingStreams?: RefItem[];
 }
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
@@ -257,7 +254,7 @@ export default function JournalsIndex({
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate">{journal.description ?? '-'}</TableCell>
-                                        <TableCell className="text-right font-mono">{formatNZD(journal.total_amount)}</TableCell>
+                                        <TableCell className="text-right font-mono">{formatMoney(journal.total_amount)}</TableCell>
                                         <TableCell>
                                             <Badge className={statusBadge(journal.status)}>
                                                 {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}

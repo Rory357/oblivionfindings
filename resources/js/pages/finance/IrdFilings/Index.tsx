@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter } from '@/components/finance';
+import { TaxTabsFooter, formatMoney } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,9 +64,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
     { title: 'IRD Filings', href: '/finance/ird-filings' },
 ];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -155,7 +152,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                         stats={[
                             { label: 'Filed', value: filedCount },
                             { label: 'Pending', value: pendingCount },
-                            { label: 'Total filed', value: formatCurrency(totalFiledAmount) },
+                            { label: 'Total filed', value: formatMoney(totalFiledAmount) },
                         ]}
                         actions={
                             <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
@@ -198,7 +195,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Filed Amount</p>
-                                <p className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(totalFiledAmount)}</p>
+                                <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(totalFiledAmount)}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -226,7 +223,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                 {availableGstReturns.map((ret) => (
                                                     <SelectItem key={ret.id} value={String(ret.id)}>
                                                         Period {ret.ird_period}: {formatDate(ret.period_start)} &ndash;{' '}
-                                                        {formatDate(ret.period_end)} ({formatCurrency(Number(ret.gst_payable))})
+                                                        {formatDate(ret.period_end)} ({formatMoney(Number(ret.gst_payable))})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -292,7 +289,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                     <SelectItem key={run.id} value={String(run.id)}>
                                                         {formatDate(run.period_start)} &ndash; {formatDate(run.period_end)}
                                                         {run.total_gross != null
-                                                            ? ` (${formatCurrency(Number(run.total_gross))})`
+                                                            ? ` (${formatMoney(Number(run.total_gross))})`
                                                             : ''}
                                                     </SelectItem>
                                                 ))}
@@ -408,7 +405,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, availabl
                                                         {formatDate(filing.period_to)}
                                                     </td>
                                                     <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-status-critical' : 'text-status-success'}`}>
-                                                        {formatCurrency(Math.abs(amount))}
+                                                        {formatMoney(Math.abs(amount))}
                                                         {amount < 0 ? ' (Refund)' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">

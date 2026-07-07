@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ConfirmDialog, LedgerTabsFooter } from '@/components/finance';
+import { ConfirmDialog, LedgerTabsFooter, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,9 +35,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
     { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
 ];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -82,7 +79,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         stats={[
                             { label: 'Revaluations', value: revaluations.data.length },
                             { label: 'Posted', value: postedCount },
-                            { label: 'Net gain/loss', value: formatCurrency(totalGainLoss) },
+                            { label: 'Net gain/loss', value: formatMoney(totalGainLoss) },
                         ]}
                         actions={
                             <Link href="/finance/fx-revaluations/create">
@@ -113,7 +110,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                     Total Unrealised {isGain ? 'Gain' : isLoss ? 'Loss' : 'Gain/Loss'}
                                 </p>
                                 <p className={`text-2xl font-bold font-mono tabular-nums ${isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'}`}>
-                                    {isLoss ? '(' : ''}{formatCurrency(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
+                                    {isLoss ? '(' : ''}{formatMoney(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
                                 </p>
                             </div>
                         </CardContent>
@@ -170,7 +167,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                         }`}
                                                     >
                                                         {rowIsLoss ? '(' : ''}
-                                                        {formatCurrency(Math.abs(gainLoss))}
+                                                        {formatMoney(Math.abs(gainLoss))}
                                                         {rowIsLoss ? ')' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Edit, DollarSign, FileText, ShoppingCart, Users } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 
 interface Contact {
     id: number;
@@ -97,12 +98,6 @@ const poStatusColors: Record<string, string> = {
     received: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
 };
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(amount);
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', {
@@ -333,7 +328,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                         {formatDate(bill.due_date)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatCurrency(bill.total_amount)}
+                                                        {formatMoney(bill.total_amount)}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge
@@ -389,7 +384,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                         {formatDate(po.order_date)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatCurrency(po.total_amount)}
+                                                        {formatMoney(po.total_amount)}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge
@@ -421,13 +416,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
                                     <p className="text-2xl font-bold mt-1">
-                                        {formatCurrency(totalOutstanding)}
+                                        {formatMoney(totalOutstanding)}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Total Paid YTD</p>
                                     <p className="text-2xl font-bold mt-1">
-                                        {formatCurrency(totalPaidYtd)}
+                                        {formatMoney(totalPaidYtd)}
                                     </p>
                                 </div>
                             </CardContent>

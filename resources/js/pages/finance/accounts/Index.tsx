@@ -1,4 +1,4 @@
-import { LedgerTabsFooter, NewAccountDialog } from '@/components/finance';
+import { LedgerTabsFooter, NewAccountDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,12 +45,6 @@ type PageProps = {
     taxRates?: { id: number; name: string; code: string; rate: string }[];
     fundingStreams?: RefItem[];
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(amount);
 
 const typeLabels: Record<string, string> = {
     asset: 'Assets',
@@ -127,7 +121,7 @@ function AccountRow({
                     </Badge>
                 )}
                 <span className="w-32 text-right font-mono text-sm tabular-nums">
-                    {formatNZD(account.balance)}
+                    {formatMoney(account.balance)}
                 </span>
             </div>
             {hasChildren && isOpen && (
@@ -181,7 +175,7 @@ function AccountTypeSection({
                         </span>
                     </div>
                     <span className="font-mono text-sm font-semibold tabular-nums">
-                        {formatNZD(totalBalance)}
+                        {formatMoney(totalBalance)}
                     </span>
                 </div>
             </CollapsibleTrigger>

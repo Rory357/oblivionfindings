@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewPoDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewPoDialog, PayablesTabsFooter, formatMoney, type AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,9 +25,6 @@ type PurchaseOrder = {
 };
 
 type PaginationLink = { url: string | null; label: string; active: boolean };
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground' },
@@ -181,7 +178,7 @@ export default function PurchaseOrderIndex() {
                                             <TableCell>{po.vendor?.name ?? '-'}</TableCell>
                                             <TableCell>{po.order_date}</TableCell>
                                             <TableCell>{po.expected_date ?? '-'}</TableCell>
-                                            <TableCell className="text-right">{formatNZD(po.total_amount)}</TableCell>
+                                            <TableCell className="text-right">{formatMoney(po.total_amount)}</TableCell>
                                             <TableCell>
                                                 <StatusBadge status={po.status} />
                                             </TableCell>

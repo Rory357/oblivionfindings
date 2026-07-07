@@ -8,6 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Printer, DollarSign, CheckCircle, AlertTriangle, ArrowDownToLine } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { chartColor } from '@/components/finance/chart-palette';
+import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
 interface AgedRow {
@@ -38,11 +40,6 @@ interface Props extends PageProps {
     report: Report;
 }
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const agingColumns = [
     { key: 'current' as const, label: 'Current', className: 'text-status-success dark:text-status-success' },
     { key: 'days_1_30' as const, label: '1-30 Days', className: 'text-status-warning dark:text-status-warning' },
@@ -50,8 +47,6 @@ const agingColumns = [
     { key: 'days_61_90' as const, label: '61-90 Days', className: 'text-status-critical dark:text-status-critical' },
     { key: 'days_90_plus' as const, label: '90+ Days', className: 'text-status-critical dark:text-status-critical' },
 ];
-
-const PIE_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#991b1b'];
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -98,9 +93,9 @@ export default function AgedPayables({ report }: Props) {
                         title="Aged Payables"
                         description="Outstanding payables by vendor and aging period."
                         stats={[
-                            { label: 'Outstanding', value: formatCurrency(grand_total.total) },
+                            { label: 'Outstanding', value: formatMoney(grand_total.total) },
                             { label: 'Current', value: `${currentPct}%` },
-                            { label: 'Overdue 31+', value: formatCurrency(overdueAmount) },
+                            { label: 'Overdue 31+', value: formatMoney(overdueAmount) },
                         ]}
                         actions={
                             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
@@ -119,7 +114,7 @@ export default function AgedPayables({ report }: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Outstanding</p>
-                                    <p className="text-2xl font-bold tabular-nums">{formatCurrency(grand_total.total)}</p>
+                                    <p className="text-2xl font-bold tabular-nums">{formatMoney(grand_total.total)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -133,7 +128,7 @@ export default function AgedPayables({ report }: Props) {
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Current %</p>
                                     <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{currentPct}%</p>
-                                    <p className="text-xs text-muted-foreground">{formatCurrency(grand_total.current)} current</p>
+                                    <p className="text-xs text-muted-foreground">{formatMoney(grand_total.current)} current</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <CheckCircle className="h-5 w-5 text-muted-foreground" />
@@ -146,7 +141,7 @@ export default function AgedPayables({ report }: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Overdue (31+ Days)</p>
-                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatCurrency(overdueAmount)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatMoney(overdueAmount)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <AlertTriangle className="h-5 w-5 text-muted-foreground" />
@@ -177,10 +172,10 @@ export default function AgedPayables({ report }: Props) {
                                             label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                                         >
                                             {pieData.map((_, idx) => (
-                                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                                                <Cell key={idx} fill={chartColor(idx)} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -195,10 +190,10 @@ export default function AgedPayables({ report }: Props) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
+                                        <XAxis type="number" tickFormatter={(v) => formatMoney(v)} />
                                         <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12 }} />
-                                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                                        <Bar dataKey="total" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
+                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
+                                        <Bar dataKey="total" fill={chartColor(0)} radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -234,11 +229,11 @@ export default function AgedPayables({ report }: Props) {
                                                 <TableCell className="font-medium">{row.vendor_name}</TableCell>
                                                 {agingColumns.map((col) => (
                                                     <TableCell key={col.key} className="text-right">
-                                                        {row[col.key] > 0 ? formatCurrency(row[col.key]) : '-'}
+                                                        {row[col.key] > 0 ? formatMoney(row[col.key]) : '-'}
                                                     </TableCell>
                                                 ))}
                                                 <TableCell className="text-right font-semibold">
-                                                    {formatCurrency(row.total)}
+                                                    {formatMoney(row.total)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -246,11 +241,11 @@ export default function AgedPayables({ report }: Props) {
                                             <TableCell>Grand Total</TableCell>
                                             {agingColumns.map((col) => (
                                                 <TableCell key={col.key} className={`text-right ${col.className}`}>
-                                                    {formatCurrency(report.grand_total[col.key])}
+                                                    {formatMoney(report.grand_total[col.key])}
                                                 </TableCell>
                                             ))}
                                             <TableCell className="text-right">
-                                                {formatCurrency(report.grand_total.total)}
+                                                {formatMoney(report.grand_total.total)}
                                             </TableCell>
                                         </TableRow>
                                     </TableBody>

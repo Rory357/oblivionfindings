@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import {
     CreditNoteDialog,
+    formatMoney,
     PayablesTabsFooter,
     type CreditNoteAccountOption,
     type CreditNoteClientOption,
@@ -47,9 +48,6 @@ interface Props extends PageProps {
     clients: CreditNoteClientOption[];
     accounts: CreditNoteAccountOption[];
 }
-
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -202,7 +200,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters, canManage
                                             </TableCell>
                                             <TableCell>{creditNote.vendor?.name ?? '-'}</TableCell>
                                             <TableCell>{formatDate(creditNote.credit_date)}</TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(creditNote.total_amount)}</TableCell>
+                                            <TableCell className="text-right font-medium">{formatMoney(creditNote.total_amount)}</TableCell>
                                             <TableCell>
                                                 <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
                                                     {statusConfig[creditNote.status]?.label ?? creditNote.status}

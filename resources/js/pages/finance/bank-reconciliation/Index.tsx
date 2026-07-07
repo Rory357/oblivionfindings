@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter } from '@/components/finance';
+import { BankingTabsFooter, formatMoney } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, FileCheck, CheckCircle, Clock, ListChecks, Scale } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { useCallback, useMemo } from 'react';
-
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface Reconciliation {
     id: number;
@@ -48,9 +46,6 @@ interface Props {
     bankAccounts: BankAccount[];
     filters: Filters;
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusBadge = (status: string) => {
     switch (status) {
@@ -235,10 +230,10 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                             </TableCell>
                                             <TableCell>{recon.statement_date}</TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatNZD(recon.statement_balance)}
+                                                {formatMoney(recon.statement_balance)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {recon.calculated_balance ? formatNZD(recon.calculated_balance) : '-'}
+                                                {recon.calculated_balance ? formatMoney(recon.calculated_balance) : '-'}
                                             </TableCell>
                                             <TableCell>{statusBadge(recon.status)}</TableCell>
                                             <TableCell className="text-muted-foreground">

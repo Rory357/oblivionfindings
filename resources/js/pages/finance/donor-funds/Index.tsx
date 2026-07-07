@@ -5,9 +5,11 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import {
     DonorFundDialog,
+    formatMoney,
     type DonorFundFundingStream,
     type DonorFundGlAccount,
 } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -15,8 +17,6 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Heart, AlertTriangle, HandHeart } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface Fund {
     id: number;
@@ -54,9 +54,6 @@ interface Props extends PageProps {
     glAccounts: DonorFundGlAccount[];
     fundingStreams: DonorFundFundingStream[];
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -101,8 +98,8 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                         description="Track donations, grants, and restricted funding"
                         stats={[
                             { label: 'Total funds', value: summary.total_funds },
-                            { label: 'Received', value: formatCurrency(summary.total_received) },
-                            { label: 'Available', value: formatCurrency(summary.total_available) },
+                            { label: 'Received', value: formatMoney(summary.total_received) },
+                            { label: 'Available', value: formatMoney(summary.total_available) },
                             { label: 'Expiring soon', value: summary.expiring_soon },
                         ]}
                         actions={
@@ -128,25 +125,25 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Received</p>
-                                <p className="text-xl font-bold">{formatCurrency(summary.total_received)}</p>
+                                <p className="text-xl font-bold">{formatMoney(summary.total_received)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Total Spent</p>
-                                <p className="text-xl font-bold">{formatCurrency(summary.total_spent)}</p>
+                                <p className="text-xl font-bold">{formatMoney(summary.total_spent)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Available</p>
-                                <p className="text-xl font-bold text-status-success">{formatCurrency(summary.total_available)}</p>
+                                <p className="text-xl font-bold text-status-success">{formatMoney(summary.total_available)}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Restricted</p>
-                                <p className="text-xl font-bold">{formatCurrency(summary.restricted_balance)}</p>
+                                <p className="text-xl font-bold">{formatMoney(summary.restricted_balance)}</p>
                             </CardContent>
                         </Card>
                         <Card>
@@ -181,11 +178,11 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                             nameKey="name"
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                             ))}
                                         </Pie>
                                         <Tooltip
-                                            formatter={((value: number) => formatCurrency(value)) as any}
+                                            formatter={((value: number) => formatMoney(value)) as any}
                                         />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -194,7 +191,7 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                         <div key={entry.name} className="flex items-center gap-1.5">
                                             <div
                                                 className="h-2.5 w-2.5 rounded-full"
-                                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                                                style={{ backgroundColor: chartColor(index) }}
                                             />
                                             <span className="text-muted-foreground">{entry.name}</span>
                                         </div>
@@ -254,10 +251,10 @@ export default function DonorFundsIndex({ funds, summary, canManage = false, glA
                                                 <TableCell>
                                                     <Badge variant="outline">{fundTypeLabels[fund.fund_type] ?? fund.fund_type}</Badge>
                                                 </TableCell>
-                                                <TableCell className="text-right">{formatCurrency(fund.total_received)}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(fund.total_spent)}</TableCell>
+                                                <TableCell className="text-right">{formatMoney(fund.total_received)}</TableCell>
+                                                <TableCell className="text-right">{formatMoney(fund.total_spent)}</TableCell>
                                                 <TableCell className="text-right font-medium text-status-success">
-                                                    {formatCurrency(fund.available_balance)}
+                                                    {formatMoney(fund.available_balance)}
                                                     {utilisation !== null && (
                                                         <span className="ml-1 text-xs text-muted-foreground">({utilisation}%)</span>
                                                     )}

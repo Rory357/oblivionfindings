@@ -3,7 +3,7 @@ import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter, PettyCashFundDialog, type UserOption } from '@/components/finance';
+import { BankingTabsFooter, PettyCashFundDialog, formatMoney, type UserOption } from '@/components/finance';
 import type { AccountOption } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,9 +27,6 @@ interface Props extends PageProps {
     accounts: AccountOption[];
     users: UserOption[];
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
@@ -55,8 +52,8 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                         stats={[
                             { label: 'Funds', value: funds.length },
                             { label: 'Active', value: activeCount },
-                            { label: 'Total float', value: formatCurrency(totalFloat) },
-                            { label: 'Total balance', value: formatCurrency(totalBalance) },
+                            { label: 'Total float', value: formatMoney(totalFloat) },
+                            { label: 'Total balance', value: formatMoney(totalBalance) },
                         ]}
                         actions={
                             canManage && (
@@ -106,13 +103,13 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                                                 <div>
                                                     <p className="text-muted-foreground">Float</p>
                                                     <p className="font-semibold">
-                                                        {formatCurrency(fund.float_amount)}
+                                                        {formatMoney(fund.float_amount)}
                                                     </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-muted-foreground">Current Balance</p>
                                                     <p className="font-semibold">
-                                                        {formatCurrency(fund.current_balance)}
+                                                        {formatMoney(fund.current_balance)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -124,7 +121,7 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                                                             variance < 0 ? 'font-medium text-destructive' : 'text-status-success'
                                                         }
                                                     >
-                                                        {formatCurrency(variance)}
+                                                        {formatMoney(variance)}
                                                     </span>
                                                 </div>
                                             )}

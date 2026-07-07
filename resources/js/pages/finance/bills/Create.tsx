@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -95,12 +96,6 @@ interface Props extends PageProps {
     taxRates: TaxRate[];
     purchaseOrders: PurchaseOrder[];
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', {
-        style: 'currency',
-        currency: 'NZD',
-    }).format(amount);
 
 const emptyLine = (): LineItem => ({
     description: '',
@@ -388,7 +383,7 @@ export default function BillCreate({
                                                     {po.vendor?.name ??
                                                         'Unknown'}{' '}
                                                     (
-                                                    {formatCurrency(
+                                                    {formatMoney(
                                                         Number(po.total_amount),
                                                     )}
                                                     )
@@ -663,12 +658,12 @@ export default function BillCreate({
                                                     </Select>
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm">
-                                                    {formatCurrency(
+                                                    {formatMoney(
                                                         calcLineGst(line),
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm font-medium">
-                                                    {formatCurrency(
+                                                    {formatMoney(
                                                         calcLineTotal(line),
                                                     )}
                                                 </TableCell>
@@ -701,17 +696,17 @@ export default function BillCreate({
                                         <span className="text-muted-foreground">
                                             Subtotal
                                         </span>
-                                        <span>{formatCurrency(subtotal)}</span>
+                                        <span>{formatMoney(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">
                                             GST
                                         </span>
-                                        <span>{formatCurrency(gstTotal)}</span>
+                                        <span>{formatMoney(gstTotal)}</span>
                                     </div>
                                     <div className="flex justify-between border-t pt-2 text-base font-bold">
                                         <span>Total</span>
-                                        <span>{formatCurrency(total)}</span>
+                                        <span>{formatMoney(total)}</span>
                                     </div>
                                 </div>
                             </div>

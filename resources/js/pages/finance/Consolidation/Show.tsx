@@ -33,7 +33,7 @@ import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } fr
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { type BreadcrumbItem } from '@/types';
 
 type Entity = {
@@ -271,10 +271,6 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
     );
 }
 
-function formatCurrency(value: string | number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(value));
-}
-
 function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -481,10 +477,10 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
-                                                {formatCurrency(run.total_revenue)}
+                                                {formatMoney(run.total_revenue)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono text-sm">
-                                                {formatCurrency(run.total_expenses)}
+                                                {formatMoney(run.total_expenses)}
                                             </TableCell>
                                             <TableCell>{run.eliminations_count}</TableCell>
                                             <TableCell className="text-sm text-muted-foreground">

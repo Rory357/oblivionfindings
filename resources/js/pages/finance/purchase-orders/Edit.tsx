@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { useState, useCallback } from 'react';
 
 type Option = { id: number; name: string; code?: string };
@@ -39,9 +40,6 @@ type PurchaseOrder = {
     funding_stream_id: number | null;
     lines: ExistingLine[];
 };
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 function emptyLine(): LineItem {
     return { description: '', quantity: '1', unit_price: '0', gst_rate: '15', account_id: '' };
@@ -305,8 +303,8 @@ export default function PurchaseOrderEdit() {
                                         </div>
                                         <div className="md:col-span-2 md:text-right">
                                             <Label className="md:hidden">Line Total</Label>
-                                            <div className="text-sm font-medium">{formatNZD(c.total)}</div>
-                                            <div className="text-xs text-muted-foreground">GST: {formatNZD(c.gst)}</div>
+                                            <div className="text-sm font-medium">{formatMoney(c.total)}</div>
+                                            <div className="text-xs text-muted-foreground">GST: {formatMoney(c.gst)}</div>
                                         </div>
                                         <div className="md:col-span-1 md:text-center">
                                             {lines.length > 1 && (
@@ -324,15 +322,15 @@ export default function PurchaseOrderEdit() {
                                     <div className="w-64 space-y-1 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">Subtotal</span>
-                                            <span>{formatNZD(totals.subtotal)}</span>
+                                            <span>{formatMoney(totals.subtotal)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-muted-foreground">GST</span>
-                                            <span>{formatNZD(totals.gst)}</span>
+                                            <span>{formatMoney(totals.gst)}</span>
                                         </div>
                                         <div className="flex justify-between border-t pt-1 font-semibold">
                                             <span>Total</span>
-                                            <span>{formatNZD(totals.total)}</span>
+                                            <span>{formatMoney(totals.total)}</span>
                                         </div>
                                     </div>
                                 </div>

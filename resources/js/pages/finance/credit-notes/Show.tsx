@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 
 interface CreditNoteLine {
     id: number;
@@ -40,9 +41,6 @@ interface CreditNote {
 interface Props extends PageProps {
     creditNote: CreditNote;
 }
-
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const formatDate = (date: string | null) =>
     date ? new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -152,16 +150,16 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(creditNote.subtotal)}</span>
+                                <span>{formatMoney(creditNote.subtotal)}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">GST</span>
-                                <span>{formatCurrency(creditNote.gst_amount)}</span>
+                                <span>{formatMoney(creditNote.gst_amount)}</span>
                             </div>
                             <Separator />
                             <div className="flex justify-between font-bold">
                                 <span>Total</span>
-                                <span>{formatCurrency(creditNote.total_amount)}</span>
+                                <span>{formatMoney(creditNote.total_amount)}</span>
                             </div>
                         </CardContent>
                     </Card>
@@ -223,13 +221,13 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                                 <TableRow key={line.id}>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.unit_price)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.unit_price)}</TableCell>
                                     <TableCell className="text-right">{Number(line.gst_rate).toFixed(2)}%</TableCell>
                                     <TableCell className="text-sm">
                                         {line.account ? `${line.account.code} - ${line.account.name}` : '-'}
                                     </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.gst_amount)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(line.line_total)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.gst_amount)}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatMoney(line.line_total)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

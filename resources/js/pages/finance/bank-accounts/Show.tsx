@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { BankAccountDialog, type AccountOption } from '@/components/finance';
+import { BankAccountDialog, formatMoney, type AccountOption } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +14,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
-
-const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankAccount {
     id: number;
@@ -142,7 +140,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Opening Balance</p>
                             <p className="text-2xl font-semibold font-mono tabular-nums mt-1">
-                                {formatCurrency(bankAccount.opening_balance)}
+                                {formatMoney(bankAccount.opening_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -150,7 +148,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Current Balance</p>
                             <p className={`text-2xl font-semibold font-mono tabular-nums mt-1 ${bankAccount.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                {formatCurrency(bankAccount.current_balance)}
+                                {formatMoney(bankAccount.current_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -176,14 +174,14 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                     <LineChart data={balanceHistory}>
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis dataKey="date" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                                        <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']} />
+                                        <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => formatMoney(v)} />
+                                        <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Amount']} />
                                         <Line
                                             type="monotone"
                                             dataKey="amount"
-                                            stroke={CHART_COLORS[0]}
+                                            stroke={chartColor(0)}
                                             strokeWidth={2}
-                                            dot={{ fill: CHART_COLORS[0], r: 3 }}
+                                            dot={{ fill: chartColor(0), r: 3 }}
                                             activeDot={{ r: 5 }}
                                         />
                                     </LineChart>
@@ -274,7 +272,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                                 <Badge variant="outline" className="capitalize">{txn.source}</Badge>
                                             </TableCell>
                                             <TableCell className={`text-right font-mono tabular-nums ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {formatCurrency(txn.amount)}
+                                                {formatMoney(txn.amount)}
                                             </TableCell>
                                             <TableCell>{statusBadge(txn.status)}</TableCell>
                                         </TableRow>
@@ -312,10 +310,10 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                         <TableRow key={recon.id}>
                                             <TableCell>{recon.statement_date}</TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatCurrency(recon.statement_balance)}
+                                                {formatMoney(recon.statement_balance)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {recon.calculated_balance !== null ? formatCurrency(recon.calculated_balance) : '-'}
+                                                {recon.calculated_balance !== null ? formatMoney(recon.calculated_balance) : '-'}
                                             </TableCell>
                                             <TableCell>{reconStatusBadge(recon.status)}</TableCell>
                                             <TableCell className="text-muted-foreground">{recon.completed_at || '-'}</TableCell>

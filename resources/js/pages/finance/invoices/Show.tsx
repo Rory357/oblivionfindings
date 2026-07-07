@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -53,9 +53,6 @@ interface Invoice {
 interface Props extends PageProps {
     invoice: Invoice;
 }
-
-const formatCurrency = (amount: string | number, currency = 'NZD') =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency }).format(Number(amount));
 
 const formatDate = (date: string | null) =>
     date ? new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -231,16 +228,16 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span>{formatCurrency(invoice.subtotal, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.subtotal, { currency: invoice.currency_code })}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">GST</span>
-                                <span>{formatCurrency(invoice.tax_amount, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.tax_amount, { currency: invoice.currency_code })}</span>
                             </div>
                             <Separator />
                             <div className="flex justify-between font-bold text-base">
                                 <span>Total</span>
-                                <span>{formatCurrency(invoice.total_amount, invoice.currency_code)}</span>
+                                <span>{formatMoney(invoice.total_amount, { currency: invoice.currency_code })}</span>
                             </div>
 
                             {invoice.sent_at && (
@@ -290,15 +287,15 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                 <TableRow key={line.id}>
                                     <TableCell>{line.description}</TableCell>
                                     <TableCell className="text-right">{Number(line.quantity).toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.unit_price, invoice.currency_code)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.unit_price, { currency: invoice.currency_code })}</TableCell>
                                     <TableCell className="text-sm">
                                         {line.tax_rate ? `${line.tax_rate.name} (${line.tax_rate.rate}%)` : '15% GST'}
                                     </TableCell>
                                     <TableCell className="text-sm">
                                         {line.account ? `${line.account.code} - ${line.account.name}` : '-'}
                                     </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(line.tax_amount, invoice.currency_code)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(line.line_total, invoice.currency_code)}</TableCell>
+                                    <TableCell className="text-right">{formatMoney(line.tax_amount, { currency: invoice.currency_code })}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatMoney(line.line_total, { currency: invoice.currency_code })}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

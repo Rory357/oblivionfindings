@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { CheckCircle, RotateCcw, Calendar, User, FileText } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -102,9 +103,6 @@ interface Journal {
 interface Props extends PageProps {
     journal: Journal;
 }
-
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
@@ -344,10 +342,10 @@ export default function JournalsShow({ auth, journal }: Props) {
                                         </TableCell>
                                         <TableCell>{line.description ?? '-'}</TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {Number(line.debit) > 0 ? formatNZD(line.debit) : '-'}
+                                            {Number(line.debit) > 0 ? formatMoney(line.debit) : '-'}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {Number(line.credit) > 0 ? formatNZD(line.credit) : '-'}
+                                            {Number(line.credit) > 0 ? formatMoney(line.credit) : '-'}
                                         </TableCell>
                                         <TableCell>
                                             {line.cost_centre
@@ -368,10 +366,10 @@ export default function JournalsShow({ auth, journal }: Props) {
                                         Totals
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-semibold">
-                                        {formatNZD(totalDebits)}
+                                        {formatMoney(totalDebits)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-semibold">
-                                        {formatNZD(totalCredits)}
+                                        {formatMoney(totalCredits)}
                                     </TableCell>
                                     <TableCell colSpan={2} />
                                 </TableRow>

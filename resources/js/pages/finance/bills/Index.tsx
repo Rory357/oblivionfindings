@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { NewBillDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, formatMoney, type AccountOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -73,9 +73,6 @@ interface Props extends PageProps {
     accounts: AccountOption[];
 }
 
-const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -138,9 +135,9 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                         title="Bills"
                         description="Manage accounts payable"
                         stats={[
-                            { label: 'Total unpaid', value: formatCurrency(summary.total_unpaid) },
-                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
-                            { label: 'Due this week', value: formatCurrency(summary.due_this_week) },
+                            { label: 'Total unpaid', value: formatMoney(summary.total_unpaid) },
+                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
+                            { label: 'Due this week', value: formatMoney(summary.due_this_week) },
                         ]}
                         actions={
                             canManage && (
@@ -156,9 +153,9 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
             >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatCurrency(summary.total_unpaid)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatCurrency(summary.total_overdue)} />
-                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatCurrency(summary.due_this_week)} />
+                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Total Unpaid" value={formatMoney(summary.total_unpaid)} />
+                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
+                    <FinanceSummaryCard icon={CalendarClock} tone="warning" label="Due This Week" value={formatMoney(summary.due_this_week)} />
                 </div>
 
                 {/* Filters */}
@@ -273,8 +270,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                                 </span>
                                             </span>
                                         </TableCell>
-                                        <TableCell className="text-right font-medium">{formatCurrency(bill.total_amount)}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(bill.amount_paid)}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatMoney(bill.total_amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(bill.amount_paid)}</TableCell>
                                         <TableCell>
                                             <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
                                                 {statusConfig[bill.status]?.label ?? bill.status}

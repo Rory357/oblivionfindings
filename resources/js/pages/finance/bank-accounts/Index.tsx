@@ -4,9 +4,11 @@ import { PageHero, PageLayout } from '@/components/page';
 import {
     BankAccountDialog,
     BankingTabsFooter,
+    formatMoney,
     type AccountOption,
     type EditableBankAccount,
 } from '@/components/finance';
+import { chartColor } from '@/components/finance/chart-palette';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +16,6 @@ import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Bankn
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
 import { useMemo, useState } from 'react';
-
-const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankAccount {
     id: number;
@@ -138,7 +137,7 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                         <div>
                                             <p className="text-sm text-muted-foreground">Total Cash</p>
                                             <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {formatCurrency(totalCash)}
+                                                {formatMoney(totalCash)}
                                             </p>
                                         </div>
                                     </div>
@@ -168,7 +167,7 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                         <div>
                                             <p className="text-sm text-muted-foreground">Primary Account</p>
                                             <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {primaryAccount ? formatCurrency(primaryAccount.current_balance) : 'N/A'}
+                                                {primaryAccount ? formatMoney(primaryAccount.current_balance) : 'N/A'}
                                             </p>
                                         </div>
                                     </div>
@@ -198,10 +197,10 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                                     label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                                                 >
                                                     {pieData.map((_entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                        <Cell key={`cell-${index}`} fill={chartColor(index)} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Balance']} />
+                                                <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Balance']} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -265,7 +264,7 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-muted-foreground">Current Balance</span>
                                                     <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatCurrency(account.current_balance)}
+                                                        {formatMoney(account.current_balance)}
                                                     </span>
                                                 </div>
 

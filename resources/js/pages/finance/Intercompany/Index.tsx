@@ -32,6 +32,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { ArrowLeftRight, Plus, Send, Clock, DollarSign } from 'lucide-react';
+import { formatMoney } from '@/components/finance';
 import { FormEvent, useState } from 'react';
 
 type Entity = {
@@ -70,9 +71,6 @@ const statusColors: Record<string, string> = {
     posted: 'bg-status-success-bg text-status-success border-status-success/30',
     eliminated: 'bg-status-info-bg text-status-info border-status-info/30',
 };
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 function CreateTransactionDialog({ groupId, entities }: { groupId: number; entities: Entity[] }) {
     const [open, setOpen] = useState(false);
@@ -232,7 +230,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                         stats={[
                             { label: 'Total', value: transactions.length },
                             { label: 'Pending', value: pendingTransactions.length },
-                            { label: 'Pending amount', value: formatCurrency(pendingTotal) },
+                            { label: 'Pending amount', value: formatMoney(pendingTotal) },
                         ]}
                         actions={<CreateTransactionDialog groupId={group.id} entities={entities} />}
                     />
@@ -258,7 +256,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Pending Amount</p>
-                                <p className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(pendingTotal)}</p>
+                                <p className="text-2xl font-bold font-mono tabular-nums">{formatMoney(pendingTotal)}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -301,7 +299,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                                 {txn.description}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatCurrency(Number(txn.amount))}
+                                                {formatMoney(Number(txn.amount))}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={statusColors[txn.status]}>

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
-import { ConfirmDialog } from '@/components/finance';
+import { ConfirmDialog, formatMoney } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 
 type GstReturn = {
@@ -38,9 +38,6 @@ type Filing = {
 type PageProps = {
     filing: Filing;
 };
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -227,7 +224,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Amount</p>
                                 <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}>
-                                    {formatCurrency(Math.abs(amount))}
+                                    {formatMoney(Math.abs(amount))}
                                     {isRefund ? ' (Refund)' : ''}
                                 </p>
                             </div>
@@ -290,7 +287,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                                                     : 'text-status-success'
                                                                 : ''
                                                         }`}>
-                                                            {isMonetary ? formatCurrency(Number(value)) : String(value)}
+                                                            {isMonetary ? formatMoney(Number(value)) : String(value)}
                                                         </span>
                                                     </div>
                                                 );
@@ -343,7 +340,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                     </p>
                                     <p className="text-sm text-muted-foreground">
                                         IRD Period: {filing.gst_return.ird_period} | GST Payable:{' '}
-                                        {formatCurrency(Number(filing.gst_return.gst_payable))}
+                                        {formatMoney(Number(filing.gst_return.gst_payable))}
                                     </p>
                                 </div>
                                 <Button

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHero, PageLayout } from '@/components/page';
+import { formatMoney } from '@/components/finance/money';
 
 interface BankAccount {
     id: number;
@@ -17,9 +18,6 @@ interface Props {
     bankAccounts: BankAccount[];
     preselectedBankAccountId: number | null;
 }
-
-const formatNZD = (amount: number | string) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
 export default function ReconciliationCreate({ bankAccounts, preselectedBankAccountId }: Props) {
     const { data, setData, post, processing, errors } = useForm({
@@ -73,7 +71,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                     <SelectContent>
                                         {bankAccounts.map((account) => (
                                             <SelectItem key={account.id} value={String(account.id)}>
-                                                {account.name} ({formatNZD(account.current_balance)})
+                                                {account.name} ({formatMoney(account.current_balance)})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -83,7 +81,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                 )}
                                 {selectedAccount && (
                                     <p className="text-sm text-muted-foreground">
-                                        Current balance: {formatNZD(selectedAccount.current_balance)}
+                                        Current balance: {formatMoney(selectedAccount.current_balance)}
                                     </p>
                                 )}
                             </div>

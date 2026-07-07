@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, CheckCircle2, Clock, CreditCard, DollarSign, Hash, Layers } from 'lucide-react';
+import { formatMoney } from '@/components/finance/money';
 import { useMemo } from 'react';
 
 interface Batch {
@@ -67,9 +68,6 @@ interface Props extends PageProps {
     };
 }
 
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -112,8 +110,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                         title="EFTPOS Batches"
                         description="Reconcile EFTPOS settlements with bank transactions."
                         stats={[
-                            { label: 'Settlement', value: formatCurrency(kpis.totalSettlement) },
-                            { label: 'Fees', value: formatCurrency(kpis.totalFees) },
+                            { label: 'Settlement', value: formatMoney(kpis.totalSettlement) },
+                            { label: 'Fees', value: formatMoney(kpis.totalFees) },
                             { label: 'Transactions', value: kpis.totalTxns },
                             { label: 'Unreconciled', value: kpis.unreconciledCount },
                         ]}
@@ -235,14 +233,14 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                 <TableCell>{formatDate(batch.batch_date)}</TableCell>
                                                 <TableCell className="text-sm">{batch.terminal_name ?? '-'}</TableCell>
                                                 <TableCell className="text-right">{batch.total_transactions}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(batch.total_amount)}</TableCell>
+                                                <TableCell className="text-right">{formatMoney(batch.total_amount)}</TableCell>
                                                 <TableCell className="text-right text-destructive">
-                                                    {batch.total_refunds > 0 ? `-${formatCurrency(batch.total_refunds)}` : '-'}
+                                                    {batch.total_refunds > 0 ? `-${formatMoney(batch.total_refunds)}` : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right text-muted-foreground">
-                                                    {batch.fees > 0 ? formatCurrency(batch.fees) : '-'}
+                                                    {batch.fees > 0 ? formatMoney(batch.fees) : '-'}
                                                 </TableCell>
-                                                <TableCell className="text-right font-medium">{formatCurrency(batch.settlement_amount)}</TableCell>
+                                                <TableCell className="text-right font-medium">{formatMoney(batch.settlement_amount)}</TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline" className={config.className}>
                                                         <StatusIcon className="mr-1 h-3 w-3" />
@@ -250,7 +248,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                     </Badge>
                                                     {batch.discrepancy_amount !== 0 && (
                                                         <span className="ml-1 text-xs text-destructive">
-                                                            ({formatCurrency(batch.discrepancy_amount)})
+                                                            ({formatMoney(batch.discrepancy_amount)})
                                                         </span>
                                                     )}
                                                 </TableCell>

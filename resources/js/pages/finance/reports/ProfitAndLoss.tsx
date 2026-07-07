@@ -10,8 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Printer, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+import { formatMoney } from '@/components/finance/money';
 
 interface AccountRow {
     account_code: string;
@@ -34,9 +33,6 @@ interface Props extends PageProps {
     report: Report;
     filters: { start_date: string; end_date: string };
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -86,9 +82,9 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                         title="Profit & Loss Statement"
                         description="Revenue and expense summary for the selected period."
                         stats={[
-                            { label: 'Revenue', value: formatCurrency(report.total_revenue) },
-                            { label: 'Expenses', value: formatCurrency(report.total_expenses) },
-                            { label: report.net_profit >= 0 ? 'Net Profit' : 'Net Loss', value: formatCurrency(report.net_profit) },
+                            { label: 'Revenue', value: formatMoney(report.total_revenue) },
+                            { label: 'Expenses', value: formatMoney(report.total_expenses) },
+                            { label: report.net_profit >= 0 ? 'Net Profit' : 'Net Loss', value: formatMoney(report.net_profit) },
                         ]}
                         actions={
                             <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
@@ -110,7 +106,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Revenue</p>
                                 <p className="text-2xl font-bold text-status-success dark:text-status-success">
-                                    {formatCurrency(report.total_revenue)}
+                                    {formatMoney(report.total_revenue)}
                                 </p>
                             </div>
                         </CardContent>
@@ -123,7 +119,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Expenses</p>
                                 <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
-                                    {formatCurrency(report.total_expenses)}
+                                    {formatMoney(report.total_expenses)}
                                 </p>
                             </div>
                         </CardContent>
@@ -156,7 +152,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                             : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
-                                    {formatCurrency(report.net_profit)}
+                                    {formatMoney(report.net_profit)}
                                 </p>
                             </div>
                         </CardContent>
@@ -199,16 +195,16 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
+                                        <XAxis type="number" tickFormatter={(v) => formatMoney(v)} />
                                         <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 12 }} />
                                         <Tooltip
-                                            formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']}
+                                            formatter={(value?: number) => [formatMoney(value ?? 0), 'Amount']}
                                         />
                                         <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                                             {chartData.map((entry, index) => (
                                                 <Cell
                                                     key={`cell-${index}`}
-                                                    fill={entry.type === 'revenue' ? '#10b981' : '#ef4444'}
+                                                    fill={entry.type === 'revenue' ? 'var(--status-success)' : 'var(--status-critical)'}
                                                 />
                                             ))}
                                         </Bar>
@@ -254,7 +250,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                     <TableRow key={`rev-${idx}`}>
                                         <TableCell className="font-mono text-sm">{row.account_code}</TableCell>
                                         <TableCell>{row.account_name}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(row.amount)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {report.revenue.length === 0 && (
@@ -267,7 +263,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                 <TableRow className="border-t font-semibold">
                                     <TableCell colSpan={2}>Total Revenue</TableCell>
                                     <TableCell className="text-right">
-                                        {formatCurrency(report.total_revenue)}
+                                        {formatMoney(report.total_revenue)}
                                     </TableCell>
                                 </TableRow>
 
@@ -281,7 +277,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                     <TableRow key={`exp-${idx}`}>
                                         <TableCell className="font-mono text-sm">{row.account_code}</TableCell>
                                         <TableCell>{row.account_name}</TableCell>
-                                        <TableCell className="text-right">{formatCurrency(row.amount)}</TableCell>
+                                        <TableCell className="text-right">{formatMoney(row.amount)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {report.expenses.length === 0 && (
@@ -294,7 +290,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                 <TableRow className="border-t font-semibold">
                                     <TableCell colSpan={2}>Total Expenses</TableCell>
                                     <TableCell className="text-right">
-                                        {formatCurrency(report.total_expenses)}
+                                        {formatMoney(report.total_expenses)}
                                     </TableCell>
                                 </TableRow>
 
@@ -306,7 +302,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                     <TableCell
                                         className={`text-right ${report.net_profit >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
                                     >
-                                        {formatCurrency(report.net_profit)}
+                                        {formatMoney(report.net_profit)}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
