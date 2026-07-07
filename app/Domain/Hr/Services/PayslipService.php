@@ -5,9 +5,11 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
+use App\Domain\Hr\Notifications\PayslipAvailableNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PayslipService
@@ -139,6 +141,47 @@ class PayslipService
 
             return $payslips;
         });
+    }
+
+    /**
+     * Best-effort: tell each employee their payslip is ready to view. Call this
+     * AFTER the generating transaction has committed (never inside it) so the
+     * queued notification can't race the write. Deduped by payslip owner; rows
+     * with no linked user are skipped.
+     *
+     * @param  \Illuminate\Support\Collection<int, HrPayslip>  $payslips
+     */
+    public function notifyEmployeesPayslipAvailable(Collection $payslips): void
+    {
+        $notified = [];
+
+        foreach ($payslips as $payslip) {
+            if (! $payslip instanceof HrPayslip || $payslip->user_id === null) {
+                continue;
+            }
+
+            // One notice per employee even if several payslips arrive together.
+            if (in_array($payslip->user_id, $notified, true)) {
+                continue;
+            }
+
+            $payslip->loadMissing('user');
+            $user = $payslip->user;
+            if (! $user) {
+                continue;
+            }
+
+            try {
+                $user->notify(new PayslipAvailableNotification($payslip));
+                $notified[] = $payslip->user_id;
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send payslip-available notification', [
+                    'payslip_id' => $payslip->id,
+                    'user_id' => $payslip->user_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

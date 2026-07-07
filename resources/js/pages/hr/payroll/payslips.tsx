@@ -51,6 +51,11 @@ interface Props {
         total: number;
     };
     employees: Employee[];
+    statusCounts: {
+        total: number;
+        draft: number;
+        paid: number;
+    };
     filters: {
         status: string | null;
         user_id: string | null;
@@ -95,6 +100,7 @@ function formatCurrency(amount: string | number): string {
 export default function PayslipsIndex({
     payslips,
     employees,
+    statusCounts,
     filters,
     can,
 }: Props) {
@@ -133,10 +139,9 @@ export default function PayslipsIndex({
                         title="Payslips"
                         description="Generate, review, and distribute employee payslips."
                         stats={[
-                            { label: 'Total', value: payslips.total },
-                            { label: 'Drafts', value: payslips.data.filter((p) => p.status === 'draft').length },
-                            { label: 'Approved', value: payslips.data.filter((p) => p.status === 'approved').length },
-                            { label: 'Paid', value: payslips.data.filter((p) => p.status === 'paid').length },
+                            { label: 'Total', value: statusCounts.total, href: '/hr/payroll/payslips' },
+                            { label: 'Drafts', value: statusCounts.draft, href: '/hr/payroll/payslips?status=draft' },
+                            { label: 'Paid', value: statusCounts.paid, href: '/hr/payroll/payslips?status=paid' },
                         ]}
                         actions={
                             can.generate ? (
@@ -218,9 +223,6 @@ export default function PayslipsIndex({
                                         </SelectItem>
                                         <SelectItem value="draft">
                                             Draft
-                                        </SelectItem>
-                                        <SelectItem value="approved">
-                                            Approved
                                         </SelectItem>
                                         <SelectItem value="paid">
                                             Paid

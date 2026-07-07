@@ -30,7 +30,10 @@ class PayslipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payslips.view'), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $payslips = HrPayslip::query()
+            ->forTenant($tenantId)
             ->with(['user:id,name', 'employeeProfile:id,employee_number,position_title'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('user_id'), fn ($q, $uid) => $q->where('user_id', $uid))
@@ -41,14 +44,30 @@ class PayslipController extends Controller
             ->withQueryString();
 
         $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
             ->active()
             ->with('user:id,name')
             ->get()
             ->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user?->name ?? 'Unknown']);
 
+        // Server-side status counts across the whole tenant so the hero tiles
+        // are true (a page-scoped client tally only sees the current 20 rows).
+        // Payslips flow draft → paid; 'approved' from the original schema was
+        // never wired, so it isn't surfaced.
+        $statusCounts = HrPayslip::query()
+            ->forTenant($tenantId)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
         return Inertia::render('hr/payroll/payslips', [
             'payslips' => $payslips,
             'employees' => $employees,
+            'statusCounts' => [
+                'total' => (int) $statusCounts->sum(),
+                'draft' => (int) ($statusCounts['draft'] ?? 0),
+                'paid' => (int) ($statusCounts['paid'] ?? 0),
+            ],
             'filters' => [
                 'status' => $request->query('status'),
                 'user_id' => $request->query('user_id'),
@@ -69,6 +88,10 @@ class PayslipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payslips.generate'), 403);
 
+        // users has no tenant_id column, so resolve it — the old
+        // $user->tenant_id made the "all employees" branch filter on NULL.
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $data = $request->validate([
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after:period_start'],
@@ -76,41 +99,45 @@ class PayslipController extends Controller
             'employee_profile_id' => ['nullable', 'exists:hr_employee_profiles,id'],
         ]);
 
+        $generated = collect();
+
         try {
             if (! empty($data['payroll_run_id'])) {
                 // Bulk generate from a payroll run
-                $run = HrPayrollRun::findOrFail($data['payroll_run_id']);
-                $payslips = $this->payslipService->generateBulkPayslips($run);
-                $count = $payslips->count();
+                $run = HrPayrollRun::where('tenant_id', $tenantId)->findOrFail($data['payroll_run_id']);
+                $generated = $this->payslipService->generateBulkPayslips($run);
+                $count = $generated->count();
             } elseif (! empty($data['employee_profile_id'])) {
                 // Single employee
-                $profile = HrEmployeeProfile::findOrFail($data['employee_profile_id']);
-                $this->payslipService->generatePayslip(
+                $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->findOrFail($data['employee_profile_id']);
+                $generated->push($this->payslipService->generatePayslip(
                     $profile,
                     $data['period_start'],
                     $data['period_end'],
-                );
+                ));
                 $count = 1;
             } else {
                 // All active employees
                 $profiles = HrEmployeeProfile::query()
-                    ->where('tenant_id', $user->tenant_id)
+                    ->where('tenant_id', $tenantId)
                     ->active()
                     ->get();
 
-                $count = 0;
                 foreach ($profiles as $profile) {
-                    $this->payslipService->generatePayslip(
+                    $generated->push($this->payslipService->generatePayslip(
                         $profile,
                         $data['period_start'],
                         $data['period_end'],
-                    );
-                    $count++;
+                    ));
                 }
+                $count = $generated->count();
             }
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['generate' => $e->getMessage()]);
         }
+
+        // Post-commit: let each employee know their payslip is ready to view.
+        $this->payslipService->notifyEmployeesPayslipAvailable($generated);
 
         return redirect()->back()->with('success', "{$count} payslip(s) generated successfully.");
     }

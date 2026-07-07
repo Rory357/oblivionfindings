@@ -55,6 +55,12 @@ interface Props {
     };
     profiles: PayrollExportProfile[];
     exportFieldOptions: ExportFieldOption[];
+    statusCounts: {
+        total: number;
+        draft: number;
+        locked: number;
+        exported: number;
+    };
     can: { manage: boolean; export_data: boolean };
 }
 
@@ -110,6 +116,7 @@ export default function PayrollIndex({
     runs,
     profiles,
     exportFieldOptions,
+    statusCounts,
     can,
 }: Props) {
     const [runWizardOpen, setRunWizardOpen] = useState(false);
@@ -154,10 +161,10 @@ export default function PayrollIndex({
                         title="Payroll Runs"
                         description="Manage payroll periods, lock runs, and export to your payroll provider."
                         stats={[
-                            { label: 'Total runs', value: runs.total },
-                            { label: 'Drafts', value: runs.data.filter((r) => r.status === 'draft').length },
-                            { label: 'Locked', value: runs.data.filter((r) => r.status === 'locked').length },
-                            { label: 'Exported', value: runs.data.filter((r) => r.status === 'exported').length },
+                            { label: 'Total runs', value: statusCounts.total, href: '/hr/payroll' },
+                            { label: 'Drafts', value: statusCounts.draft, href: '/hr/payroll?status=draft' },
+                            { label: 'Locked', value: statusCounts.locked, href: '/hr/payroll?status=locked' },
+                            { label: 'Exported', value: statusCounts.exported, href: '/hr/payroll?status=exported' },
                         ]}
                         actions={
                             can.manage ? (

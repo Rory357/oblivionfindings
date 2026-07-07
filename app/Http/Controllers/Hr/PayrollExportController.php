@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\PayrollExportService;
+use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Carbon\Carbon;
@@ -26,6 +27,7 @@ class PayrollExportController extends Controller
         protected PayrollExportService $payrollService,
         protected HrWebhookService $webhookService,
         protected PayrollJournalService $payrollJournalService,
+        protected PayslipService $payslipService,
     ) {}
 
     /**
@@ -94,10 +96,25 @@ class PayrollExportController extends Controller
             ])
             ->values();
 
+        // Server-side status counts across the whole tenant so the hero tiles
+        // stay true past page 1 (a client tally of $runs->data only sees the
+        // current 20 rows).
+        $statusCounts = HrPayrollRun::query()
+            ->where('tenant_id', $tenantId)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
         return Inertia::render('hr/payroll/index', [
             'runs' => $runs,
             'profiles' => $profiles,
             'exportFieldOptions' => $exportFieldOptions,
+            'statusCounts' => [
+                'total' => (int) $statusCounts->sum(),
+                'draft' => (int) ($statusCounts['draft'] ?? 0),
+                'locked' => (int) ($statusCounts['locked'] ?? 0),
+                'exported' => (int) ($statusCounts['exported'] ?? 0),
+            ],
             'filters' => [
                 'status' => $request->query('status'),
             ],
@@ -152,6 +169,11 @@ class PayrollExportController extends Controller
             abort(404);
         }
 
+        // Locking auto-generates payslips only when none exist yet; capture that
+        // so we notify employees exactly once (and not again if an admin already
+        // generated + notified via the Payslips screen).
+        $payslipsExistedBeforeLock = $run->payslips()->exists();
+
         try {
             $run = $this->payrollService->lockRun($run, $user->id);
         } catch (ValidationException $e) {
@@ -162,6 +184,12 @@ class PayrollExportController extends Controller
 
         if ($run->journal_id === null) {
             PostPayrollJournalJob::dispatch($run);
+        }
+
+        if (! $payslipsExistedBeforeLock) {
+            $this->payslipService->notifyEmployeesPayslipAvailable(
+                $run->payslips()->with('user')->get()
+            );
         }
 
         $this->webhookService->publish($run->tenant_id, 'payroll.run.locked', [
