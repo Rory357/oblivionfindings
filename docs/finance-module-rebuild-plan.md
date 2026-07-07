@@ -625,6 +625,18 @@ vendor, receipt) — the mould for C2.
     empty-list states are lower-risk and pair naturally with the command-layer list work.)*
   - **[ ] C3d — command layer** (search + filter chips synced to URL + sort + CSV export + pagination on every
     list tab; right-click context menus (shift-context-menu mould); **tab count badges** wired from controllers).
+    Shipping per-concern sub-batches:
+    - **[x] C3d-export — CSV export on all 15 lists** (merged `e7ea0a9e`). Shared `streamSanitizedCsv` helper on
+      `SanitizesCsvOutput` (base Controller) → BOM + `putCsv` per row (formula-injection safe); an `export(Request)`
+      on every finance list controller mirroring its index filters; 14 `finance.<x>.export` routes registered
+      **before** resource routes (so `/x/export` isn't captured as `{param}`); Export-CSV `<a href>` in each hero.
+      41 tests (ListExport{,Payables,Ledger,TaxBank}Test), full finance suite 227 green. ⚠️ helper is
+      `streamSanitizedCsv` not `streamCsv`/`exportCsv` (both taken as `private` elsewhere → visibility fatal);
+      ⚠️ Vendor export omits the encrypted bank_account_number by design.
+    - **[ ] C3d-badges — tab count badges** (shared `financeHubCounts` prop → every hub TabsFooter renders real counts).
+    - **[ ] C3d-list — pagination + search + URL filter chips + sort** on lists lacking them (accounts / donor-funds /
+      credit-notes / gst-returns paginate; replicate invoices/bills' URL-synced search+status+date+sort elsewhere).
+    - **[ ] C3d-menus — right-click context menus** on every list row (reuse the canonical mould, don't fork).
   - **[ ] C3e — axe (no criticals) + responsive pass per hub; fold Intercompany under a Consolidation tab.**
 - **[ ] C4 — Funding & Client Money hub** (`/finance/funding`; tabs Funding streams · Funding claims ·
   Client/resident funds · Donor/trust funds · Service billing). Migrate `operations/funding/**` +
