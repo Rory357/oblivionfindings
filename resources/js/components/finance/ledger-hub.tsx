@@ -9,7 +9,12 @@ import {
     RefreshCw,
 } from 'lucide-react';
 
-import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
+import {
+    FinanceTabs,
+    tabCountBadge,
+    type FinanceHubCounts,
+    type FinanceTabItem,
+} from './finance-tabs';
 
 /**
  * Canonical General Ledger hub tabs. Each sub-area keeps its own route + data;
@@ -56,6 +61,9 @@ export const LEDGER_TABS: LedgerTabDef[] = [
 export function LedgerTabsFooter({ active }: { active: LedgerTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
+    const counts =
+        (page.props as { financeHubCounts?: FinanceHubCounts | null })
+            .financeHubCounts?.['ledger'] ?? {};
 
     const visible = LEDGER_TABS.filter((t) => t.id === active || t.requires(can));
 
@@ -76,6 +84,7 @@ export function LedgerTabsFooter({ active }: { active: LedgerTabId }) {
                 label: t.label,
                 icon: t.icon,
                 tone: t.tone,
+                badge: tabCountBadge(counts[t.id]),
             }))}
             ariaLabel="General ledger views"
         />

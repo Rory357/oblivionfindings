@@ -633,7 +633,14 @@ vendor, receipt) — the mould for C2.
       41 tests (ListExport{,Payables,Ledger,TaxBank}Test), full finance suite 227 green. ⚠️ helper is
       `streamSanitizedCsv` not `streamCsv`/`exportCsv` (both taken as `private` elsewhere → visibility fatal);
       ⚠️ Vendor export omits the encrypted bank_account_number by design.
-    - **[ ] C3d-badges — tab count badges** (shared `financeHubCounts` prop → every hub TabsFooter renders real counts).
+    - **[x] C3d-badges — tab count badges.** `FinanceHubCountsService` returns `[hub][tab => count]` for the
+      list tabs (report / dashboard / workspace tabs carry none); shared once per finance request as a lazy,
+      finance-route-scoped `financeHubCounts` Inertia prop (non-finance pages + partial reloads pay nothing);
+      each of the 5 list-hub `*TabsFooter` reads its slice and badges tabs via `tabCountBadge` (omits 0, caps
+      `999+`). Every count org-scoped + individually guarded (bad table → no badge, never a 500 in middleware).
+      Browser-verified on demo data: receivables (Invoices 6 · Quotes 1 · Recurring 1 · Price books 1; Billing/
+      Allocations 0 → no badge; Aged-AR/Statements reports → no badge) + payables (Bills 4 · POs 2 · Vendors 4 ·
+      Credit notes 2 · Payment runs 2), no console errors. Gates: types 0, eslint 0, vitest 3, suite 230 green.
     - **[ ] C3d-list — pagination + search + URL filter chips + sort** on lists lacking them (accounts / donor-funds /
       credit-notes / gst-returns paginate; replicate invoices/bills' URL-synced search+status+date+sort elsewhere).
     - **[ ] C3d-menus — right-click context menus** on every list row (reuse the canonical mould, don't fork).

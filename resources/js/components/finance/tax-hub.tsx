@@ -1,7 +1,12 @@
 import { router, usePage } from '@inertiajs/react';
 import { Building2, Download, Landmark, Receipt } from 'lucide-react';
 
-import { FinanceTabs, type FinanceTabItem } from './finance-tabs';
+import {
+    FinanceTabs,
+    tabCountBadge,
+    type FinanceHubCounts,
+    type FinanceTabItem,
+} from './finance-tabs';
 
 /**
  * Canonical Tax & Compliance hub tabs. Mirrors the Ledger/Banking hubs
@@ -38,6 +43,9 @@ export const TAX_TABS: TaxTabDef[] = [
 export function TaxTabsFooter({ active }: { active: TaxTabId }) {
     const page = usePage();
     const can = (page.props as { auth?: { can?: CanTree } })?.auth?.can;
+    const counts =
+        (page.props as { financeHubCounts?: FinanceHubCounts | null })
+            .financeHubCounts?.['tax'] ?? {};
 
     const visible = TAX_TABS.filter((t) => t.id === active || t.requires(can));
 
@@ -58,6 +66,7 @@ export function TaxTabsFooter({ active }: { active: TaxTabId }) {
                 label: t.label,
                 icon: t.icon,
                 tone: t.tone,
+                badge: tabCountBadge(counts[t.id]),
             }))}
             ariaLabel="Tax and compliance views"
         />

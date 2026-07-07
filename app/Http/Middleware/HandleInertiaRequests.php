@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -138,6 +139,14 @@ class HandleInertiaRequests extends Middleware
             // without each controller re-deriving it.
             'calendarFeedUrl' => $user && $user->calendar_feed_token
                 ? url('/calendar/feed/'.$user->calendar_feed_token.'.ics')
+                : null,
+
+            // Count badges for the finance hub tab strips (the number beside each
+            // tab). Lazy Closure gated to finance routes → non-finance pages and
+            // Inertia partial-reloads never invoke it; every *TabsFooter reads its
+            // own hub's slice from `financeHubCounts[hub]`.
+            'financeHubCounts' => $user && str_starts_with((string) $request->route()?->getName(), 'finance.')
+                ? fn () => app(FinanceHubCountsService::class)->forOrganization($user->organization_id)
                 : null,
 
             'auth' => [
