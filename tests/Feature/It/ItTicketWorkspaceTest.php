@@ -158,6 +158,32 @@ test('public replies notify the other side of the conversation only', function (
     Notification::assertNothingSent();
 });
 
+test('the rail can retag category, subcategory and linked asset', function () {
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+    $asset = \App\Models\Asset::factory()->create(['status' => 'active']);
+
+    $this->actingAs($this->hr)
+        ->patch("/it/tickets/{$ticket->id}", [
+            'category' => 'network',
+            'subcategory' => 'VPN',
+            'asset_id' => $asset->id,
+        ])
+        ->assertRedirect();
+
+    $ticket->refresh();
+    expect($ticket->category)->toBe('network');
+    expect($ticket->subcategory)->toBe('VPN');
+    expect((int) $ticket->asset_id)->toBe($asset->id);
+
+    // The workspace offers agents the asset picker; requesters never get it.
+    $this->actingAs($this->hr)
+        ->get("/it/tickets/{$ticket->id}")
+        ->assertInertia(fn ($page) => $page->has('assetOptions'));
+    $this->actingAs($this->worker)
+        ->get("/it/tickets/{$ticket->id}")
+        ->assertInertia(fn ($page) => $page->has('assetOptions', 0));
+});
+
 test('watch and unwatch are agent actions recorded on the trail', function () {
     $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
 

@@ -270,7 +270,9 @@ class ItProvisioningController extends Controller
         $validated = $request->validate([
             'status' => ['sometimes', Rule::in(ItTicket::STATUSES)],
             'priority' => ['sometimes', Rule::in(ItTicket::PRIORITIES)],
+            'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],
             'subcategory' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'asset_id' => ['sometimes', 'nullable', 'integer', 'exists:assets,id'],
             'assigned_to_user_id' => [
                 'sometimes', 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
