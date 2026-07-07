@@ -7,7 +7,8 @@
 **Run log**
 - **Run 0 (2026-07-07)** — Ledger seeded. Slice 1 (My HR hub) audited + fixed. Gates green (see baselines below). Commit `145c101a`.
 - **Run 1 (2026-07-07)** — 🔴-queue-jump slice: fixed all three pre-existing HR Pest failures (TrainingService `source` crash = real production 500; two stale test contracts). **HR pest suite now green — future runs measure against 0 fails.** Commit `d1cda667`.
-- **Run 2 (2026-07-07)** — Slice 2 (People `/hr/people`) audited + fixed: bulk-action audit-trail hole (mass updates bypass Eloquent events) + tenant guards on bulk + profile-documents endpoints; chrome already gold (PeopleHero). Reclassified Run-0's F-4 (`fill-amberx` was a valid custom token, not a broken class) and finished the star-fill standardisation module-wide.
+- **Run 2 (2026-07-07)** — Slice 2 (People `/hr/people`) audited + fixed: bulk-action audit-trail hole (mass updates bypass Eloquent events) + tenant guards on bulk + profile-documents endpoints; chrome already gold (PeopleHero). Reclassified Run-0's F-4 (`fill-amberx` was a valid custom token, not a broken class) and finished the star-fill standardisation module-wide. Commit `b98bc4cf`.
+- **Run 3 (2026-07-07)** — Slice 3 (Recruitment) audited + fixed: talent-pool audit trait, bulk-email audit record, `window.prompt()`s → new kit `TextPromptDialog`, HR-wide malformed-class sweep. Non-HR remainder of that sweep spawned as a task chip.
 
 **Corrected baselines (measured this run, clean HEAD `4874c71a`)**
 - vitest: **8 pre-existing fails**, not 5 — my-day ×4, app-sidebar ×1, behaviour-abc-tab ×2, resident-tracking ×1 (last two reproduced via stash at clean HEAD). "No NEW failures" is measured against 8.
@@ -23,7 +24,7 @@
 |---|---------|----------|--------|----------|
 | 1 | My HR hub (16 sub-pages) | `/hr/my/*` | ✅ | See **Slice 1 findings** below — 13 fixed, 6 logged open/observations |
 | 2 | People / employee profiles | `/hr/people` | ✅ | See **Run 2 findings**. Chrome passes 4A/4B (PeopleHero: deep-linked escalating tiles, server counts; HrTabs+tabCounts; ctx menus; designed empty states; en-NZ; zero `confirm()`). Full-page profile detail = allowed long-lived-workspace exception. Open here: 🟡 resendInvite sends a generic Laravel reset mail (works — comment documents reset-link-as-invite — but no HR-branded notification, no guard against re-inviting an active user); 🟡 setActive is a pure HR visibility flag by design (no login/assignment cascade — offboarding owns revocation) — documented, not a bug; 🟡 client-supplied mime_type stored on upload (acceptable: private disk + extension allowlist + auth'd downloads); carry-over profile-update notification idea still open |
-| 3 | Recruitment | `/hr/recruitment` | ⬜ | |
+| 3 | Recruitment | `/hr/recruitment` | ✅ | See **Run 3 findings**. Chrome near-gold (RecruitmentHero 5 deep-linked tiles, server counts, HrTabs+tabCounts, EmptyCard states, en-NZ, all 10 pipeline stages UI-reachable). Open: 🟡 no force-expire affordance for lapsed offers (`portal_expires_at` passes silently; `respondOffer` does accept `withdrawn`, so the state is reachable); 🟡 no scorecard quorum before stage advance (honor system); requisition/offer approval-spine question folded into Decision D-1 |
 | 4 | Onboarding | `/hr/onboarding` | ⬜ | Pre-seeded §7.2 partially stale: `POST /hr/my/onboarding/tasks/{task}/complete` EXISTS (owner-gated, MyHrController::completeOnboardingTask). Verify the manager-side task lifecycle here. |
 | 5 | Offboarding + exit interviews | `/hr/offboarding`, `/hr/exit-interviews` | ⬜ | Drive-by fixed here: `fill-amberx` broken class in exit-interviews/show.tsx:72 (identical bug to my/reviews) |
 | 6 | Calendar hub + time-off calendar | `/hr/calendar*` | ⬜ | |
@@ -62,9 +63,9 @@
 | S9 | Payroll ↔ Time/Leave | ⬜ | §7.4 RESOLVED as by-design (see findings F-13) |
 | S10 | Announcements → bell inbox | ⬜ | |
 | S11 | Feed ↔ My HR shoutouts | 🔶 | Code evidence GREEN (this run): identical endpoints (`hr.php:122-123` vs `hr.php:1016-1017`), shared `FeedService::toggleReaction/addReply`, same HrKudos/HrKudosReply models, feed renders ReactionBar. Runtime proof at slice 16, then ✅. |
-| S12 | Recruitment → Onboarding | ⬜ | |
+| S12 | Recruitment → Onboarding | 🔶 | Code evidence GREEN (Run 3): offer accept → `CandidateController::respondOffer` (~1685) → `RecruitmentService::convertToEmployee` (207-277) → `EmployeeIntakeService::intake()` creates User + profile + onboarding checklist (`startOnboarding: true`) + `NewHireWelcomeNotification`. Runtime proof owed before ✅. |
 | S13 | Performance ↔ Governance | ⬜ | |
-| S14 | Approvals spine | ⬜ | Slice-1 evidence: leave + expenses approvals do NOT route through `ApprovalWorkflowService` (leave→HrLeaveApprovalChain, expenses→inline). Whether they surface in `/hr/approvals/pending` regardless = the S14 question. |
+| S14 | Approvals spine | ⬜ | Slice-1 evidence: leave + expenses approvals do NOT route through `ApprovalWorkflowService` (leave→HrLeaveApprovalChain, expenses→inline). Run-3 evidence: requisition + offer approvals are also recruitment-local (direct notify, no chain), and `ApprovalController` pending list covers only `['leave','expense','timesheet','document']` (ApprovalController.php:62) — recruitment approvables are NOT in the inbox. The S14 slice must decide/surface per Decision D-1. |
 | S15 | Wellbeing lone-worker → Control Room | ⬜ | |
 | S16 | Procedures (H&S) → HR | ⬜ | |
 
@@ -122,9 +123,21 @@
 
 **Run 2 gates:** types ✅ 0 errors · eslint touched files ✅ 0 errors (1 pre-existing warning, not my line) · vitest ✅ baseline 8 (first run showed 6 files failing while vite build ran concurrently — re-run solo reproduced the exact clean-HEAD baseline; don't run vitest concurrently with the build) · build ✅ exit 0 (4m31s) · pest full HR scope ✅ **694 passed / 0 failed** (693 + new bulk-audit regression test) · wayfinder n/a (no route changes).
 
+## Run 3 findings (Slice 3 — Recruitment `/hr/recruitment`)
+
+- **F-23 🔴 fixed** — `HrTalentPool` had no `AuditableChanges` trait: pooling a candidate (`addToPool` updateOrCreate), tag edits and requisition links were invisible in the audit log. Trait added (one line; verified against the model source — this claim was TRUE, unlike two sibling claims below).
+- **F-24 🟠 fixed** — `CandidateController::bulkEmail` had no audit record at all (mail-only side effect, no model write → `AuditableChanges` can't fire). Added explicit `AuditLogger::log('recruitment.bulk_email', …)` capturing subject, candidate ids and sent/skipped/failed counts.
+- **F-25 🟠 fixed** — two `window.prompt()`s in `recruitment/index.tsx` (bulk-tag label :297, offer decline-reason :642) — the same native-dialog disease as `confirm()`, which earlier sweeps missed (pattern now includes `prompt(`). Built a generic kit dialog `components/hr/recruitment/text-prompt-dialog.tsx` (mirrors BulkRejectDialog's composition) and wired both call sites; decline-reason stays optional.
+- **F-26 🟡 fixed** — `candidates/show.tsx:1287` rendered `applied_at` raw → `formatNZDate()`.
+- **F-27 🟡 fixed** — invalid class `bg-muted-foreground/80/10` (double opacity modifier — generates nothing, badge backgrounds silently transparent): swept ALL HR occurrences (11 files: approvals/chains, documents/templates, leave/show, my/goals ×2 — missed in Run 0, offboarding index+show, performance/skills, settings audit-log/automations/webhooks, candidates/create-offer, plus `lib/job-posting-constants.ts`). Non-HR remainder (sites/finance/settings, ~14 occurrences) spawned as task chip `task_d6e8ef52`.
+- **False positives dismissed (verified against source):** `HrCandidateEmailTemplate` HAS `AuditableChanges` (line 13); tag rename/delete ARE audited (per-model `$candidate->update()` loop, not a mass update); "no offer-withdrawal endpoint" is wrong — `respondOffer` accepts `withdrawn`.
+- **Verified clean:** hero/tiles/tabs/empty-states/en-NZ per chrome audit; all 10 pipeline stages reachable; rejection flow has reason + opt-in respectful decline email + pool option; HrJobPosting retirement is clean (no stragglers).
+
+**Run 3 gates:** types ✅ 0 errors · eslint touched files ✅ 0 errors (1 pre-existing warning) · PHP -l ✅ · build ✅ exit 0 (3m42s) · vitest ✅ baseline 8 (run sequentially after build) · pest full HR scope ✅ **694 passed / 0 failed** · wayfinder n/a.
+
 ## Decisions needed (Chane)
 
-1. **Approvals spine (S14):** Leave and Expenses approvals bypass `ApprovalWorkflowService` (leave→`HrLeaveApprovalChain`, expenses→inline service). §2 says every approve/decline routes through ApprovalWorkflowService/HrApprovalChain — leave arguably complies (HrLeaveApprovalChain), expenses does not. If `/hr/approvals` already aggregates both regardless, is the unified-service rule satisfied by *surfacing*, or do you want expenses migrated onto the chain model? Will gather evidence at S14; flagging early.
+1. **Approvals spine (S14) — now leave + expenses + recruitment:** Leave→`HrLeaveApprovalChain`, expenses→inline service, requisitions/offers→recruitment-local notify flow. None route through `ApprovalWorkflowService`, and `/hr/approvals/pending` only lists `['leave','expense','timesheet','document']` — recruitment approvables never appear in the inbox. Is the §2 rule satisfied by *surfacing* everything in `/hr/approvals` (add requisitions/offers to the pending list), or do you want flows migrated onto the chain service? S14 slice will implement whichever you pick.
 2. **Role-assignment guard (Run 2):** `EmployeeIntakeService::intake()`/`rehire()` assign any role that exists (validated `exists:roles,name` only) — a user with `hr.employees.manage` can create/rehire someone as `admin`. Permissions are frozen, so adding a hierarchy guard (e.g. "cannot assign a role you don't hold" or an allowlist of staff-level roles for intake) is a policy decision, not a code fix I'll make unilaterally.
 3. **User-write auditability (Run 2):** the `User` model has no `AuditableChanges` (by design — it would log every `last_login_at` touch), so security-relevant writes (`role`, `approved_at`) made by intake/rehire/offboarding are unaudited. Option: explicit `AuditLogger::log()` calls at those few write sites only. Cheap, but it's an app-wide auditing-policy call.
 

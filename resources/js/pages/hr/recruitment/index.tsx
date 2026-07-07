@@ -33,6 +33,7 @@ import { KitDialog, type KitDraft } from '@/components/hr/recruitment/kit-dialog
 import { RecruitmentHero } from '@/components/hr/recruitment/recruitment-hero';
 import { BulkEmailDialog } from '@/components/hr/recruitment/bulk-email-dialog';
 import { BulkRejectDialog } from '@/components/hr/recruitment/bulk-reject-dialog';
+import { TextPromptDialog } from '@/components/hr/recruitment/text-prompt-dialog';
 import { ScoreDialog, type ScoreTarget } from '@/components/hr/recruitment/score-dialog';
 import { TagManagerDialog } from '@/components/hr/recruitment/tag-manager-dialog';
 import {
@@ -238,6 +239,9 @@ export default function RecruitmentHub(props: Props) {
         });
     }, [candidates, search, stageFilter, tagFilter, dupOnly]);
 
+    const [tagPromptOpen, setTagPromptOpen] = useState(false);
+    const [declineOfferId, setDeclineOfferId] = useState<number | null>(null);
+
     /* ---- actions ---- */
     const advance = (c: HubCandidate) => {
         if (!c.application_id) {
@@ -294,13 +298,13 @@ export default function RecruitmentHub(props: Props) {
 
     const bulkTag = () => {
         if (selected.length === 0) return;
-        const tag = window.prompt(`Tag to apply to ${selected.length} candidate(s):`);
-        if (tag === null) return; // cancelled
-        const trimmed = tag.trim();
-        if (!trimmed) return;
+        setTagPromptOpen(true);
+    };
+
+    const submitBulkTag = (tag: string) => {
         router.post(
             '/hr/recruitment/applications/bulk',
-            { action: 'tag', candidate_ids: selected, tag: trimmed },
+            { action: 'tag', candidate_ids: selected, tag },
             {
                 preserveScroll: true,
                 onSuccess: (pg) => {
@@ -611,6 +615,27 @@ export default function RecruitmentHub(props: Props) {
             <BulkEmailDialog open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} candidateIds={selected} templates={email_templates} canManage={can.manage} />
             <BulkRejectDialog open={bulkRejectOpen} onClose={() => setBulkRejectOpen(false)} candidateIds={selected} onDone={() => setSelected([])} />
             <TagManagerDialog open={manageTagsOpen} onClose={() => setManageTagsOpen(false)} tags={support.tags} canManage={can.manage} />
+            <TextPromptDialog
+                open={tagPromptOpen}
+                onClose={() => setTagPromptOpen(false)}
+                onSubmit={submitBulkTag}
+                title={`Tag ${selected.length} candidate${selected.length === 1 ? '' : 's'}`}
+                description="Adds the tag to every selected candidate — existing tags are kept."
+                label="Tag"
+                placeholder="e.g. second-round"
+                submitLabel="Apply tag"
+            />
+            <TextPromptDialog
+                open={declineOfferId !== null}
+                onClose={() => setDeclineOfferId(null)}
+                onSubmit={submitDeclineReason}
+                title="Request changes to this offer?"
+                description="Sends the offer back to its author with your note — it leaves the approval queue until resubmitted."
+                label="Reason"
+                placeholder="e.g. salary sits above the band — needs GM sign-off"
+                submitLabel="Request changes"
+                required={false}
+            />
             {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
         </AppLayout>
     );
@@ -639,12 +664,26 @@ export default function RecruitmentHub(props: Props) {
             else toast.success(f?.success ?? 'Done');
         };
         if (action === 'decline') {
-            const reason = window.prompt('Reason for requesting changes (optional):');
-            if (reason === null) return; // cancelled
-            router.post(urls.decline, { reason }, { preserveScroll: true, onSuccess });
+            setDeclineOfferId(offerId);
             return;
         }
         router.post(urls[action], {}, { preserveScroll: true, onSuccess });
+    }
+
+    function submitDeclineReason(reason: string) {
+        if (declineOfferId === null) return;
+        router.post(
+            `/hr/recruitment/offers/${declineOfferId}/decline-approval`,
+            { reason },
+            {
+                preserveScroll: true,
+                onSuccess: (pg) => {
+                    const f = (pg.props as { flash?: { error?: string; success?: string } }).flash;
+                    if (f?.error) toast.error(f.error);
+                    else toast.success(f?.success ?? 'Changes requested');
+                },
+            },
+        );
     }
 }
 

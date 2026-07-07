@@ -26,6 +26,7 @@ use App\Domain\Hr\Notifications\RejectionNotification;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Models\Site;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -773,6 +774,17 @@ class CandidateController extends Controller
                 $failed++;
             }
         }
+
+        // Mail-only side effect — no model write fires AuditableChanges, so
+        // record the send explicitly or candidate outreach is invisible in
+        // the audit log.
+        AuditLogger::log('recruitment.bulk_email', null, [
+            'subject' => $validated['subject'],
+            'candidate_ids' => $candidates->pluck('id')->all(),
+            'sent' => $sent,
+            'skipped_no_email' => $noEmail,
+            'failed' => $failed,
+        ]);
 
         $message = "Message sent to {$sent} candidate(s)";
         if ($noEmail > 0) {

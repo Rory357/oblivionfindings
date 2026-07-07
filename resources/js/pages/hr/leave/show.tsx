@@ -55,7 +55,7 @@ const statusColors: Record<string, string> = {
     declined:
         'bg-status-critical-bg text-status-critical border-status-critical/30',
     cancelled:
-        'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
+        'bg-muted-foreground/10 text-muted-foreground border-border/30',
 };
 
 export default function ShowLeave({ request, can }: Props) {

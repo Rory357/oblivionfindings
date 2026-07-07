@@ -1284,7 +1284,9 @@ export default function CandidateShow({
                                                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        {app.applied_at}
+                                                        {formatNZDate(
+                                                            app.applied_at,
+                                                        )}
                                                     </span>
                                                     {app.target_site && (
                                                         <span>

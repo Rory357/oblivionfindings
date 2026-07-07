@@ -56,7 +56,7 @@ const typeColors: Record<string, string> = {
     certificate:
         'border-status-success/30 text-status-success bg-status-success-bg',
     offer: 'border-primary/30 text-primary bg-primary/10',
-    other: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    other: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
 };
 
 export default function DocumentTemplates({

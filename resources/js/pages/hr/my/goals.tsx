@@ -79,7 +79,7 @@ interface Props {
 const statusConfig: Record<string, { className: string; label: string }> = {
     not_started: {
         className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+            'border-border/30 text-muted-foreground bg-muted-foreground/10',
         label: 'Not Started',
     },
     in_progress: {
@@ -98,7 +98,7 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
     cancelled: {
         className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+            'border-border/30 text-muted-foreground bg-muted-foreground/10',
         label: 'Cancelled',
     },
 };

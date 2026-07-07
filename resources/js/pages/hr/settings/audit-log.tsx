@@ -74,7 +74,7 @@ const actionColors: Record<string, string> = {
     updated: 'border-status-info/30 text-status-info bg-status-info-bg',
     deleted:
         'border-status-critical/30 text-status-critical bg-status-critical-bg',
-    viewed: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    viewed: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
     approved: 'border-status-success/30 text-status-success bg-status-success-bg',
     rejected: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     signed: 'border-primary/30 text-primary bg-primary/10',

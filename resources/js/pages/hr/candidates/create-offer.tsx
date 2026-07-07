@@ -114,7 +114,7 @@ const refStatusColors: Record<string, string> = {
     completed: 'border-status-success/30 text-status-success bg-status-success-bg',
     received: 'border-status-info/30 text-status-info bg-status-info-bg',
     requested: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
-    pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    pending: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
 };
 
 export default function CreateOffer({ application, sites, roles }: Props) {
