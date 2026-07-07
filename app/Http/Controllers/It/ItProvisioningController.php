@@ -77,6 +77,7 @@ class ItProvisioningController extends Controller
             'assignees' => $this->tenantUserOptions($tenantId),
             'filters' => $filters,
             'slaPolicies' => $canEditSla ? $this->slaPolicyGrid($tenantId) : null,
+            'overview' => $this->overview($tenantId),
         ] : [];
 
         return Inertia::render('it/index', [
@@ -773,6 +774,113 @@ class ItProvisioningController extends Controller
         ];
 
         return $summary;
+    }
+
+    /**
+     * §F1 Overview payload (agents): the avg-first-response KPI plus the four
+     * "needs attention" lanes — short, capped, tenant-scoped lists that each
+     * deep-link into the filtered queue. The KPI *counts* come from the
+     * summary; this adds the one metric the summary can't cheaply carry and
+     * the lane contents. Guarded so a pre-migration read renders an empty board.
+     *
+     * @return array<string, mixed>
+     */
+    private function overview(int $tenantId): array
+    {
+        $empty = [
+            'avg_first_response_mins' => null,
+            'sla_lane' => [],
+            'awaiting_lane' => [],
+            'aging_lane' => [],
+            'unassigned_by_priority' => ['urgent' => 0, 'high' => 0, 'normal' => 0, 'low' => 0],
+        ];
+
+        if (! Schema::hasTable('it_tickets')) {
+            return $empty;
+        }
+
+        $base = fn () => ItTicket::query()
+            ->forTenant($tenantId)
+            ->with(['requester:id,name', 'assignee:id,name']);
+
+        // Avg minutes from raise to first agent reply, over replies in the last 30d.
+        $avg = ItTicket::query()
+            ->forTenant($tenantId)
+            ->whereNotNull('first_responded_at')
+            ->where('first_responded_at', '>=', now()->subDays(30))
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, first_responded_at)) AS mins')
+            ->value('mins');
+
+        // SLA lane: open tickets at risk or breached, most urgent clock first.
+        $slaLane = $base()
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->whereIn('sla_state', ['at_risk', 'breached'])
+            ->orderByRaw("CASE sla_state WHEN 'breached' THEN 0 ELSE 1 END")
+            ->orderBy('resolution_due_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (ItTicket $t) => [
+                'id' => $t->id,
+                'reference' => $t->reference,
+                'title' => $t->title,
+                'priority' => $t->priority,
+                'sla_state' => $t->sla_state,
+                'resolution_due_at' => $t->resolution_due_at?->toIso8601String(),
+                'assignee' => $t->assignee?->name,
+            ]);
+
+        // Awaiting agent reply: open, no first response yet, oldest first.
+        $awaitingLane = $base()
+            ->whereIn('status', ['open', 'in_progress'])
+            ->whereNull('first_responded_at')
+            ->orderBy('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (ItTicket $t) => [
+                'id' => $t->id,
+                'reference' => $t->reference,
+                'title' => $t->title,
+                'priority' => $t->priority,
+                'requester' => $t->requester?->name ?? 'Unknown',
+                'age' => $t->created_at?->diffForHumans(short: true),
+            ]);
+
+        // Aging: open longer than 7 days, oldest first.
+        $agingLane = $base()
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->where('created_at', '<', now()->subDays(7))
+            ->orderBy('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (ItTicket $t) => [
+                'id' => $t->id,
+                'reference' => $t->reference,
+                'title' => $t->title,
+                'priority' => $t->priority,
+                'assignee' => $t->assignee?->name,
+                'age' => $t->created_at?->diffForHumans(short: true),
+            ]);
+
+        // Unassigned open tickets, split by priority (feeds the chip row).
+        $byPriority = ItTicket::query()
+            ->forTenant($tenantId)
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->whereNull('assigned_to_user_id')
+            ->selectRaw("SUM(priority = 'urgent') AS urgent, SUM(priority = 'high') AS high, SUM(priority = 'normal') AS normal, SUM(priority = 'low') AS low")
+            ->first();
+
+        return [
+            'avg_first_response_mins' => $avg !== null ? (int) round((float) $avg) : null,
+            'sla_lane' => $slaLane,
+            'awaiting_lane' => $awaitingLane,
+            'aging_lane' => $agingLane,
+            'unassigned_by_priority' => [
+                'urgent' => (int) ($byPriority->urgent ?? 0),
+                'high' => (int) ($byPriority->high ?? 0),
+                'normal' => (int) ($byPriority->normal ?? 0),
+                'low' => (int) ($byPriority->low ?? 0),
+            ],
+        ];
     }
 
     /** @param array<int, string> $allowed */

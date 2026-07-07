@@ -168,3 +168,32 @@ test('the summary counts SLA-met settlements for the hero compliance ring', func
             ->where('summary.tickets.resolved_30d', 2)
             ->where('summary.tickets.met_30d', 1));
 });
+
+test('the overview board serves agents needs-attention lanes and hides from requesters', function () {
+    // A breached open ticket → SLA lane (normal priority, unassigned).
+    ItTicket::factory()->create(['status' => 'open', 'sla_state' => 'breached']);
+    // An unassigned urgent open ticket, no first response → awaiting + urgent chip.
+    ItTicket::factory()->urgent()->create(['status' => 'open']);
+    // A responded ticket — 60 minutes to first reply — feeds the avg.
+    ItTicket::factory()->create([
+        'created_at' => now()->subMinutes(120),
+        'first_responded_at' => now()->subMinutes(60),
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('overview')
+            ->where('overview.avg_first_response_mins', 60)
+            ->has('overview.sla_lane', 1)
+            ->where('overview.sla_lane.0.sla_state', 'breached')
+            ->where('overview.unassigned_by_priority.urgent', 1));
+
+    // The self-service payload never carries the agent overview board.
+    $worker = itQueueUser('support_worker');
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->missing('overview'));
+});

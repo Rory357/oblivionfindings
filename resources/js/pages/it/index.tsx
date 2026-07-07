@@ -13,6 +13,7 @@ import {
     type TicketRow,
 } from '@/components/it/it-wizards';
 import { ItHero } from '@/components/it/it-hero';
+import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
 import {
@@ -47,6 +48,7 @@ import {
     Inbox,
     KeyRound,
     Laptop,
+    LayoutDashboard,
     Mail,
     MoreHorizontal,
     Play,
@@ -143,6 +145,8 @@ interface Props {
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
     filters?: Filters;
+    /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
+    overview?: OverviewPayload;
     /** Effective SLA grid — present only for admins (the policy editor). */
     slaPolicies?: SlaPolicyGrid | null;
     /** The viewer's own tickets — present for anyone with it.request. */
@@ -228,12 +232,13 @@ export default function ItIndex({
     tickets,
     assignees = [],
     filters,
+    overview,
     slaPolicies,
     myTickets,
     summary,
     can,
 }: Props) {
-    const [tab, setTab] = useHrTab(can.view ? 'provisioning' : 'my-tickets');
+    const [tab, setTab] = useHrTab(can.view ? 'overview' : 'my-tickets');
     const [modal, setModal] = useState<ItModal | null>(null);
     const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
@@ -251,13 +256,10 @@ export default function ItIndex({
         ...(can.view
             ? ([
                   {
-                      id: 'provisioning',
-                      label: 'Provisioning',
-                      icon: Server,
+                      id: 'overview',
+                      label: 'Overview',
+                      icon: LayoutDashboard,
                       tone: 'primary',
-                      badge:
-                          (summary.provisioning?.pending ?? 0) +
-                          (summary.provisioning?.in_progress ?? 0),
                   },
                   {
                       id: 'tickets',
@@ -265,6 +267,15 @@ export default function ItIndex({
                       icon: Ticket,
                       tone: 'info',
                       badge: summary.tickets?.open ?? 0,
+                  },
+                  {
+                      id: 'provisioning',
+                      label: 'Provisioning',
+                      icon: Server,
+                      tone: 'primary',
+                      badge:
+                          (summary.provisioning?.pending ?? 0) +
+                          (summary.provisioning?.in_progress ?? 0),
                   },
               ] as HrTabItem[])
             : []),
@@ -576,6 +587,20 @@ export default function ItIndex({
                 />
 
                 <HrTabs value={tab} onChange={setTab} items={tabItems} ariaLabel="IT views" />
+
+                {/* ── Overview (agents) ── */}
+                {can.view && tab === 'overview' && overview && summary.tickets && (
+                    <ItOverview
+                        overview={overview}
+                        kpis={{
+                            open: summary.tickets.open,
+                            unassigned: summary.tickets.unassigned,
+                            at_risk: summary.tickets.at_risk,
+                            breached: summary.tickets.breached,
+                        }}
+                        onOpenTicket={(id) => setPeekId(id)}
+                    />
+                )}
 
                 {/* ── Provisioning queue (agents) ── */}
                 {can.view && tab === 'provisioning' && (
