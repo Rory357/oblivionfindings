@@ -20,7 +20,7 @@ import {
     UserCheck,
     Wrench,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { createElement, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -160,7 +160,6 @@ export default function AssetShow({ asset, staff, categories, fleetIncidents, ca
 
     const [tab, setTab] = useState<DetailTab>('details');
     const [modal, setModal] = useState<AssetModal | null>(null);
-    const Icon = categoryIcon(asset.category);
 
     const editable: EditableAsset = {
         id: asset.id,
@@ -205,7 +204,7 @@ export default function AssetShow({ asset, staff, categories, fleetIncidents, ca
                     </button>
                     <div className="flex flex-wrap items-start gap-4">
                         <span className="grid h-14 w-14 flex-none place-items-center rounded-2xl border border-primary-foreground/20 bg-primary-foreground/15">
-                            <Icon className="h-7 w-7" />
+                            {createElement(categoryIcon(asset.category), { className: 'h-7 w-7' })}
                         </span>
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2.5">

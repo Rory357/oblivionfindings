@@ -334,7 +334,7 @@ export default function TrainingHub({ summary, dashboard, courses, assignments, 
     /* derived: filtered + sorted courses (client-side for snappiness) */
     const visibleCourses = (() => {
         const q = search.trim().toLowerCase();
-        let list = courses.filter((c) =>
+        const list = courses.filter((c) =>
             !q ? true : [c.title, c.code, c.provider, c.category].some((f) => (f ?? '').toLowerCase().includes(q)),
         );
         const sorters: Record<string, (a: Course, b: Course) => number> = {
