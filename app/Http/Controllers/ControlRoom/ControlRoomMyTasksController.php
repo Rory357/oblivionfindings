@@ -7,6 +7,7 @@ use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -132,6 +133,11 @@ class ControlRoomMyTasksController extends Controller
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
                 'escalate' => $user->canDo('controlRoom.alerts.escalate'),
             ],
+            // Workspace-over-list: when ?alert= is present the workspace dialog
+            // opens over My Day (Inertia partial-reloads only this prop).
+            'detail' => fn () => $request->filled('alert')
+                ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                : null,
         ]);
     }
 

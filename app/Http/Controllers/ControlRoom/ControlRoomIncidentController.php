@@ -13,6 +13,7 @@ use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -229,6 +230,11 @@ class ControlRoomIncidentController extends Controller
             'can' => [
                 'createAlert' => $user->canDo('controlRoom.alerts.create'),
             ],
+            // Workspace-over-list: when ?alert= is present the alert workspace
+            // dialog opens over the tracker (e.g. following a linked alert).
+            'detail' => fn () => $request->filled('alert')
+                ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                : null,
         ]);
     }
 

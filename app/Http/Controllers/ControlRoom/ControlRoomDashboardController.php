@@ -9,6 +9,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -206,6 +207,11 @@ class ControlRoomDashboardController extends Controller
         ]);
 
         return Inertia::render('control-room/index', [
+            // Workspace-over-list: when ?alert= is present the workspace dialog
+            // opens over the dashboard (Inertia partial-reloads only this prop).
+            'detail' => fn () => $request->filled('alert')
+                ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                : null,
             'alerts' => [
                 'data' => $alerts->getCollection()->map(fn ($a) => [
                     'id' => $a->id,

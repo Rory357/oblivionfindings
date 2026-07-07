@@ -7,6 +7,7 @@ use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -121,6 +122,11 @@ class ControlRoomEscalationController extends Controller
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
             ],
+            // Workspace-over-list: when ?alert= is present the workspace dialog
+            // opens over the queue board (Inertia partial-reloads only this prop).
+            'detail' => fn () => $request->filled('alert')
+                ? app(AlertWorkspaceService::class)->build($user, (int) $request->input('alert'))
+                : null,
         ]);
     }
 
