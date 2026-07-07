@@ -806,6 +806,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/reviews/{review}/items/{item}/reject', [CompensationController::class, 'rejectReviewItem'])->name('reviews.items.reject');
             Route::post('/bonuses', [BonusController::class, 'store'])->name('bonuses.store');
             Route::post('/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('bonuses.approve');
+            Route::post('/bonuses/{bonus}/cancel', [BonusController::class, 'cancel'])->name('bonuses.cancel');
         });
     });
 

@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -29,7 +39,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, DollarSign, Plus } from 'lucide-react';
+import { CheckCircle2, DollarSign, Plus, XCircle } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 const formatMoney = (value: number, currency = 'NZD') =>
@@ -95,6 +105,16 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyForm);
+    const [cancelTarget, setCancelTarget] = useState<Bonus | null>(null);
+
+    function confirmCancelBonus() {
+        const target = cancelTarget;
+        if (!target) return;
+        setCancelTarget(null);
+        router.post(`/hr/compensation/bonuses/${target.id}/cancel`, {}, {
+            preserveScroll: true,
+        });
+    }
 
     const set = (key: string, value: string) =>
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -174,7 +194,15 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                                 {b.employee_name}
                                             </TableCell>
                                             <TableCell className="capitalize text-muted-foreground">
-                                                {b.bonus_type.replace('_', ' ')}
+                                                {BONUS_TYPES.find(
+                                                    (t) =>
+                                                        t.value ===
+                                                        b.bonus_type,
+                                                )?.label ??
+                                                    b.bonus_type.replace(
+                                                        '_',
+                                                        ' ',
+                                                    )}
                                             </TableCell>
                                             <TableCell className="text-right font-medium tabular-nums">
                                                 {formatMoney(b.amount, b.currency)}
@@ -190,20 +218,40 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                             </TableCell>
                                             {can.manage && (
                                                 <TableCell className="text-right">
-                                                    {b.status === 'pending' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                router.post(
-                                                                    `/hr/compensation/bonuses/${b.id}/approve`,
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                            Approve
-                                                        </Button>
-                                                    )}
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {b.status ===
+                                                            'pending' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    router.post(
+                                                                        `/hr/compensation/bonuses/${b.id}/approve`,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <CheckCircle2 className="mr-1 h-3 w-3" />
+                                                                Approve
+                                                            </Button>
+                                                        )}
+                                                        {(b.status ===
+                                                            'pending' ||
+                                                            b.status ===
+                                                                'approved') && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    setCancelTarget(
+                                                                        b,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <XCircle className="mr-1 h-3 w-3" />
+                                                                Cancel
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             )}
                                         </TableRow>
@@ -214,6 +262,35 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                     </CardContent>
                 </Card>
             </PageLayout>
+
+            <AlertDialog
+                open={cancelTarget !== null}
+                onOpenChange={(o) => {
+                    if (!o) setCancelTarget(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Cancel this bonus?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {cancelTarget
+                                ? `${cancelTarget.employee_name} · ${formatMoney(cancelTarget.amount, cancelTarget.currency)}. `
+                                : ''}
+                            {cancelTarget?.status === 'approved'
+                                ? 'This bonus was already approved — cancelling withdraws it before payment and notifies the employee.'
+                                : 'This pending bonus will be closed without the employee being notified.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep bonus</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmCancelBonus}>
+                            Cancel bonus
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-lg">

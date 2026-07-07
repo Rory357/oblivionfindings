@@ -10,9 +10,11 @@ use App\Domain\Hr\Models\HrCompensationReviewItem;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrSalaryBand;
+use App\Domain\Hr\Notifications\CompensationAppliedNotification;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CompensationService
 {
@@ -324,7 +326,9 @@ class CompensationService
             throw new \LogicException("Cannot apply a '{$review->status}' compensation review. It must be approved first.");
         }
 
-        DB::transaction(function () use ($review) {
+        $applied = [];
+
+        DB::transaction(function () use ($review, &$applied) {
             $approvedItems = $review->items()->where('status', 'approved')->get();
 
             foreach ($approvedItems as $item) {
@@ -351,9 +355,37 @@ class CompensationService
                     'approved_by' => $item->approved_by,
                     'created_by' => $review->created_by,
                 ]);
+
+                $applied[] = [
+                    'user_id' => $profile->user_id,
+                    'annual' => $proposedAnnual,
+                    'pct' => $item->change_percentage !== null ? (float) $item->change_percentage : null,
+                ];
             }
 
             $review->update(['status' => 'applied']);
         });
+
+        // Pay changes carry a statutory expectation of notice — tell each
+        // affected employee after commit (best-effort).
+        foreach ($applied as $change) {
+            $employee = $change['user_id'] ? User::find($change['user_id']) : null;
+            if (! $employee) {
+                continue;
+            }
+            try {
+                $employee->notify(new CompensationAppliedNotification(
+                    $change['annual'],
+                    $review->effective_date?->toDateString(),
+                    $change['pct'],
+                ));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send compensation-applied notification', [
+                    'review_id' => $review->id,
+                    'user_id' => $change['user_id'],
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 }

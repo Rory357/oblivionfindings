@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\BonusStatusNotification;
 use App\Domain\Hr\Services\CompensationService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -85,6 +87,8 @@ class BonusController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $data = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
             'bonus_type' => ['required', Rule::in(['performance', 'signing', 'retention', 'spot', 'holiday', 'other'])],
@@ -94,8 +98,11 @@ class BonusController extends Controller
             'payment_date' => ['required', 'date'],
         ]);
 
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->find($data['employee_profile_id']);
+        abort_unless($profile !== null, 422, 'That employee does not belong to this organisation.');
+
         HrBonusPayment::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
+            'tenant_id' => $tenantId,
             'employee_profile_id' => $data['employee_profile_id'],
             'bonus_type' => $data['bonus_type'],
             'amount' => $data['amount'],
@@ -116,6 +123,7 @@ class BonusController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $bonus->tenant_id);
 
         if ($bonus->status !== 'pending') {
             return redirect()->back()->with('error', 'Only pending bonuses can be approved.');
@@ -127,6 +135,54 @@ class BonusController extends Controller
             'approved_at' => now(),
         ]);
 
+        $this->notifyRecipient($bonus->fresh(), 'approved');
+
         return redirect()->back()->with('success', 'Bonus payment approved.');
+    }
+
+    /**
+     * Cancel a mistaken or declined bonus before it is paid. The `cancelled`
+     * status existed on the model but nothing could set it — a wrong bonus
+     * sat pending/approved forever.
+     */
+    public function cancel(Request $request, HrBonusPayment $bonus)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $bonus->tenant_id);
+
+        if (! in_array($bonus->status, ['pending', 'approved'], true)) {
+            return redirect()->back()->with('error', 'Only pending or approved (unpaid) bonuses can be cancelled.');
+        }
+
+        $wasApproved = $bonus->status === 'approved';
+
+        $bonus->update(['status' => 'cancelled']);
+
+        // Only tell the recipient if they had already been told it was
+        // approved — cancelling a pending bonus they never knew about is noise.
+        if ($wasApproved) {
+            $this->notifyRecipient($bonus->fresh(), 'cancelled');
+        }
+
+        return redirect()->back()->with('success', 'Bonus payment cancelled.');
+    }
+
+    private function notifyRecipient(HrBonusPayment $bonus, string $action): void
+    {
+        $recipient = $bonus->employeeProfile?->user;
+        if (! $recipient) {
+            return;
+        }
+
+        try {
+            $recipient->notify(new BonusStatusNotification($bonus, $action));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send bonus status notification', [
+                'bonus_id' => $bonus->id,
+                'action' => $action,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

@@ -158,8 +158,11 @@ class BenefitsController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $profile = HrEmployeeProfile::findOrFail($data['employee_profile_id']);
-        $plan = HrBenefitPlan::findOrFail($data['benefit_plan_id']);
+        // Tenant-scope both lookups — a bare exists: rule would accept a
+        // profile or plan from another organisation.
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->findOrFail($data['employee_profile_id']);
+        $plan = HrBenefitPlan::where('tenant_id', $tenantId)->findOrFail($data['benefit_plan_id']);
 
         $this->benefitsService->enrollEmployee($profile, $plan, $data);
 
