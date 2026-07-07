@@ -376,12 +376,19 @@ class ItProvisioningController extends Controller
                 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
             ],
+            // §H convert/link: an agent can raise a ticket straight off a
+            // provisioning request (the new laptop arrived broken).
+            'provisioning_request_id' => [
+                'nullable', 'integer',
+                Rule::exists('it_provisioning_requests', 'id')->where('tenant_id', $tenantId),
+            ],
             ...$this->itAttachmentRules(),
         ]);
 
         // Triage fields are agent-only: a self-service requester cannot pick
-        // an assignee, whatever the request body says.
+        // an assignee or link a provisioning request, whatever the body says.
         $assigneeId = $isAgent ? ($validated['assigned_to_user_id'] ?? null) : null;
+        $provisioningRequestId = $isAgent ? ($validated['provisioning_request_id'] ?? null) : null;
 
         $ticket = ItTicket::createWithReference([
             'tenant_id' => $tenantId,
@@ -389,6 +396,7 @@ class ItProvisioningController extends Controller
             'description' => $validated['description'] ?? null,
             'requester_user_id' => $user->id,
             'assigned_to_user_id' => $assigneeId,
+            'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
             'priority' => $validated['priority'],
             'source' => $isAgent ? 'agent' : 'portal',
@@ -405,6 +413,7 @@ class ItProvisioningController extends Controller
         ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
             'source' => $ticket->source,
             'assigned_to_user_id' => $assigneeId,
+            'provisioning_request_id' => $provisioningRequestId,
         ]));
 
         // Receipt to the requester ("we've got it"), plus an urgent alert to
@@ -635,6 +644,7 @@ class ItProvisioningController extends Controller
                 'employeeProfile.user:id,name',
                 'assignee:id,name',
                 'onboardingTask:id,checklist_id,title,status,sign_off_required',
+                'linkedTickets:id,provisioning_request_id,reference,status',
             ])
             ->when($filters['status'], fn ($q, $status) => $q->where('status', $status))
             ->when($filters['type'], fn ($q, $type) => $q->where('type', $type))
@@ -661,6 +671,12 @@ class ItProvisioningController extends Controller
                 'sign_off_required' => (bool) ($r->onboardingTask?->sign_off_required ?? false),
                 'created' => $r->created_at?->diffForHumans(short: true),
                 'fulfilled' => $r->fulfilled_at?->diffForHumans(short: true),
+                // §H reciprocal link — the most recent ticket raised off this
+                // request, plus a count so the chip can say "+2".
+                'linked_ticket' => $r->linkedTickets->last()
+                    ? ['id' => $r->linkedTickets->last()->id, 'reference' => $r->linkedTickets->last()->reference]
+                    : null,
+                'linked_ticket_count' => $r->linkedTickets->count(),
             ]);
     }
 

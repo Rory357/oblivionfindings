@@ -70,6 +70,9 @@ export interface RequestRow {
     sign_off_required: boolean;
     created: string | null;
     fulfilled: string | null;
+    /** Most recent ticket raised off this request (§H convert/link). */
+    linked_ticket: { id: number; reference: string | null } | null;
+    linked_ticket_count: number;
 }
 
 export interface TicketRow {
@@ -107,7 +110,7 @@ export interface EmployeeOption {
 }
 
 export type ItModal =
-    | { type: 'ticket' }
+    | { type: 'ticket'; provisioning?: { id: number; item: string } }
     | { type: 'raise' }
     | { type: 'resolve'; ticket: { id: number; reference: string | null; title: string } }
     | { type: 'fulfil'; request: RequestRow }
@@ -147,7 +150,7 @@ export function ItWizard({
     if (!modal) return null;
     switch (modal.type) {
         case 'ticket':
-            return <CreateTicketWizard assignees={assignees} onClose={onClose} />;
+            return <CreateTicketWizard assignees={assignees} provisioning={modal.provisioning} onClose={onClose} />;
         case 'new-request':
             return (
                 <NewProvisioningRequestDialog
@@ -215,20 +218,23 @@ const PRIORITY_OPTIONS = [
 
 function CreateTicketWizard({
     assignees,
+    provisioning,
     onClose,
 }: {
     assignees: AssigneeOption[];
+    provisioning?: { id: number; item: string };
     onClose: () => void;
 }) {
     const wizard = useWizard(TICKET_STEPS.length);
     const [done, setDone] = useState(false);
 
     const form = useForm({
-        title: '',
+        title: provisioning ? `Issue with ${provisioning.item}` : '',
         description: '',
         category: 'hardware',
         priority: 'normal',
         assigned_to_user_id: UNASSIGNED,
+        provisioning_request_id: provisioning?.id ?? null,
     });
 
     const assignee = assignees.find((a) => String(a.id) === form.data.assigned_to_user_id) ?? null;
@@ -310,6 +316,12 @@ function CreateTicketWizard({
                         title="What’s the issue?"
                         blurb="A clear one-liner plus any detail IT needs to act."
                     />
+                    {provisioning ? (
+                        <InfoCard icon={Server}>
+                            Linked to provisioning request — “{provisioning.item}”. The ticket will
+                            show on that request too.
+                        </InfoCard>
+                    ) : null}
                     <div className="grid gap-3.5">
                         <Field label="Title" required error={form.errors.title}>
                             <Input

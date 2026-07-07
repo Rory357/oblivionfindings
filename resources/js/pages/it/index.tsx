@@ -450,8 +450,26 @@ export default function ItIndex({
     const requestMenu = (r: RequestRow) => {
         const open = r.status === 'pending' || r.status === 'in_progress';
         return ctx.open([
+            // Available on any request — a fulfilled item can still arrive broken.
+            {
+                kind: 'item' as const,
+                label: 'Raise linked ticket',
+                icon: Ticket,
+                onSelect: () => setModal({ type: 'ticket', provisioning: { id: r.id, item: r.item } }),
+            },
+            ...(r.linked_ticket
+                ? [
+                      {
+                          kind: 'item' as const,
+                          label: `Open ${r.linked_ticket.reference ?? 'linked ticket'}`,
+                          icon: Inbox,
+                          onSelect: () => setPeekId(r.linked_ticket!.id),
+                      },
+                  ]
+                : []),
             ...(open
                 ? ([
+                      { kind: 'divider' as const },
                       {
                           kind: 'item' as const,
                           label: 'Fulfil…',
@@ -671,7 +689,7 @@ export default function ItIndex({
                                 return (
                                     <div
                                         key={r.id}
-                                        onContextMenu={actionable ? requestMenu(r) : undefined}
+                                        onContextMenu={can.manage ? requestMenu(r) : undefined}
                                         className={`grid grid-cols-[1.8fr_1.8fr_1.2fr_0.8fr_1fr_0.9fr_88px] items-center gap-3 border-b border-border/55 px-4.5 py-3 last:border-0 ${overdue ? 'bg-[color:var(--status-critical)]/5' : ''}`}
                                     >
                                         <div className="min-w-0">
@@ -694,6 +712,17 @@ export default function ItIndex({
                                                     <span className="block truncate text-[11px] text-muted-foreground">
                                                         Ref: {r.external_ref}
                                                     </span>
+                                                ) : null}
+                                                {r.linked_ticket ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPeekId(r.linked_ticket!.id)}
+                                                        className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-semibold text-primary transition-colors hover:bg-primary/10"
+                                                    >
+                                                        <Ticket className="h-3 w-3" />
+                                                        {r.linked_ticket.reference ?? 'Linked ticket'}
+                                                        {r.linked_ticket_count > 1 ? ` +${r.linked_ticket_count - 1}` : ''}
+                                                    </button>
                                                 ) : null}
                                             </span>
                                         </div>
@@ -736,23 +765,23 @@ export default function ItIndex({
                                         </span>
                                         <span className="flex items-center justify-end gap-1.5">
                                             {actionable ? (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setModal({ type: 'fulfil', request: r })}
-                                                        className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
-                                                    >
-                                                        Fulfil
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`Actions for ${r.item}`}
-                                                        onClick={requestMenu(r)}
-                                                        className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                    >
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </button>
-                                                </>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModal({ type: 'fulfil', request: r })}
+                                                    className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold transition-colors hover:border-primary/50 hover:text-primary"
+                                                >
+                                                    Fulfil
+                                                </button>
+                                            ) : null}
+                                            {can.manage ? (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Actions for ${r.item}`}
+                                                    onClick={requestMenu(r)}
+                                                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                >
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </button>
                                             ) : null}
                                         </span>
                                     </div>

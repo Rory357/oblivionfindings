@@ -316,3 +316,44 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
         ])
         ->assertForbidden();
 });
+
+test('an agent raises a ticket linked to a provisioning request; requesters cannot link', function () {
+    $profile = itProfile();
+    $req = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $profile->id,
+        'type' => 'equipment',
+        'item' => 'Laptop',
+        'status' => 'done',
+    ]);
+
+    // Agent links the ticket both ways.
+    $this->actingAs($this->hr)
+        ->post('/it/tickets', [
+            'title' => 'Laptop arrived cracked',
+            'category' => 'hardware',
+            'priority' => 'high',
+            'provisioning_request_id' => $req->id,
+        ])
+        ->assertRedirect();
+
+    $ticket = ItTicket::query()->firstWhere('title', 'Laptop arrived cracked');
+    expect((int) $ticket->provisioning_request_id)->toBe($req->id);
+    expect($req->linkedTickets()->whereKey($ticket->id)->exists())->toBeTrue();
+
+    // Self-service requesters can raise tickets but never attach a provisioning
+    // link — the agent-only field is dropped server-side.
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $worker->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+    $this->actingAs($worker)
+        ->post('/it/tickets', [
+            'title' => 'Requester link attempt',
+            'category' => 'hardware',
+            'priority' => 'normal',
+            'provisioning_request_id' => $req->id,
+        ])
+        ->assertRedirect();
+    expect(ItTicket::query()->firstWhere('title', 'Requester link attempt')->provisioning_request_id)->toBeNull();
+});
