@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingTask;
@@ -13,6 +14,7 @@ use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
 use App\Domain\Hr\Notifications\ExpenseRejectedNotification;
 use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
+use App\Domain\Hr\Notifications\DevelopmentGoalCompletedNotification;
 use App\Domain\Hr\Notifications\GoalCompletedNotification;
 use App\Domain\Hr\Notifications\HrAssetAlertNotification;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
@@ -304,6 +306,34 @@ class HrNotificationService
                 $manager->notify(new GoalCompletedNotification($goal));
             } catch (\Throwable $e) {
                 Log::warning('Failed to send goal completed notification', [
+                    'goal_id' => $goal->id,
+                    'manager_id' => $manager->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Notify the manager when a development goal is completed. Recipient is the
+     * assigned manager (falling back to the creator); skips the case where the
+     * manager is the one who marked it complete. Called from both the manager
+     * hub edit and the employee's self-service update.
+     */
+    public function notifyDevelopmentGoalCompleted(HrDevelopmentGoal $goal, ?int $actingUserId = null): void
+    {
+        $goal->loadMissing('employee');
+
+        $managerId = $goal->manager_user_id ?: $goal->created_by;
+        $manager = $managerId && $managerId !== $actingUserId
+            ? User::find($managerId)
+            : null;
+
+        if ($manager) {
+            try {
+                $manager->notify(new DevelopmentGoalCompletedNotification($goal));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send development-goal completed notification', [
                     'goal_id' => $goal->id,
                     'manager_id' => $manager->id,
                     'error' => $e->getMessage(),

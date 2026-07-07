@@ -1189,12 +1189,19 @@ class MyHrController extends Controller
             'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
         ]);
 
+        $wasCompleted = $goal->status === 'completed';
+
         if (($validated['status'] ?? null) === 'completed') {
             $validated['completed_at'] = now();
             $validated['progress_percent'] = 100;
         }
 
         $goal->update($validated);
+
+        // Employee completed their own development goal → tell the manager.
+        if (($validated['status'] ?? null) === 'completed' && ! $wasCompleted) {
+            app(HrNotificationService::class)->notifyDevelopmentGoalCompleted($goal->fresh(), $user->id);
+        }
 
         return redirect()->back()->with('success', 'Goal updated.');
     }

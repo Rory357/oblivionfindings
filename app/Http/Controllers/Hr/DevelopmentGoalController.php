@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Notifications\DevelopmentGoalAssignedNotification;
+use App\Domain\Hr\Services\HrNotificationService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
@@ -134,6 +135,8 @@ class DevelopmentGoalController extends Controller
             $payload['next_review_at'] = $next;
         }
 
+        $wasCompleted = $goal->status === 'completed';
+
         if (($payload['status'] ?? null) === 'completed') {
             $payload['completed_at'] = now()->toDateString();
             $payload['progress_percent'] = 100;
@@ -141,6 +144,13 @@ class DevelopmentGoalController extends Controller
         }
 
         $goal->update($payload);
+
+        // Completing the goal (a fresh transition) → tell the manager who set it.
+        // The store path already notifies the employee on assignment; this is the
+        // completion counterpart.
+        if (($payload['status'] ?? null) === 'completed' && ! $wasCompleted) {
+            app(HrNotificationService::class)->notifyDevelopmentGoalCompleted($goal->fresh(), $user->id);
+        }
 
         return redirect()->back()->with('success', 'Development goal updated.');
     }
