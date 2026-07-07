@@ -29,6 +29,9 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     CheckCircle2,
+    ChevronDown,
+    ChevronsUpDown,
+    ChevronUp,
     Inbox,
     KeyRound,
     Laptop,
@@ -37,13 +40,15 @@ import {
     Play,
     Plus,
     RotateCcw,
+    Search,
     Server,
     Ticket,
     Timer,
     UserCog,
+    X,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 /* ------------------------------------------------------------------ */
@@ -96,7 +101,14 @@ interface Filters {
     assignee: number | null;
     ticket_status: string | null;
     ticket_priority: string | null;
+    ticket_category: string | null;
+    sla: string | null;
     view: string | null;
+    q: string | null;
+    from: string | null;
+    to: string | null;
+    sort: string | null;
+    dir: string | null;
 }
 
 interface MyTicketRow {
@@ -163,8 +175,34 @@ const label = (raw: string) =>
 
 const REQUEST_STATUSES = ['pending', 'in_progress', 'done', 'cancelled'];
 const REQUEST_TYPES = ['account', 'access', 'equipment', 'other'];
-const TICKET_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+const TICKET_STATUSES = ['open', 'in_progress', 'waiting', 'resolved', 'closed'];
 const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
+const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
+
+/** Saved views — server `view` param; counts come from `summary.tickets.views`
+ *  keyed identically. Order mirrors the triage funnel (open → attention → done). */
+const TICKET_VIEWS: { key: string; label: string }[] = [
+    { key: 'all_open', label: 'All open' },
+    { key: 'unassigned', label: 'Unassigned' },
+    { key: 'mine', label: 'Mine' },
+    { key: 'breaching', label: 'Breaching soon' },
+    { key: 'breached', label: 'Breached' },
+    { key: 'awaiting_reply', label: 'Awaiting reply' },
+    { key: 'waiting', label: 'Waiting on requester' },
+    { key: 'recently_resolved', label: 'Recently resolved' },
+];
+
+/** localStorage key for an agent's default tickets view (§F2). */
+const TICKETS_VIEW_KEY = 'it.ticketsView';
+
+const readStoredView = (): string | null => {
+    try {
+        return localStorage.getItem(TICKETS_VIEW_KEY);
+    } catch {
+        return null;
+    }
+};
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -228,18 +266,76 @@ export default function ItIndex({
             : []),
     ];
 
-    const applyFilter = (key: keyof Filters, value: string) =>
+    /** Merge a param patch onto the current filters and reload the queue. A
+     *  filter change drops the page cursor (not in `filters`) → back to page 1. */
+    const navigate = (patch: Record<string, string | undefined>) =>
         router.get(
             '/it',
             {
                 ...Object.fromEntries(
                     Object.entries(filters ?? {}).filter(([, v]) => v !== null && v !== ''),
                 ),
-                [key]: value === ALL ? undefined : value,
+                ...patch,
                 tab,
             },
             { preserveState: true, preserveScroll: true, replace: true },
         );
+
+    const applyFilter = (key: keyof Filters, value: string) =>
+        navigate({ [key]: value === ALL || value === '' ? undefined : value });
+
+    /** Saved-view chip: remember it as the agent's default, then filter. */
+    const applyView = (key: string) => {
+        try {
+            localStorage.setItem(TICKETS_VIEW_KEY, key);
+        } catch {
+            /* private mode — persistence is best-effort */
+        }
+        navigate({ view: key });
+    };
+
+    /** Sortable header: first click → desc, re-click toggles asc⇄desc. */
+    const applySort = (col: string) => {
+        const active = filters?.sort === col;
+        const dir = !active ? 'desc' : filters?.dir === 'asc' ? 'desc' : 'asc';
+        navigate({ sort: col, dir });
+    };
+
+    // Debounced free-text search over reference / title / requester.
+    const [search, setSearch] = useState(filters?.q ?? '');
+    useEffect(() => {
+        if ((filters?.q ?? '') === search) return;
+        const timer = setTimeout(() => navigate({ q: search.trim() === '' ? undefined : search }), 350);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    // Land an agent on their remembered view when they open Tickets with none set
+    // (a hero deep-link carrying ?view= always wins).
+    useEffect(() => {
+        if (!can.view || tab !== 'tickets' || filters?.view) return;
+        const stored = readStoredView();
+        if (stored) navigate({ view: stored });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
+
+    const ticketFiltersActive = Boolean(
+        filters?.q ||
+            filters?.view ||
+            filters?.ticket_status ||
+            filters?.ticket_priority ||
+            filters?.ticket_category ||
+            filters?.sla ||
+            filters?.assignee ||
+            filters?.from ||
+            filters?.to,
+    );
+
+    /** Wipe every tickets filter (and the search box) back to the full queue. */
+    const clearTicketFilters = () => {
+        setSearch('');
+        router.get('/it', { tab: 'tickets' }, { preserveState: true, preserveScroll: true, replace: true });
+    };
 
     /** Direct row action — surfaces the redirect flash as a toast. */
     const act = (method: 'post' | 'patch', url: string, data: Record<string, string> = {}) => {
@@ -585,7 +681,61 @@ export default function ItIndex({
                 {/* ── Ticket queue (agents) ── */}
                 {can.view && tab === 'tickets' && (
                     <>
+                        {/* Saved views — counts from the all-time summary */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {TICKET_VIEWS.map((v) => {
+                                const activeView = filters?.view === v.key;
+                                const count = summary.tickets?.views[v.key] ?? 0;
+                                return (
+                                    <button
+                                        key={v.key}
+                                        type="button"
+                                        aria-pressed={activeView}
+                                        onClick={() => applyView(v.key)}
+                                        className={
+                                            activeView
+                                                ? 'inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground'
+                                                : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground'
+                                        }
+                                    >
+                                        {v.label}
+                                        <span
+                                            className={
+                                                activeView
+                                                    ? 'rounded-full bg-white/20 px-1.5 text-[11px] font-bold tabular-nums'
+                                                    : 'rounded-full bg-muted px-1.5 text-[11px] font-bold tabular-nums text-muted-foreground'
+                                            }
+                                        >
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Toolbar — search + filters */}
                         <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="search"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search reference, title, requester…"
+                                    aria-label="Search tickets"
+                                    className="h-8 w-[248px] rounded-md border border-border bg-card pr-7 pl-8 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                />
+                                {search ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearch('')}
+                                        aria-label="Clear search"
+                                        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                ) : null}
+                            </div>
                             <FilterSelect
                                 ariaLabel="Filter by ticket status"
                                 value={filters?.ticket_status ?? ALL}
@@ -600,42 +750,53 @@ export default function ItIndex({
                                 allLabel="All priorities"
                                 options={TICKET_PRIORITIES}
                             />
+                            <FilterSelect
+                                ariaLabel="Filter by category"
+                                value={filters?.ticket_category ?? ALL}
+                                onChange={(v) => applyFilter('ticket_category', v)}
+                                allLabel="All categories"
+                                options={TICKET_CATEGORIES}
+                            />
+                            <FilterSelect
+                                ariaLabel="Filter by SLA state"
+                                value={filters?.sla ?? ALL}
+                                onChange={(v) => applyFilter('sla', v)}
+                                allLabel="Any SLA state"
+                                options={SLA_STATES}
+                            />
                             <AssigneeFilter
                                 value={filters?.assignee != null ? String(filters.assignee) : ALL}
                                 onChange={(v) => applyFilter('assignee', v)}
                                 assignees={assignees}
                             />
-                            {can.manage ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="ml-auto"
-                                    onClick={() => setModal({ type: 'ticket' })}
-                                >
-                                    <Plus className="h-3.5 w-3.5" /> Log ticket
-                                </Button>
-                            ) : null}
-                            {can.edit_sla && slaPolicies ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className={can.manage ? undefined : 'ml-auto'}
-                                    onClick={() => setModal({ type: 'sla' })}
-                                >
-                                    <Timer className="h-3.5 w-3.5" /> SLA targets
-                                </Button>
-                            ) : null}
+                            <DateRange
+                                from={filters?.from ?? ''}
+                                to={filters?.to ?? ''}
+                                onChange={(k, val) => applyFilter(k, val)}
+                            />
+                            <div className="ml-auto flex items-center gap-2">
+                                {can.manage ? (
+                                    <Button size="sm" variant="outline" onClick={() => setModal({ type: 'ticket' })}>
+                                        <Plus className="h-3.5 w-3.5" /> Log ticket
+                                    </Button>
+                                ) : null}
+                                {can.edit_sla && slaPolicies ? (
+                                    <Button size="sm" variant="outline" onClick={() => setModal({ type: 'sla' })}>
+                                        <Timer className="h-3.5 w-3.5" /> SLA targets
+                                    </Button>
+                                ) : null}
+                            </div>
                         </div>
 
                         <div className="overflow-hidden rounded-2xl border border-border bg-card">
                             <div className="grid grid-cols-[3fr_1.2fr_1.2fr_0.9fr_1fr_1.5fr_0.6fr_44px] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
-                                <span>Ticket</span>
+                                <SortHeader label="Ticket" col="reference" filters={filters} onSort={applySort} />
                                 <span>Requester</span>
                                 <span>Assignee</span>
-                                <span>Priority</span>
-                                <span>Status</span>
+                                <SortHeader label="Priority" col="priority" filters={filters} onSort={applySort} />
+                                <SortHeader label="Status" col="status" filters={filters} onSort={applySort} />
                                 <span>SLA</span>
-                                <span>Age</span>
+                                <SortHeader label="Age" col="created" filters={filters} onSort={applySort} />
                                 <span />
                             </div>
                             {(tickets?.data ?? []).map((t) => (
@@ -699,15 +860,24 @@ export default function ItIndex({
                                 </div>
                             ))}
                             {(tickets?.data ?? []).length === 0 ? (
-                                <EmptyState
-                                    icon={Ticket}
-                                    title="No tickets"
-                                    blurb={
-                                        can.manage
-                                            ? 'Log the first helpdesk ticket with the button above.'
-                                            : 'The helpdesk queue is clear.'
-                                    }
-                                />
+                                ticketFiltersActive ? (
+                                    <EmptyState
+                                        icon={Ticket}
+                                        title="No tickets match"
+                                        blurb="Nothing fits these filters. Widen or clear them to see more of the queue."
+                                        action={{ label: 'Clear filters', onClick: clearTicketFilters }}
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        icon={Ticket}
+                                        title="No tickets"
+                                        blurb={
+                                            can.manage
+                                                ? 'Log the first helpdesk ticket with the button above.'
+                                                : 'The helpdesk queue is clear.'
+                                        }
+                                    />
+                                )
                             ) : null}
                         </div>
                         {tickets ? (
@@ -866,6 +1036,75 @@ function AssigneeFilter({
     );
 }
 
+/** Created-date range — two native pickers feeding the `from`/`to` params. */
+function DateRange({
+    from,
+    to,
+    onChange,
+}: {
+    from: string;
+    to: string;
+    onChange: (key: 'from' | 'to', value: string) => void;
+}) {
+    const base =
+        'h-8 rounded-md border border-border bg-card px-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
+    return (
+        <div className="flex items-center gap-1.5">
+            <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => onChange('from', e.target.value)}
+                aria-label="Raised from"
+                className={base}
+            />
+            <span className="text-[12px] text-muted-foreground">→</span>
+            <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => onChange('to', e.target.value)}
+                aria-label="Raised to"
+                className={base}
+            />
+        </div>
+    );
+}
+
+/** A sortable column header — chevron shows the active direction. */
+function SortHeader({
+    label,
+    col,
+    filters,
+    onSort,
+}: {
+    label: string;
+    col: string;
+    filters?: Filters;
+    onSort: (col: string) => void;
+}) {
+    const active = filters?.sort === col;
+    return (
+        <button
+            type="button"
+            onClick={() => onSort(col)}
+            aria-label={`Sort by ${label}`}
+            className="flex items-center gap-1 text-left tracking-wide uppercase transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+        >
+            {label}
+            {active ? (
+                filters?.dir === 'asc' ? (
+                    <ChevronUp className="h-3 w-3" />
+                ) : (
+                    <ChevronDown className="h-3 w-3" />
+                )
+            ) : (
+                <ChevronsUpDown className="h-3 w-3 opacity-40" />
+            )}
+        </button>
+    );
+}
+
 /** Progress dots for a requester's ticket: raised → working → resolved →
  *  closed. Decorative (aria-hidden) — the StatusBadge text beside it carries
  *  the meaning; `waiting` sits at the working stage with its own flag. */
@@ -893,10 +1132,12 @@ function EmptyState({
     icon: Icon,
     title,
     blurb,
+    action,
 }: {
     icon: typeof Inbox;
     title: string;
     blurb: string;
+    action?: { label: string; onClick: () => void };
 }) {
     return (
         <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
@@ -905,6 +1146,11 @@ function EmptyState({
             </span>
             <div className="text-[14px] font-bold">{title}</div>
             <p className="max-w-sm text-[12.5px] leading-relaxed text-muted-foreground">{blurb}</p>
+            {action ? (
+                <Button size="sm" variant="outline" className="mt-1" onClick={action.onClick}>
+                    {action.label}
+                </Button>
+            ) : null}
         </div>
     );
 }
