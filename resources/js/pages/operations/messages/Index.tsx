@@ -1071,7 +1071,7 @@ export default function MessagesChat({
 
                             {/* Reply preview */}
                             {replyingTo && (
-                                <div className="bg-primary/10/50 flex items-center gap-2 border-t border-l-4 border-l-indigo-500 px-4 py-2 dark:bg-primary/10">
+                                <div className="bg-primary/5 flex items-center gap-2 border-t border-l-4 border-l-indigo-500 px-4 py-2 dark:bg-primary/10">
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[10px] font-semibold text-primary">
                                             Replying to {replyingTo.senderName}

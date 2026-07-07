@@ -6317,7 +6317,7 @@ function CoverageRequirementsTab({
     return (
         <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-                <Card className="via-primary/10/70 overflow-hidden border-primary/60 bg-gradient-to-br from-white to-status-info-bg/70">
+                <Card className="via-primary/10 overflow-hidden border-primary/60 bg-gradient-to-br from-white to-status-info-bg/70">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>

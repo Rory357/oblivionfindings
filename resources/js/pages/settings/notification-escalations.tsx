@@ -273,7 +273,7 @@ function TierEditor({
     };
 
     return (
-        <div className="bg-primary/10/30 relative rounded-xl border-2 border-dashed border-primary p-4 dark:border-primary/30 dark:bg-primary/20">
+        <div className="bg-primary/10 relative rounded-xl border-2 border-dashed border-primary p-4 dark:border-primary/30 dark:bg-primary/20">
             <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
@@ -671,7 +671,7 @@ export default function NotificationEscalations({
                                 className={`transition-all duration-200 ${
                                     !isEnabled
                                         ? 'opacity-50 grayscale-[30%]'
-                                        : 'dark:border-primary/30/40 border-primary/30 shadow-sm'
+                                        : 'dark:border-primary/40 border-primary/30 shadow-sm'
                                 }`}
                             >
                                 {/* ── Card Header ── */}

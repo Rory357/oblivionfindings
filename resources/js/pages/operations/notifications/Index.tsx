@@ -119,7 +119,7 @@ export default function NotificationsIndex({ notifications = { data: [], links: 
                         const typeConf = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info;
                         const Icon = typeConf.icon;
                         return (
-                            <Card key={notif.id} className={`transition-all hover:border-border hover:shadow-sm ${!notif.is_read ? 'border-l-2 border-l-indigo-500 bg-primary/10/30 dark:bg-primary/10' : ''}`}>
+                            <Card key={notif.id} className={`transition-all hover:border-border hover:shadow-sm ${!notif.is_read ? 'border-l-2 border-l-indigo-500 bg-primary/5 dark:bg-primary/10' : ''}`}>
                                 <CardContent className="flex items-center gap-4 p-4">
                                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${typeConf.color}`}>
                                         <Icon className="h-5 w-5" />
