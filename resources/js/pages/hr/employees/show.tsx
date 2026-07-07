@@ -1299,7 +1299,7 @@ export default function EmployeeShow({
                                                 (_, i) => (
                                                     <Star
                                                         key={i}
-                                                        className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amberx text-status-warning' : 'text-status-warning'}`}
+                                                        className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-status-warning text-status-warning' : 'text-status-warning'}`}
                                                     />
                                                 ),
                                             )}
@@ -1459,7 +1459,7 @@ export default function EmployeeShow({
                                                                                 key={
                                                                                     i
                                                                                 }
-                                                                                className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amberx text-status-warning' : 'text-muted-foreground/20'}`}
+                                                                                className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-status-warning text-status-warning' : 'text-muted-foreground/20'}`}
                                                                             />
                                                                         ),
                                                                     )}
@@ -2403,19 +2403,19 @@ export default function EmployeeShow({
                                     data={[
                                         {
                                             value: complianceSummary.compliant,
-                                            color: '#22c55e',
+                                            color: 'var(--status-success)',
                                         },
                                         {
                                             value: complianceSummary.expiring_soon,
-                                            color: '#f59e0b',
+                                            color: 'var(--status-warning)',
                                         },
                                         {
                                             value: complianceSummary.expired,
-                                            color: '#ef4444',
+                                            color: 'var(--status-critical)',
                                         },
                                         {
                                             value: complianceSummary.not_started,
-                                            color: '#94a3b8',
+                                            color: 'var(--muted-foreground)',
                                         },
                                     ]}
                                 />

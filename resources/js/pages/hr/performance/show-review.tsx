@@ -143,7 +143,7 @@ export default function ShowReview({ review, reviewGoals = [], nextSteps = null,
                 {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                         key={star}
-                        className={`h-5 w-5 ${star <= rating ? 'fill-amberx text-status-warning' : 'text-foreground'}`}
+                        className={`h-5 w-5 ${star <= rating ? 'fill-status-warning text-status-warning' : 'text-foreground'}`}
                     />
                 ))}
                 <span className="ml-2 text-sm text-muted-foreground">

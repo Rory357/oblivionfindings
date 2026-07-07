@@ -6,7 +6,8 @@
 
 **Run log**
 - **Run 0 (2026-07-07)** — Ledger seeded. Slice 1 (My HR hub) audited + fixed. Gates green (see baselines below). Commit `145c101a`.
-- **Run 1 (2026-07-07)** — 🔴-queue-jump slice: fixed all three pre-existing HR Pest failures (TrainingService `source` crash = real production 500; two stale test contracts). **HR pest suite now green — future runs measure against 0 fails.**
+- **Run 1 (2026-07-07)** — 🔴-queue-jump slice: fixed all three pre-existing HR Pest failures (TrainingService `source` crash = real production 500; two stale test contracts). **HR pest suite now green — future runs measure against 0 fails.** Commit `d1cda667`.
+- **Run 2 (2026-07-07)** — Slice 2 (People `/hr/people`) audited + fixed: bulk-action audit-trail hole (mass updates bypass Eloquent events) + tenant guards on bulk + profile-documents endpoints; chrome already gold (PeopleHero). Reclassified Run-0's F-4 (`fill-amberx` was a valid custom token, not a broken class) and finished the star-fill standardisation module-wide.
 
 **Corrected baselines (measured this run, clean HEAD `4874c71a`)**
 - vitest: **8 pre-existing fails**, not 5 — my-day ×4, app-sidebar ×1, behaviour-abc-tab ×2, resident-tracking ×1 (last two reproduced via stash at clean HEAD). "No NEW failures" is measured against 8.
@@ -21,7 +22,7 @@
 | # | Surface | Route(s) | Status | Findings |
 |---|---------|----------|--------|----------|
 | 1 | My HR hub (16 sub-pages) | `/hr/my/*` | ✅ | See **Slice 1 findings** below — 13 fixed, 6 logged open/observations |
-| 2 | People / employee profiles | `/hr/people` | ⬜ | Carry-over: consider profile-update notification for sensitive fields (from slice 1 audit) |
+| 2 | People / employee profiles | `/hr/people` | ✅ | See **Run 2 findings**. Chrome passes 4A/4B (PeopleHero: deep-linked escalating tiles, server counts; HrTabs+tabCounts; ctx menus; designed empty states; en-NZ; zero `confirm()`). Full-page profile detail = allowed long-lived-workspace exception. Open here: 🟡 resendInvite sends a generic Laravel reset mail (works — comment documents reset-link-as-invite — but no HR-branded notification, no guard against re-inviting an active user); 🟡 setActive is a pure HR visibility flag by design (no login/assignment cascade — offboarding owns revocation) — documented, not a bug; 🟡 client-supplied mime_type stored on upload (acceptable: private disk + extension allowlist + auth'd downloads); carry-over profile-update notification idea still open |
 | 3 | Recruitment | `/hr/recruitment` | ⬜ | |
 | 4 | Onboarding | `/hr/onboarding` | ⬜ | Pre-seeded §7.2 partially stale: `POST /hr/my/onboarding/tasks/{task}/complete` EXISTS (owner-gated, MyHrController::completeOnboardingTask). Verify the manager-side task lifecycle here. |
 | 5 | Offboarding + exit interviews | `/hr/offboarding`, `/hr/exit-interviews` | ⬜ | Drive-by fixed here: `fill-amberx` broken class in exit-interviews/show.tsx:72 (identical bug to my/reviews) |
@@ -76,7 +77,7 @@
 - **F-1 🟠 fixed** — `leave.tsx:203` native `confirm()` on cancel-leave → controlled `AlertDialog` (status-aware copy: approved-cancel explains roster removal + balance return).
 - **F-2 🟠 fixed** — `policies.tsx:46` native `confirm()` on policy attestation → `AlertDialog` naming the policy; attestation is a statutory act, now gets a real dialog.
 - **F-3 🟠 fixed** — `reviews.tsx:105` native `confirm()` on review sign-off → `AlertDialog`.
-- **F-4 🔴 fixed** — `reviews.tsx:76` + `exit-interviews/show.tsx:72` broken class `fill-amberx` (invalid utility — rating stars never filled) → `fill-status-warning` (valid, used by succession/show.tsx).
+- **F-4 🟡 fixed (RECLASSIFIED Run 2)** — `fill-amberx` on rating stars in `reviews.tsx:76` + `exit-interviews/show.tsx:72` → `fill-status-warning`. Run-0 diagnosis said "invalid utility, stars never filled" — **that was wrong**: `amberx` is a registered `@theme` colour (app.css:128) and `.fill-amberx` exists in the built CSS (it's the meal-planner's token). Real issue: non-semantic palette token where the HR standard (succession/show.tsx) uses `fill-status-warning`. Run 2 finished the standardisation across all remaining HR star sites (performance ×2, exit-interviews index, candidates ×2, exit-interview-wizards, employees/show ×2); `amberx` remains in the sites/meal-planner module where it belongs. ⚠️Auditor lesson: verify a "suspicious" utility against `@theme` + built CSS before declaring it broken — two audit agents independently mis-called this.
 - **F-5 🟠 fixed** — `payslips.tsx` raw hex (`#8b5cf6`, `#10b981` ×3) → `var(--primary)` / `var(--status-success)`; ALSO fixed invalid `hsl(var(--…))` wrappers (tokens are oklch — `hsl(oklch(…))` is invalid CSS) on chart ticks/tooltip → plain `var(--…)`.
 - **F-6 🟠 fixed** — `training.tsx` STATUS_CONFIG + accent bars + donut: 6 distinct hex colours → semantic `var(--status-*)`/`var(--primary)`/`var(--muted-foreground)` tokens.
 - **F-7 🟠 fixed** — malformed Tailwind class `bg-muted-foreground/80/10` (double opacity modifier, generates nothing) in `reviews.tsx:49` and `expenses.tsx:52` and `training.tsx:104` → `bg-muted-foreground/10`.
@@ -109,9 +110,23 @@
 
 **Run 1 gates:** pest scoped (3 files) 17/17 ✅ · pest full HR scope ✅ 0 failed (see run log) · types/lint/build/vitest **not run — no TS/JS or route changes** (PHP service + two PHP test files only; those gates cannot be affected). Wayfinder n/a.
 
+## Run 2 findings (Slice 2 — People `/hr/people`)
+
+- **F-19 🔴 fixed** — **Bulk actions left no audit trail.** `EmployeeProfileController::bulkAction` used mass query updates (`whereIn()->update()`), which skip Eloquent events entirely — `AuditableChanges` never fired, so bulk deactivate/reactivate/assign-site/department/manager were invisible in `/hr/settings/audit-log` (violates the auditability non-negotiable; the audit agent claimed the trait "will fire" — verified false for query-builder updates). Also: no tenant scope on the id list (sibling endpoints `setActive`/`rehire` assert tenant) and the denormalised department-label lookup was tenant-unscoped. Fixed: tenant-scoped model fetch + per-model `update()` so the trait fires per row + tenant-validated department (422 otherwise). Regression test added: `PeoplePaneActionsTest` "bulk actions write an audit-log row per profile" (8/8 green).
+- **F-20 🟠 fixed** — Profile-documents endpoints (`profileDocuments`, `storeForProfile`, `updateForProfile`, `destroyForProfile` in HrDocumentController) never asserted the route-bound profile belongs to the actor's tenant (dormant in this single-tenant deployment per the org-isolation decision, but inconsistent with sibling endpoints' defense-in-depth). Added `assertHrTenantAccess` to all four.
+- **F-21 🟡 fixed** — `employees/show.tsx` compliance donut used 4 raw hex colours → `var(--status-*)`/`var(--muted-foreground)` (same defect class as slice 1's payslips/training).
+- **F-22 🟡 fixed** — Finished the rating-star standardisation started in Run 0 (see F-4 reclassification): 6 remaining HR files switched `fill-amberx` → semantic `fill-status-warning` (`performance/reviews`, `performance/show-review`, `exit-interviews/index`, `candidates/show`, `candidates/create-offer`, `components/hr/exit-interview-wizards`). HR now has one star idiom; `amberx` remains the meal-planner token.
+- **Verified clean** — chrome audit: PeopleHero passes 4A fully (all four KPI tiles deep-link, compliance tile escalates, counts server-side, single quick-action row); index/edit/panes pass 4B (HrTabs + server tabCounts, row context menus, designed empty states, en-NZ dates, no client-derived KPI lies, zero `confirm()`).
+
+**Open items routed from Run 2:** 🟡 HrDocument has no SoftDeletes — destroy endpoints hard-delete file+row against the archive-not-delete house rule → slice 12 (needs a migration decision); 🟡 rehire doesn't check the previous stint was offboarded → slice 5; role-assignment guard + User-write auditability → **Decisions D-2/D-3** below.
+
+**Run 2 gates:** types ✅ 0 errors · eslint touched files ✅ 0 errors (1 pre-existing warning, not my line) · vitest ✅ baseline 8 (first run showed 6 files failing while vite build ran concurrently — re-run solo reproduced the exact clean-HEAD baseline; don't run vitest concurrently with the build) · build ✅ exit 0 (4m31s) · pest full HR scope ✅ **694 passed / 0 failed** (693 + new bulk-audit regression test) · wayfinder n/a (no route changes).
+
 ## Decisions needed (Chane)
 
 1. **Approvals spine (S14):** Leave and Expenses approvals bypass `ApprovalWorkflowService` (leave→`HrLeaveApprovalChain`, expenses→inline service). §2 says every approve/decline routes through ApprovalWorkflowService/HrApprovalChain — leave arguably complies (HrLeaveApprovalChain), expenses does not. If `/hr/approvals` already aggregates both regardless, is the unified-service rule satisfied by *surfacing*, or do you want expenses migrated onto the chain model? Will gather evidence at S14; flagging early.
+2. **Role-assignment guard (Run 2):** `EmployeeIntakeService::intake()`/`rehire()` assign any role that exists (validated `exists:roles,name` only) — a user with `hr.employees.manage` can create/rehire someone as `admin`. Permissions are frozen, so adding a hierarchy guard (e.g. "cannot assign a role you don't hold" or an allowlist of staff-level roles for intake) is a policy decision, not a code fix I'll make unilaterally.
+3. **User-write auditability (Run 2):** the `User` model has no `AuditableChanges` (by design — it would log every `last_login_at` touch), so security-relevant writes (`role`, `approved_at`) made by intake/rehire/offboarding are unaudited. Option: explicit `AuditLogger::log()` calls at those few write sites only. Cheap, but it's an app-wide auditing-policy call.
 
 ---
 

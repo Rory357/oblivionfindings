@@ -996,6 +996,7 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
 
         $profile->load('user:id,name,email');
 
@@ -1037,6 +1038,7 @@ class HrDocumentController extends Controller
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
@@ -1076,6 +1078,7 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
         abort_unless($document->employee_profile_id === $profile->id, 404);
 
         $validated = $request->validate([
@@ -1095,6 +1098,7 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
         abort_unless($document->employee_profile_id === $profile->id, 404);
 
         if ($document->storage_path && Storage::disk($document->storage_disk ?? 'private')->exists($document->storage_path)) {

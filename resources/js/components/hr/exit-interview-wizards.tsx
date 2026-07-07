@@ -267,7 +267,7 @@ export function ExitInterviewWizard({
                                     <Star
                                         className={`h-6 w-6 ${
                                             star <= form.data.overall_satisfaction
-                                                ? 'fill-amberx text-status-warning'
+                                                ? 'fill-status-warning text-status-warning'
                                                 : 'text-muted-foreground'
                                         }`}
                                     />

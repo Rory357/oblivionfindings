@@ -135,6 +135,28 @@ test('bulk assign_site moves selected profiles to the chosen site', function () 
     expect($a->fresh()->primary_site_id)->toBe($site->id);
 });
 
+test('bulk actions write an audit-log row per profile', function () {
+    // Regression: bulkAction used a mass query update, which skips Eloquent
+    // events — AuditableChanges never fired, so bulk changes were invisible
+    // in the audit log.
+    $a = makeStaffProfile('Audited One');
+    $b = makeStaffProfile('Audited Two');
+
+    $this->actingAs($this->manager)
+        ->post('/hr/people/bulk', [
+            'action' => 'deactivate',
+            'ids' => [$a->id, $b->id],
+        ])
+        ->assertRedirect();
+
+    foreach ([$a, $b] as $profile) {
+        expect(\App\Models\AuditLog::query()
+            ->where('action', 'hremployeeprofile.update')
+            ->where('auditable_id', $profile->id)
+            ->exists())->toBeTrue();
+    }
+});
+
 test('bulk action is forbidden without employees.manage', function () {
     $a = makeStaffProfile('Guarded Worker');
     $viewer = User::factory()->create([

@@ -607,7 +607,9 @@ class EmployeeProfileController extends Controller
 
     public function bulkAction(Request $request)
     {
-        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+        $user = $request->user();
+        abort_unless($user?->canDo('hr.employees.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'action' => ['required', 'string', 'in:deactivate,reactivate,assign_site,assign_department,assign_manager'],
@@ -618,21 +620,36 @@ class EmployeeProfileController extends Controller
             'manager_user_id' => ['required_if:action,assign_manager', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $query = HrEmployeeProfile::whereIn('id', $data['ids']);
+        if ($data['action'] === 'assign_department') {
+            // keep the denormalised label column in sync with the FK so the
+            // table + filter stay consistent (see departments brief).
+            $department = HrDepartment::where('tenant_id', $tenantId)->find($data['department_id']);
+            abort_unless($department !== null, 422, 'That department does not belong to this organisation.');
+        }
 
-        $count = match ($data['action']) {
-            'deactivate' => $query->update(['is_active' => false]),
-            'reactivate' => $query->update(['is_active' => true]),
-            'assign_site' => $query->update(['primary_site_id' => $data['site_id']]),
-            'assign_department' => $query->update([
+        $attributes = match ($data['action']) {
+            'deactivate' => ['is_active' => false],
+            'reactivate' => ['is_active' => true],
+            'assign_site' => ['primary_site_id' => $data['site_id']],
+            'assign_department' => [
                 'department_id' => $data['department_id'],
-                // keep the denormalised label column in sync with the FK so the
-                // table + filter stay consistent (see departments brief).
-                'department' => HrDepartment::find($data['department_id'])?->name,
-            ]),
-            'assign_manager' => $query->update(['manager_user_id' => $data['manager_user_id']]),
-            default => 0,
+                'department' => $department->name,
+            ],
+            'assign_manager' => ['manager_user_id' => $data['manager_user_id']],
         };
+
+        // Update model-by-model (not a mass query update): bulk query updates
+        // skip Eloquent events, so AuditableChanges would never log the rows
+        // and the change would be invisible in /hr/settings/audit-log.
+        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->whereIn('id', $data['ids'])
+            ->get();
+
+        foreach ($profiles as $profile) {
+            $profile->update($attributes);
+        }
+
+        $count = $profiles->count();
 
         return back()->with('success', "{$count} " . ($count === 1 ? 'person' : 'people') . ' updated.');
     }
